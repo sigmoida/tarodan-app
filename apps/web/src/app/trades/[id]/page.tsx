@@ -71,7 +71,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any; d
   },
   accepted: { 
     label: 'Kabul Edildi', 
-    color: 'bg-blue-100 text-blue-700 border-blue-300', 
+    color: 'bg-orange-100 text-orange-700 border-orange-300', 
     icon: CheckCircleIcon,
     description: 'Takas kabul edildi, gönderim bekleniyor'
   },
@@ -349,8 +349,8 @@ export default function TradeDetailPage() {
         </div>
 
         {/* Status Description */}
-        <div className="card p-4 mb-6 bg-blue-50 border-blue-200">
-          <p className="text-sm text-blue-800">{statusConfig.description}</p>
+        <div className="card p-4 mb-6 bg-orange-50 border-orange-200">
+          <p className="text-sm text-orange-800">{statusConfig.description}</p>
         </div>
 
         {/* Countdown Timer */}

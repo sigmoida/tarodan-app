@@ -108,7 +108,7 @@ import { EventModule } from './modules/events';
 
     // PHASE 4 - Infrastructure Modules
     StorageModule,      // GAP-007: MinIO File Storage (HIGH)
-    SearchModule,       // GAP-008: Elasticsearch Search (HIGH)
+    // SearchModule,       // GAP-008: Elasticsearch Search (HIGH) - Temporarily disabled
     PaymentProvidersModule, // GAP-015 & GAP-016: iyzico & Aras Kargo
 
     // PHASE 5 - Operations Modules
@@ -116,7 +116,7 @@ import { EventModule } from './modules/events';
     InvoiceModule,      // Invoice Generation & Delivery
 
     // GAP-L02 & GAP-L03 - GraphQL & i18n
-    GraphQLAppModule,   // GAP-L02: GraphQL API Support
+    // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled
     I18nModule,         // GAP-L03: Multi-language Support
 
     // Background Workers (BullMQ)

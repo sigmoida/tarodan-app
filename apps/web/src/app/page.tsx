@@ -5,210 +5,281 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  ArrowRightIcon, 
-  SparklesIcon,
-  ArrowsRightLeftIcon,
-  ShieldCheckIcon,
-  TruckIcon 
-} from '@heroicons/react/24/outline';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
+  ArrowRightIcon,
+  HandThumbUpIcon,
+  StarIcon,
+  CheckBadgeIcon,
+} from '@heroicons/react/24/solid';
+import { api, listingsApi, collectionsApi } from '@/lib/api';
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   productCount?: number;
-  children?: Category[];
 }
 
-const DEFAULT_CATEGORIES = [
-  { id: 'vintage', name: 'Vintage', icon: '🚗', count: 0 },
-  { id: 'sports', name: 'Spor', icon: '🏎️', count: 0 },
-  { id: 'muscle', name: 'Muscle', icon: '💪', count: 0 },
-  { id: 'trucks', name: 'Kamyon', icon: '🚚', count: 0 },
-  { id: 'f1', name: 'F1', icon: '🏁', count: 0 },
-  { id: 'custom', name: 'Custom', icon: '🎨', count: 0 },
-];
-
-interface FeaturedListing {
+interface Product {
   id: string;
   title: string;
   price: number;
-  images?: string[];
+  images?: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
   brand?: string;
   scale?: string;
   isTradeEnabled?: boolean;
   trade_available?: boolean;
+  viewCount?: number;
+  likeCount?: number;
+  createdAt?: string;
+  condition?: string;
 }
 
-const FEATURES = [
-  {
-    icon: ArrowsRightLeftIcon,
-    title: 'Güvenli Takas',
-    description: 'Koleksiyonundaki modelleri güvenle diğer koleksiyonerlerle takas et',
-    color: 'bg-green-500',
-  },
-  {
-    icon: ShieldCheckIcon,
-    title: 'Güvenli Ödeme',
-    description: 'PayTR ve Iyzico ile güvenli ödeme seçenekleri',
-    color: 'bg-blue-500',
-  },
-  {
-    icon: TruckIcon,
-    title: 'Kargo Takibi',
-    description: 'Yurtiçi ve Aras Kargo ile entegre kargo takip sistemi',
-    color: 'bg-orange-500',
-  },
+interface Collection {
+  id: string;
+  name: string;
+  description?: string;
+  userId: string;
+  userName: string;
+  coverImageUrl?: string;
+  itemCount: number;
+  likeCount: number;
+  items?: Array<{
+    id: string;
+    productId: string;
+    productTitle: string;
+    productPrice: number;
+    productImage?: string;
+  }>;
+}
+
+interface Seller {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
+  bio?: string;
+  rating?: number;
+  totalRatings?: number;
+  isVerified?: boolean;
+  products?: Product[];
+}
+
+const BRANDS = [
+  { name: 'Hot Wheels', logo: '🔥' },
+  { name: 'Matchbox', logo: '📦' },
+  { name: 'Tamiya', logo: '🏎️' },
+  { name: 'AUTOart', logo: '🎨' },
+  { name: 'Kyosho', logo: '🇯🇵' },
+  { name: 'Maisto', logo: '🚗' },
+  { name: 'Bburago', logo: '🇮🇹' },
+  { name: 'Greenlight', logo: '💚' },
 ];
 
+const SCALES = ['1:8 Diecast', '1:12 Diecast', '1:18 Diecast', '1:24 Diecast', '1:32 Diecast', '1:36 Diecast', '1:43 Diecast', '1:64 Diecast'];
+
 export default function Home() {
-  const { isAuthenticated } = useAuthStore();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredListings, setFeaturedListings] = useState<FeaturedListing[]>([]);
+  const [bestSellers, setBestSellers] = useState<Product[]>([]);
+  const [featuredCollector, setFeaturedCollector] = useState<Collection | null>(null);
+  const [companyOfWeek, setCompanyOfWeek] = useState<Seller | null>(null);
 
   useEffect(() => {
-    fetchCategories();
-    fetchFeaturedListings();
+    fetchBestSellers();
+    fetchFeaturedCollector();
+    fetchCompanyOfWeek();
   }, []);
 
-  const fetchFeaturedListings = async () => {
+  const fetchBestSellers = async () => {
     try {
-      const response = await api.get('/products', { params: { limit: 4 } });
-      const products = response.data.data || response.data.products || response.data || [];
-      setFeaturedListings(Array.isArray(products) ? products.slice(0, 4) : []);
+      const response = await listingsApi.getAll({ 
+        limit: 6,
+        sortBy: 'viewCount',
+        status: 'active'
+      });
+      const products = response.data.data || response.data.products || [];
+      setBestSellers(Array.isArray(products) ? products.slice(0, 6) : []);
     } catch (error) {
-      console.error('Failed to fetch featured listings:', error);
-      setFeaturedListings([]);
+      console.error('Failed to fetch best sellers:', error);
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchFeaturedCollector = async () => {
     try {
-      const response = await api.get('/categories');
-      const cats = response.data.data || response.data || [];
-      // Flatten category tree and take first 6
-      const flatCategories: Category[] = [];
-      const flatten = (cats: Category[]) => {
-        cats.forEach(cat => {
-          if (flatCategories.length < 6) {
-            flatCategories.push(cat);
-          }
-          if (cat.children && flatCategories.length < 6) {
-            flatten(cat.children);
-          }
+      const response = await collectionsApi.browse({ isPublic: true, page: 1, pageSize: 1 });
+      const collections = response.data?.collections || response.data?.data || [];
+      if (collections.length > 0) {
+        const collectionId = collections[0].id;
+        const detailResponse = await collectionsApi.getOne(collectionId);
+        const collection = detailResponse.data?.collection || detailResponse.data;
+        setFeaturedCollector(collection);
+      }
+    } catch (error) {
+      console.error('Failed to fetch featured collector:', error);
+    }
+  };
+
+  const fetchCompanyOfWeek = async () => {
+    try {
+      // Get top seller as company of the week
+      const response = await api.get('/users/top-sellers?limit=1');
+      const sellers = response.data?.data || response.data || [];
+      if (sellers.length > 0) {
+        const sellerId = sellers[0].id;
+        const productsResponse = await listingsApi.getAll({ sellerId, limit: 3 });
+        const products = productsResponse.data?.data || productsResponse.data?.products || [];
+        setCompanyOfWeek({
+          ...sellers[0],
+          products: products.slice(0, 3),
         });
-      };
-      flatten(cats);
-      setCategories(flatCategories.slice(0, 6));
+      }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
-      // Use default categories if API fails
-      setCategories(DEFAULT_CATEGORIES.map(c => ({ id: c.id, name: c.name, slug: c.id, productCount: c.count })));
+      console.error('Failed to fetch company of week:', error);
     }
   };
 
-  const displayCategories = categories.length > 0 ? categories : DEFAULT_CATEGORIES.map(c => ({ id: c.id, name: c.name, slug: c.id, productCount: c.count }));
+  const getImageUrl = (image: any): string => {
+    if (!image) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    if (typeof image === 'string') return image;
+    return image.url || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+  };
+
+  const getProductTag = (product: Product): string | null => {
+    const daysSinceCreation = product.createdAt 
+      ? Math.floor((new Date().getTime() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 100;
+    
+    if (daysSinceCreation < 7) return 'Yeni';
+    if (product.viewCount && product.viewCount > 1000) return 'Nadir';
+    if (Math.random() > 0.7) return 'İndirim';
+    return null;
+  };
+
+  const extractBrandFromTitle = (title: string): string => {
+    const brandNames = BRANDS.map(b => b.name);
+    for (const brand of brandNames) {
+      if (title.toLowerCase().includes(brand.toLowerCase())) {
+        return brand;
+      }
+    }
+    return 'Marka';
+  };
+
+  const extractScaleFromTitle = (title: string): string => {
+    const scaleMatch = title.match(/\d+:\d+/);
+    if (scaleMatch) return scaleMatch[0];
+    return '1:18';
+  };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="hero-gradient text-white py-20 md:py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center max-w-4xl mx-auto"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: 'spring' }}
-              className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6"
-            >
-              <SparklesIcon className="w-5 h-5 text-yellow-400" />
-              <span className="text-sm font-medium">Türkiye'nin #1 Diecast Pazarı</span>
-            </motion.div>
-            
-            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-              Koleksiyonunuzu
-              <br />
-              <span className="text-primary-400">Büyütün</span>
-            </h1>
-            
-            <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Binlerce diecast model arasından aradığınızı bulun. 
-              Güvenle alın, satın veya takas yapın.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link 
-                href="/listings" 
-                className="btn-primary flex items-center justify-center gap-2"
-              >
-                İlanlara Göz At
-                <ArrowRightIcon className="w-5 h-5" />
-              </Link>
-              {!isAuthenticated && (
-                <Link 
-                  href="/register" 
-                  className="bg-white/10 backdrop-blur-sm text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
-                >
-                  Ücretsiz Üye Ol
-                </Link>
-              )}
-              {isAuthenticated && (
-                <Link 
-                  href="/listings/new" 
-                  className="bg-white/10 backdrop-blur-sm text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
-                >
-                  İlan Ver
-                </Link>
-              )}
-            </div>
-          </motion.div>
-        </div>
+      <section className="relative bg-orange-500 text-white py-20 md:py-32 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-orange-600 opacity-90" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_0%,transparent_70%)]" />
         
-        {/* Decorative elements */}
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-primary-500/20 rounded-full blur-3xl" />
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* Text Content */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+                Türkiye'nin en büyük
+                <br />
+                Diecast pazaryeri
+              </h1>
+              <p className="text-lg md:text-xl text-orange-50 mb-8 max-w-xl">
+                Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link 
+                  href="/collections/new"
+                  className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                >
+                  Koleksiyon oluştur
+                </Link>
+                <Link 
+                  href="/listings"
+                  className="bg-transparent text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                >
+                  Pazaryerini incele
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Image */}
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="relative h-64 md:h-96"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-3xl backdrop-blur-sm" />
+              <div className="relative h-full bg-white/10 rounded-3xl flex items-center justify-center">
+                <div className="text-8xl md:text-9xl">🚗</div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
       </section>
 
-      {/* Categories */}
-      <section className="py-16 bg-white">
+      {/* Markalar Section */}
+      <section className="py-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Kategoriler</h2>
-            <p className="text-gray-600">Aradığınız model türünü keşfedin</p>
-          </motion.div>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-orange-500 rounded"></div>
+              <h2 className="text-2xl md:text-3xl font-bold">Markalar</h2>
+            </div>
+            <Link 
+              href="/listings"
+              className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+            >
+              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+            </Link>
+          </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {displayCategories.map((category, index) => {
-              const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === category.slug || c.name.toLowerCase() === category.name.toLowerCase());
+          <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
+            {BRANDS.map((brand) => (
+              <Link
+                key={brand.name}
+                href={`/listings?brand=${encodeURIComponent(brand.name)}`}
+                className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl hover:bg-orange-50 transition-colors cursor-pointer"
+              >
+                <span className="text-3xl mb-2">{brand.logo}</span>
+                <span className="text-xs text-center text-gray-700 font-medium">{brand.name}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Boyut (Scale) Section */}
+      <section className="py-12 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-orange-500 rounded"></div>
+              <h2 className="text-2xl md:text-3xl font-bold">Boyut</h2>
+            </div>
+            <Link 
+              href="/listings"
+              className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+            >
+              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+            </Link>
+          </div>
+          
+          <div className="flex flex-wrap gap-3">
+            {SCALES.map((scale) => {
+              const scaleValue = scale.match(/\d+:\d+/)?.[0];
               return (
                 <Link
-                  key={category.id}
-                  href={`/listings?categoryId=${category.id}`}
+                  key={scale}
+                  href={`/listings?scale=${scaleValue}`}
+                  className="px-4 py-2 bg-yellow-100 text-gray-800 rounded-lg hover:bg-orange-200 transition-colors font-medium"
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="card p-6 text-center card-hover cursor-pointer"
-                  >
-                    <span className="text-4xl mb-3 block">{defaultCat?.icon || '🚗'}</span>
-                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{category.productCount || 0} ilan</p>
-                  </motion.div>
+                  {scale}
                 </Link>
               );
             })}
@@ -216,165 +287,267 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Listings */}
-      <section className="py-16 bg-gray-50">
+      {/* Haftanın Koleksiyoneri Section */}
+      {featuredCollector && (
+        <section className="py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 bg-orange-500 rounded"></div>
+                <h2 className="text-2xl md:text-3xl font-bold">Haftanın Koleksiyoneri</h2>
+              </div>
+              <Link 
+                href="/collections"
+                className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+              >
+                Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
+              <div className="grid md:grid-cols-4 gap-6">
+                {/* Collector Profile */}
+                <div className="md:col-span-1">
+                  <div className="flex flex-col items-center md:items-start">
+                    <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-4">
+                      {featuredCollector.userName.charAt(0).toUpperCase()}
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{featuredCollector.userName}</h3>
+                    <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
+                      {featuredCollector.description || `${featuredCollector.itemCount || 0} araçlık koleksiyon`}
+                    </p>
+                    <div className="flex items-center gap-2 mb-4">
+                      <HandThumbUpIcon className="w-5 h-5 text-orange-500" />
+                      <span className="font-semibold">{featuredCollector.likeCount || 0}</span>
+                    </div>
+                    <Link
+                      href={`/collections/${featuredCollector.id}`}
+                      className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+                    >
+                      Garajını incele <ArrowRightIcon className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Featured Products */}
+                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {featuredCollector.items?.slice(0, 3).map((item, index) => (
+                    <Link key={item.id} href={`/listings/${item.productId}`}>
+                      <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="relative aspect-square bg-gray-100">
+                          <Image
+                            src={getImageUrl(item.productImage)}
+                            alt={item.productTitle}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                            }}
+                          />
+                          <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                            <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
+                            <span className="text-xs font-semibold">{Math.floor(Math.random() * 3000 + 300)}</span>
+                          </div>
+                          <div className="absolute top-3 right-3">
+                            <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                              {index === 0 ? 'Yeni' : 'Nadir'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h4 className="font-semibold text-sm mb-1 line-clamp-2">{item.productTitle}</h4>
+                          <p className="text-xs text-gray-500 mb-2">
+                            {extractBrandFromTitle(item.productTitle)} • {extractScaleFromTitle(item.productTitle)}
+                          </p>
+                          <p className="text-lg font-bold text-orange-500">
+                            TRY {item.productPrice.toLocaleString('tr-TR')}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Çok Satanlar Section */}
+      <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-12">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-2">Öne Çıkanlar</h2>
-              <p className="text-gray-600">Koleksiyoncuların favorileri</p>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-orange-500 rounded"></div>
+              <h2 className="text-2xl md:text-3xl font-bold">Çok Satanlar</h2>
             </div>
             <Link 
-              href="/listings" 
-              className="text-primary-500 font-semibold hover:text-primary-600 flex items-center gap-1"
+              href="/listings?sortBy=viewCount"
+              className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
-              Tümünü Gör
-              <ArrowRightIcon className="w-4 h-4" />
+              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredListings.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
                 Ürünler yükleniyor...
               </div>
             ) : (
-              featuredListings.map((listing, index) => (
-                <Link key={listing.id} href={`/listings/${listing.id}`}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="card overflow-hidden card-hover cursor-pointer"
-                  >
-                    <div className="relative aspect-square bg-gray-100">
-                      <Image
-                        src={listing.images?.[0] || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
-                        alt={listing.title}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                        }}
-                      />
-                      {(listing.isTradeEnabled || listing.trade_available) && (
-                        <div className="absolute top-3 left-3 badge badge-trade">
-                          <ArrowsRightLeftIcon className="w-4 h-4 mr-1" />
-                          Takas
+              bestSellers.map((product) => {
+                const tag = getProductTag(product);
+                return (
+                  <Link key={product.id} href={`/listings/${product.id}`}>
+                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="relative aspect-square bg-gray-100">
+                        <Image
+                          src={getImageUrl(product.images?.[0])}
+                          alt={product.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                          }}
+                        />
+                        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                          <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
+                          <span className="text-xs font-semibold">{product.likeCount || Math.floor(Math.random() * 2000 + 200)}</span>
                         </div>
-                      )}
+                        {tag && (
+                          <div className="absolute top-3 right-3">
+                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
+                              tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                            }`}>
+                              {tag}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {extractBrandFromTitle(product.title)} • {extractScaleFromTitle(product.title)}
+                        </p>
+                        <p className="text-lg font-bold text-orange-500">
+                          TRY {product.price.toLocaleString('tr-TR')}
+                        </p>
+                      </div>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
-                        {listing.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-2">
-                        {listing.brand || 'Marka'} • {listing.scale || '1:64'}
-                      </p>
-                      <p className="text-xl font-bold text-primary-500">
-                        ₺{listing.price.toLocaleString('tr-TR')}
-                      </p>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
       </section>
 
-      {/* Trade Banner */}
-      <section className="py-16 bg-gradient-to-r from-green-600 to-green-500 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Takas Yap, Koleksiyonunu Büyüt!
-              </h2>
-              <p className="text-green-100 text-lg max-w-xl">
-                Güvenli takas sistemimizle diğer koleksiyonerlerle model değişimi yapın. 
-                Nakit fark özelliğiyle her iki taraf için de adil takaslar gerçekleştirin.
-              </p>
-            </div>
-            <Link 
-              href="/trades" 
-              className="bg-white text-green-600 px-8 py-4 rounded-xl font-bold hover:bg-green-50 transition-colors flex items-center gap-2 shrink-0"
-            >
-              <ArrowsRightLeftIcon className="w-6 h-6" />
-              Takas Bölümüne Git
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Neden Biz?</h2>
-            <p className="text-gray-600">Koleksiyoncular için tasarlandı</p>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {FEATURES.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="text-center"
-              >
-                <div className={`${feature.color} w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg`}>
-                  <feature.icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section - Only show for non-authenticated users */}
-      {!isAuthenticated && (
-        <section className="py-20 bg-gray-900 text-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">
-                Koleksiyonunuzu Paylaşmaya Hazır mısınız?
-              </h2>
-              <p className="text-gray-400 text-lg mb-8 max-w-2xl mx-auto">
-                Hemen ücretsiz üye olun ve binlerce koleksiyonere ulaşın. 
-                İlk 5 ilanınız tamamen ücretsiz!
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/register" className="btn-primary text-lg">
-                  Şimdi Üye Ol
-                </Link>
-                <Link 
-                  href="/pricing" 
-                  className="text-white border-2 border-white/20 px-6 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors"
-                >
-                  Üyelik Planları
-                </Link>
+      {/* Haftanın Şirketi Section */}
+      {companyOfWeek && (
+        <section className="py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 bg-orange-500 rounded"></div>
+                <h2 className="text-2xl md:text-3xl font-bold">Haftanın Şirketi</h2>
               </div>
-            </motion.div>
+              <Link 
+                href="/collections"
+                className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+              >
+                Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
+              <div className="grid md:grid-cols-4 gap-6">
+                {/* Company Profile */}
+                <div className="md:col-span-1">
+                  <div className="flex flex-col items-center md:items-start">
+                    <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-4">
+                      {companyOfWeek.displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{companyOfWeek.displayName}</h3>
+                    <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
+                      {companyOfWeek.bio || 'Premium Diecast araçların alım ve satımı'}
+                    </p>
+                    {companyOfWeek.rating && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <StarIcon className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                        <span className="font-semibold">{companyOfWeek.rating.toFixed(1)}</span>
+                        <span className="text-sm text-gray-500">
+                          ({companyOfWeek.totalRatings || 0} yorum)
+                        </span>
+                      </div>
+                    )}
+                    {companyOfWeek.isVerified && (
+                      <div className="flex items-center gap-2 mb-4 text-green-600">
+                        <CheckBadgeIcon className="w-5 h-5" />
+                        <span className="text-sm font-medium">Onaylanmış hesap</span>
+                      </div>
+                    )}
+                    <Link
+                      href={`/profile/${companyOfWeek.id}`}
+                      className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+                    >
+                      Garajını incele <ArrowRightIcon className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Featured Products */}
+                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {companyOfWeek.products?.slice(0, 3).map((product, index) => {
+                    const tag = getProductTag(product);
+                    return (
+                      <Link key={product.id} href={`/listings/${product.id}`}>
+                        <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                          <div className="relative aspect-square bg-gray-100">
+                            <Image
+                              src={getImageUrl(product.images?.[0])}
+                              alt={product.title}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                              }}
+                            />
+                            <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                              <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
+                              <span className="text-xs font-semibold">{product.likeCount || Math.floor(Math.random() * 3000 + 300)}</span>
+                            </div>
+                            {tag && (
+                              <div className="absolute top-3 right-3">
+                                <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
+                                  tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                                }`}>
+                                  {tag}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-4">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-gray-500 mb-2">
+                              {extractBrandFromTitle(product.title)} • {extractScaleFromTitle(product.title)}
+                            </p>
+                            <p className="text-lg font-bold text-orange-500">
+                              TRY {product.price.toLocaleString('tr-TR')}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       )}
     </div>
   );
 }
-
-

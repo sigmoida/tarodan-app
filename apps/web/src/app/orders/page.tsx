@@ -39,7 +39,7 @@ interface Order {
 const statusLabels: Record<string, { label: string; color: string }> = {
   pending_payment: { label: 'Ödeme Bekleniyor', color: 'text-yellow-400 bg-yellow-400/10' },
   paid: { label: 'Ödendi', color: 'text-green-400 bg-green-400/10' },
-  preparing: { label: 'Hazırlanıyor', color: 'text-blue-400 bg-blue-400/10' },
+  preparing: { label: 'Hazırlanıyor', color: 'text-orange-400 bg-orange-400/10' },
   shipped: { label: 'Kargoya Verildi', color: 'text-purple-400 bg-purple-400/10' },
   delivered: { label: 'Teslim Edildi', color: 'text-green-400 bg-green-400/10' },
   completed: { label: 'Tamamlandı', color: 'text-green-400 bg-green-400/10' },

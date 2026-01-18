@@ -379,21 +379,21 @@ export default function ListingDetailPage() {
                         onClick={() => shareToSocial('twitter')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
                       >
-                        <span className="text-blue-400 text-lg">𝕏</span>
+                        <span className="text-orange-400 text-lg">𝕏</span>
                         Twitter / X
                       </button>
                       <button
                         onClick={() => shareToSocial('facebook')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
                       >
-                        <span className="text-blue-600 text-lg">📘</span>
+                        <span className="text-orange-600 text-lg">📘</span>
                         Facebook
                       </button>
                       <button
                         onClick={() => shareToSocial('telegram')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
                       >
-                        <span className="text-blue-500 text-lg">✈️</span>
+                        <span className="text-orange-500 text-lg">✈️</span>
                         Telegram
                       </button>
                       <hr className="my-1" />

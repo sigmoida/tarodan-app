@@ -224,9 +224,9 @@ export default function SecuritySettingsPage() {
               telefonunuzdaki bir uygulama tarafından oluşturulan bir kod girmenizi gerektirir.
             </p>
             
-            <div className="bg-blue-50 rounded-lg p-4 mb-6">
-              <h4 className="font-medium text-blue-900 mb-2">Gereksinimler:</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
+            <div className="bg-orange-50 rounded-lg p-4 mb-6">
+              <h4 className="font-medium text-orange-900 mb-2">Gereksinimler:</h4>
+              <ul className="text-sm text-orange-800 space-y-1">
                 <li className="flex items-center">
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

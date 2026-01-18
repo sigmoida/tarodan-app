@@ -14,19 +14,20 @@ import {
 import { listingsApi } from '@/lib/api';
 
 interface Listing {
-  id: number;
+  id: string | number;
   title: string;
   price: number;
-  images: string[];
-  brand: string;
-  scale: string;
+  images: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
+  brand?: string;
+  scale?: string;
   condition: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
-  seller: {
-    id: number;
-    username: string;
-    rating: number;
+  seller?: {
+    id: string | number;
+    displayName?: string;
+    username?: string;
+    rating?: number;
   };
 }
 
@@ -68,7 +69,10 @@ export default function ListingsPage() {
   const fetchListings = async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, any> = {};
+      const params: Record<string, any> = {
+        limit: 100, // Tüm ürünleri göster
+        page: 1,
+      };
       if (searchQuery) params.search = searchQuery;
       
       // Get categoryId from URL if present
@@ -119,6 +123,12 @@ export default function ListingsPage() {
   };
 
   const activeFilterCount = Object.values(filters).filter(v => v).length;
+
+  const getImageUrl = (image: any): string => {
+    if (!image) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    if (typeof image === 'string') return image;
+    return image.url || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -274,10 +284,11 @@ export default function ListingsPage() {
                   <div className="card overflow-hidden card-hover">
                     <div className="relative aspect-square bg-gray-100">
                       <Image
-                        src={listing.images?.[0] || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
+                        src={getImageUrl(listing.images?.[0])}
                         alt={listing.title}
                         fill
                         className="object-cover"
+                        unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
                         }}

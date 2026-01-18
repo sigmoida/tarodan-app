@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   pending: { label: 'Onay Bekliyor', color: 'bg-yellow-100 text-yellow-700', icon: ClockIcon },
   active: { label: 'Aktif', color: 'bg-green-100 text-green-700', icon: CheckCircleIcon },
   rejected: { label: 'Reddedildi', color: 'bg-red-100 text-red-700', icon: XCircleIcon },
-  sold: { label: 'Satıldı', color: 'bg-blue-100 text-blue-700', icon: CheckCircleIcon },
+  sold: { label: 'Satıldı', color: 'bg-orange-100 text-orange-700', icon: CheckCircleIcon },
   reserved: { label: 'Rezerve', color: 'bg-purple-100 text-purple-700', icon: ClockIcon },
   inactive: { label: 'Pasif', color: 'bg-gray-100 text-gray-700', icon: XCircleIcon },
 };

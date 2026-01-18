@@ -81,31 +81,30 @@ export class SearchService implements OnModuleInit {
       if (!indexExists) {
         await this.client.indices.create({
           index: this.PRODUCTS_INDEX,
-          body: {
-            settings: {
-              number_of_shards: 1,
-              number_of_replicas: 0,
-              analysis: {
-                analyzer: {
-                  turkish: {
-                    type: 'custom',
-                    tokenizer: 'standard',
-                    filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
-                  },
+          settings: {
+            number_of_shards: 1,
+            number_of_replicas: 0,
+            analysis: {
+              analyzer: {
+                turkish: {
+                  type: 'custom',
+                  tokenizer: 'standard',
+                  filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
                 },
-                filter: {
-                  turkish_stop: {
-                    type: 'stop',
-                    stopwords: '_turkish_',
-                  },
-                  turkish_stemmer: {
-                    type: 'stemmer',
-                    language: 'turkish',
-                  },
+              },
+              filter: {
+                turkish_stop: {
+                  type: 'stop',
+                  stopwords: '_turkish_',
+                },
+                turkish_stemmer: {
+                  type: 'stemmer',
+                  language: 'turkish',
                 },
               },
             },
-            mappings: {
+          },
+          mappings: {
               properties: {
                 id: { type: 'keyword' },
                 title: {
@@ -132,7 +131,6 @@ export class SearchService implements OnModuleInit {
                 updatedAt: { type: 'date' },
               },
             },
-          },
         });
         console.log('✅ Created Elasticsearch index: products');
       }
@@ -222,17 +220,15 @@ export class SearchService implements OnModuleInit {
     try {
       const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
-        body: {
-          query: {
-            bool: {
-              must: must.length > 0 ? must : [{ match_all: {} }],
-              filter,
-            },
+        query: {
+          bool: {
+            must: must.length > 0 ? must : [{ match_all: {} }],
+            filter,
           },
-          sort,
-          from: (page - 1) * pageSize,
-          size: pageSize,
         },
+        sort,
+        from: (page - 1) * pageSize,
+        size: pageSize,
       });
 
       const hits = response.hits.hits;
@@ -285,7 +281,7 @@ export class SearchService implements OnModuleInit {
       await this.client.index({
         index: this.PRODUCTS_INDEX,
         id: product.id,
-        body: {
+        document: {
           id: product.id,
           title: product.title,
           description: product.description,
@@ -372,7 +368,7 @@ export class SearchService implements OnModuleInit {
           },
         ]);
 
-        await this.client.bulk({ refresh: true, body });
+        await this.client.bulk({ refresh: true, operations: body });
       }
 
       // Update index status
@@ -403,24 +399,22 @@ export class SearchService implements OnModuleInit {
     try {
       const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
-        body: {
-          query: {
-            bool: {
-              must: [
-                {
-                  multi_match: {
-                    query,
-                    type: 'phrase_prefix',
-                    fields: ['title', 'categoryName'],
-                  },
+        query: {
+          bool: {
+            must: [
+              {
+                multi_match: {
+                  query,
+                  type: 'phrase_prefix',
+                  fields: ['title', 'categoryName'],
                 },
-              ],
-              filter: [{ term: { status: ProductStatus.active } }],
-            },
+              },
+            ],
+            filter: [{ term: { status: ProductStatus.active } }],
           },
-          _source: ['title'],
-          size: limit,
         },
+        _source: ['title'],
+        size: limit,
       });
 
       return response.hits.hits.map((hit: any) => hit._source.title);
@@ -518,7 +512,9 @@ export class SearchService implements OnModuleInit {
    */
   private async updateIndexStats(): Promise<void> {
     try {
-      const response = await this.client.count({ index: this.PRODUCTS_INDEX });
+      const response = await this.client.count({ 
+        index: this.PRODUCTS_INDEX 
+      });
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: {

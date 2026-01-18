@@ -19,6 +19,9 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import * as Minio from 'minio';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -50,6 +53,219 @@ const randomFutureDate = (daysAhead: number) => {
   const date = new Date();
   date.setDate(date.getDate() + Math.floor(Math.random() * daysAhead) + 1);
   return date;
+};
+
+// ==========================================================================
+// Photo Upload Helpers
+// ==========================================================================
+
+interface PhotoFile {
+  filename: string;
+  filepath: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+// Initialize MinIO client
+const initMinIOClient = (): Minio.Client | null => {
+  try {
+    const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
+    const port = parseInt(process.env.MINIO_PORT || '9000', 10);
+    const useSSL = process.env.MINIO_USE_SSL === 'true';
+    const accessKey = process.env.MINIO_ACCESS_KEY || 'minioadmin';
+    const secretKey = process.env.MINIO_SECRET_KEY || 'minioadmin';
+
+    return new Minio.Client({
+      endPoint: endpoint,
+      port: port,
+      useSSL: useSSL,
+      accessKey: accessKey,
+      secretKey: secretKey,
+    });
+  } catch (error) {
+    console.error('⚠️ Failed to initialize MinIO client:', error);
+    return null;
+  }
+};
+
+// Get MIME type from file extension
+const getMimeType = (filename: string): string => {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+    'gif': 'image/gif',
+  };
+  return mimeTypes[ext] || 'image/jpeg';
+};
+
+// Load photos from photos folder
+const loadPhotosFromFolder = (): PhotoFile[] => {
+  // Seed script runs from apps/api/ when using npx prisma db seed
+  // Photos folder is at project root: diecast/photos
+  const photosDir = path.join(process.cwd(), '..', '..', 'photos');
+  const photos: PhotoFile[] = [];
+
+  try {
+    if (!fs.existsSync(photosDir)) {
+      console.log(`⚠️ Photos directory not found: ${photosDir}`);
+      return photos;
+    }
+
+    const files = fs.readdirSync(photosDir);
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (imageExtensions.includes(ext)) {
+        const filepath = path.join(photosDir, file);
+        try {
+          const buffer = fs.readFileSync(filepath);
+          photos.push({
+            filename: file,
+            filepath: filepath,
+            mimeType: getMimeType(file),
+            buffer: buffer,
+          });
+        } catch (error) {
+          console.error(`⚠️ Failed to read photo ${file}:`, error);
+        }
+      }
+    }
+
+    console.log(`📸 Loaded ${photos.length} photos from ${photosDir}`);
+  } catch (error) {
+    console.error('⚠️ Error loading photos:', error);
+  }
+
+  return photos;
+};
+
+// Upload photo to MinIO
+const uploadPhotoToMinIO = async (
+  minioClient: Minio.Client,
+  photo: PhotoFile,
+  bucket: string = 'products',
+  folder: string = 'product-images'
+): Promise<{ url: string; key: string } | null> => {
+  try {
+    // Ensure bucket exists
+    const bucketExists = await minioClient.bucketExists(bucket);
+    if (!bucketExists) {
+      await minioClient.makeBucket(bucket, 'tr-istanbul');
+      console.log(`✅ Created MinIO bucket: ${bucket}`);
+
+      // Set public read policy
+      const policy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { AWS: ['*'] },
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${bucket}/*`],
+          },
+        ],
+      };
+      await minioClient.setBucketPolicy(bucket, JSON.stringify(policy));
+    }
+
+    // Generate unique key
+    const uniqueId = randomUUID().substring(0, 8);
+    const ext = path.extname(photo.filename);
+    const key = `${folder}/${uniqueId}-${photo.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+    // Upload to MinIO
+    await minioClient.putObject(
+      bucket,
+      key,
+      photo.buffer,
+      photo.buffer.length,
+      {
+        'Content-Type': photo.mimeType,
+      }
+    );
+
+    // Generate public URL
+    const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
+    const port = process.env.MINIO_PORT || '9000';
+    const url = `http://${endpoint}:${port}/${bucket}/${key}`;
+
+    return { url, key };
+  } catch (error) {
+    console.error(`⚠️ Failed to upload photo ${photo.filename} to MinIO:`, error);
+    return null;
+  }
+};
+
+// Match photo filename to product title
+const matchPhotoToProduct = (filename: string, productTitle: string): boolean => {
+  const normalizedFilename = filename.toLowerCase();
+  const normalizedTitle = productTitle.toLowerCase();
+
+  // Extract keywords from filename
+  const keywords: string[] = [];
+  
+  // Common patterns
+  if (normalizedFilename.includes('911')) {
+    keywords.push('porsche 911', '911');
+  }
+  if (normalizedFilename.includes('ferrari') && normalizedFilename.includes('f40')) {
+    keywords.push('ferrari f40', 'f40');
+  }
+  if (normalizedFilename.includes('bmw') && (normalizedFilename.includes('m3') || normalizedFilename.includes('e30'))) {
+    keywords.push('bmw m3', 'm3 e30', 'bmw');
+  }
+  if (normalizedFilename.includes('bmw')) {
+    keywords.push('bmw');
+  }
+  if (normalizedFilename.includes('honda') && normalizedFilename.includes('civic')) {
+    keywords.push('honda civic', 'civic');
+  }
+  if (normalizedFilename.includes('ford') && normalizedFilename.includes('raptor')) {
+    keywords.push('ford f-150 raptor', 'raptor', 'f-150');
+  }
+  if (normalizedFilename.includes('ford') && (normalizedFilename.includes('mustang') || normalizedFilename.includes('mach'))) {
+    keywords.push('ford mustang', 'mustang mach', 'mustang');
+  }
+  if (normalizedFilename.includes('toyota') || normalizedFilename.includes('supra')) {
+    keywords.push('toyota supra', 'supra');
+  }
+  if (normalizedFilename.includes('mazda') || normalizedFilename.includes('miata')) {
+    keywords.push('mazda mx-5', 'mazda miata', 'miata', 'mx-5');
+  }
+  if (normalizedFilename.includes('mitsubishi') || (normalizedFilename.includes('lancer') && normalizedFilename.includes('evo'))) {
+    keywords.push('mitsubishi lancer evo', 'lancer evo', 'evo');
+  }
+  if (normalizedFilename.includes('land rover') || normalizedFilename.includes('defender')) {
+    keywords.push('land rover defender', 'defender');
+  }
+  if (normalizedFilename.includes('mercedes') && (normalizedFilename.includes('amg') || normalizedFilename.includes('gt'))) {
+    keywords.push('mercedes amg gt', 'mercedes amg', 'amg gt');
+  }
+  if (normalizedFilename.includes('alfa') || normalizedFilename.includes('romeo')) {
+    keywords.push('alfa romeo');
+  }
+  if (normalizedFilename.includes('aston') || normalizedFilename.includes('martin')) {
+    keywords.push('aston martin');
+  }
+  if (normalizedFilename.includes('hot wheels') && normalizedFilename.includes('japan')) {
+    keywords.push('hot wheels', 'japan');
+  }
+  if (normalizedFilename.includes('majorette') && normalizedFilename.includes('racing')) {
+    keywords.push('majorette', 'racing');
+  }
+  if (normalizedFilename.includes('majorette')) {
+    keywords.push('majorette');
+  }
+  if (normalizedFilename.includes('hot wheels')) {
+    keywords.push('hot wheels');
+  }
+
+  // Check if any keyword matches product title
+  return keywords.some(keyword => normalizedTitle.includes(keyword));
 };
 
 async function main() {
@@ -707,20 +923,152 @@ async function main() {
   // ==========================================================================
   console.log('Creating product images...');
 
-  for (const product of products) {
-    const imageCount = Math.floor(Math.random() * 4) + 1; // 1-4 images
-    for (let i = 0; i < imageCount; i++) {
+  // Try to load photos from photos folder and upload to MinIO
+  const minioClient = initMinIOClient();
+  const photos = loadPhotosFromFolder();
+  const uploadedPhotos: Array<{ url: string; key: string; filename: string; photo: PhotoFile }> = [];
+  let useRealPhotos = false;
+
+  if (minioClient && photos.length > 0) {
+    console.log(`📤 Uploading ${photos.length} photos to MinIO...`);
+    
+    for (const photo of photos) {
+      const result = await uploadPhotoToMinIO(minioClient, photo);
+      if (result) {
+        uploadedPhotos.push({
+          url: result.url,
+          key: result.key,
+          filename: photo.filename,
+          photo: photo,
+        });
+      }
+    }
+
+    if (uploadedPhotos.length > 0) {
+      useRealPhotos = true;
+      console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos to MinIO`);
+    } else {
+      console.log('⚠️ No photos were uploaded, falling back to placeholder images');
+    }
+  } else {
+    if (!minioClient) {
+      console.log('⚠️ MinIO client not available, using placeholder images');
+    }
+    if (photos.length === 0) {
+      console.log('⚠️ No photos found, using placeholder images');
+    }
+  }
+
+  // Delete existing placeholder images if we have real photos
+  // But keep real images (MinIO URLs)
+  if (useRealPhotos && uploadedPhotos.length > 0) {
+    await prisma.productImage.deleteMany({
+      where: {
+        productId: {
+          in: products.map(p => p.id),
+        },
+        OR: [
+          { url: { contains: 'via.placeholder.com' } },
+          { url: { contains: 'placeholder' } },
+          { minioKey: null },
+        ],
+      },
+    });
+  }
+
+  // Track which photos have been used for matching
+  const usedPhotoIndices = new Set<number>();
+  const availablePhotoIndices = uploadedPhotos.map((_, index) => index);
+  let roundRobinIndex = 0;
+
+  // Check existing images for each product
+  const productsWithImages = await prisma.product.findMany({
+    where: {
+      id: { in: products.map(p => p.id) },
+    },
+    include: {
+      images: {
+        where: {
+          OR: [
+            { url: { not: { contains: 'via.placeholder.com' } } },
+            { url: { not: { contains: 'placeholder' } } },
+            { minioKey: { not: null } },
+          ],
+        },
+      },
+    },
+  });
+
+  const productsWithoutRealImages = products.filter(p => {
+    const productWithImages = productsWithImages.find(pwi => pwi.id === p.id);
+    return !productWithImages || productWithImages.images.length === 0;
+  });
+
+  console.log(`📊 ${productsWithoutRealImages.length} products need images (${products.length - productsWithoutRealImages.length} already have real images)`);
+
+  // Assign photos to products that need them
+  for (const product of productsWithoutRealImages) {
+    let selectedPhoto: typeof uploadedPhotos[0] | null = null;
+
+    if (useRealPhotos && uploadedPhotos.length > 0) {
+      // Try to find matching photo (only from unused photos)
+      let matchedPhotoIndex = -1;
+      for (let i = 0; i < uploadedPhotos.length; i++) {
+        if (!usedPhotoIndices.has(i) && matchPhotoToProduct(uploadedPhotos[i].filename, product.title)) {
+          matchedPhotoIndex = i;
+          break;
+        }
+      }
+
+      if (matchedPhotoIndex >= 0) {
+        // Use matched photo
+        selectedPhoto = uploadedPhotos[matchedPhotoIndex];
+        usedPhotoIndices.add(matchedPhotoIndex);
+        // Remove from available list
+        const idx = availablePhotoIndices.indexOf(matchedPhotoIndex);
+        if (idx > -1) {
+          availablePhotoIndices.splice(idx, 1);
+        }
+      } else {
+        // Use random photo from available ones
+        if (availablePhotoIndices.length > 0) {
+          const randomIdx = Math.floor(Math.random() * availablePhotoIndices.length);
+          const selectedIndex = availablePhotoIndices[randomIdx];
+          selectedPhoto = uploadedPhotos[selectedIndex];
+          usedPhotoIndices.add(selectedIndex);
+          availablePhotoIndices.splice(randomIdx, 1);
+        } else {
+          // All photos used, use round-robin
+          selectedPhoto = uploadedPhotos[roundRobinIndex % uploadedPhotos.length];
+          roundRobinIndex++;
+        }
+      }
+    }
+
+    // Create product image
+    if (selectedPhoto) {
       await prisma.productImage.create({
         data: {
           productId: product.id,
-          url: `https://via.placeholder.com/800x600?text=${encodeURIComponent(product.title)}_${i + 1}`,
-          sortOrder: i,
+          url: selectedPhoto.url,
+          minioKey: selectedPhoto.key,
+          sortOrder: 0,
+        },
+      });
+    } else {
+      // Fallback to placeholder
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: `https://via.placeholder.com/800x600?text=${encodeURIComponent(product.title)}`,
+          sortOrder: 0,
         },
       });
     }
   }
 
-  console.log(`✅ Created product images`);
+  const imageType = useRealPhotos ? 'real photos' : 'placeholder images';
+  console.log(`✅ Created product images (${imageType})`);
 
   // ==========================================================================
   // 12. Create Collections

@@ -234,7 +234,7 @@ export default function NewTradePage() {
           {/* Requested Product (What I Want) */}
           <div className="card p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
+              <span className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold">
                 1
               </span>
               İstediğim Ürün
@@ -371,7 +371,7 @@ export default function NewTradePage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">İstediğim ürün:</span>
-                    <span className="font-semibold text-blue-600">
+                    <span className="font-semibold text-orange-600">
                       ₺{theirTotal.toLocaleString('tr-TR')}
                     </span>
                   </div>

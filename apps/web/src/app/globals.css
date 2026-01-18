@@ -5,8 +5,8 @@
 @tailwind utilities;
 
 :root {
-  --primary: #E53935;
-  --primary-dark: #CC2E2E;
+  --primary: #f97316;
+  --primary-dark: #ea580c;
   --accent-green: #4CAF50;
   --accent-blue: #2196F3;
   --text-primary: #212121;
@@ -53,7 +53,7 @@ body {
 
 /* Selection */
 ::selection {
-  background-color: rgba(229, 57, 53, 0.2);
+  background-color: rgba(249, 115, 22, 0.2);
 }
 
 /* Custom utility classes */
@@ -96,7 +96,7 @@ body {
   }
   
   .badge-status {
-    @apply bg-blue-100 text-blue-700;
+    @apply bg-orange-100 text-orange-700;
   }
 }
 

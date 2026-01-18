@@ -37,7 +37,13 @@ export default function Navbar() {
   }, [checkAuth]);
 
   return (
-    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
+    <>
+      {/* Reklam Banner */}
+      <div className="bg-gray-100 text-center py-2 text-sm text-gray-600">
+        REKLAM ALANI
+      </div>
+      
+      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
@@ -50,7 +56,7 @@ export default function Navbar() {
               className="rounded-xl"
             />
             <span className="font-display font-bold text-xl hidden sm:block">
-              Tarodan <span className="text-primary-500">Market</span>
+              TARODAN
             </span>
           </Link>
 
@@ -68,7 +74,7 @@ export default function Navbar() {
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Model, marka ara..."
+                placeholder="Kategori, ürün, marka, koleksiyon ara"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
@@ -159,18 +165,25 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center">
                 <Link
                   href="/login"
-                  className="text-gray-600 hover:text-primary-500 font-medium transition-colors hidden sm:block"
+                  className="text-gray-600 hover:text-primary-500 font-medium transition-colors hidden sm:block mr-6"
                 >
-                  Giriş Yap
+                  Giriş yap
                 </Link>
                 <Link
                   href="/register"
-                  className="bg-primary-500 text-white px-4 py-2 rounded-xl font-medium hover:bg-primary-600 transition-colors"
+                  className="bg-primary-500 text-white px-4 py-2 rounded-xl font-medium hover:bg-primary-600 transition-colors mr-6"
                 >
                   Üye Ol
+                </Link>
+                <Link
+                  href="/cart"
+                  className="text-gray-600 hover:text-primary-500 font-medium transition-colors hidden sm:flex items-center gap-1"
+                >
+                  <ShoppingCartIcon className="w-5 h-5" />
+                  Sepetim
                 </Link>
               </div>
             )}
@@ -291,7 +304,8 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+      </nav>
+    </>
   );
 }
 

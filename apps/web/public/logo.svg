@@ -1,5 +1,18 @@
 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="40" height="40" rx="8" fill="#3B82F6"/>
-  <path d="M20 10L25 15H22V25H18V15H15L20 10Z" fill="white"/>
-  <path d="M12 28C12 26.9 12.9 26 14 26H26C27.1 26 28 26.9 28 28V30H12V28Z" fill="white"/>
+  <!-- Background circle with orange fill -->
+  <rect width="40" height="40" rx="8" fill="#f97316"/>
+  
+  <!-- Circular arrows icon -->
+  <g transform="translate(20, 20)">
+    <!-- Outer circle -->
+    <circle cx="0" cy="0" r="10" stroke="white" stroke-width="2" fill="none"/>
+    
+    <!-- Clockwise arrow (top-right) -->
+    <path d="M -5 -8 Q 8 -8 8 0" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 6 -2 L 8 0 L 6 2" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Counter-clockwise arrow (bottom-left) -->
+    <path d="M -5 8 Q 8 8 8 0" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 6 2 L 8 0 L 6 -2" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

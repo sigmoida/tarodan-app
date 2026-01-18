@@ -59,7 +59,7 @@ interface Trade {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Bekliyor', color: 'bg-yellow-100 text-yellow-700', icon: ClockIcon },
-  accepted: { label: 'Kabul Edildi', color: 'bg-blue-100 text-blue-700', icon: CheckCircleIcon },
+  accepted: { label: 'Kabul Edildi', color: 'bg-orange-100 text-orange-700', icon: CheckCircleIcon },
   rejected: { label: 'Reddedildi', color: 'bg-red-100 text-red-700', icon: XCircleIcon },
   initiator_shipped: { label: 'Kargo Gönderildi', color: 'bg-purple-100 text-purple-700', icon: TruckIcon },
   receiver_shipped: { label: 'Kargo Gönderildi', color: 'bg-purple-100 text-purple-700', icon: TruckIcon },

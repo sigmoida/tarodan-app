@@ -331,7 +331,7 @@ export default function CategoryPage() {
                         className="object-cover group-hover:scale-105 transition-transform"
                       />
                       {product.isTradeEnabled && (
-                        <span className="absolute top-2 left-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
+                        <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                           <ArrowsRightLeftIcon className="h-3 w-3" />
                           Takas
                         </span>
@@ -379,7 +379,7 @@ export default function CategoryPage() {
                             {product.title}
                           </h3>
                           {product.isTradeEnabled && (
-                            <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
+                            <span className="bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                               <ArrowsRightLeftIcon className="h-3 w-3" />
                               Takas
                             </span>
