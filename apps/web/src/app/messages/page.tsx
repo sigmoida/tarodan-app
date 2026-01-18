@@ -187,10 +187,6 @@ export default function MessagesPage() {
     }
   }, [selectedThread]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   const loadThreads = async () => {
     try {
       const response = await messagesApi.getThreads();
@@ -236,7 +232,18 @@ export default function MessagesPage() {
   const loadMessages = async (threadId: string) => {
     try {
       const response = await messagesApi.getMessages(threadId);
-      setMessages(response.data.data || response.data.messages || []);
+      const messages = response.data.data || response.data.messages || [];
+      // Backend returns messages in desc order (newest first), but chat should show oldest first
+      // Sort by createdAt ascending (oldest to newest)
+      const sortedMessages = [...messages].sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateA - dateB; // Ascending order (oldest first)
+      });
+      setMessages(sortedMessages);
+      
+      // Refresh thread list to update unread counts (backend marks messages as read when loading)
+      await loadThreads();
     } catch (error) {
       console.error('Messages load error:', error);
     }
@@ -280,6 +287,11 @@ export default function MessagesPage() {
       setNewMessage('');
       setContentWarning(null);
       loadThreads(); // Refresh threads to update last message
+      
+      // Scroll to bottom after sending new message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
         toast('Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });

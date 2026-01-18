@@ -72,7 +72,13 @@ export default function LoginPage() {
             <p className="text-gray-600">Hesabınıza giriş yapın</p>
           </div>
 
-          <div className="space-y-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+            className="space-y-6"
+          >
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 E-posta
@@ -85,6 +91,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ornek@email.com"
                   className="input pl-12"
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -101,6 +108,13 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="input pl-12 pr-12"
+                  autoComplete="current-password"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -130,14 +144,13 @@ export default function LoginPage() {
             </div>
 
             <button
-              type="button"
-              onClick={handleSubmit}
+              type="submit"
               disabled={isLoading}
               className="btn-primary w-full"
             >
               {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
-          </div>
+          </form>
 
           <p className="text-center mt-8 text-gray-600">
             Hesabınız yok mu?{' '}

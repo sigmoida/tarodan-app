@@ -16,6 +16,8 @@ import {
   HeartIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
+import { messagesApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
 
 const NAV_LINKS = [
@@ -30,11 +32,36 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
-  const cartCount = 0;
+  const { itemCount: cartCount } = useCartStore();
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUnreadMessageCount();
+      // Poll for new messages every 30 seconds
+      const interval = setInterval(fetchUnreadMessageCount, 30000);
+      return () => clearInterval(interval);
+    } else {
+      setUnreadMessageCount(0);
+    }
+  }, [isAuthenticated]);
+
+  const fetchUnreadMessageCount = async () => {
+    try {
+      const response = await messagesApi.getThreads();
+      const threads = response.data.data || response.data.threads || [];
+      const totalUnread = threads.reduce((sum: number, thread: any) => {
+        return sum + (thread.unreadCount || 0);
+      }, 0);
+      setUnreadMessageCount(totalUnread);
+    } catch (error) {
+      console.error('Failed to fetch unread message count:', error);
+    }
+  };
 
   return (
     <>
@@ -104,6 +131,11 @@ export default function Navbar() {
                   className="p-2 text-gray-600 hover:text-primary-500 transition-colors relative"
                 >
                   <ChatBubbleLeftRightIcon className="w-6 h-6" />
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   href="/favorites"
@@ -119,7 +151,7 @@ export default function Navbar() {
                   <ShoppingCartIcon className="w-6 h-6" />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center">
-                      {cartCount}
+                      {cartCount > 9 ? '9+' : cartCount}
                     </span>
                   )}
                 </Link>

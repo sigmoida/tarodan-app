@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -15,6 +15,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   BoltIcon,
+  XMarkIcon,
+  MagnifyingGlassPlusIcon,
+  MagnifyingGlassMinusIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
@@ -65,7 +68,7 @@ export default function ListingDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   
-  const { addToCart } = useCartStore();
+  const { addToCart, items: cartItems, removeFromCart } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   
   const [listing, setListing] = useState<Listing | null>(null);
@@ -80,6 +83,37 @@ export default function ListingDetailPage() {
     message: '',
     icon: null as React.ReactNode,
   });
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
+  const [showMagnifier, setShowMagnifier] = useState(false);
+  const [imageContainerRef, setImageContainerRef] = useState<HTMLDivElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const zoomPreviewRef = useRef<HTMLDivElement | null>(null);
+  
+  // Check if product is in cart
+  const cartItem = listing ? cartItems.find(item => item.productId === listing.id) : null;
+  const isInCart = !!cartItem;
+
+  // Helper function to get image URL
+  const getImageUrl = (image: ProductImage | string): string => {
+    if (typeof image === 'string') {
+      return image || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+    }
+    return image?.url || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+  };
+
+  // Calculate images array early so it can be used in useEffect hooks
+  const images = useMemo(() => {
+    if (!listing) return ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
+    return listing.images?.length 
+      ? listing.images.map(img => getImageUrl(img))
+      : ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
+  }, [listing]);
 
   useEffect(() => {
     if (id) {
@@ -87,6 +121,45 @@ export default function ListingDetailPage() {
       checkFavorite();
     }
   }, [id, isAuthenticated]);
+
+  // Handle ESC key to close lightbox
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isLightboxOpen) {
+        setIsLightboxOpen(false);
+        setZoomLevel(1);
+        setPanPosition({ x: 0, y: 0 });
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isLightboxOpen) return;
+      
+      if (e.key === 'ArrowLeft') {
+        setLightboxImageIndex((i) => (i > 0 ? i - 1 : images.length - 1));
+        setZoomLevel(1);
+        setPanPosition({ x: 0, y: 0 });
+      } else if (e.key === 'ArrowRight') {
+        setLightboxImageIndex((i) => (i < images.length - 1 ? i + 1 : 0));
+        setZoomLevel(1);
+        setPanPosition({ x: 0, y: 0 });
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLightboxOpen, images.length]);
+
+  // Sync lightbox image index with active image index
+  useEffect(() => {
+    if (isLightboxOpen) {
+      setLightboxImageIndex(activeImageIndex);
+    }
+  }, [isLightboxOpen, activeImageIndex]);
 
   const fetchListing = async () => {
     try {
@@ -103,17 +176,11 @@ export default function ListingDetailPage() {
     if (!isAuthenticated) return;
     try {
       const response = await wishlistApi.check(id);
-      setIsFavorite(response.data?.isFavorite || response.data?.exists || false);
+      setIsFavorite(response.data?.inWishlist || false);
     } catch (error) {
       // Ignore - wishlist check is optional
+      setIsFavorite(false);
     }
-  };
-
-  const getImageUrl = (image: ProductImage | string): string => {
-    if (typeof image === 'string') {
-      return image || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
-    }
-    return image?.url || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
   };
 
   const handleAddToCart = async () => {
@@ -136,6 +203,28 @@ export default function ListingDetailPage() {
       toast.error('Sepete eklenemedi');
     } finally {
       setIsAddingToCart(false);
+    }
+  };
+
+  const handleRemoveFromCart = async () => {
+    if (!cartItem) return;
+    
+    setIsAddingToCart(true);
+    try {
+      await removeFromCart(cartItem.id);
+      toast.success('Ürün sepetten çıkarıldı');
+    } catch (error) {
+      toast.error('Sepetten çıkarılamadı');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleCartToggle = () => {
+    if (isInCart) {
+      handleRemoveFromCart();
+    } else {
+      handleAddToCart();
     }
   };
 
@@ -224,6 +313,114 @@ export default function ListingDetailPage() {
     setShowShareMenu(false);
   };
 
+  // Lightbox handlers
+  const openLightbox = (index: number) => {
+    setLightboxImageIndex(index);
+    setIsLightboxOpen(true);
+    setZoomLevel(1);
+    setPanPosition({ x: 0, y: 0 });
+  };
+
+  const closeLightbox = () => {
+    setIsLightboxOpen(false);
+    setZoomLevel(1);
+    setPanPosition({ x: 0, y: 0 });
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(prev + 0.5, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => {
+      const newZoom = Math.max(prev - 0.5, 1);
+      if (newZoom === 1) {
+        setPanPosition({ x: 0, y: 0 });
+      }
+      return newZoom;
+    });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!isLightboxOpen) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    setZoomLevel((prev) => {
+      const newZoom = Math.max(1, Math.min(3, prev + delta));
+      if (newZoom === 1) {
+        setPanPosition({ x: 0, y: 0 });
+      }
+      return newZoom;
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel <= 1) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    setPanPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Magnifier handlers - optimized with requestAnimationFrame
+  const handleMagnifierMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imageContainerRef) return;
+    
+    // Cancel previous animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    // Use requestAnimationFrame to throttle updates
+    animationFrameRef.current = requestAnimationFrame(() => {
+      if (!imageContainerRef) return;
+      
+      const rect = imageContainerRef.getBoundingClientRect();
+      const magnifierSize = 150;
+      const halfSize = magnifierSize / 2;
+      
+      let x = e.clientX - rect.left;
+      let y = e.clientY - rect.top;
+      
+      // Büyüteci resmin kenarlarında sınırla
+      x = Math.max(halfSize, Math.min(rect.width - halfSize, x));
+      y = Math.max(halfSize, Math.min(rect.height - halfSize, y));
+      
+      // Check if mouse is within image bounds
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      if (mouseX >= 0 && mouseX <= rect.width && mouseY >= 0 && mouseY <= rect.height) {
+        setMagnifierPosition({ x, y });
+        setShowMagnifier(true);
+        
+        // Directly update background position for smooth tracking
+        if (zoomPreviewRef.current) {
+          const zoomLevel = 3;
+          const bgX = -x * zoomLevel + (rect.width / 2);
+          const bgY = -y * zoomLevel + (rect.height / 2);
+          zoomPreviewRef.current.style.backgroundPosition = `${bgX}px ${bgY}px`;
+        }
+      } else {
+        setShowMagnifier(false);
+      }
+    });
+  }, [imageContainerRef]);
+
+  const handleMagnifierMouseLeave = () => {
+    setShowMagnifier(false);
+  };
+
   // Check if trade is available
   const isTradeAvailable = listing?.trade_available || listing?.isTradeEnabled || false;
 
@@ -255,29 +452,52 @@ export default function ListingDetailPage() {
     );
   }
 
-  const images = listing.images?.length 
-    ? listing.images.map(img => getImageUrl(img))
-    : ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
-          <div>
-            <div className="relative aspect-square bg-white rounded-2xl overflow-hidden shadow-sm">
+          <div className="relative">
+            {/* Küçük Resim + Büyüteç */}
+            <div 
+              ref={setImageContainerRef}
+              className="relative aspect-square bg-white rounded-2xl overflow-visible shadow-sm cursor-zoom-in"
+              onClick={() => openLightbox(activeImageIndex)}
+              onMouseMove={handleMagnifierMouseMove}
+              onMouseLeave={handleMagnifierMouseLeave}
+            >
               <Image
                 src={images[activeImageIndex]}
                 alt={listing.title}
                 fill
-                className="object-cover"
+                className="object-cover rounded-2xl"
+                unoptimized
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
                 }}
               />
+
+              {/* Kare Büyüteç (Viewport) */}
+              {showMagnifier && imageContainerRef && (
+                <div
+                  className="absolute pointer-events-none z-20"
+                  style={{
+                    left: `${magnifierPosition.x}px`,
+                    top: `${magnifierPosition.y}px`,
+                    transform: 'translate(-50%, -50%)',
+                    width: '150px',
+                    height: '150px',
+                    border: '2px solid rgba(255, 140, 0, 0.8)',
+                    boxShadow: '0 0 15px rgba(0, 0, 0, 0.3)',
+                    overflow: 'hidden',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '4px',
+                  }}
+                />
+              )}
               
               {isTradeAvailable && (
-                <div className="absolute top-4 left-4 badge badge-trade text-base">
+                <div className="absolute top-4 left-4 badge badge-trade text-base z-10">
                   <ArrowsRightLeftIcon className="w-5 h-5 mr-1" />
                   Takas Kabul Edilir
                 </div>
@@ -287,13 +507,13 @@ export default function ListingDetailPage() {
                 <>
                   <button
                     onClick={() => setActiveImageIndex((i) => (i > 0 ? i - 1 : images.length - 1))}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors z-10"
                   >
                     <ChevronLeftIcon className="w-6 h-6" />
                   </button>
                   <button
                     onClick={() => setActiveImageIndex((i) => (i < images.length - 1 ? i + 1 : 0))}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors z-10"
                   >
                     <ChevronRightIcon className="w-6 h-6" />
                   </button>
@@ -301,23 +521,181 @@ export default function ListingDetailPage() {
               )}
             </div>
 
+            {/* Sağ Taraf: Büyük Zoom Preview - Modal gibi açılır, yazıların üstüne gelebilir */}
+            {showMagnifier && imageContainerRef && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.95, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="absolute left-full top-0 ml-4 w-full aspect-square bg-white rounded-2xl overflow-hidden shadow-2xl hidden md:block z-50"
+                style={{ maxWidth: '600px' }}
+              >
+                <div
+                  ref={zoomPreviewRef}
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${images[activeImageIndex]})`,
+                    backgroundSize: `${imageContainerRef.offsetWidth * 3}px ${imageContainerRef.offsetHeight * 3}px`,
+                    backgroundRepeat: 'no-repeat',
+                    willChange: 'background-position',
+                  }}
+                />
+              </motion.div>
+            )}
+
             {/* Thumbnails */}
             {images.length > 1 && (
               <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
                 {images.map((img, index) => (
                   <button
                     key={index}
-                    onClick={() => setActiveImageIndex(index)}
+                    onClick={() => {
+                      setActiveImageIndex(index);
+                      openLightbox(index);
+                    }}
                     className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
                       index === activeImageIndex ? 'border-primary-500' : 'border-transparent'
                     }`}
                   >
-                    <Image src={img} alt="" fill className="object-cover" />
+                    <Image src={img} alt="" fill className="object-cover" unoptimized />
                   </button>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Lightbox Modal */}
+          {isLightboxOpen && (
+            <div 
+              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+              onClick={closeLightbox}
+            >
+              <div 
+                className="relative max-w-7xl w-full h-full flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <button
+                  onClick={closeLightbox}
+                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+
+                {/* Zoom Controls */}
+                <div className="absolute top-4 left-4 z-10 flex gap-2">
+                  <button
+                    onClick={handleZoomIn}
+                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    disabled={zoomLevel >= 3}
+                  >
+                    <MagnifyingGlassPlusIcon className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleZoomOut}
+                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    disabled={zoomLevel <= 1}
+                  >
+                    <MagnifyingGlassMinusIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Image Container */}
+                <div 
+                  className="flex-1 flex items-center justify-center overflow-hidden"
+                  onWheel={handleWheel}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  style={{ cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                >
+                  <div
+                    className="relative"
+                    style={{
+                      transform: `scale(${zoomLevel}) translate(${panPosition.x / zoomLevel}px, ${panPosition.y / zoomLevel}px)`,
+                      transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                    }}
+                  >
+                    <Image
+                      src={images[lightboxImageIndex]}
+                      alt={listing.title}
+                      width={1200}
+                      height={1200}
+                      className="max-w-[90vw] max-h-[90vh] object-contain"
+                      unoptimized
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Navigation Arrows */}
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setLightboxImageIndex((i) => (i > 0 ? i - 1 : images.length - 1));
+                        setZoomLevel(1);
+                        setPanPosition({ x: 0, y: 0 });
+                      }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10"
+                    >
+                      <ChevronLeftIcon className="w-6 h-6" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLightboxImageIndex((i) => (i < images.length - 1 ? i + 1 : 0));
+                        setZoomLevel(1);
+                        setPanPosition({ x: 0, y: 0 });
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10"
+                    >
+                      <ChevronRightIcon className="w-6 h-6" />
+                    </button>
+                  </>
+                )}
+
+                {/* Thumbnails */}
+                {images.length > 1 && (
+                  <div className="flex justify-center gap-2 pb-4 overflow-x-auto px-4">
+                    {images.map((img, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setLightboxImageIndex(index);
+                          setZoomLevel(1);
+                          setPanPosition({ x: 0, y: 0 });
+                        }}
+                        className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
+                          index === lightboxImageIndex 
+                            ? 'border-primary-500' 
+                            : 'border-white/20 hover:border-white/40'
+                        }`}
+                      >
+                        <Image 
+                          src={img} 
+                          alt="" 
+                          fill 
+                          className="object-cover" 
+                          unoptimized
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Image Counter */}
+                {images.length > 1 && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm">
+                    {lightboxImageIndex + 1} / {images.length}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Details */}
           <div>
@@ -517,12 +895,15 @@ export default function ListingDetailPage() {
                   </Link>
                 )}
                 <button
-                  onClick={handleAddToCart}
+                  onClick={handleCartToggle}
                   disabled={isAddingToCart}
-                  className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isInCart ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
                 >
                   <ShoppingCartIcon className="w-5 h-5" />
-                  {isAddingToCart ? 'Ekleniyor...' : 'Sepete Ekle'}
+                  {isAddingToCart 
+                    ? (isInCart ? 'Çıkarılıyor...' : 'Ekleniyor...') 
+                    : (isInCart ? 'Sepetten Çıkar' : 'Sepete Ekle')
+                  }
                 </button>
                 <button
                   onClick={handleToggleFavorite}
@@ -531,7 +912,7 @@ export default function ListingDetailPage() {
                   {isFavorite ? (
                     <>
                       <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                      Favorilerde
+                      Favorilerden Çıkar
                     </>
                   ) : (
                     <>

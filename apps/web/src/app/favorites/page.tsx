@@ -14,14 +14,14 @@ import { useAuthStore } from '@/stores/authStore';
 interface WishlistItem {
   id: string;
   productId: string;
-  product: {
-    id: string;
-    title: string;
-    price: number;
-    images?: Array<{ url: string } | string>;
-    condition?: string;
-  };
-  addedAt: string;
+  productTitle: string;
+  productImage?: string;
+  productPrice: number;
+  productCondition?: string;
+  productStatus?: string;
+  sellerId: string;
+  sellerName: string;
+  addedAt: string | Date;
 }
 
 export default function FavoritesPage() {
@@ -43,12 +43,12 @@ export default function FavoritesPage() {
     setIsLoading(true);
     try {
       const response = await wishlistApi.get();
-      // Handle multiple possible response formats
+      // Backend returns { items: WishlistItem[] }
       const wishlistItems = response.data?.items || response.data?.data || response.data || [];
       
-      // Filter out invalid items (those without proper product data)
+      // Filter out invalid items (those without productId or productTitle)
       const validItems = (Array.isArray(wishlistItems) ? wishlistItems : []).filter(
-        (item: any) => item && (item.product || item.productId)
+        (item: any) => item && item.productId && item.productTitle
       );
       
       setItems(validItems);
@@ -64,9 +64,9 @@ export default function FavoritesPage() {
     }
   };
 
-  const handleRemove = async (itemId: string) => {
+  const handleRemove = async (productId: string) => {
     try {
-      await wishlistApi.remove(itemId);
+      await wishlistApi.remove(productId);
       toast.success('Favorilerden çıkarıldı');
       fetchFavorites();
     } catch (error: any) {
@@ -75,15 +75,11 @@ export default function FavoritesPage() {
     }
   };
 
-  const getImageUrl = (product: WishlistItem['product'] | undefined | null): string => {
-    if (!product || !product.images || product.images.length === 0) {
+  const getImageUrl = (productImage?: string): string => {
+    if (!productImage) {
       return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
     }
-    const firstImage = product.images[0];
-    if (typeof firstImage === 'string') {
-      return firstImage;
-    }
-    return firstImage?.url || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    return productImage;
   };
 
   if (isLoading) {
@@ -130,9 +126,6 @@ export default function FavoritesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {items.map((item, index) => {
-              const productId = item.productId || item.product?.id;
-              const product = item.product;
-              
               return (
                 <motion.div
                   key={item.id || index}
@@ -141,13 +134,14 @@ export default function FavoritesPage() {
                   transition={{ delay: index * 0.05 }}
                   className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <Link href={`/listings/${productId}`}>
+                  <Link href={`/listings/${item.productId}`}>
                     <div className="relative aspect-square bg-gray-100">
                       <Image
-                        src={getImageUrl(product)}
-                        alt={product?.title || 'Ürün'}
+                        src={getImageUrl(item.productImage)}
+                        alt={item.productTitle || 'Ürün'}
                         fill
                         className="object-cover"
+                        unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
                         }}
@@ -155,7 +149,7 @@ export default function FavoritesPage() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          handleRemove(item.id || productId);
+                          handleRemove(item.productId);
                         }}
                         className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
                       >
@@ -164,18 +158,18 @@ export default function FavoritesPage() {
                     </div>
                   </Link>
                   <div className="p-4">
-                    <Link href={`/listings/${productId}`}>
+                    <Link href={`/listings/${item.productId}`}>
                       <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 hover:text-primary-500">
-                        {product?.title || 'Ürün'}
+                        {item.productTitle || 'Ürün'}
                       </h3>
                     </Link>
                     <div className="flex items-center justify-between">
                       <p className="text-xl font-bold text-primary-500">
-                        ₺{Number(product?.price || 0).toLocaleString('tr-TR')}
+                        ₺{Number(item.productPrice || 0).toLocaleString('tr-TR')}
                       </p>
-                      {product?.condition && (
+                      {item.productCondition && (
                         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          {product.condition}
+                          {item.productCondition}
                         </span>
                       )}
                     </div>
