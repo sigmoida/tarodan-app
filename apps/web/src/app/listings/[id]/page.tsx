@@ -21,6 +21,8 @@ import toast from 'react-hot-toast';
 import { listingsApi, wishlistApi } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
+import AuthRequiredModal from '@/components/AuthRequiredModal';
+import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
 
 interface ProductImage {
   id?: string;
@@ -72,6 +74,12 @@ export default function ListingDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalConfig, setAuthModalConfig] = useState({
+    title: 'Giriş Yapmanız Gerekiyor',
+    message: '',
+    icon: null as React.ReactNode,
+  });
 
   useEffect(() => {
     if (id) {
@@ -138,8 +146,12 @@ export default function ListingDetailPage() {
 
   const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
-      toast.error('Favorilere eklemek için giriş yapın');
-      router.push('/login');
+      setAuthModalConfig({
+        title: 'Favorilere Ekle',
+        message: 'Bu ürünü favorilerinize eklemek için giriş yapmanız gerekiyor.',
+        icon: <HeartOutlineIcon className="w-10 h-10 text-red-500" />,
+      });
+      setShowAuthModal(true);
       return;
     }
     
@@ -454,13 +466,30 @@ export default function ListingDetailPage() {
                       </span>
                     </div>
                   </div>
-                  <Link
-                    href={`/messages?user=${listing.seller.id}&listing=${listing.id}`}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                    Mesaj Gönder
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link
+                      href={`/messages?user=${listing.seller.id}&listing=${listing.id}`}
+                      className="btn-secondary flex items-center gap-2"
+                    >
+                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                      Mesaj Gönder
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAuthModalConfig({
+                          title: 'Satıcıya Mesaj Gönder',
+                          message: 'Satıcıyla iletişime geçmek için giriş yapmanız gerekiyor.',
+                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-primary-500" />,
+                        });
+                        setShowAuthModal(true);
+                      }}
+                      className="btn-secondary flex items-center gap-2"
+                    >
+                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                      Mesaj Gönder
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -517,6 +546,14 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
+      {/* Auth Required Modal */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={authModalConfig.title}
+        message={authModalConfig.message}
+        icon={authModalConfig.icon}
+      />
     </div>
   );
 }

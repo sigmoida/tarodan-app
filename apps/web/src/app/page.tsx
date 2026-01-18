@@ -11,6 +11,9 @@ import {
   CheckBadgeIcon,
 } from '@heroicons/react/24/solid';
 import { api, listingsApi, collectionsApi } from '@/lib/api';
+import { useAuthStore } from '@/stores/authStore';
+import AuthRequiredModal from '@/components/AuthRequiredModal';
+import { RectangleStackIcon } from '@heroicons/react/24/outline';
 
 interface Category {
   id: string;
@@ -77,9 +80,11 @@ const BRANDS = [
 const SCALES = ['1:8 Diecast', '1:12 Diecast', '1:18 Diecast', '1:24 Diecast', '1:32 Diecast', '1:36 Diecast', '1:43 Diecast', '1:64 Diecast'];
 
 export default function Home() {
+  const { isAuthenticated } = useAuthStore();
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [featuredCollector, setFeaturedCollector] = useState<Collection | null>(null);
   const [companyOfWeek, setCompanyOfWeek] = useState<Seller | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     fetchBestSellers();
@@ -192,12 +197,21 @@ export default function Home() {
                 Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link 
-                  href="/collections/new"
-                  className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
-                >
-                  Koleksiyon oluştur
-                </Link>
+                {isAuthenticated ? (
+                  <Link 
+                    href="/collections"
+                    className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                  >
+                    Koleksiyon oluştur
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                  >
+                    Koleksiyon oluştur
+                  </button>
+                )}
                 <Link 
                   href="/listings"
                   className="bg-transparent text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 border-2 border-white"
@@ -548,6 +562,15 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Koleksiyon Oluştur"
+        message="Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor."
+        icon={<RectangleStackIcon className="w-10 h-10 text-primary-500" />}
+      />
     </div>
   );
 }

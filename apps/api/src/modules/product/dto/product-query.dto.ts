@@ -6,9 +6,10 @@ import {
   IsNumber,
   Min,
   Max,
+  IsBoolean,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ProductStatus, ProductCondition } from '@prisma/client';
 
 export class ProductQueryDto {
@@ -75,7 +76,8 @@ export class ProductQueryDto {
     description: 'Filter only trade-enabled products',
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
   tradeOnly?: boolean;
 
   @ApiPropertyOptional({

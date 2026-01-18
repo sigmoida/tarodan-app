@@ -49,17 +49,35 @@ export default function ListingsPage() {
     minPrice: '',
     maxPrice: '',
     tradeOnly: false,
+    sortBy: 'created_desc', // Varsayılan: En Yeni
   });
 
   useEffect(() => {
     const urlSearch = searchParams.get('search');
-    const urlCategoryId = searchParams.get('categoryId');
+    const urlTradeOnly = searchParams.get('tradeOnly');
+    const urlBrand = searchParams.get('brand');
+    const urlScale = searchParams.get('scale');
+    const urlCondition = searchParams.get('condition');
+    const urlMinPrice = searchParams.get('minPrice');
+    const urlMaxPrice = searchParams.get('maxPrice');
+    const urlSortBy = searchParams.get('sortBy');
+
+    // Update search query
     if (urlSearch) {
       setSearchQuery(urlSearch);
     }
-    if (urlCategoryId) {
-      // Category filter will be handled in fetchListings via URL param
-    }
+
+    // Update filters from URL params
+    setFilters(prev => ({
+      ...prev,
+      tradeOnly: urlTradeOnly === 'true',
+      brand: urlBrand || '',
+      scale: urlScale || '',
+      condition: urlCondition || '',
+      minPrice: urlMinPrice || '',
+      maxPrice: urlMaxPrice || '',
+      sortBy: urlSortBy || 'created_desc',
+    }));
   }, [searchParams]);
 
   useEffect(() => {
@@ -96,6 +114,7 @@ export default function ListingsPage() {
       if (filters.brand) params.brand = filters.brand;
       if (filters.scale) params.scale = filters.scale;
       if (filters.tradeOnly) params.tradeOnly = true;
+      if (filters.sortBy) params.sortBy = filters.sortBy;
 
       const response = await listingsApi.getAll(params);
       setListings(response.data.data || response.data.products || []);
@@ -119,6 +138,7 @@ export default function ListingsPage() {
       minPrice: '',
       maxPrice: '',
       tradeOnly: false,
+      sortBy: 'created_desc',
     });
   };
 
@@ -149,6 +169,20 @@ export default function ListingsPage() {
                 />
               </div>
             </form>
+
+            {/* Sort Dropdown */}
+            <select
+              value={filters.sortBy}
+              onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+              className="px-4 py-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-primary-500 transition-colors cursor-pointer"
+            >
+              <option value="created_desc">En Yeni</option>
+              <option value="created_asc">En Eski</option>
+              <option value="price_asc">Fiyat: Düşükten Yükseğe</option>
+              <option value="price_desc">Fiyat: Yüksekten Düşüğe</option>
+              <option value="title_asc">A-Z</option>
+              <option value="title_desc">Z-A</option>
+            </select>
 
             {/* Filter Button */}
             <button

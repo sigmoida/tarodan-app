@@ -10,8 +10,12 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   TruckIcon,
+  ShieldCheckIcon,
+  CurrencyDollarIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { tradesApi } from '@/lib/api';
+import { useAuthStore } from '@/stores/authStore';
 
 interface TradeItem {
   id: string;
@@ -75,13 +79,18 @@ const FILTER_TABS = [
 ];
 
 export default function TradesPage() {
+  const { isAuthenticated } = useAuthStore();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('');
 
   useEffect(() => {
-    fetchTrades();
-  }, [activeFilter]);
+    if (isAuthenticated) {
+      fetchTrades();
+    } else {
+      setIsLoading(false);
+    }
+  }, [activeFilter, isAuthenticated]);
 
   const fetchTrades = async () => {
     setIsLoading(true);
@@ -100,6 +109,167 @@ export default function TradesPage() {
       setIsLoading(false);
     }
   };
+
+  // Guest user - show informational landing page
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        {/* Hero Section */}
+        <div className="bg-gradient-to-r from-primary-500 to-orange-500 text-white py-16">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <ArrowsRightLeftIcon className="w-20 h-20 mx-auto mb-6 opacity-90" />
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                Güvenli Takas Sistemi
+              </h1>
+              <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
+                Koleksiyonunuzdaki modelleri diğer koleksiyonerlerle güvenle takas edin. 
+                Para ödemeden koleksiyonunuzu büyütün!
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/login?redirect=/trades"
+                  className="px-8 py-4 bg-white text-primary-500 font-semibold rounded-xl hover:bg-orange-50 transition-colors"
+                >
+                  Giriş Yap
+                </Link>
+                <Link
+                  href="/register?redirect=/trades"
+                  className="px-8 py-4 bg-transparent text-white font-semibold rounded-xl border-2 border-white hover:bg-white/10 transition-colors"
+                >
+                  Ücretsiz Üye Ol
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <h2 className="text-2xl font-bold text-center mb-12 text-gray-900">
+            Takas Nasıl Çalışır?
+          </h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
+            >
+              <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">1. Teklif Gönder</h3>
+              <p className="text-gray-600">
+                Beğendiğiniz bir ilanda "Takas Teklifi" butonuna tıklayın ve kendi ürünlerinizi seçin.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
+            >
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <CurrencyDollarIcon className="w-8 h-8 text-green-500" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">2. Nakit Fark Ekle</h3>
+              <p className="text-gray-600">
+                Değer farkı varsa nakit ekleyebilirsiniz. Ödeme platformda güvende tutulur.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
+            >
+              <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ShieldCheckIcon className="w-8 h-8 text-orange-500" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">3. Güvenli Teslimat</h3>
+              <p className="text-gray-600">
+                Her iki taraf da kargoyu gönderir. Onay sonrası takas tamamlanır.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Benefits Section */}
+        <div className="bg-gray-50 py-16">
+          <div className="max-w-4xl mx-auto px-4">
+            <h2 className="text-2xl font-bold text-center mb-12 text-gray-900">
+              Neden Takas Yapmalısınız?
+            </h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="flex items-start gap-4">
+                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold text-gray-900">Para Harcamadan Büyüyün</h4>
+                  <p className="text-gray-600">İhtiyacınız olmayan modelleri değerlenin</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold text-gray-900">Nadir Modellere Ulaşın</h4>
+                  <p className="text-gray-600">Satışta olmayan modelleri takas ile bulun</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold text-gray-900">%100 Güvenli</h4>
+                  <p className="text-gray-600">Platform koruması ve anlaşmazlık desteği</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold text-gray-900">Toplulukla Bağ Kurun</h4>
+                  <p className="text-gray-600">Diğer koleksiyonerlerle tanışın</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center mt-12">
+              <Link
+                href="/listings?tradeOnly=true"
+                className="inline-flex items-center gap-2 text-primary-500 font-semibold hover:text-primary-600"
+              >
+                <UserGroupIcon className="w-5 h-5" />
+                Takas Kabul Eden İlanları Gör
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Section */}
+        <div className="py-16">
+          <div className="max-w-2xl mx-auto px-4 text-center">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">
+              Hemen Takas Yapmaya Başla!
+            </h2>
+            <p className="text-gray-600 mb-8">
+              Ücretsiz üye ol ve ilk takas teklifini gönder.
+            </p>
+            <Link
+              href="/register?redirect=/trades"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
+            >
+              <ArrowsRightLeftIcon className="w-5 h-5" />
+              Ücretsiz Başla
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
