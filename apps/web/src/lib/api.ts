@@ -178,7 +178,8 @@ export const userApi = {
     bio?: string;
   }) => api.patch('/users/me', data),
   getMyProducts: (params?: Record<string, any>) =>
-    api.get('/users/me/products', { params }),
+    api.get('/products/my-listings', { params }),
+  getStats: () => api.get('/users/me/stats'),
 };
 
 // Messages (thread-based messaging)

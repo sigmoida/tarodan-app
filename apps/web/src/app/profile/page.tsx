@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
-import { api } from '@/lib/api';
+import { api, userApi } from '@/lib/api';
 
 interface UserProfile {
   id: string;
@@ -33,7 +33,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,49 +42,106 @@ export default function ProfilePage() {
       router.push('/login');
       return;
     }
+    // First use authStore user data immediately, then refresh
+    if (user) {
+      setProfileFromAuthStore();
+    }
     loadProfile();
   }, [isAuthenticated]);
 
+  const setProfileFromAuthStore = () => {
+    if (!user) return;
+    
+    // Get membership tier display name
+    const tierDisplay = user.membershipTier === 'premium' ? 'Premium' :
+                       user.membershipTier === 'business' ? 'Business' :
+                       user.membershipTier === 'basic' ? 'Basic' : 'Free';
+    
+    setProfile({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      phone: user.phone,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      isVerified: user.isVerified,
+      isSeller: user.isSeller,
+      createdAt: String(user.createdAt),
+      membership: {
+        tier: tierDisplay,
+        expiresAt: '',
+      },
+      stats: {
+        productsCount: user.listingCount || 0,
+        ordersCount: user.totalPurchases || 0,
+        tradesCount: 0,
+        collectionsCount: 0,
+        rating: user.rating || 0,
+        reviewsCount: user.totalRatings || 0,
+      },
+    });
+    setLoading(false);
+  };
+
   const loadProfile = async () => {
     try {
+      // Use /users/me for profile data
       const [profileResponse, statsResponse] = await Promise.all([
-        api.get('/auth/profile'),
-        api.get('/users/me/stats').catch(() => null), // Stats endpoint may not exist yet
+        userApi.getProfile().catch(() => null),
+        userApi.getStats().catch(() => null),
       ]);
-      const profileData = profileResponse.data.user || profileResponse.data;
-      const statsData = statsResponse?.data || {};
+      
+      const profileData = profileResponse?.data?.user || profileResponse?.data || user;
+      const statsData = statsResponse?.data?.data || statsResponse?.data || {};
+      
+      if (!profileData) {
+        // If no profile data, keep using authStore data
+        return;
+      }
+      
+      // Extract membership info from various possible API formats
+      const membershipTier = 
+        profileData.membership?.tier?.type ||
+        profileData.membership?.tier?.name ||
+        profileData.membership?.tier ||
+        profileData.membershipTier ||
+        user?.membershipTier ||
+        'free';
+      
+      const tierNormalized = String(membershipTier).toLowerCase();
+      const tierDisplay = tierNormalized.includes('premium') ? 'Premium' : 
+                         tierNormalized.includes('business') ? 'Business' :
+                         tierNormalized.includes('basic') ? 'Basic' : 'Free';
       
       setProfile({
         ...profileData,
+        displayName: profileData.displayName || profileData.display_name || user?.displayName || '',
+        isVerified: profileData.isVerified || profileData.is_verified || user?.isVerified || false,
+        isSeller: profileData.isSeller || profileData.is_seller || user?.isSeller || false,
+        createdAt: profileData.createdAt || profileData.created_at || user?.createdAt || new Date().toISOString(),
+        membership: {
+          tier: tierDisplay,
+          expiresAt: profileData.membership?.expiresAt || '',
+        },
         stats: {
-          productsCount: statsData.productsCount || 0,
-          ordersCount: statsData.ordersCount || 0,
-          tradesCount: statsData.tradesCount || 0,
-          collectionsCount: statsData.collectionsCount || 0,
-          rating: statsData.rating || 0,
-          reviewsCount: statsData.reviewsCount || 0,
+          productsCount: statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
+                        profileData._count?.products ?? profileData.listingCount ?? user?.listingCount ?? 0,
+          ordersCount: statsData.ordersCount ?? statsData.orders ?? 
+                      profileData._count?.orders ?? user?.totalPurchases ?? 0,
+          tradesCount: statsData.tradesCount ?? statsData.trades ?? 
+                      profileData._count?.trades ?? 0,
+          collectionsCount: statsData.collectionsCount ?? statsData.collections ?? 
+                           profileData._count?.collections ?? 0,
+          rating: statsData.rating ?? profileData.rating ?? user?.rating ?? 0,
+          reviewsCount: statsData.reviewsCount ?? statsData.totalRatings ?? user?.totalRatings ?? 0,
         },
       });
+      
+      // Also refresh authStore user data
+      refreshUserData();
     } catch (error) {
       console.error('Profile load error:', error);
-      // Fallback to auth profile if user endpoint fails
-      try {
-        const response = await api.get('/auth/profile');
-        const profileData = response.data.user || response.data;
-        setProfile({
-          ...profileData,
-          stats: {
-            productsCount: 0,
-            ordersCount: 0,
-            tradesCount: 0,
-            collectionsCount: 0,
-            rating: 0,
-            reviewsCount: 0,
-          },
-        });
-      } catch (err) {
-        console.error('Auth profile load error:', err);
-      }
+      // Fallback to auth store user data already set
     } finally {
       setLoading(false);
     }

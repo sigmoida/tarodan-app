@@ -1,8 +1,32 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+// Expo'nun belirlediği LAN IP'sini al
+const getApiUrl = () => {
+  // Expo Go'nun çalıştığı bilgisayarın IP'si
+  const expoHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  
+  if (expoHost) {
+    // Expo host IP'sini kullan - API /api prefix'i ile
+    return `http://${expoHost}:3001/api`;
+  }
+  
+  // Fallback - Android emulator için 10.0.2.2, diğerleri için localhost
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3001/api';
+  }
+  
+  return 'http://localhost:3001/api';
+};
+
+const API_URL = getApiUrl();
+
+console.log('📡 API URL:', API_URL);
+console.log('📱 Platform:', Platform.OS);
+console.log('🌐 Expo Host:', Constants.expoConfig?.hostUri);
 
 export const api = axios.create({
   baseURL: API_URL,

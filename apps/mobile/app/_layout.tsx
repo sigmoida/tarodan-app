@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider } from 'react-native-paper';
 import { useColorScheme } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications } from '../src/services/push';
+import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
 
 // Query client
 const queryClient = new QueryClient({
@@ -31,30 +32,9 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Custom theme
-const customLightTheme = {
-  ...MD3LightTheme,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: '#E53935',
-    secondary: '#FF5722',
-    tertiary: '#FFC107',
-  },
-};
-
-const customDarkTheme = {
-  ...MD3DarkTheme,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: '#E53935',
-    secondary: '#FF5722',
-    tertiary: '#FFC107',
-  },
-};
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? customDarkTheme : customLightTheme;
+  const theme = colorScheme === 'dark' ? TarodanDarkTheme : TarodanLightTheme;
   const { loadToken, isAuthenticated } = useAuthStore();
 
   useEffect(() => {

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { messagesApi } from '@/lib/api';
-import Navbar from '@/components/layout/Navbar';
+import { messagesApi, listingsApi } from '@/lib/api';
 
 interface MessageThread {
   id: string;
@@ -63,6 +63,7 @@ const checkContentFilter = (text: string): { passed: boolean; warning?: string }
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated, user } = useAuthStore();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -71,15 +72,114 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contentWarning, setContentWarning] = useState<string | null>(null);
+  const [creatingThread, setCreatingThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // URL params for product-specific messaging
+  const sellerId = searchParams.get('user');
+  const productId = searchParams.get('listing');
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
       return;
     }
     loadThreads();
   }, [isAuthenticated]);
+
+  // Handle creating a new thread when coming from a product page
+  useEffect(() => {
+    if (sellerId && isAuthenticated && !loading && !creatingThread) {
+      handleCreateThreadForProduct();
+    }
+  }, [sellerId, isAuthenticated, loading]);
+
+  const handleCreateThreadForProduct = async () => {
+    if (!sellerId || creatingThread) return;
+    
+    // Fetch product details if productId is provided
+    let productTitle = '';
+    if (productId) {
+      try {
+        const productResponse = await listingsApi.getOne(productId);
+        const product = productResponse.data.product || productResponse.data;
+        productTitle = product.title || 'Ürün';
+      } catch (error) {
+        console.error('Failed to fetch product:', error);
+      }
+    }
+    
+    // Check if a thread already exists with this seller (and optionally product)
+    const existingThread = threads.find(t => 
+      t.otherUser?.id === sellerId && 
+      (!productId || t.product?.id === productId)
+    );
+
+    if (existingThread) {
+      setSelectedThread(existingThread);
+      // Pre-fill message with product reference
+      if (productTitle && !newMessage) {
+        setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+      }
+      // Clear URL params without triggering a reload
+      window.history.replaceState({}, '', '/messages');
+      return;
+    }
+
+    // Create a new thread
+    setCreatingThread(true);
+    try {
+      const response = await messagesApi.createThread({
+        participantId: sellerId,
+        productId: productId || undefined,
+      });
+      
+      const newThread = response.data.thread || response.data;
+      
+      // Transform the thread to match our interface
+      const transformedThread: MessageThread = {
+        id: newThread.id,
+        otherUser: {
+          id: sellerId,
+          displayName: newThread.otherUser?.displayName || 'Satıcı',
+          avatarUrl: newThread.otherUser?.avatarUrl,
+        },
+        unreadCount: 0,
+        product: productId ? {
+          id: productId,
+          title: productTitle || 'Ürün',
+        } : undefined,
+      };
+
+      setThreads(prev => [transformedThread, ...prev]);
+      setSelectedThread(transformedThread);
+      
+      // Pre-fill message with product reference
+      if (productTitle) {
+        setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+      }
+      
+      // Clear URL params
+      window.history.replaceState({}, '', '/messages');
+    } catch (error: any) {
+      console.error('Failed to create thread:', error);
+      // If thread already exists, try to find it in the threads
+      if (error.response?.status === 409) {
+        await loadThreads();
+        const existingThread = threads.find(t => t.otherUser?.id === sellerId);
+        if (existingThread) {
+          setSelectedThread(existingThread);
+          if (productTitle) {
+            setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+          }
+        }
+      } else {
+        toast.error('Sohbet başlatılamadı');
+      }
+    } finally {
+      setCreatingThread(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedThread) {

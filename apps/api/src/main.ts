@@ -11,12 +11,17 @@ async function bootstrap() {
 
   // Security
   app.use(helmet());
+  
+  // CORS - Development'ta tüm origin'lere izin ver (mobil için)
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   app.enableCors({
-    origin: process.env.CORS_ORIGINS?.split(',') || [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-    ],
+    origin: isDevelopment 
+      ? true // Development'ta tüm origin'lere izin ver
+      : (process.env.CORS_ORIGINS?.split(',') || [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:3002',
+        ]),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

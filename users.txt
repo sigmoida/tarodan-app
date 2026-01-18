@@ -1,0 +1,338 @@
+1.2.	INDIVIDUAL USERS
+
+1.2.1.	Guest Users (unregistered)
+
+Guest users can:
+
+•	Browse all marketplace listings
+•	Search vehicles with full search functionality
+•	Use advanced filters (brand, scale, price, condition, etc.)
+•	Sort results (newest, price, popularity)
+•	View detailed vehicle information
+•	View seller public profiles (limited info)
+•	View featured collections (read-only)
+•	View Digital Garages of paid members (read-only)
+•	Read product reviews
+•	Read seller ratings
+•	View marketplace statistics
+•	Access help center and FAQ
+•	Add items to cart (session-based)
+•	Calculate shipping costs
+•	Complete purchases via guest checkout
+•	Receive order confirmation email
+•	Track orders via email link
+
+Guest users cannot: 
+
+•	Cannot create listings
+•	Cannot save favorites/wishlists
+•	Cannot save cart across sessions
+•	Cannot participate in trades
+•	Cannot rate or comment
+•	Cannot message sellers directly
+•	Cannot create collections or Digital Garage
+•	Cart expires after 24 hours of inactivity
+•	Limited access to seller contact information
+
+To encourage guest users to sign up: 
+•	After viewing 10 listings: "Create account to save favorites"
+•	When trying to message seller: "Register to contact sellers"
+•	After first purchase: "Create account to track orders easily"
+
+1.2.2.	Free Members (Individual)
+
+Registration requirements:
+•	Email address (verified)
+•	Password (min 8 characters, 1 uppercase, 1 number, 1 special char)
+•	First name
+•	Last name
+•	Phone number (verified via SMS)
+•	Date of birth (age verification: must be 18+)
+•	Country/City (for shipping calculations)
+
+Optional Information:
+•	Profile photo
+•	Bio/About me (max 500 characters)
+•	Favorite brands
+•	Collection interests
+
+Free users can: 
+•	All Guest Capabilities PLUS:
+•	Create up to [configurable: 5-10] free listings
+•	List vehicles for sale only (no trading)
+•	Upload up to 5 images per listing
+•	Edit/update own listings
+•	Deactivate/reactivate listings
+•	View listing analytics (views, favorites)
+•	Relist expired listings
+
+•	Save unlimited favorite items
+•	Create wishlist (private)
+•	Follow other sellers
+•	Rate products (after purchase)
+•	Rate sellers (after transaction)
+•	Write reviews (after purchase, max 500 characters)
+•	Like collections (but cannot create own)
+•	Message sellers and buyers
+•	Receive notifications (email + in-app)
+•	Report inappropriate content
+•	Block users
+•	Saved addresses (up to 3)
+•	Saved payment methods (tokenized)
+•	Order history
+•	Sales history
+•	Saved searches (up to 5)
+•	Basic analytics dashboard
+•	Email preferences management
+
+Limitations:
+•	Maximum [5-10] active listings (configurable by admin)
+•	Cannot feature listings
+•	Listings expire after 60 days (must relist)
+•	Cannot bulk upload
+•	Cannot schedule listings
+•	No priority in search results
+•	Cannot propose or accept trades
+•	Cannot access trade features
+•	Cannot create Digital Garage
+•	Cannot upload collections
+•	Cannot showcase vehicles
+•	Cannot share collection links
+•	Cannot create seller advertisements
+•	Cannot promote listings
+
+Other:
+•	Standard customer support (24-48 hour response)
+•	No premium badges or highlights
+•	Not eligible for "Collector Highlight"
+•	Limited to 50 messages per day
+
+
+Verification Status:
+
+**Unverified Free Member** (until criteria met)
+•	Email verified ✓
+•	Phone verified ✓
+•	Waiting for:
+•	Complete 1st successful sale OR purchase
+•	Account age: 30 days minimum
+•	Zero disputes/reports
+•	Profile 80%+ complete (photo, bio, location)
+
+**Verified Free Member** (after criteria met)
+•	All above requirements met
+•	Verification badge displayed on profile
+•	Slightly higher trust score
+•	Can list higher-value items (up to 5,000 TRY limit)
+
+To encourage upgrading: 
+•	When listing limit reached: "Upgrade for unlimited listings"
+•	After 5 sales: "Upgrade to access trading features"
+•	When trying to create collection: "Premium members get Digital Garage"
+•	Monthly email with benefits comparison
+
+1.2.3.	Paid Members (Individual)
+
+Registration/Upgrade Requirements:
+
+**From Free to Paid:**
+•	All free member requirements met
+•	Payment method added
+•	Subscription plan selected (monthly/annual)
+•	Terms of paid membership accepted
+
+**New User Direct to Paid:**
+•	All free member requirements
+•	Immediate payment required
+
+Subscription Plans:
+**Monthly Plan:**
+•	Price: 99 TRY/month
+•	Billed monthly
+•	Cancel anytime
+•	Full features access
+
+**Annual Plan:**
+•	Price: 990 TRY/year (2 months free)
+•	Billed annually
+•	Cancel anytime
+•	Full features access
+•	Priority support
+
+Features Included:
+•	All Free Member capabilities
+•	Unlimited listings
+•	Trading capabilities
+•	Digital Garage
+•	Ad-free experience
+•	Featured listings
+•	Analytics dashboard
+•	Priority support
+
+**Listing Features:**
+•	Unlimited active listings
+•	Upload up to 15 images per listing
+•	360-degree photo support
+•	Featured listing slots (3 active at a time)
+•	Listings never expire (until sold)
+•	Quick relist with one click
+•	Premium listing badges
+•	Priority in search results (when relevant)
+•	Listing templates (save and reuse)
+•	Advanced pricing tools (price history, suggestions)
+
+**Trading Capabilities:**
+•	Propose trades
+•	Accept/reject trade offers
+•	Counter-offer in trades
+•	Trade with cash adjustments
+•	Access to trade protection program
+•	Trade history and analytics
+•	Trade reputation score
+
+**Digital Garage (Collection Showcase):**
+•	Create unlimited collections
+•	Name and organize collections (e.g., "Ferrari 1:18", "Vintage Trucks")
+•	Upload items not for sale (display only)
+•	Add acquisition details (date, location, story)
+•	Set estimated values
+•	Categorize by custom tags
+•	Cover photos for each collection
+•	Privacy settings (public/unlisted/private)
+•	Shareable unique URLs
+•	Social media sharing (Facebook, Twitter, Instagram, WhatsApp)
+•	Embed codes for external websites
+•	Collection statistics (views, likes, shares)
+•	Featured in "Collector Highlight" rotation
+•	QR code for each Digital Garage
+•	Print-friendly collection catalog view
+
+**Social & Community:**
+•	Verified premium badge on profile
+•	Custom profile URL (yourname.diecastmarket.com)
+•	Extended bio (up to 2,000 characters)
+•	Link to external website/social media
+•	Priority listing in seller directory
+•	Featured in homepage "Collector Highlight" carousel
+
+**Advertising Capabilities:**
+•	Create promoted listings
+•	Homepage banner placement (weekly rotation)
+•	Category page top placement
+•	Search results featured placement
+•	"Sponsored" badge (clearly marked)
+•	Pricing: 50 TRY/listing/week
+•	Digital Garage promotion
+•	Featured Digital Garage on homepage
+•	Social media promotion support
+•	Newsletter inclusion eligibility
+•	Pricing: 100 TRY/month
+
+**Analytics & Insights:**
+•	Advanced dashboard with:
+•	Listing performance metrics
+•	Conversion rates
+•	Revenue tracking
+•	Trade success rates
+•	Best performing listings
+•	Collection engagement metrics
+
+**Communication:**
+•	Unlimited messaging
+•	Real-time chat notifications
+•	Priority customer support (12-hour response time)
+•	Dedicated support email
+
+**Other Premium Benefits:**
+•	Ad-free browsing experience
+•	Exclusive promotions and deals
+•	Priority in dispute resolution
+•	Premium seller badge
+•	Social media shoutouts (periodic)
+
+Verification Status:
+
+**Unverified Paid Member:**
+•	Email verified ✓
+•	Phone verified ✓
+•	Payment method verified ✓
+•	Waiting for:
+•	Complete 3 successful sales OR purchases
+•	Account age: 15 days minimum
+•	Zero disputes with negative resolution
+•	Digital Garage created (at least 1 collection)
+•	Profile 100% complete
+
+**Verified Paid Member:**
+•	All verification criteria met
+•	"Verified Premium Collector" badge
+•	Higher placement in Collector Highlight
+•	Eligible for "Collector of the Month"
+•	Enhanced trust score
+•	Can list items up to 50,000 TRY
+•	Can receive direct trades worth up to 100,000 TRY
+
+**Subscription Management:**
+•	View current plan and billing date
+•	Upgrade/downgrade anytime
+•	Auto-renewal (can be disabled)
+•	Payment method management
+•	Billing history and invoices
+•	Renewal reminders (7 days, 1 day before)
+•	Failed payment recovery (3 retry attempts over 7 days)
+
+# Downgrade Policy (Non-Payment):
+
+•	**Grace Period (7 days after payment failure):**
+•	All premium features remain active
+•	Email reminders sent (day 1, 3, 5, 7)
+•	SMS reminder (day 5)
+•	In-app notification banner
+
+Downgrade to Free (Day 8):
+•	Account automatically downgraded to Free Member
+•	Listings beyond free tier limit (5-10) → deactivated but saved
+•	Digital Garage → set to private, view-only access maintained
+•	Featured listings → removed from featured slots
+•	Active trades → allowed to complete, no new trades
+•	Ads → start appearing
+•	Analytics → read-only, historical data preserved
+•	Messages → limit to 50/day
+•	Saved searches → reduced to 5
+  
+**What's Preserved:**
+•	All historical data
+•	Collections (accessible but not public)
+•	Reviews and ratings
+•	Order history
+•	Favorites
+•	Account settings
+
+**Reactivation:**
+•	Pay outstanding balance
+•	All features restored immediately
+•	Listings reactivated automatically
+•	Digital Garage made public again
+•	No data loss
+
+Rating System for Individual Paid Members:
+
+**Overall Rating (1-5 stars):**
+Calculated from:
+•	- Product accuracy (40%): Item as described
+•	- Communication (20%): Response time and quality
+•	- Shipping (20%): Speed and packaging
+•	- Trade fairness (20%): For members who trade
+
+**Reputation Scores:**
+•	- **Rising Star**: 10-50 successful transactions, 4.5+ rating
+•	- **Trusted Seller**: 50-200 transactions, 4.7+ rating
+•	- **Elite Collector**: 200+ transactions, 4.8+ rating
+•	- **Hall of Fame**: 500+ transactions, 4.9+ rating, 2+ years
+
+**Special Recognitions:**
+•	"Fast Shipper": 95%+ items shipped within 24 hours
+•	"Fair Trader": 90%+ trade satisfaction
+•	"Responsive": Average response time < 2 hours
+•	"Collector Expert": Specialization in specific brand/category
+•	"Community Champion": High engagement in forums/collections

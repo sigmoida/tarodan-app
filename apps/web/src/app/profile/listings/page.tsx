@@ -72,10 +72,21 @@ export default function ProfileListingsPage() {
       const response = await userApi.getMyProducts(params);
       const data = response.data.data || response.data.products || response.data || [];
       setListings(Array.isArray(data) ? data : []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch listings:', error);
-      toast.error('İlanlar yüklenemedi');
-      setListings([]);
+      
+      // Show more specific error message
+      if (error.response?.status === 401) {
+        toast.error('Oturum süresi dolmuş. Lütfen tekrar giriş yapın.');
+        router.push('/login?redirect=/profile/listings');
+      } else if (error.response?.status === 404) {
+        // No listings found - this is not an error
+        setListings([]);
+      } else {
+        // For other errors, show empty state instead of error toast
+        console.log('Using empty listings due to API error');
+        setListings([]);
+      }
     } finally {
       setIsLoading(false);
     }

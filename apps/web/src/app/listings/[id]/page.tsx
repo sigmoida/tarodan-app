@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
-import { listingsApi, wishlistApi, collectionsApi, api } from '@/lib/api';
+import { listingsApi, wishlistApi } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -71,47 +71,14 @@ export default function ListingDetailPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  const [showCollectionModal, setShowCollectionModal] = useState(false);
-  const [userCollections, setUserCollections] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCollectionId, setSelectedCollectionId] = useState('');
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchListing();
       checkFavorite();
-      if (isAuthenticated) {
-        fetchUserCollections();
-      }
     }
   }, [id, isAuthenticated]);
-
-  const fetchUserCollections = async () => {
-    try {
-      const response = await collectionsApi.getMyCollections();
-      const collections = response.data.collections || response.data.data || [];
-      setUserCollections(collections);
-    } catch (error) {
-      console.error('Failed to fetch collections:', error);
-    }
-  };
-
-  const handleAddToCollection = async () => {
-    if (!selectedCollectionId) {
-      toast.error('Lütfen bir koleksiyon seçin');
-      return;
-    }
-
-    try {
-      await collectionsApi.addItem(selectedCollectionId, { productId: id });
-      toast.success('Ürün koleksiyona eklendi');
-      setShowCollectionModal(false);
-      setSelectedCollectionId('');
-    } catch (error: any) {
-      console.error('Failed to add to collection:', error);
-      toast.error(error.response?.data?.message || 'Koleksiyona eklenemedi');
-    }
-  };
 
   const fetchListing = async () => {
     try {
@@ -492,7 +459,7 @@ export default function ListingDetailPage() {
                     className="btn-secondary flex items-center gap-2"
                   >
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                    Mesaj
+                    Mesaj Gönder
                   </Link>
                 </div>
               </div>
@@ -528,76 +495,32 @@ export default function ListingDetailPage() {
                   <ShoppingCartIcon className="w-5 h-5" />
                   {isAddingToCart ? 'Ekleniyor...' : 'Sepete Ekle'}
                 </button>
-                {isAuthenticated && (
-                  <button
-                    onClick={() => setShowCollectionModal(true)}
-                    className="btn-secondary flex-1 flex items-center justify-center gap-2"
-                  >
-                    <HeartIcon className="w-5 h-5" />
-                    Koleksiyona Ekle
-                  </button>
-                )}
+                <button
+                  onClick={handleToggleFavorite}
+                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                >
+                  {isFavorite ? (
+                    <>
+                      <HeartSolidIcon className="w-5 h-5 text-red-500" />
+                      Favorilerde
+                    </>
+                  ) : (
+                    <>
+                      <HeartIcon className="w-5 h-5" />
+                      Favorilere Ekle
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Collection Modal */}
-      {showCollectionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Koleksiyona Ekle</h2>
-            {userCollections.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-gray-600 mb-4">Henüz koleksiyonunuz yok</p>
-                <Link
-                  href="/collections"
-                  className="text-primary-500 hover:text-primary-600"
-                  onClick={() => setShowCollectionModal(false)}
-                >
-                  Koleksiyon Oluştur
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <select
-                  value={selectedCollectionId}
-                  onChange={(e) => setSelectedCollectionId(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl"
-                >
-                  <option value="">Koleksiyon Seçin</option>
-                  {userCollections.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowCollectionModal(false);
-                      setSelectedCollectionId('');
-                    }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    İptal
-                  </button>
-                  <button
-                    onClick={handleAddToCollection}
-                    disabled={!selectedCollectionId}
-                    className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:bg-gray-300"
-                  >
-                    Ekle
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+
 
 

@@ -58,7 +58,7 @@ interface ListingLimits {
 
 export default function NewListingPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [listingLimits, setListingLimits] = useState<ListingLimits | null>(null);
@@ -83,46 +83,42 @@ export default function NewListingPage() {
       return;
     }
     fetchCategories();
-    fetchListingLimits();
+    // Refresh user data first, then update limits
+    refreshUser().then(() => {
+      updateListingLimits();
+    });
   }, [isAuthenticated]);
 
-  const fetchListingLimits = async () => {
+  // Update limits whenever user or limits change
+  useEffect(() => {
+    if (user && limits) {
+      updateListingLimits();
+    }
+  }, [user, limits]);
+
+  const updateListingLimits = () => {
     setLimitsLoading(true);
     try {
-      // Try to get membership and listing count
-      const [membershipRes, productsRes] = await Promise.all([
-        api.get('/membership').catch(() => null),
-        api.get('/users/me/products').catch(() => null),
-      ]);
-
-      const membership = membershipRes?.data?.membership || membershipRes?.data || { tier: 'free' };
-      const products = productsRes?.data?.data || productsRes?.data?.products || [];
-      const activeProducts = Array.isArray(products) ? products.filter((p: any) => p.status !== 'deleted') : [];
-
-      // Default limits based on tier
-      const tierLimits: Record<string, number> = {
-        free: 5,
-        basic: 20,
-        premium: 100,
-        pro: 999,
-      };
-
-      const maxFree = tierLimits[membership.tier] || 5;
-      const isPremium = ['premium', 'pro', 'basic'].includes(membership.tier);
+      // Use auth store for membership info
+      const membershipTier = user?.membershipTier || 'free';
+      const currentCount = user?.listingCount || 0;
+      const maxListings = limits?.maxListings ?? 10;
+      const isPremium = membershipTier === 'premium' || membershipTier === 'business';
+      const isUnlimited = maxListings === -1;
 
       setListingLimits({
-        currentCount: activeProducts.length,
-        maxFreeListings: maxFree,
-        canCreateListing: isPremium || activeProducts.length < maxFree,
+        currentCount,
+        maxFreeListings: isUnlimited ? -1 : maxListings,
+        canCreateListing: isUnlimited || currentCount < maxListings,
         isPremium,
-        membershipTier: membership.tier || 'free',
+        membershipTier,
       });
     } catch (error) {
-      console.error('Failed to fetch listing limits:', error);
+      console.error('Failed to update listing limits:', error);
       // Default to allowing listing creation
       setListingLimits({
         currentCount: 0,
-        maxFreeListings: 5,
+        maxFreeListings: 10,
         canCreateListing: true,
         isPremium: false,
         membershipTier: 'free',
@@ -155,7 +151,8 @@ export default function NewListingPage() {
   };
 
   const addImageUrl = () => {
-    if (newImageUrl.trim() && formData.imageUrls.length < 10) {
+    const maxImages = limits?.maxImagesPerListing || 10;
+    if (newImageUrl.trim() && formData.imageUrls.length < maxImages) {
       setFormData({
         ...formData,
         imageUrls: [...formData.imageUrls, newImageUrl.trim()],
@@ -245,20 +242,31 @@ export default function NewListingPage() {
             </div>
           ) : listingLimits && (
             <div className={`mb-6 p-4 rounded-xl border ${
-              listingLimits.canCreateListing 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-red-50 border-red-200'
+              listingLimits.isPremium 
+                ? 'bg-yellow-50 border-yellow-200' 
+                : listingLimits.canCreateListing 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-red-50 border-red-200'
             }`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`font-medium ${listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'}`}>
-                    İlan Hakkı: {listingLimits.currentCount} / {listingLimits.maxFreeListings}
-                  </p>
-                  <p className={`text-sm ${listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'}`}>
-                    {listingLimits.isPremium 
-                      ? `${listingLimits.membershipTier.charAt(0).toUpperCase() + listingLimits.membershipTier.slice(1)} üyelik`
-                      : 'Ücretsiz üyelik'
+                  <p className={`font-medium ${
+                    listingLimits.isPremium 
+                      ? 'text-yellow-800' 
+                      : listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'
+                  }`}>
+                    {listingLimits.maxFreeListings === -1 
+                      ? `Mevcut İlan: ${listingLimits.currentCount} (Sınırsız)`
+                      : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxFreeListings}`
                     }
+                  </p>
+                  <p className={`text-sm ${
+                    listingLimits.isPremium 
+                      ? 'text-yellow-600' 
+                      : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {listingLimits.membershipTier.charAt(0).toUpperCase() + listingLimits.membershipTier.slice(1)} üyelik
+                    {listingLimits.isPremium && ' ⭐'}
                   </p>
                 </div>
                 {!listingLimits.canCreateListing && (
@@ -266,9 +274,9 @@ export default function NewListingPage() {
                     Premium'a Geç
                   </Link>
                 )}
-                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.currentCount >= listingLimits.maxFreeListings - 2 && (
+                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.maxFreeListings !== -1 && listingLimits.currentCount >= listingLimits.maxFreeListings - 2 && (
                   <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                    Daha fazla ilan için →
+                    Sınırsız ilan için →
                   </Link>
                 )}
               </div>
@@ -387,24 +395,38 @@ export default function NewListingPage() {
             </div>
 
             {/* Trade Toggle */}
-            <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
+            <div className={`flex items-center justify-between p-4 rounded-xl border ${
+              limits?.canTrade 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               <div>
                 <label className="font-medium text-gray-900">Takas Aktif</label>
-                <p className="text-sm text-gray-600">Bu ürünü takas için de açık tutar</p>
+                <p className="text-sm text-gray-600">
+                  {limits?.canTrade 
+                    ? 'Bu ürünü takas için de açık tutar' 
+                    : 'Takas özelliği Premium üyelik gerektirir'}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${
-                  formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                    formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
+              {limits?.canTrade ? (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${
+                    formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+                      formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              ) : (
+                <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                  Premium'a Geç →
+                </Link>
+              )}
             </div>
 
             {/* Price */}
@@ -428,7 +450,7 @@ export default function NewListingPage() {
             {/* Images */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri (En fazla 10)
+                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 10})
               </label>
               <div className="space-y-3">
                 <div className="flex gap-2">
@@ -448,7 +470,7 @@ export default function NewListingPage() {
                   <button
                     type="button"
                     onClick={addImageUrl}
-                    disabled={formData.imageUrls.length >= 10}
+                    disabled={formData.imageUrls.length >= (limits?.maxImagesPerListing || 10)}
                     className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     Ekle
