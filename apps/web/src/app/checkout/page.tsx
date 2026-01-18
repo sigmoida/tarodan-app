@@ -123,25 +123,28 @@ export default function CheckoutPage() {
 
       setShippingLoading(true);
       try {
-        // Try to get shipping rates from API
-        const response = await api.get('/shipping/rates', {
-          params: {
-            city,
-            carrier: selectedCarrier,
-            weight: 0.5, // Default weight for diecast cars in kg
-          }
-        }).catch(() => null);
+        // For authenticated users, try API first
+        if (isAuthenticated) {
+          const response = await api.get('/shipping/rates', {
+            params: {
+              city,
+              carrier: selectedCarrier,
+              weight: 0.5,
+            }
+          }).catch(() => null);
 
-        if (response?.data?.rate) {
-          setShippingCost(response.data.rate);
-        } else {
-          // Fallback: Calculate based on city (Istanbul cheaper, others standard)
-          const istanbulCities = ['İstanbul', 'istanbul', 'ISTANBUL'];
-          const baseRate = istanbulCities.some(c => city.toLowerCase().includes(c.toLowerCase())) ? 34.90 : 49.90;
-          // Add extra for Aras vs Yurtiçi
-          const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
-          setShippingCost(baseRate + carrierExtra);
+          if (response?.data?.rate) {
+            setShippingCost(response.data.rate);
+            setShippingLoading(false);
+            return;
+          }
         }
+
+        // Fallback (guest users or API failure): Calculate locally
+        const istanbulCities = ['İstanbul', 'istanbul', 'ISTANBUL'];
+        const baseRate = istanbulCities.some(c => city.toLowerCase().includes(c.toLowerCase())) ? 34.90 : 49.90;
+        const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
+        setShippingCost(baseRate + carrierExtra);
       } catch (error) {
         console.error('Failed to calculate shipping:', error);
         setShippingCost(49.90); // Default fallback
@@ -244,109 +247,105 @@ export default function CheckoutPage() {
     setIsLoading(true);
 
     try {
-      if (isAuthenticated) {
-        // Logged-in user checkout
-        if (!selectedAddressId) {
-          toast.error('Lütfen bir teslimat adresi seçin');
+      // Determine checkout mode
+      const hasSavedAddress = isAuthenticated && selectedAddressId && addresses.length > 0;
+      const hasFormAddress = newAddress.fullName && newAddress.city && newAddress.district && newAddress.address;
+      
+      // Get shipping address - prefer saved address for logged-in users, otherwise use form
+      let shippingAddress: any;
+      let contactEmail: string;
+      let contactPhone: string;
+      let contactName: string;
+
+      if (hasSavedAddress) {
+        // Use saved address
+        const selectedAddress = addresses.find(a => a.id === selectedAddressId);
+        if (!selectedAddress) {
+          toast.error('Seçilen adres bulunamadı');
           setIsLoading(false);
           return;
         }
+        shippingAddress = {
+          fullName: selectedAddress.fullName,
+          phone: selectedAddress.phone || user?.phone || '',
+          city: selectedAddress.city,
+          district: selectedAddress.district,
+          address: selectedAddress.address,
+          zipCode: selectedAddress.zipCode,
+        };
+        contactEmail = user?.email || '';
+        contactPhone = user?.phone || selectedAddress.phone || '';
+        contactName = selectedAddress.fullName || user?.displayName || '';
+      } else if (hasFormAddress) {
+        // Use form address (guest or logged-in user without saved addresses)
+        const email = isAuthenticated ? user?.email : guestEmail;
+        const phone = isAuthenticated ? (user?.phone || newAddress.phone) : (guestPhone || newAddress.phone);
+        const name = isAuthenticated ? (user?.displayName || newAddress.fullName) : (guestName || newAddress.fullName);
+        
+        if (!email) {
+          toast.error('Lütfen e-posta adresinizi girin');
+          setIsLoading(false);
+          return;
+        }
+        if (!phone) {
+          toast.error('Lütfen telefon numaranızı girin');
+          setIsLoading(false);
+          return;
+        }
+        
+        shippingAddress = {
+          fullName: newAddress.fullName,
+          phone: newAddress.phone || phone,
+          city: newAddress.city,
+          district: newAddress.district,
+          address: newAddress.address,
+          zipCode: newAddress.zipCode,
+        };
+        contactEmail = email;
+        contactPhone = phone;
+        contactName = name || newAddress.fullName;
+      } else {
+        // No address available
+        toast.error('Lütfen teslimat adresini girin');
+        setIsLoading(false);
+        return;
+      }
 
-        // For each item, create an order
-        for (const item of checkoutItems) {
-          // Create order using guest checkout endpoint but with user info
-          // Since we don't have direct purchase endpoint, we'll use guest checkout
-          const selectedAddress = addresses.find(a => a.id === selectedAddressId);
-          
-          const orderResponse = await ordersApi.createGuest({
-            productId: item.productId,
-            email: user?.email || '',
-            // Prioritize user's profile phone over address phone
-            phone: user?.phone || selectedAddress?.phone || '',
-            guestName: selectedAddress?.fullName || user?.displayName || '',
-            shippingAddress: {
-              fullName: selectedAddress?.fullName || '',
-              // Use profile phone if address doesn't have one
-              phone: selectedAddress?.phone || user?.phone || '',
-              city: selectedAddress?.city || '',
-              district: selectedAddress?.district || '',
-              address: selectedAddress?.address || '',
-              zipCode: selectedAddress?.zipCode,
-            },
-          });
+      // Create orders
+      for (const item of checkoutItems) {
+        const orderResponse = await ordersApi.createGuest({
+          productId: item.productId,
+          email: contactEmail,
+          phone: contactPhone,
+          guestName: contactName,
+          shippingAddress,
+        });
 
-          const orderId = orderResponse.data.id || orderResponse.data.order?.id;
-          
-          if (orderId) {
-            // TESTING MODE: Skip payment, directly mark as paid
-            // This will trigger invoice generation on the backend
-            try {
-              await api.patch(`/orders/${orderId}/status`, { 
-                status: 'paid',
-                paymentStatus: 'completed'
-              });
-            } catch (statusError) {
-              // If status update fails, order is still created
-              console.log('Order status update skipped:', statusError);
-            }
+        const orderId = orderResponse.data.id || orderResponse.data.order?.id;
+        
+        if (orderId) {
+          // TESTING MODE: Skip payment, directly mark as paid
+          try {
+            await api.patch(`/orders/${orderId}/status`, { 
+              status: 'paid',
+              paymentStatus: 'completed'
+            });
+          } catch (statusError) {
+            console.log('Order status update skipped:', statusError);
           }
         }
+      }
 
-        toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
-        if (!directProductId) {
-          await clearCart();
-        }
+      toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
+      if (!directProductId) {
+        await clearCart();
+      }
+      
+      // Redirect based on auth status
+      if (isAuthenticated) {
         router.push('/orders');
       } else {
-        // Guest checkout
-        if (!guestEmail || !guestPhone || !guestName) {
-          toast.error('Lütfen iletişim bilgilerinizi girin');
-          setIsLoading(false);
-          return;
-        }
-
-        if (!newAddress.fullName || !newAddress.city || !newAddress.district || !newAddress.address) {
-          toast.error('Lütfen teslimat adresini girin');
-          setIsLoading(false);
-          return;
-        }
-
-        for (const item of checkoutItems) {
-          const orderResponse = await ordersApi.createGuest({
-            productId: item.productId,
-            email: guestEmail,
-            phone: guestPhone,
-            guestName: guestName,
-            shippingAddress: {
-              fullName: newAddress.fullName,
-              phone: newAddress.phone || guestPhone,
-              city: newAddress.city,
-              district: newAddress.district,
-              address: newAddress.address,
-              zipCode: newAddress.zipCode,
-            },
-          });
-
-          const orderId = orderResponse.data.id || orderResponse.data.order?.id;
-          
-          if (orderId) {
-            // TESTING MODE: Skip payment, directly confirm order
-            try {
-              await api.patch(`/orders/${orderId}/status`, { 
-                status: 'confirmed',
-                paymentStatus: 'completed'
-              });
-            } catch (statusError) {
-              console.log('Order status update skipped:', statusError);
-            }
-          }
-        }
-
-        toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
-        if (!directProductId) {
-          await clearCart();
-        }
-        router.push('/orders');
+        router.push(`/checkout/success?email=${encodeURIComponent(contactEmail)}`);
       }
     } catch (error: any) {
       console.error('Checkout failed:', error);
