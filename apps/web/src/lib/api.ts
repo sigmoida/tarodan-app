@@ -178,7 +178,7 @@ export const userApi = {
     bio?: string;
   }) => api.patch('/users/me', data),
   getMyProducts: (params?: Record<string, any>) =>
-    api.get('/products/my-listings', { params }),
+    api.get('/products/my', { params }),
   getStats: () => api.get('/users/me/stats'),
 };
 

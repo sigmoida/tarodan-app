@@ -50,6 +50,7 @@ interface Collection {
   likeCount: number;
   itemCount: number;
   items?: CollectionItem[];
+  isLiked?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,7 +69,7 @@ export default function CollectionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [myProducts, setMyProducts] = useState<UserProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
@@ -98,6 +99,10 @@ export default function CollectionDetailPage() {
       }
       const data = response.data.collection || response.data;
       setCollection(data);
+      // Set initial like state from API
+      if (data.isLiked !== undefined) {
+        setIsLiked(data.isLiked);
+      }
     } catch (error: any) {
       console.error('Failed to fetch collection:', error);
       const status = error.response?.status;
@@ -122,19 +127,27 @@ export default function CollectionDetailPage() {
       return;
     }
 
-    if (!collection) return;
+    if (!collection || !collection.id) {
+      toast.error('Koleksiyon bilgisi bulunamadı');
+      return;
+    }
 
     try {
-      await collectionsApi.like(collection.id);
-      setIsLiked(!isLiked);
+      console.log('Liking collection with ID:', collection.id);
+      const response = await collectionsApi.like(collection.id);
+      const { liked, likeCount } = response.data || {};
+      
+      setIsLiked(liked !== undefined ? liked : !isLiked);
       setCollection({
         ...collection,
-        likeCount: isLiked ? collection.likeCount - 1 : collection.likeCount + 1,
+        likeCount: likeCount !== undefined ? likeCount : collection.likeCount,
+        isLiked: liked !== undefined ? liked : !isLiked,
       });
-      toast.success(isLiked ? 'Beğeni kaldırıldı' : 'Beğenildi');
+      toast.success(liked ? 'Beğenildi' : 'Beğeni kaldırıldı');
     } catch (error: any) {
       console.error('Failed to like collection:', error);
-      toast.error('Beğeni işlemi başarısız');
+      const errorMessage = error?.response?.data?.message || error?.message || 'Beğeni işlemi başarısız';
+      toast.error(errorMessage);
     }
   };
 
@@ -178,24 +191,38 @@ export default function CollectionDetailPage() {
   };
 
   const handleAddItemToCollection = async () => {
-    if (!selectedProductId || !collection) {
-      toast.error('Lütfen bir ürün seçin');
+    if (selectedProductIds.length === 0 || !collection) {
+      toast.error('Lütfen en az bir ürün seçin');
       return;
     }
 
     setAddingItem(true);
     try {
-      await collectionsApi.addItem(collection.id, { productId: selectedProductId });
-      toast.success('Ürün koleksiyona eklendi');
+      // Add all selected products
+      const addPromises = selectedProductIds.map(productId =>
+        collectionsApi.addItem(collection.id, { productId })
+      );
+      await Promise.all(addPromises);
+      toast.success(`${selectedProductIds.length} ürün koleksiyona eklendi`);
       setShowAddItemModal(false);
-      setSelectedProductId('');
+      setSelectedProductIds([]);
       fetchCollection();
     } catch (error: any) {
-      console.error('Failed to add item:', error);
-      toast.error(error.response?.data?.message || 'Ürün eklenemedi');
+      console.error('Failed to add items:', error);
+      toast.error(error.response?.data?.message || 'Ürünler eklenemedi');
     } finally {
       setAddingItem(false);
     }
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
   };
 
   const isOwner = user?.id === collection?.userId;
@@ -312,8 +339,8 @@ export default function CollectionDetailPage() {
             <div className="flex items-center gap-3">
               {isOwner && collection && (
                 <Link
-                  href={`/collections/${collection.id}/edit`}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                  href={`/collections/${collectionIdOrSlug}/edit`}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
                 >
                   Düzenle
                 </Link>
@@ -323,7 +350,7 @@ export default function CollectionDetailPage() {
                 className={`p-2 rounded-lg transition-colors ${
                   isLiked
                     ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                    : 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-700 hover:bg-gray-600 text-white'
                 }`}
               >
                 {isLiked ? (
@@ -338,12 +365,12 @@ export default function CollectionDetailPage() {
 
         {/* Collection Items */}
         {sortedItems.length === 0 ? (
-          <div className="text-center py-16 bg-gray-800 rounded-xl">
-            <p className="text-gray-400 mb-4">Bu koleksiyonda henüz ürün yok</p>
+          <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+            <p className="text-gray-700 mb-4 text-lg">Bu koleksiyonda henüz ürün yok</p>
             {isOwner && (
               <button
                 onClick={handleOpenAddModal}
-                className="px-6 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+                className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors font-medium"
               >
                 Ürün Ekle
               </button>
@@ -373,7 +400,7 @@ export default function CollectionDetailPage() {
                 >
                   <Link
                     href={`/listings/${item.productId}`}
-                    className="bg-gray-800 rounded-xl overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all block relative"
+                    className="bg-white rounded-xl overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all block relative shadow-sm border border-gray-200"
                   >
                     {item.isFeatured && (
                       <div className="absolute top-2 left-2 z-10">
@@ -382,19 +409,20 @@ export default function CollectionDetailPage() {
                         </span>
                       </div>
                     )}
-                    <div className="aspect-square bg-gray-700 relative">
+                    <div className="aspect-square bg-gray-100 relative">
                       <Image
                         src={getItemImage(item)}
                         alt={item.productTitle}
                         fill
                         className="object-cover"
+                        unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
                         }}
                       />
                     </div>
                     <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                      <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
                         {item.productTitle}
                       </h3>
                       <p className="text-primary-500 font-bold text-xl">
@@ -422,8 +450,8 @@ export default function CollectionDetailPage() {
         {/* Add Item Modal */}
         {showAddItemModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-              <h2 className="text-xl font-semibold mb-4">Koleksiyona Ürün Ekle</h2>
+            <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900">Koleksiyona Ürün Ekle</h2>
               
               {loadingProducts ? (
                 <div className="flex justify-center py-8">
@@ -431,12 +459,12 @@ export default function CollectionDetailPage() {
                 </div>
               ) : myProducts.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-400 mb-4">
+                  <p className="text-gray-700 mb-4">
                     Eklenebilecek ürününüz yok. Önce ilan oluşturun veya tüm ürünleriniz zaten bu koleksiyonda.
                   </p>
                   <Link
                     href="/listings/new"
-                    className="text-primary-500 hover:text-primary-400"
+                    className="text-primary-500 hover:text-primary-600 font-medium"
                     onClick={() => setShowAddItemModal(false)}
                   >
                     Yeni İlan Oluştur →
@@ -444,6 +472,22 @@ export default function CollectionDetailPage() {
                 </div>
               ) : (
                 <>
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      {selectedProductIds.length > 0 
+                        ? `${selectedProductIds.length} ürün seçildi`
+                        : 'Ürün seçin'}
+                    </p>
+                    {selectedProductIds.length > 0 && (
+                      <button
+                        onClick={() => setSelectedProductIds([])}
+                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        Seçimi Temizle
+                      </button>
+                    )}
+                  </div>
+                  
                   <div className="flex-1 overflow-y-auto mb-4 space-y-2">
                     {myProducts.map((product) => {
                       const imageUrl = product.images?.[0]
@@ -451,56 +495,74 @@ export default function CollectionDetailPage() {
                           ? product.images[0]
                           : product.images[0].url
                         : 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
+                      const isSelected = selectedProductIds.includes(product.id);
                       return (
                         <button
                           key={product.id}
-                          onClick={() => setSelectedProductId(product.id)}
+                          onClick={() => toggleProductSelection(product.id)}
                           className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                            selectedProductId === product.id
-                              ? 'bg-primary-500/20 ring-2 ring-primary-500'
-                              : 'bg-gray-700 hover:bg-gray-600'
+                            isSelected
+                              ? 'bg-primary-50 ring-2 ring-primary-500 border border-primary-200'
+                              : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
                           }`}
                         >
-                          <img
-                            src={imageUrl}
-                            alt={product.title}
-                            className="w-16 h-16 rounded-lg object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
-                            }}
-                          />
-                          <div className="flex-1 text-left">
-                            <p className="font-medium text-white line-clamp-1">{product.title}</p>
-                            <p className="text-primary-400 text-sm">₺{Number(product.price).toLocaleString('tr-TR')}</p>
+                          <div className="relative">
+                            <img
+                              src={imageUrl}
+                              alt={product.title}
+                              className="w-16 h-16 rounded-lg object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
+                              }}
+                            />
+                            {isSelected && (
+                              <div className="absolute top-1 right-1 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
-                          {selectedProductId === product.id && (
-                            <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                          <div className="flex-1 text-left">
+                            <p className="font-medium text-gray-900 line-clamp-1">{product.title}</p>
+                            <p className="text-primary-600 text-sm font-semibold">₺{Number(product.price).toLocaleString('tr-TR')}</p>
+                          </div>
+                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                            isSelected
+                              ? 'bg-primary-500 border-primary-500'
+                              : 'border-gray-300'
+                          }`}>
+                            {isSelected && (
                               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </button>
                       );
                     })}
                   </div>
                   
-                  <div className="flex gap-3 pt-2 border-t border-gray-700">
+                  <div className="flex gap-3 pt-2 border-t border-gray-200">
                     <button
                       onClick={() => {
                         setShowAddItemModal(false);
-                        setSelectedProductId('');
+                        setSelectedProductIds([]);
                       }}
-                      className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                      className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
                     >
                       İptal
                     </button>
                     <button
                       onClick={handleAddItemToCollection}
-                      disabled={!selectedProductId || addingItem}
-                      className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={selectedProductIds.length === 0 || addingItem}
+                      className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
-                      {addingItem ? 'Ekleniyor...' : 'Ekle'}
+                      {addingItem 
+                        ? `Ekleniyor... (${selectedProductIds.length})` 
+                        : selectedProductIds.length > 0 
+                          ? `${selectedProductIds.length} Ürün Ekle`
+                          : 'Ekle'}
                     </button>
                   </div>
                 </>
@@ -510,9 +572,9 @@ export default function CollectionDetailPage() {
                 <button
                   onClick={() => {
                     setShowAddItemModal(false);
-                    setSelectedProductId('');
+                    setSelectedProductIds([]);
                   }}
-                  className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors mt-4"
+                  className="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors mt-4 font-medium"
                 >
                   Kapat
                 </button>

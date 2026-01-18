@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { CollectionService } from './collection.service';
 import {
@@ -49,12 +50,14 @@ export class CollectionController {
   async browsePublicCollections(
     @Query('page') page?: number,
     @Query('pageSize') pageSize?: number,
-    @Query('sortBy') sortBy?: 'popular' | 'recent',
+    @Query('sortBy') sortBy?: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc',
+    @Query('search') search?: string,
   ): Promise<CollectionListResponseDto> {
     return this.collectionService.browsePublicCollections(
       page,
       pageSize,
       sortBy,
+      search,
     );
   }
 
@@ -196,12 +199,17 @@ export class CollectionController {
   /**
    * Like a collection
    * POST /collections/:id/like
+   * Accepts both UUID and slug
    */
   @Post(':id/like')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async likeCollection(
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<void> {
-    return this.collectionService.likeCollection(id);
+    @Param('id') idOrSlug: string,
+    @Request() req: any,
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
+    }
+    return this.collectionService.likeCollection(idOrSlug, req.user.id);
   }
 }

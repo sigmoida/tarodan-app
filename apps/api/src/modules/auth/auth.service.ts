@@ -126,9 +126,13 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      // Log unexpected errors
+      // Log unexpected errors with full details
       console.error('Login error:', error);
-      throw new BadRequestException('Giriş işlemi sırasında bir hata oluştu');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      throw new BadRequestException(
+        `Giriş işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -252,6 +256,17 @@ export class AuthService {
     email: string,
     isSeller: boolean,
   ): Promise<TokensDto> {
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not configured in environment variables');
+    }
+
+    if (!jwtRefreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET is not configured in environment variables');
+    }
+
     const accessPayload: JwtPayload = {
       sub: userId,
       email,
@@ -266,18 +281,23 @@ export class AuthService {
       type: 'refresh',
     };
 
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(accessPayload, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
-      }),
-      this.jwtService.signAsync(refreshPayload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
-      }),
-    ]);
+    try {
+      const [accessToken, refreshToken] = await Promise.all([
+        this.jwtService.signAsync(accessPayload, {
+          secret: jwtSecret,
+          expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
+        }),
+        this.jwtService.signAsync(refreshPayload, {
+          secret: jwtRefreshSecret,
+          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
+        }),
+      ]);
 
-    return { accessToken, refreshToken };
+      return { accessToken, refreshToken };
+    } catch (error) {
+      console.error('Token generation error:', error);
+      throw new Error(`Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**

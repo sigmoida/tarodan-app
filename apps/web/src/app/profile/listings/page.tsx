@@ -67,10 +67,13 @@ export default function ProfileListingsPage() {
     setIsLoading(true);
     try {
       const params: Record<string, any> = {};
-      if (activeFilter) params.status = activeFilter;
+      if (activeFilter && activeFilter.trim() !== '') {
+        params.status = activeFilter;
+      }
       
       const response = await userApi.getMyProducts(params);
-      const data = response.data.data || response.data.products || response.data || [];
+      console.log('Listings API response:', response.data);
+      const data = response.data?.data || response.data?.products || response.data || [];
       setListings(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('Failed to fetch listings:', error);

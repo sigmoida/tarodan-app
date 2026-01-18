@@ -457,7 +457,7 @@ export class ProductService {
 
     const where: Prisma.ProductWhereInput = {
       sellerId,
-      status: status, // Allow filtering by status for own products
+      ...(status && status.trim() !== '' ? { status: status as ProductStatus } : {}), // Allow filtering by status for own products
     };
 
     const total = await this.prisma.product.count({ where });

@@ -99,6 +99,7 @@ export class CollectionResponseDto {
   likeCount: number;
   itemCount: number;
   items?: CollectionItemResponseDto[];
+  isLiked?: boolean; // Whether the current user has liked this collection
   createdAt: Date;
   updatedAt: Date;
 }

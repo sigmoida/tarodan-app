@@ -349,14 +349,15 @@ function SearchContent() {
                     <Link
                       key={product.id}
                       href={`/listings/${product.id}`}
-                      className="bg-dark-800 rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all group"
+                      className="bg-white rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all group shadow-sm border border-gray-200"
                     >
-                      <div className="aspect-square relative">
+                      <div className="aspect-square relative bg-gray-100">
                         <Image
                           src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                           alt={product.title}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform"
+                          unoptimized
                         />
                         {product.isTradeEnabled && (
                           <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
@@ -364,24 +365,24 @@ function SearchContent() {
                             Takas
                           </span>
                         )}
-                        <button className="absolute top-2 right-2 p-2 bg-dark-900/70 rounded-full hover:bg-dark-900 transition-colors">
-                          <HeartIcon className="h-5 w-5 text-white" />
+                        <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm">
+                          <HeartIcon className="h-5 w-5 text-gray-700" />
                         </button>
                       </div>
                       <div className="p-4">
-                        <h3 className="text-white font-medium line-clamp-2 mb-2">
+                        <h3 className="text-gray-900 font-medium line-clamp-2 mb-2">
                           {product.title}
                         </h3>
                         <div className="flex items-center justify-between">
-                          <span className="text-primary-400 font-bold text-lg">
+                          <span className="text-primary-500 font-bold text-lg">
                             ₺{product.price?.toLocaleString()}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-600">
                             {getConditionLabel(product.condition)}
                           </span>
                         </div>
                         {product.category && (
-                          <p className="text-gray-500 text-sm mt-2">
+                          <p className="text-gray-600 text-sm mt-2">
                             {product.category.name}
                           </p>
                         )}

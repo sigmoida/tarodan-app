@@ -1,0 +1,349 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
+import { useAuthStore } from '@/stores/authStore';
+import { collectionsApi } from '@/lib/api';
+
+interface Collection {
+  id: string;
+  userId: string;
+  userName: string;
+  name: string;
+  slug: string;
+  description?: string;
+  coverImageUrl?: string;
+  isPublic: boolean;
+  viewCount: number;
+  likeCount: number;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// UUID format checker
+const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+export default function EditCollectionPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuthStore();
+  const collectionIdOrSlug = params.id as string;
+
+  const [collection, setCollection] = useState<Collection | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Form state
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
+    }
+
+    if (collectionIdOrSlug) {
+      fetchCollection();
+    }
+  }, [collectionIdOrSlug, isAuthenticated, user]);
+
+  const fetchCollection = async () => {
+    if (!collectionIdOrSlug) {
+      setError('Geçersiz koleksiyon bağlantısı');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Try UUID endpoint first if it looks like a UUID, otherwise try slug
+      let response;
+      if (isUUID(collectionIdOrSlug)) {
+        response = await collectionsApi.getOne(collectionIdOrSlug);
+      } else {
+        response = await collectionsApi.getBySlug(collectionIdOrSlug);
+      }
+      const data = response.data.collection || response.data;
+      setCollection(data);
+
+      // Check if user is the owner
+      if (data.userId !== user?.id) {
+        setError('Bu koleksiyonu düzenleme yetkiniz yok');
+        setIsLoading(false);
+        return;
+      }
+
+      // Populate form with existing data
+      setName(data.name || '');
+      setDescription(data.description || '');
+      setCoverImageUrl(data.coverImageUrl || '');
+      setIsPublic(data.isPublic ?? true);
+    } catch (error: any) {
+      console.error('Fetch collection error:', error);
+      setError(error.response?.data?.message || 'Koleksiyon yüklenemedi');
+      toast.error('Koleksiyon yüklenemedi');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      toast.error('Koleksiyon adı gereklidir');
+      return;
+    }
+
+    if (!collection) {
+      toast.error('Koleksiyon bulunamadı');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await collectionsApi.update(collection.id, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        coverImageUrl: coverImageUrl.trim() || undefined,
+        isPublic,
+      });
+      
+      toast.success('Koleksiyon güncellendi');
+      // Use slug if available, otherwise use ID
+      const redirectPath = collection.slug || collection.id;
+      router.push(`/collections/${redirectPath}`);
+    } catch (error: any) {
+      console.error('Update collection error:', error);
+      toast.error(error.response?.data?.message || 'Koleksiyon güncellenemedi');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!collection) {
+      toast.error('Koleksiyon bulunamadı');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await collectionsApi.delete(collection.id);
+      toast.success('Koleksiyon silindi');
+      router.push('/collections');
+    } catch (error: any) {
+      console.error('Delete collection error:', error);
+      toast.error(error.response?.data?.message || 'Koleksiyon silinemedi');
+      setIsDeleting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !collection) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error || 'Koleksiyon bulunamadı'}</p>
+          <button
+            onClick={() => router.push('/collections')}
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          >
+            Koleksiyonlara Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+            <span>Geri</span>
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900">Koleksiyonu Düzenle</h1>
+        </div>
+
+        {/* Form */}
+        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Koleksiyon Adı *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Örn: Hot Wheels Koleksiyonum"
+                required
+                minLength={3}
+                maxLength={100}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                {name.length}/100 karakter
+              </p>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Açıklama
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Koleksiyonunuz hakkında bilgi verin..."
+                rows={5}
+                maxLength={500}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                {description.length}/500 karakter
+              </p>
+            </div>
+
+            {/* Cover Image URL */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Kapak Görseli URL
+              </label>
+              <input
+                type="url"
+                value={coverImageUrl}
+                onChange={(e) => setCoverImageUrl(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="https://example.com/image.jpg"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Koleksiyonunuz için bir kapak görseli ekleyebilirsiniz
+              </p>
+              {coverImageUrl && (
+                <div className="mt-3">
+                  <img
+                    src={coverImageUrl}
+                    alt="Kapak önizleme"
+                    className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Public/Private */}
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="w-5 h-5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Herkese açık koleksiyon
+              </label>
+            </div>
+            <p className="text-sm text-gray-500 -mt-4">
+              {isPublic
+                ? 'Koleksiyonunuz herkes tarafından görüntülenebilir'
+                : 'Koleksiyonunuz sadece siz tarafından görüntülenebilir'}
+            </p>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-4 pt-4 border-t border-gray-200">
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving || !name.trim()}
+                  className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isSaving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+                </button>
+              </div>
+              
+              {/* Delete Button */}
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium"
+              >
+                <TrashIcon className="w-5 h-5" />
+                Koleksiyonu Sil
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">
+              Koleksiyonu Sil
+            </h2>
+            <p className="text-gray-700 mb-6">
+              Bu koleksiyonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve koleksiyonunuzdaki tüm ürünler koleksiyondan kaldırılacaktır.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Siliniyor...' : 'Evet, Sil'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, MembershipTier } from '@prisma/client';
+import { PrismaClient, AdminRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -10,11 +10,12 @@ async function main() {
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
 
   // Check if admin exists
-  const existingAdmin = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { email: adminEmail },
+    include: { adminUser: true },
   });
 
-  if (existingAdmin) {
+  if (existingUser?.adminUser) {
     console.log('✅ Admin user already exists');
     return;
   }
@@ -22,24 +23,48 @@ async function main() {
   // Hash password
   const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
-  // Create admin user
-  const admin = await prisma.user.create({
-    data: {
-      email: adminEmail,
-      passwordHash: hashedPassword,
-      displayName: 'Admin',
-      firstName: 'System',
-      lastName: 'Administrator',
-      role: UserRole.ADMIN,
-      membershipTier: MembershipTier.BUSINESS,
-      isVerified: true,
-      isSeller: true,
+  // Create or get user
+  let user = existingUser;
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash: hashedPassword,
+        displayName: 'Super Admin',
+        isVerified: true,
+        isEmailVerified: true,
+        isSeller: false,
+      },
+    });
+  } else {
+    // Update password if user exists but not admin
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: hashedPassword },
+    });
+  }
+
+  // Create admin user record
+  const adminUser = await prisma.adminUser.upsert({
+    where: { userId: user.id },
+    update: {
+      role: AdminRole.super_admin,
+      permissions: { all: true },
+      isActive: true,
+    },
+    create: {
+      userId: user.id,
+      role: AdminRole.super_admin,
+      permissions: { all: true },
+      isActive: true,
     },
   });
 
   console.log('✅ Admin user created successfully!');
   console.log(`   Email: ${adminEmail}`);
-  console.log(`   ID: ${admin.id}`);
+  console.log(`   User ID: ${user.id}`);
+  console.log(`   Admin ID: ${adminUser.id}`);
+  console.log(`   Role: ${adminUser.role}`);
   console.log('');
   console.log('⚠️  Remember to change the default password!');
 }

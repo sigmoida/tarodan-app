@@ -231,12 +231,11 @@ export class SearchService implements OnModuleInit {
         size: pageSize,
       });
 
-      const body = response.body;
-      const hits = body.hits.hits;
+      const hits = response.hits.hits;
       const total =
-        typeof body.hits.total === 'number'
-          ? body.hits.total
-          : body.hits.total?.value || 0;
+        typeof response.hits.total === 'number'
+          ? response.hits.total
+          : (response.hits.total as any)?.value || 0;
 
       return {
         results: hits.map((hit: any) => ({
@@ -254,7 +253,7 @@ export class SearchService implements OnModuleInit {
         total,
         page,
         pageSize,
-        took: body.took,
+        took: response.took,
       };
     } catch (error) {
       console.error('Elasticsearch search error:', error);
@@ -418,7 +417,7 @@ export class SearchService implements OnModuleInit {
         size: limit,
       });
 
-      return response.body.hits.hits.map((hit: any) => hit._source.title);
+      return response.hits.hits.map((hit: any) => hit._source.title);
     } catch (error) {
       console.error('Elasticsearch autocomplete error:', error);
       return [];
@@ -519,7 +518,7 @@ export class SearchService implements OnModuleInit {
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: {
-          documentCount: response.body.count,
+          documentCount: response.count,
           lastSyncedAt: new Date(),
         },
       });

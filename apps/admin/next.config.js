@@ -18,7 +18,22 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'placehold.co',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'storage.tarodan.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'autopartia.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'autopartia.com',
         pathname: '/**',
       },
     ],

@@ -15,10 +15,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   BoltIcon,
+  FolderPlusIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
-import { listingsApi, wishlistApi } from '@/lib/api';
+import { listingsApi, wishlistApi, collectionsApi } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -64,7 +65,7 @@ export default function ListingDetailPage() {
   const id = params.id as string;
   
   const { addToCart } = useCartStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user, limits } = useAuthStore();
   
   const [listing, setListing] = useState<Listing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,6 +73,10 @@ export default function ListingDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+  const [addingToCollection, setAddingToCollection] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -134,6 +139,50 @@ export default function ListingDetailPage() {
   const handleBuyNow = () => {
     if (!listing) return;
     router.push(`/checkout?productId=${listing.id}`);
+  };
+
+  const isOwner = listing && (listing.sellerId === user?.id || listing.seller?.id === user?.id);
+
+  const handleOpenCollectionModal = async () => {
+    if (!isAuthenticated || !user) {
+      toast.error('Koleksiyona eklemek için giriş yapmalısınız');
+      return;
+    }
+    
+    if (!limits?.canCreateCollections) {
+      toast.error('Koleksiyon oluşturma özelliği üyeliğinizde mevcut değil');
+      router.push('/pricing');
+      return;
+    }
+
+    setShowCollectionModal(true);
+    setLoadingCollections(true);
+    try {
+      const response = await collectionsApi.getMyCollections();
+      const data = response.data?.collections || response.data?.data || [];
+      setCollections(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch collections:', error);
+      toast.error('Koleksiyonlar yüklenemedi');
+    } finally {
+      setLoadingCollections(false);
+    }
+  };
+
+  const handleAddToCollection = async (collectionId: string) => {
+    if (!listing) return;
+    
+    setAddingToCollection(true);
+    try {
+      await collectionsApi.addItem(collectionId, { productId: listing.id });
+      toast.success('Ürün koleksiyona eklendi');
+      setShowCollectionModal(false);
+    } catch (error: any) {
+      console.error('Failed to add to collection:', error);
+      toast.error(error.response?.data?.message || 'Koleksiyona eklenemedi');
+    } finally {
+      setAddingToCollection(false);
+    }
   };
 
   const handleToggleFavorite = async () => {
@@ -259,6 +308,7 @@ export default function ListingDetailPage() {
                 alt={listing.title}
                 fill
                 className="object-cover"
+                unoptimized
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
                 }}
@@ -513,10 +563,82 @@ export default function ListingDetailPage() {
                 </button>
               </div>
             </div>
+
+            {/* Add to Collection Button - Only for owner */}
+            {isOwner && limits?.canCreateCollections && (
+              <div className="pt-3 border-t border-gray-200">
+                <button
+                  onClick={handleOpenCollectionModal}
+                  className="w-full btn-secondary flex items-center justify-center gap-2"
+                >
+                  <FolderPlusIcon className="w-5 h-5" />
+                  Koleksiyona Ekle
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Add to Collection Modal */}
+      {showCollectionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Koleksiyona Ekle</h2>
+            
+            {loadingCollections ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-2">
+                  {collections.length > 0 ? (
+                    collections.map((collection) => (
+                      <button
+                        key={collection.id}
+                        onClick={() => handleAddToCollection(collection.id)}
+                        disabled={addingToCollection}
+                        className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <h3 className="font-medium text-gray-900">{collection.name}</h3>
+                        {collection.description && (
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{collection.description}</p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-2">
+                          {collection.itemCount || 0} ürün
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-gray-600 text-center py-8">Henüz koleksiyonunuz yok</p>
+                  )}
+                  
+                  {/* New Collection Button */}
+                  <button
+                    onClick={() => {
+                      setShowCollectionModal(false);
+                      router.push('/collections');
+                    }}
+                    className="w-full p-4 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-300 rounded-lg transition-colors text-primary-700 font-medium"
+                  >
+                    + Yeni Koleksiyon Oluştur
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowCollectionModal(false)}
+                className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

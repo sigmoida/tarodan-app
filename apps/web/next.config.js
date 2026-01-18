@@ -30,6 +30,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'storage.tarodan.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'autopartia.com',
+      },
+      {
+        protocol: 'http',
+        hostname: 'autopartia.com',
+      },
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

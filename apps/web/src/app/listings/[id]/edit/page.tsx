@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { listingsApi, api } from '@/lib/api';
@@ -48,21 +48,15 @@ const SCALES = [
   'Diğer',
 ];
 
-interface ListingLimits {
-  currentCount: number;
-  maxFreeListings: number;
-  canCreateListing: boolean;
-  isPremium: boolean;
-  membershipTier: string;
-}
-
-export default function NewListingPage() {
+export default function EditListingPage() {
+  const params = useParams();
   const router = useRouter();
-  const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
+  const id = params.id as string;
+  const { isAuthenticated, user, limits } = useAuthStore();
+  
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [listingLimits, setListingLimits] = useState<ListingLimits | null>(null);
-  const [limitsLoading, setLimitsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -73,58 +67,51 @@ export default function NewListingPage() {
     scale: '1:64',
     isTradeEnabled: false,
     imageUrls: [] as string[],
+    status: 'active' as string,
   });
   const [newImageUrl, setNewImageUrl] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('İlan oluşturmak için giriş yapmalısınız');
-      router.push('/login?redirect=/listings/new');
+      toast.error('İlan düzenlemek için giriş yapmalısınız');
+      router.push('/login');
       return;
     }
+    fetchListing();
     fetchCategories();
-    // Refresh user data first, then update limits
-    refreshUser().then(() => {
-      updateListingLimits();
-    });
-  }, [isAuthenticated]);
+  }, [id, isAuthenticated]);
 
-  // Update limits whenever user or limits change
-  useEffect(() => {
-    if (user && limits) {
-      updateListingLimits();
-    }
-  }, [user, limits]);
-
-  const updateListingLimits = () => {
-    setLimitsLoading(true);
+  const fetchListing = async () => {
+    setIsFetching(true);
     try {
-      // Use auth store for membership info
-      const membershipTier = user?.membershipTier || 'free';
-      const currentCount = user?.listingCount || 0;
-      const maxListings = limits?.maxListings ?? 10;
-      const isPremium = membershipTier === 'premium' || membershipTier === 'business';
-      const isUnlimited = maxListings === -1;
+      const response = await listingsApi.getOne(id);
+      const listing = response.data.product || response.data;
+      
+      // Check if user is the owner
+      if (listing.sellerId !== user?.id && listing.seller?.id !== user?.id) {
+        toast.error('Bu ilanı düzenleme yetkiniz yok');
+        router.push(`/listings/${id}`);
+        return;
+      }
 
-      setListingLimits({
-        currentCount,
-        maxFreeListings: isUnlimited ? -1 : maxListings,
-        canCreateListing: isUnlimited || currentCount < maxListings,
-        isPremium,
-        membershipTier,
+      setFormData({
+        title: listing.title || '',
+        description: listing.description || '',
+        price: listing.price?.toString() || '',
+        categoryId: listing.categoryId || listing.category?.id || '',
+        condition: listing.condition || 'very_good',
+        brand: listing.brand || '',
+        scale: listing.scale || '1:64',
+        isTradeEnabled: listing.isTradeEnabled || listing.trade_available || false,
+        imageUrls: listing.images?.map((img: any) => img.url || img) || [],
+        status: listing.status || 'active',
       });
-    } catch (error) {
-      console.error('Failed to update listing limits:', error);
-      // Default to allowing listing creation
-      setListingLimits({
-        currentCount: 0,
-        maxFreeListings: 10,
-        canCreateListing: true,
-        isPremium: false,
-        membershipTier: 'free',
-      });
+    } catch (error: any) {
+      console.error('Failed to fetch listing:', error);
+      toast.error(error.response?.data?.message || 'İlan yüklenemedi');
+      router.push(`/listings/${id}`);
     } finally {
-      setLimitsLoading(false);
+      setIsFetching(false);
     }
   };
 
@@ -135,7 +122,6 @@ export default function NewListingPage() {
       setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      toast.error('Kategoriler yüklenemedi');
     }
   };
 
@@ -181,12 +167,6 @@ export default function NewListingPage() {
       return;
     }
 
-    // Check listing limit
-    if (listingLimits && !listingLimits.canCreateListing) {
-      toast.error(`Ücretsiz ilan limitinize ulaştınız (${listingLimits.maxFreeListings}/${listingLimits.maxFreeListings}). Premium üyelik alarak daha fazla ilan oluşturabilirsiniz.`);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const payload = {
@@ -199,14 +179,15 @@ export default function NewListingPage() {
         scale: formData.scale || undefined,
         isTradeEnabled: formData.isTradeEnabled,
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
+        status: formData.status,
       };
 
-      await listingsApi.create(payload as any);
-      toast.success('İlanınız oluşturuldu! Onay bekliyor.');
-      router.push('/profile/listings?status=pending');
+      await listingsApi.update(id, payload as any);
+      toast.success('İlanınız güncellendi!');
+      router.push(`/listings/${id}`);
     } catch (error: any) {
-      console.error('Failed to create listing:', error);
-      toast.error(error.response?.data?.message || 'İlan oluşturulamadı');
+      console.error('Failed to update listing:', error);
+      toast.error(error.response?.data?.message || 'İlan güncellenemedi');
     } finally {
       setIsLoading(false);
     }
@@ -214,15 +195,26 @@ export default function NewListingPage() {
 
   const flatCategories = flattenCategories(categories);
 
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
-          href="/listings"
+          href={`/listings/${id}`}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeftIcon className="w-5 h-5" />
-          İlanlara Dön
+          İlana Dön
         </Link>
 
         <motion.div
@@ -230,58 +222,10 @@ export default function NewListingPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-2xl shadow-sm p-6 md:p-8"
         >
-          <h1 className="text-3xl font-bold mb-2">Yeni İlan Oluştur</h1>
-          <p className="text-gray-600 mb-4">
-            Ürününüzü koleksiyoncularla buluşturun. İlk ilanınızı oluşturduğunuzda otomatik olarak satıcı hesabınız aktifleşir.
+          <h1 className="text-3xl font-bold mb-2">İlanı Düzenle</h1>
+          <p className="text-gray-600 mb-6">
+            İlan bilgilerinizi güncelleyin.
           </p>
-
-          {/* Listing Limit Info */}
-          {limitsLoading ? (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-            </div>
-          ) : listingLimits && (
-            <div className={`mb-6 p-4 rounded-xl border ${
-              listingLimits.isPremium 
-                ? 'bg-yellow-50 border-yellow-200' 
-                : listingLimits.canCreateListing 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`font-medium ${
-                    listingLimits.isPremium 
-                      ? 'text-yellow-800' 
-                      : listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'
-                  }`}>
-                    {listingLimits.maxFreeListings === -1 
-                      ? `Mevcut İlan: ${listingLimits.currentCount} (Sınırsız)`
-                      : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxFreeListings}`
-                    }
-                  </p>
-                  <p className={`text-sm ${
-                    listingLimits.isPremium 
-                      ? 'text-yellow-600' 
-                      : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {listingLimits.membershipTier.charAt(0).toUpperCase() + listingLimits.membershipTier.slice(1)} üyelik
-                    {listingLimits.isPremium && ' ⭐'}
-                  </p>
-                </div>
-                {!listingLimits.canCreateListing && (
-                  <Link href="/pricing" className="btn-primary text-sm">
-                    Premium'a Geç
-                  </Link>
-                )}
-                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.maxFreeListings !== -1 && listingLimits.currentCount >= listingLimits.maxFreeListings - 2 && (
-                  <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                    Sınırsız ilan için →
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Title */}
@@ -501,9 +445,6 @@ export default function NewListingPage() {
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Görsel URL'lerini ekleyin. İleride dosya yükleme özelliği eklenecektir.
-              </p>
             </div>
 
             {/* Submit */}
@@ -520,7 +461,7 @@ export default function NewListingPage() {
                 disabled={isLoading}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Oluşturuluyor...' : 'İlanı Oluştur'}
+                {isLoading ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
               </button>
             </div>
           </form>

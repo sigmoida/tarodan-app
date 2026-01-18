@@ -319,6 +319,7 @@ const ModerationPage = () => {
                           alt={item.title}
                           fill
                           className="object-cover"
+                          unoptimized
                         />
                       </div>
                     ) : (

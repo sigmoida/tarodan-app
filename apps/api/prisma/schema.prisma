@@ -231,6 +231,7 @@ model User {
 
   // Relations - GAP-012: Collections
   collections       Collection[]
+  collectionLikes   CollectionLike[]
 
   // Relations - GAP-013: Support Tickets
   supportTickets    SupportTicket[]   @relation("TicketCreator")
@@ -892,6 +893,7 @@ model Collection {
   // Relations
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   items        CollectionItem[]
+  likes        CollectionLike[]
 
   @@unique([userId, slug])
   @@index([userId])
@@ -913,6 +915,22 @@ model CollectionItem {
 
   @@unique([collectionId, productId])
   @@map("collection_items")
+}
+
+model CollectionLike {
+  id           String   @id @default(uuid())
+  collectionId String   @map("collection_id")
+  userId      String   @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, userId])
+  @@index([collectionId])
+  @@index([userId])
+  @@map("collection_likes")
 }
 
 // =============================================================================

@@ -54,8 +54,8 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   basic: {
     maxListings: 25,
     maxImagesPerListing: 10,
-    canTrade: false,
-    canCreateCollections: false,
+    canTrade: true,
+    canCreateCollections: true,
   },
   premium: {
     maxListings: -1,
