@@ -112,6 +112,8 @@ export class MembershipService {
       canTrade: membership.tier.canTrade,
       canCreateCollection: membership.tier.canCreateCollections,
       maxImages: membership.tier.maxImagesPerListing,
+      maxFreeListings: membership.tier.maxFreeListings,
+      maxTotalListings: membership.tier.maxTotalListings,
       remainingFreeListings: membership.remainingFreeListings,
       remainingTotalListings: membership.remainingTotalListings,
       remainingFeaturedSlots: membership.remainingFeaturedSlots,

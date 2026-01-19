@@ -889,7 +889,14 @@ async function main() {
 
   const products: any[] = [];
   const sellers = users.filter(u => u.isSeller);
-  const statuses = [ProductStatus.active, ProductStatus.active, ProductStatus.active, ProductStatus.active, ProductStatus.reserved, ProductStatus.sold, ProductStatus.pending];
+  // More pending products for admin testing (40% pending, 40% active, 10% reserved, 5% sold, 5% inactive)
+  const statuses = [
+    ProductStatus.pending, ProductStatus.pending, ProductStatus.pending, ProductStatus.pending, // 40% pending
+    ProductStatus.active, ProductStatus.active, ProductStatus.active, ProductStatus.active, // 40% active
+    ProductStatus.reserved, ProductStatus.reserved, // 10% reserved
+    ProductStatus.sold, // 5% sold
+    ProductStatus.inactive, // 5% inactive
+  ];
 
   // Create 100+ products
   for (let i = 0; i < 120; i++) {

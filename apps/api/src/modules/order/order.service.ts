@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, Prisma } from '@prisma/client';
 import { EventService } from '../events';
@@ -31,7 +32,21 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
+    private readonly cache: CacheService,
   ) {}
+
+  /**
+   * Invalidate product caches when product status changes
+   */
+  private async invalidateProductCaches(productId: string): Promise<void> {
+    try {
+      await this.cache.del(`products:detail:${productId}`);
+      await this.cache.delPattern('products:list:*');
+      this.logger.log(`Product cache invalidated for ${productId}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate product cache: ${error}`);
+    }
+  }
 
   /**
    * Generate unique order number
@@ -259,7 +274,7 @@ export class OrderService {
    * - Cannot buy own product
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Get product with seller info - using Prisma instead of raw SQL
       // Transaction provides isolation for concurrent purchases
       const product = await tx.product.findUnique({
@@ -301,17 +316,34 @@ export class OrderService {
         shippingAddress = savedAddress;
         shippingAddressId = savedAddress.id;
       } else if (dto.shippingAddress) {
+        // Validate required fields
+        if (!dto.shippingAddress.fullName?.trim()) {
+          throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+        }
+        if (!dto.shippingAddress.phone?.trim()) {
+          throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+        }
+        if (!dto.shippingAddress.city?.trim()) {
+          throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+        }
+        if (!dto.shippingAddress.district?.trim()) {
+          throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+        }
+        if (!dto.shippingAddress.address?.trim()) {
+          throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
+        }
+        
         // Use inline address object - create a new address for the user
         const newAddress = await tx.address.create({
           data: {
             userId: buyerId,
             title: 'Sipariş Adresi',
-            fullName: dto.shippingAddress.fullName,
-            phone: dto.shippingAddress.phone,
-            city: dto.shippingAddress.city,
-            district: dto.shippingAddress.district,
-            address: dto.shippingAddress.address,
-            zipCode: dto.shippingAddress.zipCode || null,
+            fullName: dto.shippingAddress.fullName.trim(),
+            phone: dto.shippingAddress.phone.trim(),
+            city: dto.shippingAddress.city.trim(),
+            district: dto.shippingAddress.district.trim(),
+            address: dto.shippingAddress.address.trim(),
+            zipCode: dto.shippingAddress.zipCode?.trim() || null,
             isDefault: false,
           },
         });
@@ -426,10 +458,16 @@ export class OrderService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount,
+        productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
         provider: 'iyzico', // Default provider
       };
     });
+
+    // Invalidate product cache after successful transaction
+    await this.invalidateProductCaches(result.productId);
+    
+    return result;
   }
 
   /**
@@ -442,7 +480,9 @@ export class OrderService {
    * - Commission is calculated automatically
    */
   async create(buyerId: string, dto: CreateOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
+    let productIdForCache: string | null = null;
+    
+    const result = await this.prisma.$transaction(async (tx) => {
       // Get and validate offer
       const offer = await tx.offer.findUnique({
         where: { id: dto.offerId },
@@ -562,8 +602,18 @@ export class OrderService {
         data: { status: ProductStatus.sold },
       });
 
+      // Store productId for cache invalidation
+      productIdForCache = offer.productId;
+
       return this.formatOrderResponse(order, buyerId);
     });
+
+    // Invalidate product cache after successful transaction
+    if (productIdForCache) {
+      await this.invalidateProductCaches(productIdForCache);
+    }
+    
+    return result;
   }
 
   /**
@@ -571,7 +621,7 @@ export class OrderService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Get product
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
@@ -608,16 +658,24 @@ export class OrderService {
         finalPrice = Number(offer.amount);
       }
 
-      // Create or get guest user
-      let guestUser = await tx.user.findFirst({
-        where: {
-          email: dto.email,
-          displayName: { startsWith: 'GUEST_' },
-        },
+      // Check if user already exists with this email
+      let existingUser = await tx.user.findUnique({
+        where: { email: dto.email },
       });
 
-      if (!guestUser) {
-        // Create a guest user
+      let guestUser;
+      
+      if (existingUser) {
+        // If the user is a registered (non-guest) user, throw error
+        if (!existingUser.displayName?.startsWith('GUEST_')) {
+          throw new BadRequestException(
+            'Bu e-posta adresi kayıtlı bir hesaba ait. Lütfen giriş yaparak devam edin veya farklı bir e-posta adresi kullanın.'
+          );
+        }
+        // Use existing guest user
+        guestUser = existingUser;
+      } else {
+        // Create a new guest user
         const guestId = `GUEST_${Date.now()}`;
         guestUser = await tx.user.create({
           data: {
@@ -629,6 +687,23 @@ export class OrderService {
             isSeller: false,
           },
         });
+      }
+
+      // Validate shipping address for guest checkout
+      if (!dto.shippingAddress?.fullName?.trim()) {
+        throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+      }
+      if (!dto.shippingAddress?.phone?.trim()) {
+        throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+      }
+      if (!dto.shippingAddress?.city?.trim()) {
+        throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+      }
+      if (!dto.shippingAddress?.district?.trim()) {
+        throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+      }
+      if (!dto.shippingAddress?.address?.trim()) {
+        throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
       }
 
       // Calculate commission with category-based matching (3.3)
@@ -653,12 +728,12 @@ export class OrderService {
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
           shippingAddress: {
-            fullName: dto.shippingAddress.fullName,
-            phone: dto.shippingAddress.phone,
-            city: dto.shippingAddress.city,
-            district: dto.shippingAddress.district,
-            address: dto.shippingAddress.address,
-            zipCode: dto.shippingAddress.zipCode,
+            fullName: dto.shippingAddress.fullName.trim(),
+            phone: dto.shippingAddress.phone.trim(),
+            city: dto.shippingAddress.city.trim(),
+            district: dto.shippingAddress.district.trim(),
+            address: dto.shippingAddress.address.trim(),
+            zipCode: dto.shippingAddress.zipCode?.trim() || null,
           },
           // Store guest info in metadata
         },
@@ -696,8 +771,14 @@ export class OrderService {
         ...this.formatOrderResponse(order, guestUser.id),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
+        productId: dto.productId, // Include for cache invalidation
       };
     });
+
+    // Invalidate product cache after successful transaction
+    await this.invalidateProductCaches(dto.productId);
+    
+    return result;
   }
 
   /**

@@ -48,6 +48,7 @@ interface Listing {
   condition?: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
+  status?: 'pending' | 'active' | 'reserved' | 'sold' | 'inactive' | 'rejected';
   sellerId?: string;
   seller?: {
     id: string;
@@ -219,6 +220,12 @@ export default function ListingDetailPage() {
   const handleAddToCart = async () => {
     if (!listing) return;
     
+    // Check if product is available
+    if (listing.status && listing.status !== 'active') {
+      toast.error('Bu ürün şu anda satışta değil');
+      return;
+    }
+    
     setIsAddingToCart(true);
     try {
       await addToCart({
@@ -263,6 +270,19 @@ export default function ListingDetailPage() {
 
   const handleBuyNow = () => {
     if (!listing) return;
+    
+    // Check if product is available for purchase
+    if (listing.status && listing.status !== 'active') {
+      if (listing.status === 'reserved') {
+        toast.error('Bu ürün şu anda başka bir alıcı tarafından satın alınıyor');
+      } else if (listing.status === 'sold') {
+        toast.error('Bu ürün satılmıştır');
+      } else {
+        toast.error('Bu ürün şu anda satışta değil');
+      }
+      return;
+    }
+    
     router.push(`/checkout?productId=${listing.id}`);
   };
 
@@ -632,7 +652,7 @@ export default function ListingDetailPage() {
                       openLightbox(index);
                     }}
                     className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                      index === activeImageIndex ? 'border-primary-500' : 'border-transparent'
+                      index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
                     }`}
                   >
                     <Image src={img} alt="" fill className="object-cover" unoptimized />
@@ -748,7 +768,7 @@ export default function ListingDetailPage() {
                         }}
                         className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
                           index === lightboxImageIndex 
-                            ? 'border-primary-500' 
+                            ? 'border-orange-500' 
                             : 'border-white/20 hover:border-white/40'
                         }`}
                       >
@@ -874,7 +894,7 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-primary-500 mb-6">
+            <p className="text-4xl font-bold text-orange-500 mb-6">
               ₺{Number(listing.price).toLocaleString('tr-TR')}
             </p>
 
@@ -925,12 +945,12 @@ export default function ListingDetailPage() {
               <div className="bg-white rounded-xl p-4 mb-6">
                 <div className="flex items-center gap-4">
                   <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary-500 transition-all">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
                       <span className="text-xl">👤</span>
                     </div>
                   </Link>
                   <div className="flex-1">
-                    <Link href={`/seller/${listing.seller.id}`} className="font-semibold hover:text-primary-500 transition-colors">
+                    <Link href={`/seller/${listing.seller.id}`} className="font-semibold hover:text-orange-500 transition-colors">
                       {listing.seller.displayName || listing.seller.username || 'Satıcı'}
                     </Link>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -958,7 +978,7 @@ export default function ListingDetailPage() {
                         setAuthModalConfig({
                           title: 'Satıcıya Mesaj Gönder',
                           message: 'Satıcıyla iletişime geçmek için giriş yapmanız gerekiyor.',
-                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-primary-500" />,
+                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-orange-500" />,
                         });
                         setShowAuthModal(true);
                       }}
@@ -972,15 +992,60 @@ export default function ListingDetailPage() {
               </div>
             )}
 
+            {/* Product Status Banner */}
+            {listing.status && listing.status !== 'active' && (
+              <div className={`rounded-xl p-4 mb-4 ${
+                listing.status === 'reserved' 
+                  ? 'bg-yellow-50 border border-yellow-200' 
+                  : listing.status === 'sold' 
+                    ? 'bg-red-50 border border-red-200'
+                    : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <ExclamationTriangleIcon className={`w-6 h-6 ${
+                    listing.status === 'reserved' 
+                      ? 'text-yellow-600' 
+                      : listing.status === 'sold' 
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                  }`} />
+                  <div>
+                    <p className={`font-semibold ${
+                      listing.status === 'reserved' 
+                        ? 'text-yellow-800' 
+                        : listing.status === 'sold' 
+                          ? 'text-red-800'
+                          : 'text-gray-800'
+                    }`}>
+                      {listing.status === 'reserved' && 'Bu ürün şu anda rezerve edilmiş'}
+                      {listing.status === 'sold' && 'Bu ürün satılmıştır'}
+                      {listing.status === 'pending' && 'Bu ürün onay bekliyor'}
+                      {listing.status === 'inactive' && 'Bu ürün aktif değil'}
+                      {listing.status === 'rejected' && 'Bu ürün reddedilmiş'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {listing.status === 'reserved' && 'Başka bir alıcı tarafından satın alma işlemi devam ediyor.'}
+                      {listing.status === 'sold' && 'Bu ürün artık satışta değil.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="space-y-3">
               {/* Primary Action: Buy Now */}
               <button
                 onClick={handleBuyNow}
-                className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-lg"
+                disabled={listing.status !== 'active'}
+                className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
+                  listing.status === 'active' 
+                    ? 'btn-primary' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                }`}
               >
                 <BoltIcon className="w-6 h-6" />
-                Hemen Al
+                {listing.status === 'sold' ? 'Satıldı' : listing.status === 'reserved' ? 'Rezerve Edildi' : 'Hemen Al'}
               </button>
 
               {/* Secondary Actions */}
@@ -988,11 +1053,15 @@ export default function ListingDetailPage() {
                 {isTradeAvailable && (
                   <button
                     onClick={() => {
+                      if (listing.status !== 'active') {
+                        toast.error('Bu ürün şu anda satışta değil');
+                        return;
+                      }
                       if (!isAuthenticated) {
                         setAuthModalConfig({
                           title: 'Giriş Yapmanız Gerekiyor',
                           message: 'Takas teklifi göndermek için giriş yapmalısınız.',
-                          icon: <ArrowsRightLeftIcon className="w-12 h-12 text-primary-500" />,
+                          icon: <ArrowsRightLeftIcon className="w-12 h-12 text-orange-500" />,
                         });
                         setShowAuthModal(true);
                         return;
@@ -1003,7 +1072,10 @@ export default function ListingDetailPage() {
                       }
                       router.push(`/trades/new?listing=${listing.id}`);
                     }}
-                    className="btn-trade flex-1 flex items-center justify-center gap-2"
+                    disabled={listing.status !== 'active'}
+                    className={`flex-1 flex items-center justify-center gap-2 ${
+                      listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                    }`}
                   >
                     <ArrowsRightLeftIcon className="w-5 h-5" />
                     Takas Teklifi
@@ -1011,8 +1083,14 @@ export default function ListingDetailPage() {
                 )}
                 <button
                   onClick={handleCartToggle}
-                  disabled={isAddingToCart}
-                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isInCart ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                  disabled={isAddingToCart || listing.status !== 'active'}
+                  className={`flex-1 flex items-center justify-center gap-2 ${
+                    listing.status !== 'active' 
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                      : isInCart 
+                        ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                        : 'btn-secondary'
+                  }`}
                 >
                   <ShoppingCartIcon className="w-5 h-5" />
                   {isAddingToCart 
@@ -1055,7 +1133,6 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-<<<<<<< HEAD
       {/* Product Reviews Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
@@ -1089,7 +1166,7 @@ export default function ListingDetailPage() {
 
           {reviewsLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
             </div>
           ) : reviews.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
@@ -1109,8 +1186,8 @@ export default function ListingDetailPage() {
                   className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-primary-600 font-semibold">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-orange-600 font-semibold">
                         {review.user?.displayName?.[0]?.toUpperCase() || '?'}
                       </span>
                     </div>
@@ -1151,7 +1228,7 @@ export default function ListingDetailPage() {
           )}
         </div>
       </div>
-=======
+
       {/* Add to Collection Modal */}
       {showCollectionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -1160,7 +1237,7 @@ export default function ListingDetailPage() {
             
             {loadingCollections ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">
@@ -1192,7 +1269,7 @@ export default function ListingDetailPage() {
                       setShowCollectionModal(false);
                       router.push('/collections');
                     }}
-                    className="w-full p-4 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-300 rounded-lg transition-colors text-primary-700 font-medium"
+                    className="w-full p-4 bg-orange-50 hover:bg-orange-100 border-2 border-dashed border-orange-300 rounded-lg transition-colors text-orange-700 font-medium"
                   >
                     + Yeni Koleksiyon Oluştur
                   </button>
@@ -1211,7 +1288,6 @@ export default function ListingDetailPage() {
           </div>
         </div>
       )}
->>>>>>> 26a0e5d904f5febad581078d9c1fff531dd2cbbf
 
       {/* Auth Required Modal */}
       <AuthRequiredModal
@@ -1249,7 +1325,7 @@ export default function ListingDetailPage() {
               </button>
               <Link
                 href="/membership"
-                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors text-center"
+                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors text-center"
               >
                 Üyeliği Yükselt
               </Link>

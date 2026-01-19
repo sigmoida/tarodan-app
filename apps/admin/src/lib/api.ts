@@ -16,8 +16,22 @@ api.interceptors.request.use(
       const token = localStorage.getItem('admin_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        console.warn('No admin token found in localStorage');
       }
     }
+    
+    // Log request in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Request:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`,
+        hasAuth: !!config.headers.Authorization,
+      });
+    }
+    
     return config;
   },
   (error) => {
@@ -29,6 +43,17 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Log error for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.message,
+        response: error.response?.data,
+      });
+    }
+
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('admin_token');
@@ -36,6 +61,13 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network Error:', error.message);
+      error.message = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+    }
+
     return Promise.reject(error);
   }
 );
@@ -66,7 +98,10 @@ export const adminApi = {
   // Products
   getProducts: (params?: any) => api.get('/admin/products', { params }),
   getProduct: (id: string) => api.get(`/admin/products/${id}`),
-  approveProduct: (id: string, note?: string) => api.post(`/admin/products/${id}/approve`, { note }),
+  approveProduct: (id: string, note?: string) => {
+    const body = note ? { note } : {};
+    return api.post(`/admin/products/${id}/approve`, body);
+  },
   rejectProduct: (id: string, reason: string) => api.post(`/admin/products/${id}/reject`, { reason }),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
   

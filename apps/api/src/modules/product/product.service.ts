@@ -4,9 +4,12 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
+import { MembershipService } from '../membership/membership.service';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma } from '@prisma/client';
 
@@ -15,11 +18,19 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    @Inject(forwardRef(() => MembershipService))
+    private readonly membershipService: MembershipService,
   ) {}
 
   /**
    * Create a new product
    * POST /products
+   * 
+   * Membership Listing Limits:
+   * - Free: 5 free listings, 10 total
+   * - Basic: 15 free listings, 50 total
+   * - Premium: 50 free listings, 200 total
+   * - Business: 200 free listings, 1000 total
    */
   async create(sellerId: string, dto: CreateProductDto) {
     // Verify seller status - auto-enable if not already a seller
@@ -29,6 +40,28 @@ export class ProductService {
 
     if (!seller) {
       throw new ForbiddenException('Kullanıcı bulunamadı');
+    }
+
+    // ========================================================================
+    // MEMBERSHIP LISTING LIMIT CHECK
+    // ========================================================================
+    const canCreate = await this.membershipService.canCreateListing(sellerId);
+    if (!canCreate.allowed) {
+      // Get detailed limits for error message
+      const limits = await this.membershipService.getUserLimits(sellerId);
+      throw new ForbiddenException(
+        `İlan limitinize ulaştınız. Mevcut üyeliğiniz (${limits.tierName}) ile maksimum ${limits.remainingTotalListings + await this.getActiveListingCount(sellerId)} ilan oluşturabilirsiniz. ` +
+        `Daha fazla ilan eklemek için üyeliğinizi yükseltin.`
+      );
+    }
+
+    // Check image limit based on membership tier
+    const limits = await this.membershipService.getUserLimits(sellerId);
+    if (dto.imageUrls && dto.imageUrls.length > limits.maxImages) {
+      throw new BadRequestException(
+        `Üyeliğiniz (${limits.tierName}) ile ilan başına maksimum ${limits.maxImages} görsel yükleyebilirsiniz. ` +
+        `${dto.imageUrls.length} görsel gönderdiniz.`
+      );
     }
 
     // Auto-enable seller mode when user creates their first listing
@@ -348,10 +381,10 @@ export class ProductService {
     if (dto.isTradeEnabled === true) {
       const seller = await this.prisma.user.findUnique({
         where: { id: sellerId },
-        include: { membershipTier: true },
+        include: { membership: { include: { tier: true } } },
       });
       
-      if (!seller?.membershipTier?.canTrade) {
+      if (!seller?.membership?.tier?.canTrade) {
         throw new BadRequestException('Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.');
       }
       canEnableTrade = true;
@@ -548,6 +581,82 @@ export class ProductService {
         : undefined,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
+    };
+  }
+
+  // ==========================================================================
+  // LISTING STATISTICS & LIMITS
+  // ==========================================================================
+
+  /**
+   * Get active listing count for a seller
+   * Active listings include: pending, active, reserved statuses
+   */
+  async getActiveListingCount(sellerId: string): Promise<number> {
+    return this.prisma.product.count({
+      where: {
+        sellerId,
+        status: { in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved] },
+      },
+    });
+  }
+
+  /**
+   * Get detailed listing statistics for a seller
+   * Returns counts by status and membership limit info
+   */
+  async getSellerListingStats(sellerId: string) {
+    // Get all listing counts by status
+    const [pending, active, reserved, sold, rejected, total] = await Promise.all([
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
+      this.prisma.product.count({ where: { sellerId } }),
+    ]);
+
+    // Active listings = pending + active + reserved (counts against limit)
+    const activeListings = pending + active + reserved;
+
+    // Get membership limits
+    const limits = await this.membershipService.getUserLimits(sellerId);
+
+    return {
+      // Counts by status
+      counts: {
+        pending,
+        active,
+        reserved,
+        sold,
+        rejected,
+        total,
+        activeListings, // This counts against the limit
+      },
+      // Membership limits
+      limits: {
+        tierName: limits.tierName,
+        tierType: limits.tierType,
+        maxFreeListings: limits.maxFreeListings,       // Tier's total max free listings
+        maxTotalListings: limits.maxTotalListings,     // Tier's total max listings
+        remainingFreeListings: limits.remainingFreeListings,
+        remainingTotalListings: limits.remainingTotalListings,
+        maxImagesPerListing: limits.maxImages,
+        canCreateListing: limits.canCreateListing,
+        canUseFreeSlot: limits.canUseFreeSlot,
+        canTrade: limits.canTrade,
+        canCreateCollection: limits.canCreateCollection,
+      },
+      // Quick summary for UI
+      summary: {
+        used: activeListings,
+        max: limits.maxTotalListings,                  // Real tier limit
+        remaining: limits.remainingTotalListings,
+        canCreate: limits.canCreateListing,
+        percentUsed: limits.maxTotalListings > 0 
+          ? Math.round((activeListings / limits.maxTotalListings) * 100) 
+          : 0,
+      },
     };
   }
 }

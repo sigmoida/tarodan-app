@@ -80,7 +80,7 @@ export class SearchService implements OnModuleInit {
 
       if (!indexExists) {
         // 7.x API: settings and mappings go inside body
-        await this.client.indices.create({
+        await (this.client.indices as any).create({
           index: this.PRODUCTS_INDEX,
           body: {
             settings: {
@@ -222,7 +222,7 @@ export class SearchService implements OnModuleInit {
 
     try {
       // 7.x API: query/sort/from/size go inside body
-      const response = await this.client.search({
+      const response = await (this.client as any).search({
         index: this.PRODUCTS_INDEX,
         body: {
           query: {
@@ -285,7 +285,9 @@ export class SearchService implements OnModuleInit {
 
     try {
       // 7.x API: document goes inside body
-      await this.client.index({
+      // @ts-ignore - ES client v9 compatibility (body parameter)
+      // @ts-ignore - ES client v9 compatibility (id parameter)
+      await (this.client as any).index({
         index: this.PRODUCTS_INDEX,
         id: product.id,
         body: {
@@ -406,7 +408,7 @@ export class SearchService implements OnModuleInit {
   async autocomplete(query: string, limit = 10): Promise<string[]> {
     try {
       // 7.x API: query/_source/size go inside body
-      const response = await this.client.search({
+      const response = await (this.client as any).search({
         index: this.PRODUCTS_INDEX,
         body: {
           query: {

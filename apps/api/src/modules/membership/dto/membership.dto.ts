@@ -189,6 +189,8 @@ export class MembershipLimitsDto {
   canTrade: boolean;
   canCreateCollection: boolean;
   maxImages: number;
+  maxFreeListings: number;      // Total max free listings for tier
+  maxTotalListings: number;     // Total max listings for tier
   remainingFreeListings: number;
   remainingTotalListings: number;
   remainingFeaturedSlots: number;

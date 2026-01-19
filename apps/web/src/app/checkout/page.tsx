@@ -256,7 +256,8 @@ export default function CheckoutPage() {
     try {
       // Determine checkout mode
       const hasSavedAddress = isAuthenticated && selectedAddressId && addresses.length > 0;
-      const hasFormAddress = newAddress.fullName && newAddress.city && newAddress.district && newAddress.address;
+      // Check if form has all required fields including phone
+      const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
       
       // Get shipping address - prefer saved address for logged-in users, otherwise use form
       let shippingAddress: any;
@@ -289,6 +290,25 @@ export default function CheckoutPage() {
         const phone = isAuthenticated ? (user?.phone || newAddress.phone) : (guestPhone || newAddress.phone);
         const name = isAuthenticated ? (user?.displayName || newAddress.fullName) : (guestName || newAddress.fullName);
         
+        // Validate required contact info for guest users
+        if (!isAuthenticated) {
+          if (!guestName?.trim()) {
+            toast.error('Lütfen adınızı ve soyadınızı girin');
+            setIsLoading(false);
+            return;
+          }
+          if (!guestEmail?.trim()) {
+            toast.error('Lütfen e-posta adresinizi girin');
+            setIsLoading(false);
+            return;
+          }
+          if (!guestPhone?.trim()) {
+            toast.error('Lütfen telefon numaranızı girin');
+            setIsLoading(false);
+            return;
+          }
+        }
+        
         if (!email) {
           toast.error('Lütfen e-posta adresinizi girin');
           setIsLoading(false);
@@ -300,20 +320,50 @@ export default function CheckoutPage() {
           return;
         }
         
+        // Ensure address has a valid phone number
+        const addressPhone = newAddress.phone?.trim() || phone;
+        if (!addressPhone) {
+          toast.error('Lütfen teslimat adresi için telefon numarası girin');
+          setIsLoading(false);
+          return;
+        }
+        
         shippingAddress = {
           fullName: newAddress.fullName,
-          phone: newAddress.phone || phone,
+          phone: addressPhone,
           city: newAddress.city,
           district: newAddress.district,
           address: newAddress.address,
-          zipCode: newAddress.zipCode,
+          zipCode: newAddress.zipCode || undefined,
         };
         contactEmail = email;
         contactPhone = phone;
         contactName = name || newAddress.fullName;
       } else {
-        // No address available
-        toast.error('Lütfen teslimat adresini girin');
+        // No address available - provide specific error message
+        if (isAuthenticated) {
+          if (addresses.length === 0) {
+            toast.error('Lütfen "Yeni Adres Ekle" butonuna tıklayarak teslimat adresinizi girin');
+          } else if (!selectedAddressId) {
+            toast.error('Lütfen teslimat adresinizi seçin');
+          } else {
+            toast.error('Seçilen adres geçersiz, lütfen yeni bir adres ekleyin');
+          }
+        } else {
+          // Guest user - check which fields are missing
+          const missingFields = [];
+          if (!newAddress.fullName) missingFields.push('Ad Soyad');
+          if (!newAddress.phone) missingFields.push('Telefon');
+          if (!newAddress.city) missingFields.push('Şehir');
+          if (!newAddress.district) missingFields.push('İlçe');
+          if (!newAddress.address) missingFields.push('Açık Adres');
+          
+          if (missingFields.length > 0) {
+            toast.error(`Lütfen şu alanları doldurun: ${missingFields.join(', ')}`);
+          } else {
+            toast.error('Lütfen teslimat adresini girin');
+          }
+        }
         setIsLoading(false);
         return;
       }
@@ -322,25 +372,63 @@ export default function CheckoutPage() {
       for (const item of checkoutItems) {
         let orderResponse;
         
-        if (isAuthenticated) {
-          // Authenticated user: use directBuy endpoint
-          orderResponse = await ordersApi.directBuy({
-            productId: item.productId,
-            shippingAddressId: hasSavedAddress ? selectedAddressId! : undefined,
-            shippingAddress: hasFormAddress && !hasSavedAddress ? shippingAddress : undefined,
-          });
-        } else {
-          // Guest user: use guest checkout endpoint
-          orderResponse = await ordersApi.createGuest({
-            productId: item.productId,
-            email: contactEmail,
-            phone: contactPhone,
-            guestName: contactName,
-            shippingAddress,
-          });
+        try {
+          if (isAuthenticated) {
+            // Authenticated user: use directBuy endpoint
+            // Only send shippingAddressId if it's a valid UUID, otherwise send shippingAddress object
+            const validAddressId = hasSavedAddress && selectedAddressId && selectedAddressId.trim() !== '' 
+              ? selectedAddressId 
+              : undefined;
+            
+            // Build request payload
+            const payload: {
+              productId: string;
+              shippingAddressId?: string;
+              shippingAddress?: typeof shippingAddress;
+            } = {
+              productId: item.productId,
+            };
+            
+            if (validAddressId) {
+              payload.shippingAddressId = validAddressId;
+            } else if (shippingAddress) {
+              payload.shippingAddress = shippingAddress;
+            } else {
+              throw new Error('Teslimat adresi bulunamadı');
+            }
+            
+            console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            orderResponse = await ordersApi.directBuy(payload);
+          } else {
+            // Guest user: use guest checkout endpoint
+            const guestPayload = {
+              productId: item.productId,
+              email: contactEmail,
+              phone: contactPhone,
+              guestName: contactName,
+              shippingAddress,
+            };
+            
+            console.log('Guest checkout payload:', JSON.stringify(guestPayload, null, 2));
+            orderResponse = await ordersApi.createGuest(guestPayload);
+          }
+        } catch (orderError: any) {
+          console.error('Order creation failed:', orderError);
+          const errorMessage = orderError.response?.data?.message || 
+                              orderError.response?.data?.error || 
+                              orderError.message ||
+                              'Sipariş oluşturulamadı';
+          
+          // Handle array of error messages
+          if (Array.isArray(errorMessage)) {
+            toast.error(errorMessage.join(', '));
+          } else {
+            toast.error(errorMessage);
+          }
+          throw orderError;
         }
 
-        const orderId = orderResponse.data.id || orderResponse.data.order?.id;
+        const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
         
         if (orderId) {
           // TESTING MODE: Skip payment, directly mark as paid
@@ -635,8 +723,12 @@ export default function CheckoutPage() {
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setStep(2)}
-                    disabled={isAuthenticated && !selectedAddressId}
-                    className="btn-primary"
+                    disabled={
+                      isAuthenticated 
+                        ? !selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)
+                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address)
+                    }
+                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Devam Et
                   </button>

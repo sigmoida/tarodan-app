@@ -34,7 +34,7 @@ export class UserService {
   }
 
   /**
-   * Get user with addresses
+   * Get user with addresses and membership info
    */
   async findByIdWithAddresses(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -43,6 +43,16 @@ export class UserService {
         addresses: {
           orderBy: { isDefault: 'desc' },
         },
+        membership: {
+          include: {
+            tier: true,
+          },
+        },
+        _count: {
+          select: {
+            products: true,
+          },
+        },
       },
     });
 
@@ -50,7 +60,45 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    return user;
+    // Format membership info for frontend
+    const membershipInfo = user.membership ? {
+      tier: {
+        type: user.membership.tier.type,
+        name: user.membership.tier.name,
+        maxFreeListings: user.membership.tier.maxFreeListings,
+        maxTotalListings: user.membership.tier.maxTotalListings,
+        maxImagesPerListing: user.membership.tier.maxImagesPerListing,
+        canTrade: user.membership.tier.canTrade,
+        canCreateCollections: user.membership.tier.canCreateCollections,
+        featuredListingSlots: user.membership.tier.featuredListingSlots,
+        commissionDiscount: Number(user.membership.tier.commissionDiscount),
+        isAdFree: user.membership.tier.isAdFree,
+      },
+      status: user.membership.status,
+      expiresAt: user.membership.currentPeriodEnd,
+    } : {
+      tier: {
+        type: 'free',
+        name: 'Ücretsiz',
+        maxFreeListings: 5,
+        maxTotalListings: 10,
+        maxImagesPerListing: 3,
+        canTrade: false,
+        canCreateCollections: false,
+        featuredListingSlots: 0,
+        commissionDiscount: 0,
+        isAdFree: false,
+      },
+      status: 'active',
+      expiresAt: null,
+    };
+
+    return {
+      ...user,
+      membershipTier: membershipInfo.tier.type,
+      membership: membershipInfo,
+      listingCount: user._count.products,
+    };
   }
 
   /**

@@ -1,6 +1,6 @@
 import { IsUUID, IsOptional, ValidateNested, IsString, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 class ShippingAddressDto {
   @IsString()
@@ -45,6 +45,7 @@ export class DirectBuyDto {
     description: 'Shipping address ID (use either this or shippingAddress)',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir teslimat adresi ID giriniz' })
   shippingAddressId?: string;
 
@@ -61,6 +62,7 @@ export class DirectBuyDto {
     description: 'Billing address ID (defaults to shipping address if not provided)',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
   billingAddressId?: string;
 }

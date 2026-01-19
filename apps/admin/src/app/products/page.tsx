@@ -75,12 +75,26 @@ export default function ProductsPage() {
 
   const handleApprove = async (productId: string) => {
     try {
-      await adminApi.approveProduct(productId);
+      const response = await adminApi.approveProduct(productId);
       toast.success('Ürün onaylandı');
       loadProducts();
     } catch (error: any) {
       console.error('Approve error:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'İşlem başarısız';
+      
+      // Better error handling
+      let errorMessage = 'İşlem başarısız';
+      
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response.data?.message || error.response.data?.error || `Sunucu hatası: ${error.response.status}`;
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        // Error in request setup
+        errorMessage = error.message || 'Bir hata oluştu';
+      }
+      
       toast.error(errorMessage);
     }
   };
