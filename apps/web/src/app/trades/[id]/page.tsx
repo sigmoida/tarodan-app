@@ -378,7 +378,7 @@ export default function TradeDetailPage() {
           {/* SOL - Karşı Tarafın Ürünü */}
           <div className="card p-6 flex-1">
             <h2 className="text-xl font-semibold mb-4">{theirName}'in Ürünü</h2>
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto">
               {theirItems.map((item) => (
                 <Link
                   key={item.id}
@@ -423,7 +423,7 @@ export default function TradeDetailPage() {
           {/* SAĞ - Benim Teklifim */}
           <div className="card p-6 flex-1">
             <h2 className="text-xl font-semibold mb-4">Sizin Teklifiniz</h2>
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto">
               {myItems.map((item) => (
                 <Link
                   key={item.id}

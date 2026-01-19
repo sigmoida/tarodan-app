@@ -128,19 +128,18 @@ export class TradeService {
       );
     }
 
-    // Validate initiator has trade-enabled products
+    // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
     const initiatorProducts = await this.prisma.product.findMany({
       where: {
         id: { in: dto.initiatorItems.map((i) => i.productId) },
         sellerId: initiatorId,
         status: ProductStatus.active,
-        isTradeEnabled: true,
       },
     });
 
     if (initiatorProducts.length !== dto.initiatorItems.length) {
       throw new BadRequestException(
-        'Bazı ürünler takasa uygun değil veya size ait değil',
+        'Bazı ürünler size ait değil veya aktif değil',
       );
     }
 

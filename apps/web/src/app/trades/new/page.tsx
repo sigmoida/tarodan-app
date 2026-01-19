@@ -86,10 +86,9 @@ export default function NewTradePage() {
       
       setRequestedProduct(product);
       
-      // Fetch my trade-enabled products
+      // Fetch my active products (all of them - user wants to offer their own items)
       const myProductsResponse = await listingsApi.getAll({
         sellerId: user?.id,
-        isTradeEnabled: true,
         status: 'active',
       });
       
@@ -284,22 +283,13 @@ export default function NewTradePage() {
               <div className="text-center py-12">
                 <ArrowsRightLeftIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Takasa açık ürününüz yok
+                  Aktif ürününüz yok
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  Takas teklifi göndermek için takasa açık ürününüz olmalı.
+                  Takas teklifi göndermek için en az bir aktif ürününüz olmalı.
                 </p>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
-                  <p className="text-amber-800 text-sm">
-                    <strong>💡 Bilgi:</strong> Takas özelliği Premium üyelik gerektirir. 
-                    İlanlarınızı takasa açmak için önce üyeliğinizi yükseltin.
-                  </p>
-                </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Link href="/membership" className="btn-primary">
-                    Üyeliği Yükselt
-                  </Link>
-                  <Link href="/listings/new" className="btn-secondary">
+                  <Link href="/listings/new" className="btn-primary">
                     Yeni Ürün Listele
                   </Link>
                 </div>
