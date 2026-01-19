@@ -343,6 +343,20 @@ export class ProductService {
       throw new ForbiddenException('Sadece aktif veya pasif duruma geçirebilirsiniz');
     }
 
+    // Check membership for trade feature
+    let canEnableTrade = false;
+    if (dto.isTradeEnabled === true) {
+      const seller = await this.prisma.user.findUnique({
+        where: { id: sellerId },
+        include: { membershipTier: true },
+      });
+      
+      if (!seller?.membershipTier?.canTrade) {
+        throw new BadRequestException('Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.');
+      }
+      canEnableTrade = true;
+    }
+
     // Build update data
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
@@ -350,6 +364,7 @@ export class ProductService {
       price: dto.price,
       condition: dto.condition,
       status: dto.status,
+      isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       version: { increment: 1 }, // Optimistic locking
     };

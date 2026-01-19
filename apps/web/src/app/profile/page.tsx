@@ -86,13 +86,17 @@ export default function ProfilePage() {
   const loadProfile = async () => {
     try {
       // Use /users/me for profile data
-      const [profileResponse, statsResponse] = await Promise.all([
+      const [profileResponse, statsResponse, ordersResponse, productsResponse] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
+        api.get('/orders', { params: { role: 'buyer', limit: 1 } }).catch(() => null),
+        userApi.getMyProducts({ limit: 1 }).catch(() => null),
       ]);
       
       const profileData = profileResponse?.data?.user || profileResponse?.data || user;
       const statsData = statsResponse?.data?.data || statsResponse?.data || {};
+      const ordersCount = ordersResponse?.data?.meta?.total || ordersResponse?.data?.data?.length || 0;
+      const productsCount = productsResponse?.data?.meta?.total || productsResponse?.data?.data?.length || productsResponse?.data?.products?.length || 0;
       
       if (!profileData) {
         // If no profile data, keep using authStore data
@@ -124,10 +128,10 @@ export default function ProfilePage() {
           expiresAt: profileData.membership?.expiresAt || '',
         },
         stats: {
-          productsCount: statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
-                        profileData._count?.products ?? profileData.listingCount ?? user?.listingCount ?? 0,
-          ordersCount: statsData.ordersCount ?? statsData.orders ?? 
-                      profileData._count?.orders ?? user?.totalPurchases ?? 0,
+          productsCount: productsCount || (statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
+                        profileData._count?.products ?? profileData.listingCount ?? user?.listingCount ?? 0),
+          ordersCount: ordersCount || (statsData.ordersCount ?? statsData.orders ?? 
+                      profileData._count?.orders ?? user?.totalPurchases ?? 0),
           tradesCount: statsData.tradesCount ?? statsData.trades ?? 
                       profileData._count?.trades ?? 0,
           collectionsCount: statsData.collectionsCount ?? statsData.collections ?? 
@@ -262,7 +266,8 @@ export default function ProfilePage() {
                 {[
                   { label: 'Mesajlarım', href: '/messages', icon: '💬' },
                   { label: 'Favorilerim', href: '/wishlist', icon: '❤️' },
-                  { label: 'Üyelik', href: '/profile/membership', icon: '⭐' },
+                  { label: 'Takip Ettiklerim', href: '/profile/following', icon: '👥' },
+                  { label: 'Üyelik', href: '/pricing', icon: '⭐' },
                   { label: 'Destek', href: '/support', icon: '🎫' },
                   { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
                   { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },

@@ -6,6 +6,7 @@ import {
   IsOptional,
   Matches,
   IsBoolean,
+  IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -22,9 +23,7 @@ export class RegisterDto {
     description: 'User phone number (Turkish format)',
   })
   @IsOptional()
-  @Matches(/^\+90[0-9]{10}$/, {
-    message: 'Geçerli bir Türkiye telefon numarası giriniz (+905XXXXXXXXX)',
-  })
+  @IsString()
   phone?: string;
 
   @ApiProperty({
@@ -47,6 +46,14 @@ export class RegisterDto {
   @MinLength(2, { message: 'İsim en az 2 karakter olmalıdır' })
   @MaxLength(100, { message: 'İsim en fazla 100 karakter olabilir' })
   displayName: string;
+
+  @ApiPropertyOptional({
+    example: '1990-01-15',
+    description: 'Birth date (YYYY-MM-DD)',
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'Geçerli bir tarih giriniz (YYYY-MM-DD)' })
+  birthDate?: string;
 
   @ApiPropertyOptional({
     example: false,

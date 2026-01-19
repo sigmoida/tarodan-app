@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
-import { MagnifyingGlassIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, EyeIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface Order {
@@ -36,6 +36,9 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState<string>('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -69,6 +72,33 @@ export default function OrdersPage() {
       toast.error('Siparişler yüklenemedi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startEditing = (order: Order) => {
+    setEditingOrderId(order.id);
+    setNewStatus(order.status);
+  };
+
+  const cancelEditing = () => {
+    setEditingOrderId(null);
+    setNewStatus('');
+  };
+
+  const updateOrderStatus = async (orderId: string) => {
+    if (!newStatus) return;
+    
+    setUpdatingStatus(true);
+    try {
+      await adminApi.updateOrderStatus(orderId, newStatus);
+      toast.success('Sipariş durumu güncellendi');
+      setEditingOrderId(null);
+      loadOrders();
+    } catch (error: any) {
+      console.error('Status update error:', error);
+      toast.error(error.response?.data?.message || 'Durum güncellenemedi');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -159,7 +189,53 @@ export default function OrdersPage() {
                   orders.map((order) => (
                     <tr key={order.id}>
                       <td className="font-mono text-sm">{order.orderNumber}</td>
-                      <td>{getStatusBadge(order.status)}</td>
+                      <td>
+                        {editingOrderId === order.id ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={newStatus}
+                              onChange={(e) => setNewStatus(e.target.value)}
+                              className="admin-input py-1 px-2 text-sm w-36"
+                              disabled={updatingStatus}
+                            >
+                              <option value="pending_payment">Ödeme Bekliyor</option>
+                              <option value="paid">Ödendi</option>
+                              <option value="preparing">Hazırlanıyor</option>
+                              <option value="shipped">Kargoda</option>
+                              <option value="delivered">Teslim Edildi</option>
+                              <option value="completed">Tamamlandı</option>
+                              <option value="cancelled">İptal</option>
+                            </select>
+                            <button
+                              onClick={() => updateOrderStatus(order.id)}
+                              disabled={updatingStatus}
+                              className="p-1 text-green-400 hover:text-green-300 hover:bg-green-900/30 rounded"
+                              title="Kaydet"
+                            >
+                              <CheckIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              disabled={updatingStatus}
+                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded"
+                              title="İptal"
+                            >
+                              <XMarkIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(order.status)}
+                            <button
+                              onClick={() => startEditing(order)}
+                              className="p-1 text-gray-500 hover:text-white hover:bg-dark-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Durumu Değiştir"
+                            >
+                              <PencilIcon className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
                       <td>{order.buyer.displayName}</td>
                       <td>{order.seller.displayName}</td>
                       <td>{order.itemCount} adet</td>
@@ -171,12 +247,21 @@ export default function OrdersPage() {
                       </td>
                       <td>{new Date(order.createdAt).toLocaleDateString('tr-TR')}</td>
                       <td>
-                        <button
-                          className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
-                          title="Detay"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => startEditing(order)}
+                            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-lg"
+                            title="Durumu Değiştir"
+                          >
+                            <PencilIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                            title="Detay"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

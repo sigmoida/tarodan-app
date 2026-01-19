@@ -260,21 +260,20 @@ export class OrderService {
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock the product row to prevent concurrent purchases
-      // Using raw query with FOR UPDATE for pessimistic locking
-      const lockedProducts = await tx.$queryRaw<any[]>`
-        SELECT p.*, u."displayName" as "sellerName"
-        FROM "Product" p
-        JOIN "User" u ON p."sellerId" = u.id
-        WHERE p.id = ${dto.productId}::uuid
-        FOR UPDATE
-      `;
+      // Get product with seller info - using Prisma instead of raw SQL
+      // Transaction provides isolation for concurrent purchases
+      const product = await tx.product.findUnique({
+        where: { id: dto.productId },
+        include: {
+          seller: {
+            select: { id: true, displayName: true },
+          },
+        },
+      });
 
-      if (!lockedProducts || lockedProducts.length === 0) {
+      if (!product) {
         throw new NotFoundException('Ürün bulunamadı');
       }
-
-      const product = lockedProducts[0];
 
       // Validate product is available
       if (product.status !== ProductStatus.active) {
@@ -286,18 +285,45 @@ export class OrderService {
         throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
       }
 
-      // Validate shipping address belongs to buyer
-      const shippingAddress = await tx.address.findUnique({
-        where: { id: dto.addressId },
-      });
+      // Resolve shipping address - either from saved address or inline address
+      let shippingAddress: any;
+      let shippingAddressId: string | null = null;
 
-      if (!shippingAddress || shippingAddress.userId !== buyerId) {
-        throw new BadRequestException('Geçersiz teslimat adresi');
+      if (dto.shippingAddressId) {
+        // Use saved address
+        const savedAddress = await tx.address.findUnique({
+          where: { id: dto.shippingAddressId },
+        });
+
+        if (!savedAddress || savedAddress.userId !== buyerId) {
+          throw new BadRequestException('Geçersiz teslimat adresi');
+        }
+        shippingAddress = savedAddress;
+        shippingAddressId = savedAddress.id;
+      } else if (dto.shippingAddress) {
+        // Use inline address object - create a new address for the user
+        const newAddress = await tx.address.create({
+          data: {
+            userId: buyerId,
+            title: 'Sipariş Adresi',
+            fullName: dto.shippingAddress.fullName,
+            phone: dto.shippingAddress.phone,
+            city: dto.shippingAddress.city,
+            district: dto.shippingAddress.district,
+            address: dto.shippingAddress.address,
+            zipCode: dto.shippingAddress.zipCode || null,
+            isDefault: false,
+          },
+        });
+        shippingAddress = newAddress;
+        shippingAddressId = newAddress.id;
+      } else {
+        throw new BadRequestException('Teslimat adresi gereklidir');
       }
 
       // Validate billing address if provided
       let billingAddress = shippingAddress;
-      if (dto.billingAddressId && dto.billingAddressId !== dto.addressId) {
+      if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
         const billing = await tx.address.findUnique({
           where: { id: dto.billingAddressId },
         });
@@ -337,10 +363,10 @@ export class OrderService {
           totalAmount,
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
-          shippingAddressId: dto.addressId,
+          shippingAddressId: shippingAddressId,
           shippingAddress: {
             id: shippingAddress.id,
-            title: shippingAddress.title,
+            title: shippingAddress.title || 'Teslimat Adresi',
             fullName: shippingAddress.fullName,
             phone: shippingAddress.phone,
             city: shippingAddress.city,
@@ -1109,18 +1135,28 @@ export class OrderService {
    * Format order response
    */
   private formatOrderResponse(order: any, userId: string) {
+    const product = order.product ? {
+      id: order.product.id,
+      title: order.product.title,
+      imageUrl: order.product.images?.[0]?.url,
+      status: order.product.status,
+    } : null;
+    
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       amount: Number(order.totalAmount),
+      totalAmount: Number(order.totalAmount), // Frontend uyumu için
       commissionAmount: Number(order.commissionAmount),
       status: order.status,
-      product: {
-        id: order.product.id,
-        title: order.product.title,
-        imageUrl: order.product.images?.[0]?.url,
-        status: order.product.status,
-      },
+      product,
+      // Frontend items array bekliyor - tek ürünü items formatında da döndür
+      items: product ? [{
+        id: order.id,
+        product,
+        quantity: 1,
+        price: Number(order.totalAmount),
+      }] : [],
       buyer: order.buyer,
       seller: order.seller,
       shippingAddress: order.shippingAddress && typeof order.shippingAddress === 'object'

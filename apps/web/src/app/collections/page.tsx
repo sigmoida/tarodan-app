@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { FolderPlusIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
 
@@ -22,12 +24,24 @@ interface Collection {
 }
 
 export default function CollectionsPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [myCollections, setMyCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  
+  // Free üyeler koleksiyon oluşturamaz
+  const canCreateCollection = user?.membershipTier !== 'free';
+  
+  const handleCreateClick = () => {
+    if (!canCreateCollection) {
+      setShowPremiumModal(true);
+      return;
+    }
+    setShowCreateModal(true);
+  };
 
   useEffect(() => {
     loadCollections();
@@ -73,7 +87,7 @@ export default function CollectionsPage() {
           </div>
           {isAuthenticated && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={handleCreateClick}
               className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors"
             >
               + Yeni Koleksiyon
@@ -188,6 +202,42 @@ export default function CollectionsPage() {
             loadCollections();
           }}
         />
+      )}
+
+      {/* Premium Required Modal */}
+      {showPremiumModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl max-w-md w-full p-6 text-center"
+          >
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderPlusIcon className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Premium Üyelik Gerekli
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Koleksiyon oluşturma özelliği sadece Premium ve üzeri üyelikler için aktiftir. 
+              Üyeliğinizi yükselterek kendi koleksiyonlarınızı oluşturabilir ve paylaşabilirsiniz.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowPremiumModal(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Vazgeç
+              </button>
+              <Link
+                href="/membership"
+                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors text-center"
+              >
+                Üyeliği Yükselt
+              </Link>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

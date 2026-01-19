@@ -189,6 +189,7 @@ model User {
   displayName       String       @map("display_name")
   avatarUrl         String?      @map("avatar_url")
   bio               String?
+  birthDate         DateTime?    @map("birth_date")
   isVerified        Boolean      @default(false) @map("is_verified")
   isEmailVerified   Boolean      @default(false) @map("is_email_verified")  // GAP-006
   isPhoneVerified   Boolean      @default(false) @map("is_phone_verified")
@@ -249,6 +250,10 @@ model User {
   // Relations - Invoice System
   buyerInvoices           Invoice[]     @relation("BuyerInvoices")
   sellerInvoices          Invoice[]     @relation("SellerInvoices")
+
+  // Relations - Follow System
+  followers               UserFollow[]  @relation("Following")
+  following               UserFollow[]  @relation("Followers")
 
   @@index([email])
   @@index([isSeller])
@@ -1356,6 +1361,26 @@ model SearchIndex {
 }
 
 // =============================================================================
+// USER FOLLOW SYSTEM
+// =============================================================================
+
+model UserFollow {
+  id          String   @id @default(uuid())
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("user_follows")
+}
+
+// =============================================================================
 // INDEXES SUMMARY
 // =============================================================================
 // All indexes are defined inline with @@index directives
@@ -1368,3 +1393,4 @@ model SearchIndex {
 // - Rating: receiverId
 // - SupportTicket: creatorId, status, priority
 // - AuditLog: adminUserId, entityType+entityId, createdAt
+// - UserFollow: followerId, followingId

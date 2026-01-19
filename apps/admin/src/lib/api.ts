@@ -72,7 +72,7 @@ export const adminApi = {
   // Orders
   getOrders: (params?: any) => api.get('/admin/orders', { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
-  updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}/status`, { status }),
+  updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
   
   // Trades
   getTrades: (params?: any) => api.get('/admin/trades', { params }),

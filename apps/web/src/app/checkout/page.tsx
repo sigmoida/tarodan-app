@@ -78,6 +78,13 @@ export default function CheckoutPage() {
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<string>('aras');
+  
+  // Card info state (for UI display - actual payment handled by iyzico/paytr)
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
 
   // Get checkout items (either from cart or direct buy)
   const checkoutItems: CheckoutItem[] = directProduct ? [directProduct] : cartItems;
@@ -311,15 +318,27 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Create orders
+      // Create orders - use different endpoint based on auth status
       for (const item of checkoutItems) {
-        const orderResponse = await ordersApi.createGuest({
-          productId: item.productId,
-          email: contactEmail,
-          phone: contactPhone,
-          guestName: contactName,
-          shippingAddress,
-        });
+        let orderResponse;
+        
+        if (isAuthenticated) {
+          // Authenticated user: use directBuy endpoint
+          orderResponse = await ordersApi.directBuy({
+            productId: item.productId,
+            shippingAddressId: hasSavedAddress ? selectedAddressId! : undefined,
+            shippingAddress: hasFormAddress && !hasSavedAddress ? shippingAddress : undefined,
+          });
+        } else {
+          // Guest user: use guest checkout endpoint
+          orderResponse = await ordersApi.createGuest({
+            productId: item.productId,
+            email: contactEmail,
+            phone: contactPhone,
+            guestName: contactName,
+            shippingAddress,
+          });
+        }
 
         const orderId = orderResponse.data.id || orderResponse.data.order?.id;
         
@@ -740,6 +759,99 @@ export default function CheckoutPage() {
                       <div className="text-2xl">🏦</div>
                     </div>
                   </label>
+                </div>
+
+                {/* Card Information */}
+                <div className="mt-6 p-4 bg-white border border-gray-200 rounded-xl">
+                  <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                    <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                    Kart Bilgileri
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kart Üzerindeki İsim
+                      </label>
+                      <input
+                        type="text"
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                        placeholder="AD SOYAD"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kart Numarası
+                      </label>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                          const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+                          setCardNumber(formatted);
+                        }}
+                        placeholder="0000 0000 0000 0000"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Son Kullanma Tarihi
+                        </label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            if (value.length >= 2) {
+                              setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
+                            } else {
+                              setCardExpiry(value);
+                            }
+                          }}
+                          placeholder="AA/YY"
+                          maxLength={5}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          CVV/CVC
+                        </label>
+                        <input
+                          type="password"
+                          value={cardCvc}
+                          onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="•••"
+                          maxLength={4}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                    
+                    {isAuthenticated && (
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={saveCard}
+                          onChange={(e) => setSaveCard(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        Bu kartı gelecekteki alışverişlerim için kaydet
+                      </label>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                    <ShieldCheckIcon className="w-4 h-4 text-green-500" />
+                    256-bit SSL ile şifrelenmiş güvenli ödeme
+                  </div>
                 </div>
 
                 {/* Invoice Info */}

@@ -59,6 +59,7 @@ export class AuthService {
         phone: dto.phone,
         passwordHash,
         displayName: dto.displayName,
+        birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
         isSeller: dto.isSeller ?? false,
         sellerType: dto.isSeller ? SellerType.individual : null,
         isVerified: false, // Email verification required

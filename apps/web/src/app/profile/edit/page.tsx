@@ -14,7 +14,9 @@ export default function EditProfilePage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     displayName: '',
+    email: '',
     phone: '',
+    birthDate: '',
     bio: '',
     isCorporateSeller: false,
     companyName: '',
@@ -30,7 +32,9 @@ export default function EditProfilePage() {
     if (user) {
       setFormData({
         displayName: user.displayName || '',
+        email: user.email || '',
         phone: user.phone || '',
+        birthDate: (user as any).birthDate ? new Date((user as any).birthDate).toISOString().split('T')[0] : '',
         bio: (user as any).bio || '',
         isCorporateSeller: (user as any).isCorporateSeller || false,
         companyName: (user as any).companyName || '',
@@ -91,15 +95,45 @@ export default function EditProfilePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Telefon
+                E-posta
               </label>
               <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="+90 555 123 4567"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+                disabled
+                title="E-posta adresini değiştirmek için destek ile iletişime geçin"
               />
+              <p className="text-xs text-gray-400 mt-1">E-posta değişikliği için destek ile iletişime geçin</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Telefon
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="+90 555 123 4567"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Doğum Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
             </div>
 
             <div>

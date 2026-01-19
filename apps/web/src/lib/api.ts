@@ -38,7 +38,7 @@ api.interceptors.response.use(
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
-  register: (data: { displayName: string; email: string; password: string; phone?: string }) =>
+  register: (data: { displayName: string; email: string; password: string; phone?: string; birthDate?: string }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
@@ -49,6 +49,7 @@ export const listingsApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
+  getById: (id: string | number) => api.get(`/products/${id}`),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>
@@ -105,6 +106,19 @@ export const ordersApi = {
     api.get('/orders', { params }),
   getOne: (id: string | number) => api.get(`/orders/${id}`),
   create: (data: any) => api.post('/orders', data),
+  // Direct buy for authenticated users (Buy Now)
+  directBuy: (data: {
+    productId: string;
+    shippingAddressId?: string;
+    shippingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+  }) => api.post('/orders/buy', data),
   createGuest: (data: {
     productId: string;
     email: string;
@@ -178,7 +192,7 @@ export const userApi = {
     bio?: string;
   }) => api.patch('/users/me', data),
   getMyProducts: (params?: Record<string, any>) =>
-    api.get('/products/my-listings', { params }),
+    api.get('/products/my', { params }),
   getStats: () => api.get('/users/me/stats'),
 };
 
