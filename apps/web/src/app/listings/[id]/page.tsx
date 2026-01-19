@@ -19,10 +19,12 @@ import {
   XMarkIcon,
   MagnifyingGlassPlusIcon,
   MagnifyingGlassMinusIcon,
+  FlagIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
-import { listingsApi, wishlistApi, collectionsApi } from '@/lib/api';
+import { listingsApi, wishlistApi, collectionsApi, api } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
@@ -46,6 +48,7 @@ interface Listing {
   condition?: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
+  status?: 'pending' | 'active' | 'reserved' | 'sold' | 'inactive' | 'rejected';
   sellerId?: string;
   seller?: {
     id: string;
@@ -71,6 +74,10 @@ export default function ListingDetailPage() {
   
   const { addToCart, items: cartItems, removeFromCart } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
+  
+  // Free üyeler takas yapamaz - Premium, Business veya Basic üyeler trade yapabilir
+  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business' || user?.membershipTier === 'basic');
+  const [showTradeModal, setShowTradeModal] = useState(false);
   
   const [listing, setListing] = useState<Listing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +107,11 @@ export default function ListingDetailPage() {
   const animationFrameRef = useRef<number | null>(null);
   const zoomPreviewRef = useRef<HTMLDivElement | null>(null);
   
+  // Product reviews state
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewStats, setReviewStats] = useState<{ averageRating: number; totalRatings: number } | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  
   // Check if product is in cart
   const cartItem = listing ? cartItems.find(item => item.productId === listing.id) : null;
   const isInCart = !!cartItem;
@@ -124,6 +136,7 @@ export default function ListingDetailPage() {
     if (id) {
       fetchListing();
       checkFavorite();
+      fetchReviews();
     }
   }, [id, isAuthenticated]);
 
@@ -188,8 +201,30 @@ export default function ListingDetailPage() {
     }
   };
 
+  const fetchReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      const [reviewsRes, statsRes] = await Promise.all([
+        api.get(`/ratings/products/${id}`),
+        api.get(`/ratings/products/${id}/stats`),
+      ]);
+      setReviews(reviewsRes.data?.ratings || reviewsRes.data?.data || []);
+      setReviewStats(statsRes.data || null);
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!listing) return;
+    
+    // Check if product is available
+    if (listing.status && listing.status !== 'active') {
+      toast.error('Bu ürün şu anda satışta değil');
+      return;
+    }
     
     setIsAddingToCart(true);
     try {
@@ -235,6 +270,19 @@ export default function ListingDetailPage() {
 
   const handleBuyNow = () => {
     if (!listing) return;
+    
+    // Check if product is available for purchase
+    if (listing.status && listing.status !== 'active') {
+      if (listing.status === 'reserved') {
+        toast.error('Bu ürün şu anda başka bir alıcı tarafından satın alınıyor');
+      } else if (listing.status === 'sold') {
+        toast.error('Bu ürün satılmıştır');
+      } else {
+        toast.error('Bu ürün şu anda satışta değil');
+      }
+      return;
+    }
+    
     router.push(`/checkout?productId=${listing.id}`);
   };
 
@@ -604,7 +652,7 @@ export default function ListingDetailPage() {
                       openLightbox(index);
                     }}
                     className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                      index === activeImageIndex ? 'border-primary-500' : 'border-transparent'
+                      index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
                     }`}
                   >
                     <Image src={img} alt="" fill className="object-cover" unoptimized />
@@ -720,7 +768,7 @@ export default function ListingDetailPage() {
                         }}
                         className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
                           index === lightboxImageIndex 
-                            ? 'border-primary-500' 
+                            ? 'border-orange-500' 
                             : 'border-white/20 hover:border-white/40'
                         }`}
                       >
@@ -756,6 +804,7 @@ export default function ListingDetailPage() {
                 <button
                   onClick={handleToggleFavorite}
                   className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  title="Favorilere Ekle"
                 >
                   {isFavorite ? (
                     <HeartSolidIcon className="w-6 h-6 text-red-500" />
@@ -767,6 +816,7 @@ export default function ListingDetailPage() {
                   <button
                     onClick={handleShare}
                     className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    title="Paylaş"
                   >
                     <ShareIcon className="w-6 h-6 text-gray-400" />
                   </button>
@@ -822,10 +872,29 @@ export default function ListingDetailPage() {
                     </div>
                   )}
                 </div>
+                {/* Report Button */}
+                <button
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      setAuthModalConfig({
+                        title: 'İlanı Raporla',
+                        message: 'İlanı raporlamak için giriş yapmanız gerekiyor.',
+                        icon: <FlagIcon className="w-10 h-10 text-red-500" />,
+                      });
+                      setShowAuthModal(true);
+                    } else {
+                      toast('İlan raporlama özelliği yakında eklenecek');
+                    }
+                  }}
+                  className="p-2 rounded-full hover:bg-red-50 transition-colors"
+                  title="İlanı Raporla"
+                >
+                  <FlagIcon className="w-6 h-6 text-gray-400 hover:text-red-500" />
+                </button>
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-primary-500 mb-6">
+            <p className="text-4xl font-bold text-orange-500 mb-6">
               ₺{Number(listing.price).toLocaleString('tr-TR')}
             </p>
 
@@ -875,13 +944,15 @@ export default function ListingDetailPage() {
             {listing.seller && (
               <div className="bg-white rounded-xl p-4 mb-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-xl">👤</span>
-                  </div>
+                  <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
+                      <span className="text-xl">👤</span>
+                    </div>
+                  </Link>
                   <div className="flex-1">
-                    <p className="font-semibold">
+                    <Link href={`/seller/${listing.seller.id}`} className="font-semibold hover:text-orange-500 transition-colors">
                       {listing.seller.displayName || listing.seller.username || 'Satıcı'}
-                    </p>
+                    </Link>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <div className="flex items-center">
                         <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
@@ -907,7 +978,7 @@ export default function ListingDetailPage() {
                         setAuthModalConfig({
                           title: 'Satıcıya Mesaj Gönder',
                           message: 'Satıcıyla iletişime geçmek için giriş yapmanız gerekiyor.',
-                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-primary-500" />,
+                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-orange-500" />,
                         });
                         setShowAuthModal(true);
                       }}
@@ -921,32 +992,105 @@ export default function ListingDetailPage() {
               </div>
             )}
 
+            {/* Product Status Banner */}
+            {listing.status && listing.status !== 'active' && (
+              <div className={`rounded-xl p-4 mb-4 ${
+                listing.status === 'reserved' 
+                  ? 'bg-yellow-50 border border-yellow-200' 
+                  : listing.status === 'sold' 
+                    ? 'bg-red-50 border border-red-200'
+                    : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <ExclamationTriangleIcon className={`w-6 h-6 ${
+                    listing.status === 'reserved' 
+                      ? 'text-yellow-600' 
+                      : listing.status === 'sold' 
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                  }`} />
+                  <div>
+                    <p className={`font-semibold ${
+                      listing.status === 'reserved' 
+                        ? 'text-yellow-800' 
+                        : listing.status === 'sold' 
+                          ? 'text-red-800'
+                          : 'text-gray-800'
+                    }`}>
+                      {listing.status === 'reserved' && 'Bu ürün şu anda rezerve edilmiş'}
+                      {listing.status === 'sold' && 'Bu ürün satılmıştır'}
+                      {listing.status === 'pending' && 'Bu ürün onay bekliyor'}
+                      {listing.status === 'inactive' && 'Bu ürün aktif değil'}
+                      {listing.status === 'rejected' && 'Bu ürün reddedilmiş'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {listing.status === 'reserved' && 'Başka bir alıcı tarafından satın alma işlemi devam ediyor.'}
+                      {listing.status === 'sold' && 'Bu ürün artık satışta değil.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="space-y-3">
               {/* Primary Action: Buy Now */}
               <button
                 onClick={handleBuyNow}
-                className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-lg"
+                disabled={listing.status !== 'active'}
+                className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
+                  listing.status === 'active' 
+                    ? 'btn-primary' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                }`}
               >
                 <BoltIcon className="w-6 h-6" />
-                Hemen Al
+                {listing.status === 'sold' ? 'Satıldı' : listing.status === 'reserved' ? 'Rezerve Edildi' : 'Hemen Al'}
               </button>
 
               {/* Secondary Actions */}
               <div className="flex gap-3">
                 {isTradeAvailable && (
-                  <Link
-                    href={`/trades/new?listing=${listing.id}`}
-                    className="btn-trade flex-1 flex items-center justify-center gap-2"
+                  <button
+                    onClick={() => {
+                      if (listing.status !== 'active') {
+                        toast.error('Bu ürün şu anda satışta değil');
+                        return;
+                      }
+                      if (!isAuthenticated) {
+                        setAuthModalConfig({
+                          title: 'Giriş Yapmanız Gerekiyor',
+                          message: 'Takas teklifi göndermek için giriş yapmalısınız.',
+                          icon: <ArrowsRightLeftIcon className="w-12 h-12 text-orange-500" />,
+                        });
+                        setShowAuthModal(true);
+                        return;
+                      }
+                      if (!canTrade) {
+                        setShowTradeModal(true);
+                        return;
+                      }
+                      router.push(`/trades/new?listing=${listing.id}`);
+                    }}
+                    disabled={listing.status !== 'active'}
+                    className={`flex-1 flex items-center justify-center gap-2 ${
+                      listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                    }`}
                   >
                     <ArrowsRightLeftIcon className="w-5 h-5" />
                     Takas Teklifi
-                  </Link>
+                  </button>
                 )}
                 <button
                   onClick={handleCartToggle}
-                  disabled={isAddingToCart}
-                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isInCart ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                  disabled={isAddingToCart || listing.status !== 'active'}
+                  className={`flex-1 flex items-center justify-center gap-2 ${
+                    listing.status !== 'active' 
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                      : isInCart 
+                        ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                        : 'btn-secondary'
+                  }`}
                 >
                   <ShoppingCartIcon className="w-5 h-5" />
                   {isAddingToCart 
@@ -989,6 +1133,102 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
+      {/* Product Reviews Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              Ürün Değerlendirmeleri
+            </h2>
+            {reviewStats && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarIcon
+                      key={star}
+                      className={`w-5 h-5 ${
+                        star <= (reviewStats.averageRating || 0)
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-lg font-semibold text-gray-900">
+                  {(reviewStats.averageRating || 0).toFixed(1)}
+                </span>
+                <span className="text-gray-500">
+                  ({reviewStats.totalRatings || 0} değerlendirme)
+                </span>
+              </div>
+            )}
+          </div>
+
+          {reviewsLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+            </div>
+          ) : reviews.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-lg font-medium text-gray-900 mb-2">
+                Henüz değerlendirme yapılmamış
+              </p>
+              <p className="text-gray-600">
+                Bu ürünü satın alan ilk kişi olun ve deneyiminizi paylaşın!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {reviews.map((review: any) => (
+                <div
+                  key={review.id}
+                  className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-orange-600 font-semibold">
+                        {review.user?.displayName?.[0]?.toUpperCase() || '?'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900">
+                          {review.user?.displayName || 'Anonim'}
+                        </span>
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <StarIcon
+                              key={star}
+                              className={`w-4 h-4 ${
+                                star <= (review.score || 0)
+                                  ? 'text-yellow-400 fill-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {new Date(review.createdAt).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                      {review.title && (
+                        <h4 className="font-medium text-gray-900 mb-1">
+                          {review.title}
+                        </h4>
+                      )}
+                      {review.comment && (
+                        <p className="text-gray-700">{review.comment}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Add to Collection Modal */}
       {showCollectionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -997,7 +1237,7 @@ export default function ListingDetailPage() {
             
             {loadingCollections ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">
@@ -1029,7 +1269,7 @@ export default function ListingDetailPage() {
                       setShowCollectionModal(false);
                       router.push('/collections');
                     }}
-                    className="w-full p-4 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-300 rounded-lg transition-colors text-primary-700 font-medium"
+                    className="w-full p-4 bg-orange-50 hover:bg-orange-100 border-2 border-dashed border-orange-300 rounded-lg transition-colors text-orange-700 font-medium"
                   >
                     + Yeni Koleksiyon Oluştur
                   </button>
@@ -1057,6 +1297,42 @@ export default function ListingDetailPage() {
         message={authModalConfig.message}
         icon={authModalConfig.icon}
       />
+
+      {/* Trade Premium Required Modal */}
+      {showTradeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl max-w-md w-full p-6 text-center"
+          >
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ArrowsRightLeftIcon className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Premium Üyelik Gerekli
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Takas özelliği sadece Premium ve üzeri üyelikler için aktiftir. 
+              Üyeliğinizi yükselterek takas teklifleri gönderebilir ve alabilirsiniz.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowTradeModal(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Vazgeç
+              </button>
+              <Link
+                href="/membership"
+                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors text-center"
+              >
+                Üyeliği Yükselt
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

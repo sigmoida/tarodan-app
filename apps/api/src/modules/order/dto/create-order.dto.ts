@@ -1,5 +1,6 @@
 import { IsUUID, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class CreateOrderDto {
   @ApiProperty({
@@ -21,6 +22,7 @@ export class CreateOrderDto {
     description: 'Billing address ID (defaults to shipping address if not provided)',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
   billingAddressId?: string;
 }

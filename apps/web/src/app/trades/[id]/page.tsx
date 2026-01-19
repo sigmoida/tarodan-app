@@ -328,6 +328,13 @@ export default function TradeDetailPage() {
   const receiverTotal = calculateTotalValue(trade.receiverItems);
   const valueDifference = receiverTotal - initiatorTotal;
 
+  // Kullanıcı perspektifinden ürünleri ayarla
+  const myItems = isInitiator ? trade.initiatorItems : trade.receiverItems;
+  const theirItems = isInitiator ? trade.receiverItems : trade.initiatorItems;
+  const theirName = isInitiator ? trade.receiverName : trade.initiatorName;
+  const myTotal = isInitiator ? initiatorTotal : receiverTotal;
+  const theirTotal = isInitiator ? receiverTotal : initiatorTotal;
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -367,14 +374,12 @@ export default function TradeDetailPage() {
         )}
 
         {/* Trade Items Comparison */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          {/* Initiator Items */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              {isInitiator ? 'Sizin Teklifiniz' : `${trade.initiatorName}'in Teklifi`}
-            </h2>
-            <div className="space-y-3 mb-4">
-              {trade.initiatorItems.map((item) => (
+        <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+          {/* SOL - Karşı Tarafın Ürünü */}
+          <div className="card p-6 flex-1">
+            <h2 className="text-xl font-semibold mb-4">{theirName}'in Ürünü</h2>
+            <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto">
+              {theirItems.map((item) => (
                 <Link
                   key={item.id}
                   href={`/listings/${item.productId}`}
@@ -403,25 +408,23 @@ export default function TradeDetailPage() {
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-600">Toplam Değer</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₺{initiatorTotal.toLocaleString('tr-TR')}
+                ₺{theirTotal.toLocaleString('tr-TR')}
               </p>
             </div>
           </div>
 
-          {/* Swap Icon */}
-          <div className="hidden lg:flex items-center justify-center">
+          {/* ORTA - Takas İkonu */}
+          <div className="flex items-center justify-center py-4 lg:py-0">
             <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
               <ArrowsRightLeftIcon className="w-8 h-8 text-primary-600" />
             </div>
           </div>
 
-          {/* Receiver Items */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              {isReceiver ? 'Sizin Ürününüz' : `${trade.receiverName}'in Ürünü`}
-            </h2>
-            <div className="space-y-3 mb-4">
-              {trade.receiverItems.map((item) => (
+          {/* SAĞ - Benim Teklifim */}
+          <div className="card p-6 flex-1">
+            <h2 className="text-xl font-semibold mb-4">Sizin Teklifiniz</h2>
+            <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto">
+              {myItems.map((item) => (
                 <Link
                   key={item.id}
                   href={`/listings/${item.productId}`}
@@ -450,7 +453,7 @@ export default function TradeDetailPage() {
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-600">Toplam Değer</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₺{receiverTotal.toLocaleString('tr-TR')}
+                ₺{myTotal.toLocaleString('tr-TR')}
               </p>
             </div>
           </div>

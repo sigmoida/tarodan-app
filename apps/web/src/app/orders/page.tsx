@@ -13,9 +13,16 @@ interface Order {
   id: string;
   orderNumber: string;
   status: string;
-  totalAmount: number;
+  totalAmount?: number;
+  amount?: number;
   createdAt: string;
-  items: Array<{
+  product?: {
+    id: string;
+    title: string;
+    imageUrl?: string;
+    status?: string;
+  };
+  items?: Array<{
     id: string;
     product: {
       id: string;
@@ -25,15 +32,22 @@ interface Order {
     quantity: number;
     price: number;
   }>;
-  seller: {
+  seller?: {
+    id: string;
+    displayName: string;
+  };
+  buyer?: {
     id: string;
     displayName: string;
   };
   shipment?: {
     trackingNumber: string;
-    carrier: string;
+    carrier?: string;
+    provider?: string;
     status: string;
   };
+  isBuyer?: boolean;
+  isSeller?: boolean;
 }
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -66,6 +80,11 @@ export default function OrdersPage() {
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
+  
+  // Seller rating state
+  const [sellerCommunication, setSellerCommunication] = useState(5);
+  const [sellerShipping, setSellerShipping] = useState(5);
+  const [sellerPackaging, setSellerPackaging] = useState(5);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -94,24 +113,42 @@ export default function OrdersPage() {
     setReviewScore(5);
     setReviewTitle('');
     setReviewText('');
+    setSellerCommunication(5);
+    setSellerShipping(5);
+    setSellerPackaging(5);
     setShowReviewModal(true);
   };
 
   const submitReview = async () => {
-    if (!reviewingOrder || !reviewingOrder.items?.[0]) {
+    const productId = reviewingOrder?.product?.id || reviewingOrder?.items?.[0]?.product?.id;
+    const sellerId = reviewingOrder?.seller?.id;
+    
+    if (!reviewingOrder || !productId) {
       toast.error('Sipariş bilgisi bulunamadı');
       return;
     }
 
     setSubmittingReview(true);
     try {
+      // Submit product rating
       await ratingsApi.createProductRating({
-        productId: reviewingOrder.items[0].product.id,
+        productId,
         orderId: reviewingOrder.id,
         score: reviewScore,
         title: reviewTitle || undefined,
         review: reviewText || undefined,
       });
+
+      // Submit seller rating (if seller exists)
+      if (sellerId) {
+        const avgSellerScore = Math.round((sellerCommunication + sellerShipping + sellerPackaging) / 3);
+        await ratingsApi.createUserRating({
+          receiverId: sellerId,
+          orderId: reviewingOrder.id,
+          score: avgSellerScore,
+          comment: `İletişim: ${sellerCommunication}/5, Kargo: ${sellerShipping}/5, Paketleme: ${sellerPackaging}/5`,
+        });
+      }
 
       toast.success('Değerlendirmeniz kaydedildi!');
       setShowReviewModal(false);
@@ -126,7 +163,8 @@ export default function OrdersPage() {
 
   const canReview = (order: Order) => {
     // Only buyers can review and status must be reviewable
-    const isBuyer = order.items?.[0]?.product?.id && filter !== 'seller';
+    const productId = order.product?.id || order.items?.[0]?.product?.id;
+    const isBuyer = productId && (order.isBuyer !== false) && filter !== 'seller';
     const isReviewableStatus = REVIEWABLE_STATUSES.includes(order.status);
     const notAlreadyReviewed = !reviewedOrders.has(order.id);
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
@@ -197,43 +235,56 @@ export default function OrdersPage() {
                   </div>
 
                   <div className="space-y-3">
-                    {order.items?.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                          {item.product?.imageUrl ? (
-                            <img
-                              src={item.product.imageUrl}
-                              alt={item.product.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-2xl">
-                              🚗
-                            </div>
-                          )}
+                    {/* Ürün bilgisi - items veya product'tan al */}
+                    {(() => {
+                      const productInfo = order.product || order.items?.[0]?.product;
+                      const productImage = productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
+                      const orderPrice = Number(order.totalAmount) || Number(order.amount) || order.items?.[0]?.price || 0;
+                      
+                      return productInfo ? (
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                            {productImage ? (
+                              <img
+                                src={productImage}
+                                alt={productInfo.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">
+                                🚗
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <Link
+                              href={`/listings/${productInfo.id}`}
+                              className="font-medium text-gray-900 hover:text-primary-500 transition-colors"
+                            >
+                              {productInfo.title || 'Ürün'}
+                            </Link>
+                            <p className="text-sm text-gray-500">
+                              1 adet × ₺{orderPrice.toLocaleString('tr-TR')}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <Link
-                            href={`/listings/${item.product?.id}`}
-                            className="font-medium text-gray-900 hover:text-primary-500 transition-colors"
-                          >
-                            {item.product?.title || 'Ürün'}
-                          </Link>
-                          <p className="text-sm text-gray-500">
-                            {item.quantity} adet × ₺{Number(item.price).toLocaleString('tr-TR')}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      ) : (
+                        <p className="text-gray-500">Ürün bilgisi yüklenemedi</p>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                     <div className="text-sm text-gray-500">
-                      Satıcı: {order.seller?.displayName || 'Satıcı'}
+                      {order.isBuyer !== false ? (
+                        <>Satıcı: {order.seller?.displayName || 'Satıcı'}</>
+                      ) : (
+                        <>Alıcı: {order.buyer?.displayName || 'Alıcı'}</>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-primary-500">
-                        ₺{Number(order.totalAmount).toLocaleString('tr-TR')}
+                        ₺{(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR')}
                       </p>
                     </div>
                   </div>
@@ -242,7 +293,7 @@ export default function OrdersPage() {
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                       <p className="text-sm">
                         <span className="text-gray-500">Kargo:</span>{' '}
-                        {order.shipment.carrier}
+                        {order.shipment.carrier || order.shipment.provider}
                       </p>
                       <p className="text-sm">
                         <span className="text-gray-500">Takip No:</span>{' '}
@@ -281,68 +332,165 @@ export default function OrdersPage() {
 
         {/* Review Modal */}
         {showReviewModal && reviewingOrder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Ürünü Değerlendir</h2>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Siparişi Değerlendir</h2>
               
-              {reviewingOrder.items?.[0] && (
-                <div className="flex items-center gap-3 mb-6 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl">
-                    🚗
-                  </div>
-                  <p className="font-medium text-gray-900">{reviewingOrder.items[0].product?.title}</p>
-                </div>
-              )}
-
-              {/* Star Rating */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Puanınız</label>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setReviewScore(star)}
-                      className="p-1 hover:scale-110 transition-transform"
-                    >
-                      {star <= reviewScore ? (
-                        <StarIcon className="w-8 h-8 text-yellow-400" />
-                      ) : (
-                        <StarOutlineIcon className="w-8 h-8 text-gray-300" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Başlık (opsiyonel)
-                </label>
-                <input
-                  type="text"
-                  value={reviewTitle}
-                  onChange={(e) => setReviewTitle(e.target.value)}
-                  placeholder="Örn: Harika bir ürün!"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  maxLength={100}
-                />
-              </div>
-
-              {/* Review Text */}
+              {/* Product Section */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Değerlendirmeniz (opsiyonel)
-                </label>
-                <textarea
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  placeholder="Deneyiminizi paylaşın..."
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  maxLength={1000}
-                />
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  📦 Ürün Değerlendirmesi
+                </h3>
+                
+                {(reviewingOrder.product || reviewingOrder.items?.[0]?.product) && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl overflow-hidden">
+                      {(reviewingOrder.product?.imageUrl || reviewingOrder.items?.[0]?.product?.imageUrl) ? (
+                        <img
+                          src={reviewingOrder.product?.imageUrl || reviewingOrder.items?.[0]?.product?.imageUrl}
+                          alt="Ürün"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : '🚗'}
+                    </div>
+                    <p className="font-medium text-gray-900">
+                      {reviewingOrder.product?.title || reviewingOrder.items?.[0]?.product?.title}
+                    </p>
+                  </div>
+                )}
+
+                {/* Product Star Rating */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ürün Puanı</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewScore(star)}
+                        className="p-1 hover:scale-110 transition-transform"
+                      >
+                        {star <= reviewScore ? (
+                          <StarIcon className="w-8 h-8 text-yellow-400" />
+                        ) : (
+                          <StarOutlineIcon className="w-8 h-8 text-gray-300" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Başlık (opsiyonel)
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewTitle}
+                    onChange={(e) => setReviewTitle(e.target.value)}
+                    placeholder="Örn: Harika bir ürün!"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    maxLength={100}
+                  />
+                </div>
+
+                {/* Review Text */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Yorum (opsiyonel)
+                  </label>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="Ürün hakkında deneyiminizi paylaşın..."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    maxLength={1000}
+                  />
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-6"></div>
+
+              {/* Seller Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  👤 Satıcı Değerlendirmesi
+                </h3>
+                
+                {reviewingOrder.seller && (
+                  <p className="text-sm text-gray-600 mb-4">
+                    Satıcı: <span className="font-medium text-gray-900">{reviewingOrder.seller.displayName}</span>
+                  </p>
+                )}
+
+                {/* Seller Rating Categories */}
+                <div className="space-y-3">
+                  {/* Communication */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">İletişim</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerCommunication(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerCommunication ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Shipping Speed */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">Kargo Hızı</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerShipping(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerShipping ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Packaging */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">Paketleme</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerPackaging(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerPackaging ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -357,7 +505,7 @@ export default function OrdersPage() {
                   disabled={submittingReview}
                   className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
-                  {submittingReview ? 'Gönderiliyor...' : 'Gönder'}
+                  {submittingReview ? 'Gönderiliyor...' : 'Değerlendir'}
                 </button>
               </div>
             </div>

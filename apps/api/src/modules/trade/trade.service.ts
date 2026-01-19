@@ -6,6 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { MembershipService } from '../membership/membership.service';
 import {
   TradeStatus,
   ProductStatus,
@@ -30,7 +31,10 @@ import {
 
 @Injectable()
 export class TradeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membershipService: MembershipService,
+  ) {}
 
   // ==========================================================================
   // TRADE STATE MACHINE
@@ -110,19 +114,32 @@ export class TradeService {
       throw new NotFoundException('Alıcı kullanıcı bulunamadı');
     }
 
-    // Validate initiator has trade-enabled products
+    // Validate initiator membership - must be premium to create trade
+    const initiatorCanTrade = await this.membershipService.canCreateTrade(initiatorId);
+    if (!initiatorCanTrade.allowed) {
+      throw new BadRequestException(initiatorCanTrade.reason);
+    }
+
+    // Validate receiver membership - must be premium to receive trade
+    const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
+    if (!receiverCanTrade.allowed) {
+      throw new BadRequestException(
+        'Takas teklifi gönderilemiyor. Alıcı kullanıcı Premium üyelik gerektiren takas özelliğine sahip değil.',
+      );
+    }
+
+    // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
     const initiatorProducts = await this.prisma.product.findMany({
       where: {
         id: { in: dto.initiatorItems.map((i) => i.productId) },
         sellerId: initiatorId,
         status: ProductStatus.active,
-        isTradeEnabled: true,
       },
     });
 
     if (initiatorProducts.length !== dto.initiatorItems.length) {
       throw new BadRequestException(
-        'Bazı ürünler takasa uygun değil veya size ait değil',
+        'Bazı ürünler size ait değil veya aktif değil',
       );
     }
 
@@ -332,6 +349,14 @@ export class TradeService {
     // Only receiver can accept
     if (trade.receiverId !== userId) {
       throw new ForbiddenException('Sadece takas alıcısı kabul edebilir');
+    }
+
+    // Validate receiver membership - must still be premium (subscription might have expired)
+    const receiverCanTrade = await this.membershipService.canCreateTrade(userId);
+    if (!receiverCanTrade.allowed) {
+      throw new BadRequestException(
+        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Premium üyeliğinizi yenileyin.',
+      );
     }
 
     // Check valid transition
@@ -545,6 +570,14 @@ export class TradeService {
 
     if (!isInitiator && !isReceiver) {
       throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+    }
+
+    // Validate user membership - must be premium to ship trade
+    const userCanTrade = await this.membershipService.canCreateTrade(userId);
+    if (!userCanTrade.allowed) {
+      throw new BadRequestException(
+        'Trade işlemlerini yapmak için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+      );
     }
 
     // Check trade can be shipped
@@ -973,24 +1006,28 @@ export class TradeService {
       receiverId: trade.receiverId,
       receiverName: trade.receiver?.displayName || '',
       status: trade.status,
-      initiatorItems: (trade.initiatorItems || []).map((item: any) => ({
-        id: item.id,
-        productId: item.productId,
-        productTitle: item.product?.title || '',
-        productImage: item.product?.images?.[0]?.url,
-        side: item.side,
-        quantity: item.quantity,
-        valueAtTrade: parseFloat(item.valueAtTrade),
-      })),
-      receiverItems: (trade.receiverItems || []).map((item: any) => ({
-        id: item.id,
-        productId: item.productId,
-        productTitle: item.product?.title || '',
-        productImage: item.product?.images?.[0]?.url,
-        side: item.side,
-        quantity: item.quantity,
-        valueAtTrade: parseFloat(item.valueAtTrade),
-      })),
+      initiatorItems: (trade.initiatorItems || [])
+        .filter((item: any) => item.side === 'initiator')
+        .map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          productTitle: item.product?.title || '',
+          productImage: item.product?.images?.[0]?.url,
+          side: item.side,
+          quantity: item.quantity,
+          valueAtTrade: parseFloat(item.valueAtTrade),
+        })),
+      receiverItems: (trade.receiverItems || [])
+        .filter((item: any) => item.side === 'receiver')
+        .map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          productTitle: item.product?.title || '',
+          productImage: item.product?.images?.[0]?.url,
+          side: item.side,
+          quantity: item.quantity,
+          valueAtTrade: parseFloat(item.valueAtTrade),
+        })),
       cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
       cashPayerId: trade.cashPayerId || undefined,
       cashCommission: trade.cashCommission

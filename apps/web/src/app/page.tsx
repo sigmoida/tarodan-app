@@ -198,19 +198,39 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 {isAuthenticated ? (
-                  <Link 
-                    href="/collections"
-                    className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
-                  >
-                    Koleksiyon oluştur
-                  </Link>
+                  <>
+                    <Link 
+                      href="/listings/new"
+                      className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white shadow-lg"
+                    >
+                      <span className="text-xl">+</span>
+                      İlan Ver
+                    </Link>
+                    <Link 
+                      href="/collections"
+                      className="bg-transparent text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                    >
+                      Koleksiyon oluştur
+                    </Link>
+                  </>
                 ) : (
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white"
-                  >
-                    Koleksiyon oluştur
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        window.location.href = '/login?redirect=/listings/new';
+                      }}
+                      className="bg-white text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-white shadow-lg"
+                    >
+                      <span className="text-xl">+</span>
+                      İlan Ver
+                    </button>
+                    <button
+                      onClick={() => setShowAuthModal(true)}
+                      className="bg-transparent text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 border-2 border-white"
+                    >
+                      Koleksiyon oluştur
+                    </button>
+                  </>
                 )}
                 <Link 
                   href="/listings"

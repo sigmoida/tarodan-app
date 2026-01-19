@@ -50,10 +50,11 @@ const SCALES = [
 
 interface ListingLimits {
   currentCount: number;
-  maxFreeListings: number;
+  maxListings: number;
   canCreateListing: boolean;
   isPremium: boolean;
   membershipTier: string;
+  remainingListings: number;
 }
 
 export default function NewListingPage() {
@@ -96,10 +97,32 @@ export default function NewListingPage() {
     }
   }, [user, limits]);
 
-  const updateListingLimits = () => {
+  const updateListingLimits = async () => {
     setLimitsLoading(true);
     try {
-      // Use auth store for membership info
+      // Fetch real listing stats from API
+      const response = await api.get('/products/my/stats');
+      const stats = response.data;
+      
+      const tierName = stats.limits?.tierName || 'Free';
+      const tierType = stats.limits?.tierType || 'free';
+      const isPremium = tierType === 'premium' || tierType === 'business';
+      const maxListings = stats.summary?.max || 10;
+      const currentCount = stats.summary?.used || 0;
+      const remaining = stats.summary?.remaining || 0;
+      const canCreate = stats.summary?.canCreate ?? true;
+
+      setListingLimits({
+        currentCount,
+        maxListings,
+        canCreateListing: canCreate,
+        isPremium,
+        membershipTier: tierName,
+        remainingListings: remaining,
+      });
+    } catch (error) {
+      console.error('Failed to update listing limits:', error);
+      // Fallback to auth store data
       const membershipTier = user?.membershipTier || 'free';
       const currentCount = user?.listingCount || 0;
       const maxListings = limits?.maxListings ?? 10;
@@ -108,20 +131,11 @@ export default function NewListingPage() {
 
       setListingLimits({
         currentCount,
-        maxFreeListings: isUnlimited ? -1 : maxListings,
+        maxListings: isUnlimited ? -1 : maxListings,
         canCreateListing: isUnlimited || currentCount < maxListings,
         isPremium,
         membershipTier,
-      });
-    } catch (error) {
-      console.error('Failed to update listing limits:', error);
-      // Default to allowing listing creation
-      setListingLimits({
-        currentCount: 0,
-        maxFreeListings: 10,
-        canCreateListing: true,
-        isPremium: false,
-        membershipTier: 'free',
+        remainingListings: isUnlimited ? -1 : maxListings - currentCount,
       });
     } finally {
       setLimitsLoading(false);
@@ -183,7 +197,7 @@ export default function NewListingPage() {
 
     // Check listing limit
     if (listingLimits && !listingLimits.canCreateListing) {
-      toast.error(`Ücretsiz ilan limitinize ulaştınız (${listingLimits.maxFreeListings}/${listingLimits.maxFreeListings}). Premium üyelik alarak daha fazla ilan oluşturabilirsiniz.`);
+      toast.error(`İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`);
       return;
     }
 
@@ -255,9 +269,9 @@ export default function NewListingPage() {
                       ? 'text-yellow-800' 
                       : listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'
                   }`}>
-                    {listingLimits.maxFreeListings === -1 
+                    {listingLimits.maxListings === -1 
                       ? `Mevcut İlan: ${listingLimits.currentCount} (Sınırsız)`
-                      : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxFreeListings}`
+                      : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxListings}`
                     }
                   </p>
                   <p className={`text-sm ${
@@ -265,18 +279,23 @@ export default function NewListingPage() {
                       ? 'text-yellow-600' 
                       : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {listingLimits.membershipTier.charAt(0).toUpperCase() + listingLimits.membershipTier.slice(1)} üyelik
+                    {listingLimits.membershipTier} üyelik
                     {listingLimits.isPremium && ' ⭐'}
                   </p>
+                  {listingLimits.remainingListings !== -1 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Kalan ilan hakkı: {listingLimits.remainingListings}
+                    </p>
+                  )}
                 </div>
                 {!listingLimits.canCreateListing && (
                   <Link href="/pricing" className="btn-primary text-sm">
                     Premium'a Geç
                   </Link>
                 )}
-                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.maxFreeListings !== -1 && listingLimits.currentCount >= listingLimits.maxFreeListings - 2 && (
+                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.maxListings !== -1 && listingLimits.remainingListings <= 2 && (
                   <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                    Sınırsız ilan için →
+                    Daha fazla ilan için →
                   </Link>
                 )}
               </div>

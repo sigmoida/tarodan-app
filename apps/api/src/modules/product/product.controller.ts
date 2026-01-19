@@ -71,6 +71,62 @@ export class ProductController {
   }
 
   /**
+   * GET /products/my/stats
+   * Get seller's listing statistics and membership limits
+   */
+  @Get('my/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'İlan istatistikleri ve limitleri',
+    description: 'Kullanıcının ilan sayıları, üyelik limitleri ve kalan haklarını döner'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'İlan istatistikleri',
+    schema: {
+      type: 'object',
+      properties: {
+        counts: {
+          type: 'object',
+          properties: {
+            pending: { type: 'number', description: 'Bekleyen ilanlar' },
+            active: { type: 'number', description: 'Aktif ilanlar' },
+            reserved: { type: 'number', description: 'Rezerve ilanlar' },
+            sold: { type: 'number', description: 'Satılmış ilanlar' },
+            rejected: { type: 'number', description: 'Reddedilen ilanlar' },
+            total: { type: 'number', description: 'Toplam ilanlar' },
+            activeListings: { type: 'number', description: 'Limite sayılan ilanlar (pending+active+reserved)' },
+          },
+        },
+        limits: {
+          type: 'object',
+          properties: {
+            tierName: { type: 'string', description: 'Üyelik adı' },
+            tierType: { type: 'string', description: 'Üyelik tipi' },
+            maxTotalListings: { type: 'number', description: 'Maksimum ilan hakkı' },
+            remainingTotalListings: { type: 'number', description: 'Kalan ilan hakkı' },
+            canCreateListing: { type: 'boolean', description: 'İlan oluşturabilir mi?' },
+          },
+        },
+        summary: {
+          type: 'object',
+          properties: {
+            used: { type: 'number', description: 'Kullanılan ilan sayısı' },
+            max: { type: 'number', description: 'Maksimum ilan sayısı' },
+            remaining: { type: 'number', description: 'Kalan ilan hakkı' },
+            canCreate: { type: 'boolean', description: 'İlan oluşturabilir mi?' },
+            percentUsed: { type: 'number', description: 'Kullanım yüzdesi' },
+          },
+        },
+      },
+    },
+  })
+  async getMyListingStats(@CurrentUser('id') sellerId: string) {
+    return this.productService.getSellerListingStats(sellerId);
+  }
+
+  /**
    * GET /products/:id
    * Get single product (public)
    */

@@ -93,13 +93,14 @@ const MEMBERSHIP_TIERS = [
 export default function PricingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
-  const [loading, setLoading] = useState<string | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
   useEffect(() => {
     const tier = searchParams.get('tier');
     if (tier) {
+      setSelectedTier(tier);
       // Scroll to specific tier
       setTimeout(() => {
         const element = document.getElementById(`tier-${tier}`);
@@ -108,30 +109,34 @@ export default function PricingPage() {
     }
   }, [searchParams]);
 
-  const handleUpgrade = async (tierId: string) => {
-    if (!isAuthenticated) {
-      toast.error('Üyelik yükseltmek için giriş yapmalısınız');
-      router.push('/login?redirect=/pricing');
-      return;
-    }
+  const currentTier = user?.membershipTier || 'free';
 
+  const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
-      toast.info('Zaten ücretsiz plandasınız');
+      toast.info('Ücretsiz plan zaten mevcut');
+      return;
+    }
+    if (tierId === currentTier) {
+      toast.info('Bu plan zaten aktif');
+      return;
+    }
+    setSelectedTier(tierId);
+  };
+
+  const handleContinue = () => {
+    if (!selectedTier || selectedTier === 'free') {
+      toast.error('Lütfen bir plan seçin');
       return;
     }
 
-    setLoading(tierId);
-    try {
-      // In a real implementation, this would initiate payment
-      // For now, we'll just show a message
-      toast.success('Ödeme sayfasına yönlendiriliyorsunuz...');
-      // await api.post('/membership/upgrade', { tier: tierId, period: selectedPeriod });
-    } catch (error: any) {
-      console.error('Upgrade error:', error);
-      toast.error(error.response?.data?.message || 'Üyelik yükseltilemedi');
-    } finally {
-      setLoading(null);
+    if (!isAuthenticated) {
+      toast.error('Devam etmek için giriş yapmalısınız');
+      router.push(`/login?redirect=/pricing?tier=${selectedTier}`);
+      return;
     }
+
+    // Redirect to membership checkout
+    router.push(`/membership/checkout?tier=${selectedTier}&period=${selectedPeriod}`);
   };
 
   return (
@@ -178,27 +183,45 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {MEMBERSHIP_TIERS.map((tier, index) => {
             const displayPrice = selectedPeriod === 'yearly' && tier.price > 0
               ? Math.round(tier.price * 12 * 0.8)
               : tier.price;
             
+            const isSelected = selectedTier === tier.id;
+            const isCurrent = currentTier === tier.id;
+            
             return (
               <motion.div
                 key={tier.id}
+                id={`tier-${tier.id}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className={`relative bg-white rounded-xl shadow-lg border-2 overflow-hidden ${
-                  tier.popular
-                    ? 'border-primary-500 scale-105'
-                    : 'border-gray-200'
-                }`}
+                onClick={() => tier.price > 0 && handleSelectTier(tier.id)}
+                className={`relative bg-white rounded-xl shadow-lg border-2 overflow-hidden transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-primary-500 ring-2 ring-primary-500 scale-105'
+                    : tier.popular
+                    ? 'border-primary-300 hover:border-primary-400'
+                    : 'border-gray-200 hover:border-gray-300'
+                } ${tier.price === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
-                {tier.popular && (
+                {tier.popular && !isSelected && (
                   <div className="absolute top-0 right-0 bg-primary-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
                     Popüler
+                  </div>
+                )}
+                {isSelected && (
+                  <div className="absolute top-0 right-0 bg-green-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
+                    <CheckIcon className="w-4 h-4" />
+                    Seçildi
+                  </div>
+                )}
+                {isCurrent && !isSelected && (
+                  <div className="absolute top-0 left-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold rounded-br-lg">
+                    Mevcut
                   </div>
                 )}
 
@@ -250,36 +273,39 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  {/* CTA Button */}
-                  {isAuthenticated ? (
-                    <button
-                      onClick={() => handleUpgrade(tier.id)}
-                      disabled={loading === tier.id}
-                      className={`w-full text-center py-3 rounded-lg font-semibold transition-colors ${
-                        tier.popular
-                          ? 'bg-primary-500 text-white hover:bg-primary-600'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {loading === tier.id ? 'İşleniyor...' : tier.price === 0 ? 'Mevcut Plan' : 'Yükselt'}
-                    </button>
-                  ) : (
-                    <Link
-                      href={`/register?plan=${tier.id}`}
-                      className={`block w-full text-center py-3 rounded-lg font-semibold transition-colors ${
-                        tier.popular
-                          ? 'bg-primary-500 text-white hover:bg-primary-600'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      Başla
-                    </Link>
-                  )}
+                  {/* Selection indicator */}
+                  <div className={`w-full py-3 rounded-lg font-semibold text-center transition-colors ${
+                    isSelected
+                      ? 'bg-primary-500 text-white'
+                      : isCurrent
+                      ? 'bg-blue-100 text-blue-700'
+                      : tier.price === 0
+                      ? 'bg-gray-100 text-gray-400'
+                      : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200'
+                  }`}>
+                    {isCurrent ? 'Mevcut Planınız' : tier.price === 0 ? 'Ücretsiz' : isSelected ? 'Seçildi' : 'Seç'}
+                  </div>
                 </div>
               </motion.div>
             );
           })}
         </div>
+
+        {/* Continue Button */}
+        {selectedTier && selectedTier !== 'free' && selectedTier !== currentTier && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-center mb-12"
+          >
+            <button
+              onClick={handleContinue}
+              className="px-12 py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
+            >
+              {isAuthenticated ? 'Ödemeye Devam Et' : 'Giriş Yap ve Devam Et'}
+            </button>
+          </motion.div>
+        )}
 
         {/* FAQ Section */}
         <div className="max-w-3xl mx-auto mt-16">

@@ -114,4 +114,54 @@ export class UserController {
   ) {
     return this.userService.deleteAddress(userId, addressId);
   }
+
+  /**
+   * GET /users/me/following
+   * Get users that current user is following
+   */
+  @Get('me/following')
+  @ApiOperation({ summary: 'Takip ettiklerim' })
+  @ApiResponse({ status: 200, description: 'Takip edilen kullanıcılar' })
+  async getFollowing(@CurrentUser('id') userId: string) {
+    return this.userService.getFollowing(userId);
+  }
+
+  /**
+   * GET /users/:id/profile
+   * Get public user profile
+   */
+  @Get(':id/profile')
+  @ApiOperation({ summary: 'Kullanıcı profili görüntüle' })
+  @ApiResponse({ status: 200, description: 'Kullanıcı profili' })
+  async getUserProfile(@Param('id') userId: string) {
+    return this.userService.getPublicProfile(userId);
+  }
+
+  /**
+   * POST /users/:id/follow
+   * Follow a user
+   */
+  @Post(':id/follow')
+  @ApiOperation({ summary: 'Kullanıcıyı takip et' })
+  @ApiResponse({ status: 200, description: 'Takip edildi' })
+  async followUser(
+    @CurrentUser('id') currentUserId: string,
+    @Param('id') targetUserId: string,
+  ) {
+    return this.userService.followUser(currentUserId, targetUserId);
+  }
+
+  /**
+   * DELETE /users/:id/follow
+   * Unfollow a user
+   */
+  @Delete(':id/follow')
+  @ApiOperation({ summary: 'Takibi bırak' })
+  @ApiResponse({ status: 200, description: 'Takip bırakıldı' })
+  async unfollowUser(
+    @CurrentUser('id') currentUserId: string,
+    @Param('id') targetUserId: string,
+  ) {
+    return this.userService.unfollowUser(currentUserId, targetUserId);
+  }
 }

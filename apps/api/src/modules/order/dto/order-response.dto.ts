@@ -65,6 +65,20 @@ export class OrderShipmentDto {
   cost?: number | null;
 }
 
+export class OrderItemDto {
+  @ApiProperty({ example: 'uuid' })
+  id: string;
+
+  @ApiProperty({ type: OrderProductDto })
+  product: OrderProductDto;
+
+  @ApiProperty({ example: 1 })
+  quantity: number;
+
+  @ApiProperty({ example: 250.0 })
+  price: number;
+}
+
 export class OrderResponseDto {
   @ApiProperty({ example: 'uuid' })
   id: string;
@@ -75,14 +89,20 @@ export class OrderResponseDto {
   @ApiProperty({ example: 250.0 })
   amount: number;
 
+  @ApiProperty({ example: 262.5, description: 'Total amount including commission' })
+  totalAmount: number;
+
   @ApiProperty({ example: 12.5 })
   commissionAmount: number;
 
   @ApiProperty({ example: 'pending_payment' })
   status: string;
 
-  @ApiProperty({ type: OrderProductDto })
-  product: OrderProductDto;
+  @ApiPropertyOptional({ type: OrderProductDto, nullable: true })
+  product: OrderProductDto | null;
+
+  @ApiPropertyOptional({ type: [OrderItemDto], description: 'Order items list' })
+  items?: OrderItemDto[];
 
   @ApiProperty({ type: OrderUserDto })
   buyer: OrderUserDto;
@@ -98,6 +118,15 @@ export class OrderResponseDto {
 
   @ApiPropertyOptional({ type: OrderShipmentDto })
   shipment?: OrderShipmentDto | null;
+
+  @ApiPropertyOptional({ example: 'guest@example.com', description: 'Guest email for guest checkout' })
+  guestEmail?: string;
+
+  @ApiPropertyOptional({ example: 'uuid', description: 'Payment ID' })
+  paymentId?: string | null;
+
+  @ApiPropertyOptional({ example: 'Please handle with care', description: 'Order notes' })
+  notes?: string | null;
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;

@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, Prisma } from '@prisma/client';
 import { EventService } from '../events';
@@ -31,7 +32,21 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
+    private readonly cache: CacheService,
   ) {}
+
+  /**
+   * Invalidate product caches when product status changes
+   */
+  private async invalidateProductCaches(productId: string): Promise<void> {
+    try {
+      await this.cache.del(`products:detail:${productId}`);
+      await this.cache.delPattern('products:list:*');
+      this.logger.log(`Product cache invalidated for ${productId}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate product cache: ${error}`);
+    }
+  }
 
   /**
    * Generate unique order number
@@ -259,22 +274,21 @@ export class OrderService {
    * - Cannot buy own product
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
-    return this.prisma.$transaction(async (tx) => {
-      // Lock the product row to prevent concurrent purchases
-      // Using raw query with FOR UPDATE for pessimistic locking
-      const lockedProducts = await tx.$queryRaw<any[]>`
-        SELECT p.*, u."displayName" as "sellerName"
-        FROM "Product" p
-        JOIN "User" u ON p."sellerId" = u.id
-        WHERE p.id = ${dto.productId}::uuid
-        FOR UPDATE
-      `;
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Get product with seller info - using Prisma instead of raw SQL
+      // Transaction provides isolation for concurrent purchases
+      const product = await tx.product.findUnique({
+        where: { id: dto.productId },
+        include: {
+          seller: {
+            select: { id: true, displayName: true },
+          },
+        },
+      });
 
-      if (!lockedProducts || lockedProducts.length === 0) {
+      if (!product) {
         throw new NotFoundException('Ürün bulunamadı');
       }
-
-      const product = lockedProducts[0];
 
       // Validate product is available
       if (product.status !== ProductStatus.active) {
@@ -286,18 +300,62 @@ export class OrderService {
         throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
       }
 
-      // Validate shipping address belongs to buyer
-      const shippingAddress = await tx.address.findUnique({
-        where: { id: dto.addressId },
-      });
+      // Resolve shipping address - either from saved address or inline address
+      let shippingAddress: any;
+      let shippingAddressId: string | null = null;
 
-      if (!shippingAddress || shippingAddress.userId !== buyerId) {
-        throw new BadRequestException('Geçersiz teslimat adresi');
+      if (dto.shippingAddressId) {
+        // Use saved address
+        const savedAddress = await tx.address.findUnique({
+          where: { id: dto.shippingAddressId },
+        });
+
+        if (!savedAddress || savedAddress.userId !== buyerId) {
+          throw new BadRequestException('Geçersiz teslimat adresi');
+        }
+        shippingAddress = savedAddress;
+        shippingAddressId = savedAddress.id;
+      } else if (dto.shippingAddress) {
+        // Validate required fields
+        if (!dto.shippingAddress.fullName?.trim()) {
+          throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+        }
+        if (!dto.shippingAddress.phone?.trim()) {
+          throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+        }
+        if (!dto.shippingAddress.city?.trim()) {
+          throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+        }
+        if (!dto.shippingAddress.district?.trim()) {
+          throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+        }
+        if (!dto.shippingAddress.address?.trim()) {
+          throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
+        }
+        
+        // Use inline address object - create a new address for the user
+        const newAddress = await tx.address.create({
+          data: {
+            userId: buyerId,
+            title: 'Sipariş Adresi',
+            fullName: dto.shippingAddress.fullName.trim(),
+            phone: dto.shippingAddress.phone.trim(),
+            city: dto.shippingAddress.city.trim(),
+            district: dto.shippingAddress.district.trim(),
+            address: dto.shippingAddress.address.trim(),
+            zipCode: dto.shippingAddress.zipCode?.trim() || null,
+            isDefault: false,
+          },
+        });
+        shippingAddress = newAddress;
+        shippingAddressId = newAddress.id;
+      } else {
+        throw new BadRequestException('Teslimat adresi gereklidir');
       }
 
       // Validate billing address if provided
       let billingAddress = shippingAddress;
-      if (dto.billingAddressId && dto.billingAddressId !== dto.addressId) {
+      if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
         const billing = await tx.address.findUnique({
           where: { id: dto.billingAddressId },
         });
@@ -337,10 +395,10 @@ export class OrderService {
           totalAmount,
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
-          shippingAddressId: dto.addressId,
+          shippingAddressId: shippingAddressId,
           shippingAddress: {
             id: shippingAddress.id,
-            title: shippingAddress.title,
+            title: shippingAddress.title || 'Teslimat Adresi',
             fullName: shippingAddress.fullName,
             phone: shippingAddress.phone,
             city: shippingAddress.city,
@@ -400,10 +458,16 @@ export class OrderService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount,
+        productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
         provider: 'iyzico', // Default provider
       };
     });
+
+    // Invalidate product cache after successful transaction
+    await this.invalidateProductCaches(result.productId);
+    
+    return result;
   }
 
   /**
@@ -416,7 +480,9 @@ export class OrderService {
    * - Commission is calculated automatically
    */
   async create(buyerId: string, dto: CreateOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
+    let productIdForCache: string | null = null;
+    
+    const result = await this.prisma.$transaction(async (tx) => {
       // Get and validate offer
       const offer = await tx.offer.findUnique({
         where: { id: dto.offerId },
@@ -536,8 +602,18 @@ export class OrderService {
         data: { status: ProductStatus.sold },
       });
 
+      // Store productId for cache invalidation
+      productIdForCache = offer.productId;
+
       return this.formatOrderResponse(order, buyerId);
     });
+
+    // Invalidate product cache after successful transaction
+    if (productIdForCache) {
+      await this.invalidateProductCaches(productIdForCache);
+    }
+    
+    return result;
   }
 
   /**
@@ -545,7 +621,7 @@ export class OrderService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Get product
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
@@ -582,16 +658,24 @@ export class OrderService {
         finalPrice = Number(offer.amount);
       }
 
-      // Create or get guest user
-      let guestUser = await tx.user.findFirst({
-        where: {
-          email: dto.email,
-          displayName: { startsWith: 'GUEST_' },
-        },
+      // Check if user already exists with this email
+      let existingUser = await tx.user.findUnique({
+        where: { email: dto.email },
       });
 
-      if (!guestUser) {
-        // Create a guest user
+      let guestUser;
+      
+      if (existingUser) {
+        // If the user is a registered (non-guest) user, throw error
+        if (!existingUser.displayName?.startsWith('GUEST_')) {
+          throw new BadRequestException(
+            'Bu e-posta adresi kayıtlı bir hesaba ait. Lütfen giriş yaparak devam edin veya farklı bir e-posta adresi kullanın.'
+          );
+        }
+        // Use existing guest user
+        guestUser = existingUser;
+      } else {
+        // Create a new guest user
         const guestId = `GUEST_${Date.now()}`;
         guestUser = await tx.user.create({
           data: {
@@ -603,6 +687,23 @@ export class OrderService {
             isSeller: false,
           },
         });
+      }
+
+      // Validate shipping address for guest checkout
+      if (!dto.shippingAddress?.fullName?.trim()) {
+        throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+      }
+      if (!dto.shippingAddress?.phone?.trim()) {
+        throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+      }
+      if (!dto.shippingAddress?.city?.trim()) {
+        throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+      }
+      if (!dto.shippingAddress?.district?.trim()) {
+        throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+      }
+      if (!dto.shippingAddress?.address?.trim()) {
+        throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
       }
 
       // Calculate commission with category-based matching (3.3)
@@ -627,12 +728,12 @@ export class OrderService {
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
           shippingAddress: {
-            fullName: dto.shippingAddress.fullName,
-            phone: dto.shippingAddress.phone,
-            city: dto.shippingAddress.city,
-            district: dto.shippingAddress.district,
-            address: dto.shippingAddress.address,
-            zipCode: dto.shippingAddress.zipCode,
+            fullName: dto.shippingAddress.fullName.trim(),
+            phone: dto.shippingAddress.phone.trim(),
+            city: dto.shippingAddress.city.trim(),
+            district: dto.shippingAddress.district.trim(),
+            address: dto.shippingAddress.address.trim(),
+            zipCode: dto.shippingAddress.zipCode?.trim() || null,
           },
           // Store guest info in metadata
         },
@@ -670,8 +771,14 @@ export class OrderService {
         ...this.formatOrderResponse(order, guestUser.id),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
+        productId: dto.productId, // Include for cache invalidation
       };
     });
+
+    // Invalidate product cache after successful transaction
+    await this.invalidateProductCaches(dto.productId);
+    
+    return result;
   }
 
   /**
@@ -1109,18 +1216,28 @@ export class OrderService {
    * Format order response
    */
   private formatOrderResponse(order: any, userId: string) {
+    const product = order.product ? {
+      id: order.product.id,
+      title: order.product.title,
+      imageUrl: order.product.images?.[0]?.url,
+      status: order.product.status,
+    } : null;
+    
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       amount: Number(order.totalAmount),
+      totalAmount: Number(order.totalAmount), // Frontend uyumu için
       commissionAmount: Number(order.commissionAmount),
       status: order.status,
-      product: {
-        id: order.product.id,
-        title: order.product.title,
-        imageUrl: order.product.images?.[0]?.url,
-        status: order.product.status,
-      },
+      product,
+      // Frontend items array bekliyor - tek ürünü items formatında da döndür
+      items: product ? [{
+        id: order.id,
+        product,
+        quantity: 1,
+        price: Number(order.totalAmount),
+      }] : [],
       buyer: order.buyer,
       seller: order.seller,
       shippingAddress: order.shippingAddress && typeof order.shippingAddress === 'object'

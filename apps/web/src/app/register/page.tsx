@@ -9,7 +9,9 @@ import {
   EnvelopeIcon, 
   LockClosedIcon, 
   EyeIcon, 
-  EyeSlashIcon 
+  EyeSlashIcon,
+  PhoneIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -21,6 +23,8 @@ export default function RegisterPage() {
   // All useState hooks must be declared before any early returns
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,7 +88,7 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      await register(displayName, email, password);
+      await register(displayName, email, password, phone || undefined, birthDate || undefined);
       toast.success('Kayıt başarılı! Hoş geldiniz.');
       window.location.href = '/';
     } catch (error: any) {
@@ -181,6 +185,40 @@ export default function RegisterPage() {
                   placeholder="ornek@email.com"
                   className="input pl-12"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Telefon
+                </label>
+                <div className="relative">
+                  <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="05XX XXX XX XX"
+                    className="input pl-12"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Doğum Tarihi
+                </label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                    className="input pl-12"
+                  />
+                </div>
               </div>
             </div>
 

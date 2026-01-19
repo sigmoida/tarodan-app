@@ -6,6 +6,19 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi } from '@/lib/api';
 
+interface MembershipTier {
+  type: string;
+  name: string;
+  maxFreeListings: number;
+  maxTotalListings: number;
+  maxImagesPerListing: number;
+  canTrade: boolean;
+  canCreateCollections: boolean;
+  featuredListingSlots: number;
+  commissionDiscount: number;
+  isAdFree: boolean;
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -26,9 +39,11 @@ interface UserProfile {
     reviewsCount: number;
   };
   membership?: {
-    tier: string;
-    expiresAt: string;
+    tier: MembershipTier;
+    status: string;
+    expiresAt: string | null;
   };
+  membershipTier?: string;
 }
 
 export default function ProfilePage() {
@@ -52,10 +67,14 @@ export default function ProfilePage() {
   const setProfileFromAuthStore = () => {
     if (!user) return;
     
-    // Get membership tier display name
-    const tierDisplay = user.membershipTier === 'premium' ? 'Premium' :
-                       user.membershipTier === 'business' ? 'Business' :
-                       user.membershipTier === 'basic' ? 'Basic' : 'Free';
+    // Get membership tier info
+    const tierType = user.membershipTier || 'free';
+    const tierDefaults: Record<string, MembershipTier> = {
+      free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
+      basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
+      premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
+      business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
+    };
     
     setProfile({
       id: user.id,
@@ -67,9 +86,11 @@ export default function ProfilePage() {
       isVerified: user.isVerified,
       isSeller: user.isSeller,
       createdAt: String(user.createdAt),
+      membershipTier: tierType,
       membership: {
-        tier: tierDisplay,
-        expiresAt: '',
+        tier: tierDefaults[tierType] || tierDefaults.free,
+        status: 'active',
+        expiresAt: null,
       },
       stats: {
         productsCount: user.listingCount || 0,
@@ -86,32 +107,36 @@ export default function ProfilePage() {
   const loadProfile = async () => {
     try {
       // Use /users/me for profile data
-      const [profileResponse, statsResponse] = await Promise.all([
+      const [profileResponse, statsResponse, ordersResponse, productsResponse] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
+        api.get('/orders', { params: { role: 'buyer', limit: 1 } }).catch(() => null),
+        userApi.getMyProducts({ limit: 1 }).catch(() => null),
       ]);
       
       const profileData = profileResponse?.data?.user || profileResponse?.data || user;
       const statsData = statsResponse?.data?.data || statsResponse?.data || {};
+      const ordersCount = ordersResponse?.data?.meta?.total || ordersResponse?.data?.data?.length || 0;
+      const productsCount = productsResponse?.data?.meta?.total || productsResponse?.data?.data?.length || productsResponse?.data?.products?.length || 0;
       
       if (!profileData) {
         // If no profile data, keep using authStore data
         return;
       }
       
-      // Extract membership info from various possible API formats
-      const membershipTier = 
-        profileData.membership?.tier?.type ||
-        profileData.membership?.tier?.name ||
-        profileData.membership?.tier ||
-        profileData.membershipTier ||
-        user?.membershipTier ||
-        'free';
+      // Get membership info from API response
+      const membershipFromApi = profileData.membership;
+      const tierType = membershipFromApi?.tier?.type || profileData.membershipTier || user?.membershipTier || 'free';
       
-      const tierNormalized = String(membershipTier).toLowerCase();
-      const tierDisplay = tierNormalized.includes('premium') ? 'Premium' : 
-                         tierNormalized.includes('business') ? 'Business' :
-                         tierNormalized.includes('basic') ? 'Basic' : 'Free';
+      // Build membership tier object
+      const tierDefaults: Record<string, MembershipTier> = {
+        free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
+        basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
+        premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
+        business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
+      };
+      
+      const tierInfo = membershipFromApi?.tier || tierDefaults[tierType] || tierDefaults.free;
       
       setProfile({
         ...profileData,
@@ -119,15 +144,17 @@ export default function ProfilePage() {
         isVerified: profileData.isVerified || profileData.is_verified || user?.isVerified || false,
         isSeller: profileData.isSeller || profileData.is_seller || user?.isSeller || false,
         createdAt: profileData.createdAt || profileData.created_at || user?.createdAt || new Date().toISOString(),
+        membershipTier: tierType,
         membership: {
-          tier: tierDisplay,
-          expiresAt: profileData.membership?.expiresAt || '',
+          tier: tierInfo,
+          status: membershipFromApi?.status || 'active',
+          expiresAt: membershipFromApi?.expiresAt || null,
         },
         stats: {
-          productsCount: statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
-                        profileData._count?.products ?? profileData.listingCount ?? user?.listingCount ?? 0,
-          ordersCount: statsData.ordersCount ?? statsData.orders ?? 
-                      profileData._count?.orders ?? user?.totalPurchases ?? 0,
+          productsCount: productsCount || profileData.listingCount || (statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
+                        profileData._count?.products ?? user?.listingCount ?? 0),
+          ordersCount: ordersCount || (statsData.ordersCount ?? statsData.orders ?? 
+                      profileData._count?.orders ?? user?.totalPurchases ?? 0),
           tradesCount: statsData.tradesCount ?? statsData.trades ?? 
                       profileData._count?.trades ?? 0,
           collectionsCount: statsData.collectionsCount ?? statsData.collections ?? 
@@ -180,16 +207,27 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h1 className="text-2xl font-bold">{profile.displayName}</h1>
                     {profile.isVerified && (
-                      <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                        Doğrulanmış
+                      <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                        ✓ Doğrulanmış
                       </span>
                     )}
                     {profile.membership && (
-                      <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                        {profile.membership.tier}
+                      <span className={`px-3 py-1 text-xs rounded-full font-semibold ${
+                        profile.membership.tier.type === 'business' 
+                          ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' 
+                          : profile.membership.tier.type === 'premium'
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                            : profile.membership.tier.type === 'basic'
+                              ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                              : 'bg-gray-600 text-gray-200'
+                      }`}>
+                        {profile.membership.tier.type === 'business' && '👑 '}
+                        {profile.membership.tier.type === 'premium' && '⭐ '}
+                        {profile.membership.tier.type === 'basic' && '🔷 '}
+                        {profile.membership.tier.name}
                       </span>
                     )}
                   </div>
@@ -255,6 +293,83 @@ export default function ProfilePage() {
               </div>
             )}
 
+            {/* Membership Features */}
+            {profile.membership && (
+              <div className={`rounded-xl p-6 ${
+                profile.membership.tier.type === 'business' 
+                  ? 'bg-gradient-to-br from-orange-900/30 to-amber-900/30 border border-orange-500/30' 
+                  : profile.membership.tier.type === 'premium'
+                    ? 'bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30'
+                    : profile.membership.tier.type === 'basic'
+                      ? 'bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border border-blue-500/30'
+                      : 'bg-gray-800'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    {profile.membership.tier.type === 'business' && '👑'}
+                    {profile.membership.tier.type === 'premium' && '⭐'}
+                    {profile.membership.tier.type === 'basic' && '🔷'}
+                    {profile.membership.tier.name}
+                  </h2>
+                  {profile.membership.tier.type === 'free' && (
+                    <Link
+                      href="/pricing"
+                      className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Yükselt
+                    </Link>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center p-3 bg-black/20 rounded-lg">
+                    <p className="text-2xl font-bold text-primary-400">
+                      {profile.membership.tier.maxTotalListings === -1 ? '∞' : profile.membership.tier.maxTotalListings}
+                    </p>
+                    <p className="text-xs text-gray-400">Maks İlan</p>
+                  </div>
+                  <div className="text-center p-3 bg-black/20 rounded-lg">
+                    <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.maxImagesPerListing}</p>
+                    <p className="text-xs text-gray-400">İlan Başı Resim</p>
+                  </div>
+                  <div className="text-center p-3 bg-black/20 rounded-lg">
+                    <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.featuredListingSlots}</p>
+                    <p className="text-xs text-gray-400">Öne Çıkan Slot</p>
+                  </div>
+                  <div className="text-center p-3 bg-black/20 rounded-lg">
+                    <p className="text-2xl font-bold text-green-400">
+                      %{(profile.membership.tier.commissionDiscount * 100).toFixed(1).replace('.0', '')}
+                    </p>
+                    <p className="text-xs text-gray-400">Komisyon İndirimi</p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs ${
+                    profile.membership.tier.canTrade 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {profile.membership.tier.canTrade ? '✓' : '✗'} Takas
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs ${
+                    profile.membership.tier.canCreateCollections 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {profile.membership.tier.canCreateCollections ? '✓' : '✗'} Koleksiyon
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs ${
+                    profile.membership.tier.isAdFree 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {profile.membership.tier.isAdFree ? '✓ Reklamsız' : 'Reklamlı'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Quick Links */}
             <div className="bg-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-semibold mb-4">Hızlı Erişim</h2>
@@ -262,7 +377,8 @@ export default function ProfilePage() {
                 {[
                   { label: 'Mesajlarım', href: '/messages', icon: '💬' },
                   { label: 'Favorilerim', href: '/wishlist', icon: '❤️' },
-                  { label: 'Üyelik', href: '/profile/membership', icon: '⭐' },
+                  { label: 'Takip Ettiklerim', href: '/profile/following', icon: '👥' },
+                  { label: 'Üyelik', href: '/pricing', icon: '⭐' },
                   { label: 'Destek', href: '/support', icon: '🎫' },
                   { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
                   { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },

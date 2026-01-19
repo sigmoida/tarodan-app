@@ -78,6 +78,13 @@ export default function CheckoutPage() {
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<string>('aras');
+  
+  // Card info state (for UI display - actual payment handled by iyzico/paytr)
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
 
   // Get checkout items (either from cart or direct buy)
   const checkoutItems: CheckoutItem[] = directProduct ? [directProduct] : cartItems;
@@ -249,7 +256,8 @@ export default function CheckoutPage() {
     try {
       // Determine checkout mode
       const hasSavedAddress = isAuthenticated && selectedAddressId && addresses.length > 0;
-      const hasFormAddress = newAddress.fullName && newAddress.city && newAddress.district && newAddress.address;
+      // Check if form has all required fields including phone
+      const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
       
       // Get shipping address - prefer saved address for logged-in users, otherwise use form
       let shippingAddress: any;
@@ -282,6 +290,25 @@ export default function CheckoutPage() {
         const phone = isAuthenticated ? (user?.phone || newAddress.phone) : (guestPhone || newAddress.phone);
         const name = isAuthenticated ? (user?.displayName || newAddress.fullName) : (guestName || newAddress.fullName);
         
+        // Validate required contact info for guest users
+        if (!isAuthenticated) {
+          if (!guestName?.trim()) {
+            toast.error('Lütfen adınızı ve soyadınızı girin');
+            setIsLoading(false);
+            return;
+          }
+          if (!guestEmail?.trim()) {
+            toast.error('Lütfen e-posta adresinizi girin');
+            setIsLoading(false);
+            return;
+          }
+          if (!guestPhone?.trim()) {
+            toast.error('Lütfen telefon numaranızı girin');
+            setIsLoading(false);
+            return;
+          }
+        }
+        
         if (!email) {
           toast.error('Lütfen e-posta adresinizi girin');
           setIsLoading(false);
@@ -293,35 +320,115 @@ export default function CheckoutPage() {
           return;
         }
         
+        // Ensure address has a valid phone number
+        const addressPhone = newAddress.phone?.trim() || phone;
+        if (!addressPhone) {
+          toast.error('Lütfen teslimat adresi için telefon numarası girin');
+          setIsLoading(false);
+          return;
+        }
+        
         shippingAddress = {
           fullName: newAddress.fullName,
-          phone: newAddress.phone || phone,
+          phone: addressPhone,
           city: newAddress.city,
           district: newAddress.district,
           address: newAddress.address,
-          zipCode: newAddress.zipCode,
+          zipCode: newAddress.zipCode || undefined,
         };
         contactEmail = email;
         contactPhone = phone;
         contactName = name || newAddress.fullName;
       } else {
-        // No address available
-        toast.error('Lütfen teslimat adresini girin');
+        // No address available - provide specific error message
+        if (isAuthenticated) {
+          if (addresses.length === 0) {
+            toast.error('Lütfen "Yeni Adres Ekle" butonuna tıklayarak teslimat adresinizi girin');
+          } else if (!selectedAddressId) {
+            toast.error('Lütfen teslimat adresinizi seçin');
+          } else {
+            toast.error('Seçilen adres geçersiz, lütfen yeni bir adres ekleyin');
+          }
+        } else {
+          // Guest user - check which fields are missing
+          const missingFields = [];
+          if (!newAddress.fullName) missingFields.push('Ad Soyad');
+          if (!newAddress.phone) missingFields.push('Telefon');
+          if (!newAddress.city) missingFields.push('Şehir');
+          if (!newAddress.district) missingFields.push('İlçe');
+          if (!newAddress.address) missingFields.push('Açık Adres');
+          
+          if (missingFields.length > 0) {
+            toast.error(`Lütfen şu alanları doldurun: ${missingFields.join(', ')}`);
+          } else {
+            toast.error('Lütfen teslimat adresini girin');
+          }
+        }
         setIsLoading(false);
         return;
       }
 
-      // Create orders
+      // Create orders - use different endpoint based on auth status
       for (const item of checkoutItems) {
-        const orderResponse = await ordersApi.createGuest({
-          productId: item.productId,
-          email: contactEmail,
-          phone: contactPhone,
-          guestName: contactName,
-          shippingAddress,
-        });
+        let orderResponse;
+        
+        try {
+          if (isAuthenticated) {
+            // Authenticated user: use directBuy endpoint
+            // Only send shippingAddressId if it's a valid UUID, otherwise send shippingAddress object
+            const validAddressId = hasSavedAddress && selectedAddressId && selectedAddressId.trim() !== '' 
+              ? selectedAddressId 
+              : undefined;
+            
+            // Build request payload
+            const payload: {
+              productId: string;
+              shippingAddressId?: string;
+              shippingAddress?: typeof shippingAddress;
+            } = {
+              productId: item.productId,
+            };
+            
+            if (validAddressId) {
+              payload.shippingAddressId = validAddressId;
+            } else if (shippingAddress) {
+              payload.shippingAddress = shippingAddress;
+            } else {
+              throw new Error('Teslimat adresi bulunamadı');
+            }
+            
+            console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            orderResponse = await ordersApi.directBuy(payload);
+          } else {
+            // Guest user: use guest checkout endpoint
+            const guestPayload = {
+              productId: item.productId,
+              email: contactEmail,
+              phone: contactPhone,
+              guestName: contactName,
+              shippingAddress,
+            };
+            
+            console.log('Guest checkout payload:', JSON.stringify(guestPayload, null, 2));
+            orderResponse = await ordersApi.createGuest(guestPayload);
+          }
+        } catch (orderError: any) {
+          console.error('Order creation failed:', orderError);
+          const errorMessage = orderError.response?.data?.message || 
+                              orderError.response?.data?.error || 
+                              orderError.message ||
+                              'Sipariş oluşturulamadı';
+          
+          // Handle array of error messages
+          if (Array.isArray(errorMessage)) {
+            toast.error(errorMessage.join(', '));
+          } else {
+            toast.error(errorMessage);
+          }
+          throw orderError;
+        }
 
-        const orderId = orderResponse.data.id || orderResponse.data.order?.id;
+        const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
         
         if (orderId) {
           // TESTING MODE: Skip payment, directly mark as paid
@@ -616,8 +723,12 @@ export default function CheckoutPage() {
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setStep(2)}
-                    disabled={isAuthenticated && !selectedAddressId}
-                    className="btn-primary"
+                    disabled={
+                      isAuthenticated 
+                        ? !selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)
+                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address)
+                    }
+                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Devam Et
                   </button>
@@ -740,6 +851,99 @@ export default function CheckoutPage() {
                       <div className="text-2xl">🏦</div>
                     </div>
                   </label>
+                </div>
+
+                {/* Card Information */}
+                <div className="mt-6 p-4 bg-white border border-gray-200 rounded-xl">
+                  <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                    <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                    Kart Bilgileri
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kart Üzerindeki İsim
+                      </label>
+                      <input
+                        type="text"
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                        placeholder="AD SOYAD"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kart Numarası
+                      </label>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                          const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+                          setCardNumber(formatted);
+                        }}
+                        placeholder="0000 0000 0000 0000"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Son Kullanma Tarihi
+                        </label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            if (value.length >= 2) {
+                              setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
+                            } else {
+                              setCardExpiry(value);
+                            }
+                          }}
+                          placeholder="AA/YY"
+                          maxLength={5}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          CVV/CVC
+                        </label>
+                        <input
+                          type="password"
+                          value={cardCvc}
+                          onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="•••"
+                          maxLength={4}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                    
+                    {isAuthenticated && (
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={saveCard}
+                          onChange={(e) => setSaveCard(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        Bu kartı gelecekteki alışverişlerim için kaydet
+                      </label>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                    <ShieldCheckIcon className="w-4 h-4 text-green-500" />
+                    256-bit SSL ile şifrelenmiş güvenli ödeme
+                  </div>
                 </div>
 
                 {/* Invoice Info */}

@@ -34,7 +34,7 @@ export class UserService {
   }
 
   /**
-   * Get user with addresses
+   * Get user with addresses and membership info
    */
   async findByIdWithAddresses(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -43,6 +43,16 @@ export class UserService {
         addresses: {
           orderBy: { isDefault: 'desc' },
         },
+        userMembership: {
+          include: {
+            tier: true,
+          },
+        },
+        _count: {
+          select: {
+            products: true,
+          },
+        },
       },
     });
 
@@ -50,7 +60,49 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    return user;
+    // Format membership info for frontend
+    const membershipInfo = user.userMembership ? {
+      id: user.userMembership.id,
+      status: user.userMembership.status,
+      currentPeriodStart: user.userMembership.currentPeriodStart,
+      currentPeriodEnd: user.userMembership.currentPeriodEnd,
+      tier: {
+        id: user.userMembership.tier.id,
+        type: user.userMembership.tier.type,
+        name: user.userMembership.tier.name,
+        maxFreeListings: user.userMembership.tier.maxFreeListings,
+        maxTotalListings: user.userMembership.tier.maxTotalListings,
+        maxImagesPerListing: user.userMembership.tier.maxImagesPerListing,
+        canCreateCollections: user.userMembership.tier.canCreateCollections,
+        canTrade: user.userMembership.tier.canTrade,
+        isAdFree: user.userMembership.tier.isAdFree,
+        featuredListingSlots: user.userMembership.tier.featuredListingSlots,
+        commissionDiscount: user.userMembership.tier.commissionDiscount,
+      },
+    } : {
+      tier: {
+        type: 'free',
+        name: 'Ücretsiz',
+        maxFreeListings: 5,
+        maxTotalListings: 10,
+        maxImagesPerListing: 3,
+        canTrade: false,
+        canCreateCollections: false,
+        featuredListingSlots: 0,
+        commissionDiscount: 0,
+        isAdFree: false,
+      },
+      status: 'active',
+      expiresAt: null,
+    };
+
+    // Remove raw userMembership and add the mapped membership
+    const { userMembership, ...rest } = user;
+    return { 
+      ...rest, 
+      membership: membershipInfo,
+      listingCount: user._count?.products || 0,
+    };
   }
 
   /**
@@ -230,5 +282,161 @@ export class UserService {
       where: { userId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
+  }
+
+  /**
+   * Get public user profile
+   */
+  async getPublicProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+        bio: true,
+        isVerified: true,
+        isSeller: true,
+        sellerType: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    // Get seller stats
+    const [totalListings, totalSales, totalTrades, ratings] = await Promise.all([
+      this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),
+      this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
+      this.prisma.trade.count({ 
+        where: { 
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+          status: 'completed',
+        } 
+      }),
+      this.prisma.rating.aggregate({
+        where: { receiverId: userId },
+        _avg: { score: true },
+        _count: true,
+      }),
+    ]);
+
+    return {
+      ...user,
+      stats: {
+        totalListings,
+        totalSales,
+        totalTrades,
+        averageRating: ratings._avg?.score || 0,
+        totalRatings: ratings._count,
+      },
+    };
+  }
+
+  /**
+   * Follow a user
+   */
+  async followUser(currentUserId: string, targetUserId: string) {
+    if (currentUserId === targetUserId) {
+      throw new BadRequestException('Kendinizi takip edemezsiniz');
+    }
+
+    // Check if target user exists
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    // Check if already following
+    const existingFollow = await this.prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUserId,
+          followingId: targetUserId,
+        },
+      },
+    });
+
+    if (existingFollow) {
+      return { 
+        message: 'Zaten takip ediyorsunuz',
+        following: true,
+      };
+    }
+
+    // Create follow relationship
+    await this.prisma.userFollow.create({
+      data: {
+        followerId: currentUserId,
+        followingId: targetUserId,
+      },
+    });
+
+    return { 
+      message: 'Kullanıcı takip edildi',
+      following: true,
+    };
+  }
+
+  /**
+   * Unfollow a user
+   */
+  async unfollowUser(currentUserId: string, targetUserId: string) {
+    if (currentUserId === targetUserId) {
+      throw new BadRequestException('Kendinizi takipten çıkaramazsınız');
+    }
+
+    // Delete follow relationship
+    try {
+      await this.prisma.userFollow.delete({
+        where: {
+          followerId_followingId: {
+            followerId: currentUserId,
+            followingId: targetUserId,
+          },
+        },
+      });
+    } catch (error) {
+      // Not following, ignore
+    }
+
+    return { 
+      message: 'Takip bırakıldı',
+      following: false,
+    };
+  }
+
+  /**
+   * Get users that current user is following
+   */
+  async getFollowing(userId: string) {
+    const following = await this.prisma.userFollow.findMany({
+      where: { followerId: userId },
+      include: {
+        following: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true,
+            _count: {
+              select: {
+                products: {
+                  where: { status: 'active' },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { following };
   }
 }

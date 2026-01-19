@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsArray,
   IsUUID,
+  IsBoolean,
   Min,
   Max,
   MinLength,
@@ -68,4 +69,12 @@ export class CreateProductDto {
   @IsString({ each: true })
   @ArrayMaxSize(10, { message: 'En fazla 10 resim yüklenebilir' })
   imageUrls?: string[];
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether the product is available for trade (requires premium membership)',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Takas durumu boolean olmalıdır' })
+  isTradeEnabled?: boolean;
 }
