@@ -4,7 +4,7 @@ import { Text, Card, Searchbar, Chip, ActivityIndicator, Button, IconButton, Div
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { productsApi } from '../../src/services/api';
+import { productsApi, searchApi } from '../../src/services/api';
 import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
 
 const { width } = Dimensions.get('window');
@@ -61,43 +61,63 @@ export default function SearchScreen() {
     return params;
   }, [debouncedQuery, sortBy, category, selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly]);
 
-  // Web ile aynı endpoint: GET /products
+  // Elasticsearch veya normal ürün arama
   const { data: products, isLoading, refetch, error } = useQuery({
     queryKey: ['products', queryParams],
     queryFn: async () => {
       console.log('🔍 Search API çağrılıyor, params:', JSON.stringify(queryParams));
       try {
-        const res = await productsApi.getAll(queryParams);
-        console.log('🔍 Raw API response status:', res.status);
-        console.log('🔍 Raw API response keys:', Object.keys(res.data || {}));
-        console.log('🔍 res.data type:', typeof res.data);
-        console.log('🔍 res.data:', JSON.stringify(res.data).substring(0, 500));
-        
-        // API response: res.data could be { data: [...] } or { products: [...] } or [...]
         let data = [];
-        if (Array.isArray(res.data)) {
-          data = res.data;
-          console.log('🔍 res.data is array');
-        } else if (res.data?.data && Array.isArray(res.data.data)) {
-          data = res.data.data;
-          console.log('🔍 Using res.data.data');
-        } else if (res.data?.products && Array.isArray(res.data.products)) {
-          data = res.data.products;
-          console.log('🔍 Using res.data.products');
-        } else if (res.data?.items && Array.isArray(res.data.items)) {
-          data = res.data.items;
-          console.log('🔍 Using res.data.items');
+        
+        // Eğer arama sorgusu varsa Elasticsearch kullan
+        if (debouncedQuery && debouncedQuery.length >= 2) {
+          console.log('🔍 Using Elasticsearch search for:', debouncedQuery);
+          const searchParams = {
+            q: debouncedQuery,
+            categoryId: category || undefined,
+            minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
+            maxPrice: priceRange[1] < 50000 ? priceRange[1] : undefined,
+            condition: selectedConditions.length > 0 ? selectedConditions[0] : undefined,
+            sortBy: sortBy === 'newest' ? 'newest' : sortBy === 'price_asc' ? 'price_asc' : sortBy === 'price_desc' ? 'price_desc' : 'relevance',
+            pageSize: 50,
+          };
+          
+          const res = await searchApi.products(searchParams);
+          // Elasticsearch yanıtı: { results: [...], total, page, pageSize, took }
+          data = res.data?.results || res.data?.data || [];
+          console.log('🔍 Elasticsearch results:', data.length);
+        } else {
+          // Normal ürün listesi
+          const res = await productsApi.getAll(queryParams);
+          
+          // API response parsing
+          if (Array.isArray(res.data)) {
+            data = res.data;
+          } else if (res.data?.data && Array.isArray(res.data.data)) {
+            data = res.data.data;
+          } else if (res.data?.products && Array.isArray(res.data.products)) {
+            data = res.data.products;
+          } else if (res.data?.items && Array.isArray(res.data.items)) {
+            data = res.data.items;
+          }
+        }
+        
+        // Trade-only filter (client-side)
+        if (tradeOnly) {
+          data = data.filter((p: any) => p.tradeAvailable || p.isTradeEnabled);
         }
         
         console.log('🔍 Final products count:', data.length);
-        if (data.length > 0) {
-          console.log('🔍 First product:', JSON.stringify(data[0]).substring(0, 200));
-        }
         return data;
       } catch (err: any) {
         console.log('❌ Search API error:', err.message);
-        console.log('❌ Error response:', err.response?.data);
-        throw err;
+        // Fallback to normal products API if elasticsearch fails
+        try {
+          const res = await productsApi.getAll(queryParams);
+          return res.data?.data || res.data?.products || res.data || [];
+        } catch {
+          return [];
+        }
       }
     },
   });
@@ -660,15 +680,17 @@ const styles = StyleSheet.create({
   },
   quickFilters: {
     backgroundColor: TarodanColors.background,
-    maxHeight: 56,
+    minHeight: 56,
   },
   quickFiltersContent: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
+    alignItems: 'center',
   },
   quickChip: {
     marginRight: 8,
+    height: 36,
   },
   quickChipActive: {
     backgroundColor: TarodanColors.primary,

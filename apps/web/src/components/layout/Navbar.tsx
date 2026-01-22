@@ -75,17 +75,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="relative h-10">
-              <Image
-                src="/tarodan-logo.jpg"
-                alt="Tarodan Logo"
-                width={145}
-                height={40}
-                className="object-contain"
-                priority
-              />
-            </div>
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <Image
+              src="/tarodan-logo.jpg"
+              alt="Tarodan Logo"
+              width={160}
+              height={52}
+              className="object-contain"
+              priority
+            />
           </Link>
 
           {/* Search Bar - Desktop */}
@@ -353,5 +351,4 @@ export default function Navbar() {
     </>
   );
 }
-
 

@@ -531,7 +531,7 @@ export class SearchService implements OnModuleInit {
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: {
-          documentCount: response.body.count,
+          documentCount: response.count,
           lastSyncedAt: new Date(),
         },
       });

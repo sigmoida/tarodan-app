@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
 import clsx from 'clsx';
@@ -66,7 +67,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-dark-700">
           <Link href="/dashboard" className="flex items-center">
-            <span className="text-2xl font-bold text-primary-500">TARODAN</span>
+            <Image
+              src="/tarodan-logo.jpg"
+              alt="Tarodan Logo"
+              width={120}
+              height={40}
+              className="object-contain"
+              priority
+            />
             <span className="ml-2 text-xs text-gray-400">Admin</span>
           </Link>
           <button
@@ -135,7 +143,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Bars3Icon className="h-6 w-6" />
             </button>
             <div className="hidden lg:flex items-center">
-              <span className="text-xl font-bold text-primary-500">TARODAN</span>
+              <Image
+                src="/tarodan-logo.jpg"
+                alt="Tarodan Logo"
+                width={100}
+                height={32}
+                className="object-contain"
+              />
               <span className="ml-2 text-sm text-gray-400">Admin Panel</span>
             </div>
           </div>
