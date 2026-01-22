@@ -370,6 +370,28 @@ export default function ProfilePage() {
               </div>
             )}
 
+            {/* Business Dashboard - Only for business accounts */}
+            {profile.membership?.tier.type === 'business' && (
+              <div className="bg-gradient-to-br from-orange-900/40 to-amber-900/40 border border-orange-500/30 rounded-xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      📊 İşletme Paneli
+                    </h2>
+                    <p className="text-gray-400 text-sm mt-1">
+                      Ürün ve koleksiyon istatistiklerinizi görüntüleyin
+                    </p>
+                  </div>
+                  <Link
+                    href="/profile/business"
+                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl"
+                  >
+                    Paneli Aç →
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Quick Links */}
             <div className="bg-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-semibold mb-4">Hızlı Erişim</h2>
@@ -381,7 +403,11 @@ export default function ProfilePage() {
                   { label: 'Üyelik', href: '/pricing', icon: '⭐' },
                   { label: 'Destek', href: '/support', icon: '🎫' },
                   { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
+                  { label: 'İstatistikler', href: '/profile/statistics', icon: '📈' },
                   { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },
+                  ...(profile.membership?.tier.type === 'business' ? [
+                    { label: 'İşletme Paneli', href: '/profile/business', icon: '📊' }
+                  ] : []),
                 ].map((link) => (
                   <Link
                     key={link.label}

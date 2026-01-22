@@ -116,6 +116,30 @@ export class AuthService {
       // Generate tokens
       const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
 
+      // Format membership data safely
+      let membershipData = undefined;
+      if (user.membership && user.membership.tier) {
+        try {
+          const tier = user.membership.tier;
+          // Ensure tier has required fields
+          if (tier && tier.type && tier.name) {
+            membershipData = {
+              tier: {
+                type: String(tier.type),
+                name: String(tier.name),
+              },
+              expiresAt: user.membership.currentPeriodEnd 
+                ? new Date(user.membership.currentPeriodEnd).toISOString()
+                : undefined,
+            };
+          }
+        } catch (membershipError) {
+          console.error('Error formatting membership data:', membershipError);
+          console.error('Membership object:', JSON.stringify(user.membership, null, 2));
+          // Continue without membership data if there's an error
+        }
+      }
+
       return {
         user: {
           id: user.id,
@@ -126,10 +150,7 @@ export class AuthService {
           isSeller: user.isSeller,
           sellerType: user.sellerType ?? undefined,
           createdAt: user.createdAt,
-          membership: user.membership ? {
-            tier: user.membership.tier,
-            expiresAt: user.membership.currentPeriodEnd?.toISOString(),
-          } : undefined,
+          membership: membershipData,
         },
         tokens,
       };

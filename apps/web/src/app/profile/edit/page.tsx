@@ -12,6 +12,7 @@ export default function EditProfilePage() {
   const router = useRouter();
   const { isAuthenticated, user, setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const isBusinessTier = user?.membershipTier === 'business';
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
@@ -30,13 +31,14 @@ export default function EditProfilePage() {
       return;
     }
     if (user) {
+      const hasCompanyName = !!(user as any).companyName;
       setFormData({
         displayName: user.displayName || '',
         email: user.email || '',
         phone: user.phone || '',
         birthDate: (user as any).birthDate ? new Date((user as any).birthDate).toISOString().split('T')[0] : '',
         bio: (user as any).bio || '',
-        isCorporateSeller: (user as any).isCorporateSeller || false,
+        isCorporateSeller: hasCompanyName || (user as any).isCorporateSeller || false,
         companyName: (user as any).companyName || '',
         taxId: (user as any).taxId || '',
         taxOffice: (user as any).taxOffice || '',
@@ -152,27 +154,39 @@ export default function EditProfilePage() {
 
             {/* Corporate Seller Section */}
             <div className="border-t border-gray-600 pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold">Kurumsal Satıcı</h3>
-                  <p className="text-sm text-gray-400">Şirket adına satış yapıyorsanız aktifleştirin</p>
+              {isBusinessTier ? (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold">İşletme Bilgileri</h3>
+                    <span className="px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded">İş Üyeliği</span>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    İşletme üyeliğiniz için şirket bilgilerinizi doldurmanız gerekmektedir.
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isCorporateSeller: !formData.isCorporateSeller })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${
-                    formData.isCorporateSeller ? 'bg-primary-500' : 'bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                      formData.isCorporateSeller ? 'translate-x-6' : 'translate-x-0'
+              ) : (
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Kurumsal Satıcı</h3>
+                    <p className="text-sm text-gray-400">Şirket adına satış yapıyorsanız aktifleştirin</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isCorporateSeller: !formData.isCorporateSeller })}
+                    className={`relative w-14 h-8 rounded-full transition-colors ${
+                      formData.isCorporateSeller ? 'bg-primary-500' : 'bg-gray-600'
                     }`}
-                  />
-                </button>
-              </div>
+                  >
+                    <span
+                      className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+                        formData.isCorporateSeller ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
 
-              {formData.isCorporateSeller && (
+              {(formData.isCorporateSeller || isBusinessTier) && (
                 <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -184,7 +198,13 @@ export default function EditProfilePage() {
                       onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="ABC Ltd. Şti."
+                      required={isBusinessTier}
                     />
+                    {isBusinessTier && !formData.companyName && (
+                      <p className="text-xs text-orange-400 mt-1">
+                        ⚠️ İşletme panelini kullanmak için şirket adı zorunludur.
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

@@ -649,7 +649,7 @@ async function main() {
     { name: 'Mehmet Diecast', email: 'mehmet@demo.com', bio: 'JDM modeller konusunda uzman', seller: true, type: SellerType.individual },
     { name: 'Ayşe Vintage', email: 'ayse@demo.com', bio: 'Vintage diecast uzmanı', seller: true, type: SellerType.verified },
     { name: 'Fatma Collector', email: 'fatma@demo.com', bio: '1:18 ölçekli premium koleksiyoncu', seller: true, type: SellerType.individual },
-    { name: 'Ali Premium', email: 'ali@demo.com', bio: 'Premium ve RLC modeller', seller: true, type: SellerType.verified },
+    { name: 'Ali Premium', email: 'ali@demo.com', bio: 'Premium ve RLC modeller', seller: true, type: SellerType.verified, companyName: 'Premium Diecast Store' },
     { name: 'Zeynep Hobici', email: 'zeynep@demo.com', bio: 'Yeni başlayan koleksiyoncu', seller: true, type: SellerType.individual },
     { name: 'Mustafa Trader', email: 'mustafa@demo.com', bio: 'Takas yapmayı severim', seller: true, type: SellerType.individual },
     { name: 'Elif Modelist', email: 'elif@demo.com', bio: 'Matchbox ve Majorette koleksiyoncusu', seller: true, type: SellerType.individual },
@@ -668,7 +668,9 @@ async function main() {
     const u = userNames[i];
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: {
+        companyName: (u as any).companyName || undefined,
+      },
       create: {
         email: u.email,
         phone: `+90555${String(i + 100).padStart(7, '0')}`,
@@ -679,6 +681,7 @@ async function main() {
         isEmailVerified: true,
         isSeller: u.seller,
         sellerType: u.type,
+        companyName: (u as any).companyName || null,
       },
     });
     users.push(user);

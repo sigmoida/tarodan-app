@@ -223,4 +223,167 @@ export class ProductController {
   ) {
     return this.productService.remove(id, sellerId);
   }
+
+  // ==========================================================================
+  // PRODUCT LIKE & VIEW SYSTEM (Business Dashboard Feature)
+  // ==========================================================================
+
+  /**
+   * POST /products/:id/like
+   * Like a product
+   */
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ürünü beğen' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Ürün beğenildi',
+    schema: {
+      type: 'object',
+      properties: {
+        liked: { type: 'boolean', example: true },
+        likeCount: { type: 'number', example: 42 },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Zaten beğenilmiş' })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  async likeProduct(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.productService.likeProduct(id, userId);
+  }
+
+  /**
+   * DELETE /products/:id/unlike
+   * Remove like from a product
+   */
+  @Delete(':id/unlike')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Beğeniyi kaldır' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Beğeni kaldırıldı',
+    schema: {
+      type: 'object',
+      properties: {
+        liked: { type: 'boolean', example: false },
+        likeCount: { type: 'number', example: 41 },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Beğenilmemiş' })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  async unlikeProduct(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.productService.unlikeProduct(id, userId);
+  }
+
+  /**
+   * POST /products/:id/view
+   * Increment view count (public, but rate limited per user)
+   */
+  @Post(':id/view')
+  @Public()
+  @ApiOperation({ summary: 'Görüntülenme sayısını artır' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Görüntülenme sayısı artırıldı',
+    schema: {
+      type: 'object',
+      properties: {
+        viewCount: { type: 'number', example: 156 },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  async incrementViewCount(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.productService.incrementViewCount(id, userId);
+  }
+
+  /**
+   * GET /products/:id/stats
+   * Get product stats (seller only)
+   */
+  @Get(':id/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ürün istatistikleri (satıcı için)' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Ürün istatistikleri',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        viewCount: { type: 'number' },
+        likeCount: { type: 'number' },
+        offersCount: { type: 'number' },
+        ordersCount: { type: 'number' },
+      },
+    },
+  })
+  @ApiResponse({ status: 403, description: 'Yetkiniz yok' })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  async getProductStats(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') sellerId: string,
+  ) {
+    return this.productService.getProductStats(id, sellerId);
+  }
+
+  /**
+   * GET /products/:id/liked
+   * Check if user has liked a product
+   */
+  @Get(':id/liked')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kullanıcı bu ürünü beğenmiş mi?' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Beğeni durumu',
+    schema: {
+      type: 'object',
+      properties: {
+        liked: { type: 'boolean' },
+      },
+    },
+  })
+  async isProductLiked(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const liked = await this.productService.isProductLikedByUser(id, userId);
+    return { liked };
+  }
 }

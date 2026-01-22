@@ -71,24 +71,21 @@ export default function Navbar() {
         🎉 Yeni üyelere özel %10 indirim! Hemen üye olun
       </div>
       
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="relative w-10 h-10">
+            <div className="relative h-10">
               <Image
-                src="/logo.svg"
+                src="/tarodan-logo.jpg"
                 alt="Tarodan Logo"
-                width={40}
+                width={145}
                 height={40}
-                className="rounded-xl"
+                className="object-contain"
                 priority
               />
             </div>
-            <span className="font-display font-bold text-xl text-gray-900 hidden sm:block">
-              TARODAN
-            </span>
           </Link>
 
           {/* Search Bar - Desktop */}
@@ -102,13 +99,13 @@ export default function Navbar() {
               }}
               className="relative w-full"
             >
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
               <input
                 type="text"
                 placeholder="Kategori, ürün, marka, koleksiyon ara"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                className="w-full pl-12 pr-4 py-2.5 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white focus:ring-2 focus:ring-white/30 transition-all placeholder:text-gray-500"
               />
             </form>
           </div>
@@ -119,7 +116,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-gray-700 hover:text-orange-500 font-medium transition-colors text-sm"
+                className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
               >
                 {link.label}
               </Link>
@@ -133,14 +130,14 @@ export default function Navbar() {
                 {/* Yeni İlan Ekle Butonu - Desktop */}
                 <Link
                   href="/listings/new"
-                  className="hidden md:flex items-center gap-1.5 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+                  className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
                 >
                   <PlusIcon className="w-4 h-4" />
                   <span>İlan Ver</span>
                 </Link>
                 <Link
                   href="/messages"
-                  className="p-2 text-gray-700 hover:text-orange-500 transition-colors relative"
+                  className="p-2 text-white hover:text-orange-100 transition-colors relative"
                 >
                   <ChatBubbleLeftRightIcon className="w-6 h-6" />
                   {unreadMessageCount > 0 && (
@@ -151,18 +148,18 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/favorites"
-                  className="p-2 text-gray-700 hover:text-orange-500 transition-colors hidden sm:block"
+                  className="p-2 text-white hover:text-orange-100 transition-colors hidden sm:block"
                 >
                   <HeartIcon className="w-6 h-6" />
                 </Link>
                 <NotificationBell />
                 <Link
                   href="/cart"
-                  className="p-2 text-gray-700 hover:text-orange-500 transition-colors relative"
+                  className="p-2 text-white hover:text-orange-100 transition-colors relative"
                 >
                   <ShoppingCartIcon className="w-6 h-6" />
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-orange-500 text-xs rounded-full flex items-center justify-center font-semibold">
                       {cartCount > 9 ? '9+' : cartCount}
                     </span>
                   )}
@@ -170,11 +167,11 @@ export default function Navbar() {
                 <div className="relative group">
                   <Link
                     href="/profile"
-                    className="p-2 text-gray-700 hover:text-orange-500 transition-colors flex items-center gap-2"
+                    className="p-2 text-white hover:text-orange-100 transition-colors flex items-center gap-2"
                   >
                     <UserCircleIcon className="w-7 h-7" />
                     {user && (
-                      <span className="hidden lg:block text-sm font-medium text-gray-700">
+                      <span className="hidden lg:block text-sm font-medium text-white">
                         {user.displayName}
                       </span>
                     )}
@@ -209,33 +206,35 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/login"
-                  className="text-gray-700 hover:text-orange-500 font-medium transition-colors hidden sm:block"
-                >
-                  Giriş yap
-                </Link>
-                <Link
-                  href="/register"
-                  className="bg-orange-500 text-white px-4 py-2 rounded-xl font-medium hover:bg-orange-600 transition-colors"
-                >
-                  Üye Ol
-                </Link>
-                <Link
-                  href="/cart"
-                  className="text-gray-700 hover:text-orange-500 font-medium transition-colors hidden sm:flex items-center gap-1"
-                >
-                  <ShoppingCartIcon className="w-5 h-5" />
-                  Sepetim
-                </Link>
-              </div>
+              <>
+                <div className="flex items-center gap-4">
+                  <Link
+                    href="/login"
+                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
+                  >
+                    Giriş yap
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
+                  >
+                    Üye Ol
+                  </Link>
+                  <Link
+                    href="/cart"
+                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
+                  >
+                    <ShoppingCartIcon className="w-5 h-5" />
+                    Sepetim
+                  </Link>
+                </div>
+              </>
             )}
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="lg:hidden p-2 text-gray-600"
+              className="lg:hidden p-2 text-white"
             >
               {isOpen ? (
                 <XMarkIcon className="w-6 h-6" />
@@ -254,7 +253,7 @@ export default function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden border-t border-gray-100"
+            className="lg:hidden border-t border-orange-600 bg-orange-500"
           >
             <div className="px-4 py-4 space-y-4">
               {/* Mobile Search */}
@@ -268,13 +267,13 @@ export default function Navbar() {
                 }}
                 className="relative w-full"
               >
-                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
                 <input
                   type="text"
                   placeholder="Model, marka ara..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500"
+                  className="w-full pl-12 pr-4 py-3 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white placeholder:text-gray-500"
                 />
               </form>
 
@@ -283,7 +282,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block py-2 text-gray-700 hover:text-orange-500 font-medium"
+                  className="block py-2 text-white hover:text-orange-100 font-medium"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
@@ -291,13 +290,13 @@ export default function Navbar() {
               ))}
               
               {/* Mobile Auth Links */}
-              <div className="border-t border-gray-100 pt-4 mt-4">
+              <div className="border-t border-orange-600 pt-4 mt-4">
                 {isAuthenticated ? (
                   <div className="space-y-2">
                     {/* Yeni İlan Ekle Butonu - Mobile */}
                     <Link
                       href="/listings/new"
-                      className="flex items-center justify-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-orange-600 transition-colors mb-4"
+                      className="flex items-center justify-center gap-2 bg-white text-orange-500 px-4 py-2.5 rounded-lg font-medium hover:bg-orange-50 transition-colors mb-4"
                       onClick={() => setIsOpen(false)}
                     >
                       <PlusIcon className="w-4 h-4" />
@@ -305,21 +304,21 @@ export default function Navbar() {
                     </Link>
                     <Link
                       href="/profile"
-                      className="block py-2 text-gray-700 hover:text-orange-500 font-medium"
+                      className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
                       Profilim
                     </Link>
                     <Link
                       href="/profile/listings"
-                      className="block py-2 text-gray-700 hover:text-orange-500 font-medium"
+                      className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
                       İlanlarım
                     </Link>
                     <Link
                       href="/orders"
-                      className="block py-2 text-gray-700 hover:text-orange-500 font-medium"
+                      className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
                       Siparişlerim
@@ -335,20 +334,13 @@ export default function Navbar() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2">
+                  <div className="space-y-2">
                     <Link
                       href="/login"
-                      className="block py-2 text-center text-gray-600 hover:text-primary-500 font-medium"
+                      className="block py-2.5 text-center text-white hover:text-orange-100 font-medium rounded-lg hover:bg-white/10 transition-colors"
                       onClick={() => setIsOpen(false)}
                     >
                       Giriş Yap
-                    </Link>
-                    <Link
-                      href="/register"
-                      className="block py-2 text-center bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Üye Ol
                     </Link>
                   </div>
                 )}

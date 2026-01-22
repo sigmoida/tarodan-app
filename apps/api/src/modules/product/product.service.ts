@@ -559,6 +559,7 @@ export class ProductService {
       status: product.status,
       isTradeEnabled: product.isTradeEnabled || false,
       viewCount: product.viewCount || 0,
+      likeCount: product.likeCount || 0,
       images: product.images?.map((img: any) => ({
         id: img.id,
         url: img.url,
@@ -599,6 +600,196 @@ export class ProductService {
         status: { in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved] },
       },
     });
+  }
+
+  // ==========================================================================
+  // PRODUCT LIKE & VIEW SYSTEM (Business Dashboard Feature)
+  // ==========================================================================
+
+  /**
+   * Like a product
+   * POST /products/:id/like
+   */
+  async likeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // Check if already liked
+    const existingLike = await this.prisma.productLike.findUnique({
+      where: {
+        productId_userId: {
+          productId,
+          userId,
+        },
+      },
+    });
+
+    if (existingLike) {
+      throw new BadRequestException('Bu ürünü zaten beğendiniz');
+    }
+
+    // Create like and increment counter in transaction
+    const [_, updatedProduct] = await this.prisma.$transaction([
+      this.prisma.productLike.create({
+        data: {
+          productId,
+          userId,
+        },
+      }),
+      this.prisma.product.update({
+        where: { id: productId },
+        data: { likeCount: { increment: 1 } },
+      }),
+    ]);
+
+    // Invalidate cache
+    await this.cache.del(`products:detail:${productId}`);
+
+    return { liked: true, likeCount: updatedProduct.likeCount };
+  }
+
+  /**
+   * Unlike a product
+   * DELETE /products/:id/unlike
+   */
+  async unlikeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // Check if liked
+    const existingLike = await this.prisma.productLike.findUnique({
+      where: {
+        productId_userId: {
+          productId,
+          userId,
+        },
+      },
+    });
+
+    if (!existingLike) {
+      throw new BadRequestException('Bu ürünü beğenmemişsiniz');
+    }
+
+    // Delete like and decrement counter in transaction
+    const [_, updatedProduct] = await this.prisma.$transaction([
+      this.prisma.productLike.delete({
+        where: {
+          productId_userId: {
+            productId,
+            userId,
+          },
+        },
+      }),
+      this.prisma.product.update({
+        where: { id: productId },
+        data: { likeCount: { decrement: 1 } },
+      }),
+    ]);
+
+    // Invalidate cache
+    await this.cache.del(`products:detail:${productId}`);
+
+    return { liked: false, likeCount: Math.max(0, updatedProduct.likeCount) };
+  }
+
+  /**
+   * Check if user has liked a product
+   */
+  async isProductLikedByUser(productId: string, userId: string): Promise<boolean> {
+    const like = await this.prisma.productLike.findUnique({
+      where: {
+        productId_userId: {
+          productId,
+          userId,
+        },
+      },
+    });
+    return !!like;
+  }
+
+  /**
+   * Increment product view count
+   * POST /products/:id/view
+   * Uses Redis to prevent same user incrementing multiple times per day
+   */
+  async incrementViewCount(productId: string, userId?: string): Promise<{ viewCount: number }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // If user is logged in, check if they've already viewed today
+    if (userId) {
+      const viewKey = `product:view:${productId}:${userId}`;
+      const hasViewed = await this.cache.get(viewKey);
+      
+      if (hasViewed) {
+        // Already viewed today, return current count
+        return { viewCount: product.viewCount };
+      }
+
+      // Mark as viewed for 24 hours
+      await this.cache.set(viewKey, '1', { ttl: 86400 }); // 24 hours
+    }
+
+    // Increment view count
+    const updatedProduct = await this.prisma.product.update({
+      where: { id: productId },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    // Invalidate cache
+    await this.cache.del(`products:detail:${productId}`);
+
+    return { viewCount: updatedProduct.viewCount };
+  }
+
+  /**
+   * Get product stats (views, likes) for seller dashboard
+   */
+  async getProductStats(productId: string, sellerId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        _count: {
+          select: {
+            likes: true,
+            offers: true,
+            orders: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    if (product.sellerId !== sellerId) {
+      throw new ForbiddenException('Bu ürünün istatistiklerini görme yetkiniz yok');
+    }
+
+    return {
+      id: product.id,
+      title: product.title,
+      viewCount: product.viewCount,
+      likeCount: product.likeCount,
+      offersCount: product._count.offers,
+      ordersCount: product._count.orders,
+    };
   }
 
   /**
