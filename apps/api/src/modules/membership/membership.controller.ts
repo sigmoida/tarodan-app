@@ -7,7 +7,9 @@ import {
   Param,
   Request,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { MembershipService } from './membership.service';
 import {
   SubscribeDto,
@@ -16,7 +18,10 @@ import {
   MembershipTierResponseDto,
   UserMembershipResponseDto,
   MembershipLimitsDto,
+  InitiateMembershipPaymentDto,
+  MembershipPaymentInitResponseDto,
 } from './dto';
+import { PaymentProvider } from '../payment/dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole, MembershipTierType } from '@prisma/client';
@@ -77,6 +82,23 @@ export class MembershipController {
     @Body() dto: SubscribeDto,
   ): Promise<UserMembershipResponseDto> {
     return this.membershipService.subscribe(req.user.id, dto);
+  }
+
+  /**
+   * Initiate payment for membership subscription
+   * POST /membership/payments/initiate
+   */
+  @Post('payments/initiate')
+  async initiateMembershipPayment(
+    @Request() req: any,
+    @Body() dto: InitiateMembershipPaymentDto,
+    @Req() expressReq: ExpressRequest,
+  ): Promise<MembershipPaymentInitResponseDto> {
+    return this.membershipService.initiateMembershipPayment(
+      req.user.id,
+      dto.provider,
+      expressReq,
+    );
   }
 
   /**

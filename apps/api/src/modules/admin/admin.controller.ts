@@ -42,6 +42,8 @@ import {
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
   ReportQueryDto,
+  AdminPaymentQueryDto,
+  PaymentStatisticsQueryDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -418,5 +420,68 @@ export class AdminController {
     @Body() body: { reason: string; priority?: string },
   ) {
     return this.adminService.flagModerationItem(adminId, type, id, body.reason, body.priority);
+  }
+
+  // ==================== PAYMENT MANAGEMENT ====================
+
+  @Get('payments')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all payments with filters' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of payments' })
+  async getPayments(@Query() query: AdminPaymentQueryDto) {
+    return this.adminService.getPayments(query);
+  }
+
+  @Get('payments/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get payment details by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
+  async getPaymentById(@Param('id') id: string) {
+    return this.adminService.getPaymentById(id);
+  }
+
+  @Get('payments/statistics')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get payment statistics' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment statistics' })
+  async getPaymentStatistics(@Query() query: PaymentStatisticsQueryDto) {
+    return this.adminService.getPaymentStatistics(query);
+  }
+
+  @Get('payments/failed')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get failed payments' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of failed payments' })
+  async getFailedPayments(@Query() query: AdminPaymentQueryDto) {
+    return this.adminService.getFailedPayments(query);
+  }
+
+  @Post('payments/:id/manual-refund')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manual refund by admin' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund processed' })
+  async manualRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { amount?: number; reason?: string },
+  ) {
+    return this.adminService.manualRefund(adminId, id, body.amount, body.reason);
+  }
+
+  @Post('payments/:id/force-cancel')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Force cancel payment by admin' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment cancelled' })
+  async forceCancelPayment(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { reason: string },
+  ) {
+    return this.adminService.forceCancelPayment(adminId, id, body.reason);
   }
 }

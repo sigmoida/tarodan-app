@@ -133,3 +133,68 @@ export class AuditLogQueryDto {
   @Max(100)
   limit?: number;
 }
+
+export class AdminPaymentQueryDto {
+  @ApiPropertyOptional({ example: 'completed' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: 'iyzico' })
+  @IsOptional()
+  @IsString()
+  provider?: string;
+
+  @ApiPropertyOptional({ example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: 'order-123' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
+export enum PaymentStatisticsPeriod {
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+}
+
+export class PaymentStatisticsQueryDto {
+  @ApiPropertyOptional({ enum: PaymentStatisticsPeriod, example: 'monthly' })
+  @IsOptional()
+  @IsEnum(PaymentStatisticsPeriod)
+  period?: PaymentStatisticsPeriod;
+
+  @ApiPropertyOptional({ example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+}

@@ -152,9 +152,25 @@ export const ordersApi = {
 // Payments
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
-    api.post(`/payments/order/${orderId}/initiate`, { provider }),
+    api.post('/payments/initiate', { orderId, provider }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
+  getStatusLight: (paymentId: string) =>
+    api.get(`/payments/${paymentId}/status`),
+  getMyPayments: (params?: {
+    status?: string;
+    provider?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/payments/me', { params }),
+  cancel: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/cancel`),
+  refund: (orderId: string, refundAmount?: number) =>
+    api.post('/payments/refund', { orderId, refundAmount }),
+  retry: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/retry`),
 };
 
 // Addresses

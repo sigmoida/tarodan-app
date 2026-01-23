@@ -403,6 +403,7 @@ export default function ProfilePage() {
                   { label: 'Üyelik', href: '/pricing', icon: '⭐' },
                   { label: 'Destek', href: '/support', icon: '🎫' },
                   { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
+                  { label: 'Ödeme Geçmişi', href: '/profile/payments', icon: '💳' },
                   { label: 'İstatistikler', href: '/profile/statistics', icon: '📈' },
                   { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },
                   ...(profile.membership?.tier.type === 'business' ? [

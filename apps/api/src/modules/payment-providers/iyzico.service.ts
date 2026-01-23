@@ -129,6 +129,54 @@ export interface IyzicoRefundResponse {
   currency: string;
 }
 
+export interface IyzicoCheckoutFormInitializeRequest {
+  locale: string;
+  conversationId: string;
+  price: string;
+  paidPrice: string;
+  currency: string;
+  basketId: string;
+  paymentGroup: string;
+  callbackUrl: string;
+  enabledInstallments?: number[];
+  buyer?: IyzicoBuyer;
+  shippingAddress?: IyzicoAddress;
+  billingAddress?: IyzicoAddress;
+  basketItems: IyzicoBasketItem[];
+}
+
+export interface IyzicoCheckoutFormInitializeResponse {
+  status: 'success' | 'failure';
+  errorCode?: string;
+  errorMessage?: string;
+  locale: string;
+  systemTime: number;
+  conversationId: string;
+  checkoutFormContent?: string;
+  paymentPageUrl?: string;
+  token?: string;
+  tokenExpireTime?: number;
+}
+
+export interface IyzicoCheckoutFormResult {
+  status: 'success' | 'failure';
+  errorCode?: string;
+  errorMessage?: string;
+  locale: string;
+  systemTime: number;
+  conversationId: string;
+  paymentId?: string;
+  paymentStatus?: string;
+  fraudStatus?: number;
+  itemTransactions?: Array<{
+    itemId: string;
+    paymentTransactionId: string;
+    transactionStatus: number;
+    price: number;
+    paidPrice: number;
+  }>;
+}
+
 // =============================================================================
 // IYZICO SERVICE
 // =============================================================================
@@ -162,6 +210,24 @@ export class IyzicoService {
   async createPayment(request: IyzicoPaymentRequest): Promise<IyzicoPaymentResponse> {
     const endpoint = '/payment/auth';
     return this.makeRequest<IyzicoPaymentResponse>(endpoint, request);
+  }
+
+  /**
+   * Initialize checkout form (recommended for web payments)
+   */
+  async initializeCheckoutForm(
+    request: IyzicoCheckoutFormInitializeRequest,
+  ): Promise<IyzicoCheckoutFormInitializeResponse> {
+    const endpoint = '/payment/iyzipos/checkoutform/initialize/auth';
+    return this.makeRequest<IyzicoCheckoutFormInitializeResponse>(endpoint, request);
+  }
+
+  /**
+   * Retrieve checkout form result (after callback)
+   */
+  async retrieveCheckoutForm(token: string): Promise<IyzicoCheckoutFormResult> {
+    const endpoint = '/payment/iyzipos/checkoutform/auth';
+    return this.makeRequest<IyzicoCheckoutFormResult>(endpoint, { token });
   }
 
   /**

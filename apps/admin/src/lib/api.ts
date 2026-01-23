@@ -157,6 +157,35 @@ export const adminApi = {
   
   // Audit Logs
   getAuditLogs: (params?: any) => api.get('/admin/audit-logs', { params }),
+  
+  // Payments
+  getPayments: (params?: {
+    status?: string;
+    provider?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/payments', { params }),
+  getPayment: (id: string) => api.get(`/admin/payments/${id}`),
+  getPaymentStatistics: (params?: {
+    period?: 'daily' | 'weekly' | 'monthly';
+    startDate?: string;
+    endDate?: string;
+  }) => api.get('/admin/payments/statistics', { params }),
+  getFailedPayments: (params?: {
+    provider?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/payments/failed', { params }),
+  manualRefund: (id: string, data: { amount?: number; reason?: string }) =>
+    api.post(`/admin/payments/${id}/manual-refund`, data),
+  forceCancelPayment: (id: string, reason: string) =>
+    api.post(`/admin/payments/${id}/force-cancel`, { reason }),
 };
 
 export default api;

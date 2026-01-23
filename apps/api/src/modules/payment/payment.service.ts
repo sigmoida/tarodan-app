@@ -13,6 +13,7 @@ import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus } from '@p
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
+import { Request } from 'express';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -65,11 +66,36 @@ export class PaymentService {
   }
 
   /**
+   * Get client IP address from request
+   */
+  private getClientIp(req?: Request): string {
+    if (!req) {
+      return '127.0.0.1';
+    }
+
+    // Check for forwarded IP (behind proxy/load balancer)
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+      return ips.split(',')[0].trim();
+    }
+
+    // Check for real IP header
+    const realIp = req.headers['x-real-ip'];
+    if (realIp) {
+      return Array.isArray(realIp) ? realIp[0] : realIp;
+    }
+
+    // Fallback to connection remote address
+    return req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  }
+
+  /**
    * Initiate payment for an order
    * POST /payments/initiate
    * Requirement: PayTR & Iyzico integration (project.md)
    */
-  async initiatePayment(buyerId: string, dto: InitiatePaymentDto) {
+  async initiatePayment(buyerId: string, dto: InitiatePaymentDto, req?: Request) {
     // Verify order exists and belongs to buyer
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
@@ -121,16 +147,24 @@ export class PaymentService {
       },
     });
 
+    // Log payment creation
+    await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {
+      amount: Number(order.totalAmount),
+      provider: dto.provider,
+      buyerId: buyerId,
+    });
+
     // Generate payment URL based on provider
     let paymentUrl: string;
     let paymentHtml: string | undefined;
+    const clientIp = this.getClientIp(req);
 
     if (dto.provider === PaymentProvider.iyzico) {
-      const result = await this.initializeIyzicoPayment(payment, order);
+      const result = await this.initializeIyzicoPayment(payment, order, clientIp);
       paymentUrl = result.paymentUrl;
       paymentHtml = result.paymentHtml;
     } else {
-      const result = await this.initializePayTRPayment(payment, order);
+      const result = await this.initializePayTRPayment(payment, order, clientIp);
       paymentUrl = result.paymentUrl;
       paymentHtml = result.paymentHtml;
     }
@@ -145,53 +179,141 @@ export class PaymentService {
   }
 
   /**
-   * Initialize Iyzico payment
-   * Note: This is a mock implementation - real implementation would use iyzico SDK
+   * Initialize Iyzico payment using checkout form
    */
-  private async initializeIyzicoPayment(payment: any, order: any) {
-    // In production, use iyzico SDK:
-    // const iyzipay = require('iyzipay');
-    // const checkoutFormInitialize = await iyzipay.checkoutFormInitialize.create(request, callback);
+  private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
+    try {
+      const callbackUrl = `${this.configService.get('FRONTEND_URL')}/payment/callback/iyzico?paymentId=${payment.id}`;
+      const shippingAddress = order.shippingAddress as any;
 
-    const iyzicoApiKey = this.configService.get('IYZICO_API_KEY');
-    const iyzicoSecretKey = this.configService.get('IYZICO_SECRET_KEY');
-    const callbackUrl = `${this.configService.get('API_URL')}/payments/callback/iyzico`;
+      // Prepare buyer information
+      const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
+      const buyerFirstName = buyerName[0] || 'Müşteri';
+      const buyerLastName = buyerName.slice(1).join(' ') || '';
 
-    // Mock response - replace with actual iyzico integration
-    this.logger.log(`Initializing Iyzico payment for order ${order.id}`);
+      // Prepare basket items
+      const basketItems = [{
+        id: order.product.id,
+        name: order.product.title,
+        category1: 'Koleksiyon',
+        itemType: 'PHYSICAL' as const,
+        price: Number(order.totalAmount).toFixed(2),
+      }];
 
-    // Update payment with provider reference
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        providerPaymentId: `iyzico_${payment.id}_${Date.now()}`,
-      },
-    });
+      // Prepare addresses
+      const shippingAddr = shippingAddress ? {
+        contactName: shippingAddress.fullName || `${buyerFirstName} ${buyerLastName}`,
+        city: shippingAddress.city || 'İstanbul',
+        country: 'Turkey',
+        address: shippingAddress.address || '',
+        zipCode: shippingAddress.zipCode || '',
+      } : {
+        contactName: `${buyerFirstName} ${buyerLastName}`,
+        city: 'İstanbul',
+        country: 'Turkey',
+        address: '',
+      };
 
-    return {
-      paymentUrl: `${this.configService.get('FRONTEND_URL')}/payment/iyzico/${payment.id}`,
-      paymentHtml: undefined,
-    };
+      // Initialize checkout form
+      const checkoutFormRequest = {
+        locale: 'tr',
+        conversationId: order.id,
+        price: Number(order.totalAmount).toFixed(2),
+        paidPrice: Number(order.totalAmount).toFixed(2),
+        currency: 'TRY',
+        basketId: order.id,
+        paymentGroup: 'PRODUCT',
+        callbackUrl,
+        enabledInstallments: [1, 2, 3, 6, 9],
+        buyer: {
+          id: order.buyer.id,
+          name: buyerFirstName,
+          surname: buyerLastName,
+          gsmNumber: order.buyer.phone || '+905000000000',
+          email: order.buyer.email,
+          identityNumber: '00000000000', // Should be collected from user
+          registrationAddress: shippingAddr.address,
+          ip: clientIp,
+          city: shippingAddr.city,
+          country: 'Turkey',
+        },
+        shippingAddress: shippingAddr,
+        billingAddress: shippingAddr,
+        basketItems,
+      };
+
+      const result = await this.iyzicoService.initializeCheckoutForm(checkoutFormRequest);
+
+      if (result.status === 'failure') {
+        throw new BadRequestException(
+          result.errorMessage || 'Iyzico ödeme başlatılamadı',
+        );
+      }
+
+      if (!result.checkoutFormContent && !result.paymentPageUrl) {
+        throw new BadRequestException('Iyzico ödeme sayfası oluşturulamadı');
+      }
+
+      // Update payment with provider reference
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          providerPaymentId: result.token || payment.id,
+          providerConversationId: order.id,
+          metadata: {
+            token: result.token,
+            tokenExpireTime: result.tokenExpireTime,
+          },
+        },
+      });
+
+      // Return payment page URL or HTML content
+      if (result.paymentPageUrl) {
+        return {
+          paymentUrl: result.paymentPageUrl,
+          paymentHtml: undefined,
+        };
+      } else if (result.checkoutFormContent) {
+        return {
+          paymentUrl: `${this.configService.get('FRONTEND_URL')}/payment/iyzico/${payment.id}`,
+          paymentHtml: result.checkoutFormContent,
+        };
+      } else {
+        throw new BadRequestException('Iyzico ödeme sayfası oluşturulamadı');
+      }
+    } catch (error: any) {
+      this.logger.error(`Iyzico initialization error: ${error.message}`, error.stack);
+      throw new BadRequestException(
+        error.message || 'Iyzico ödeme başlatılamadı',
+      );
+    }
   }
 
   /**
    * Initialize PayTR payment
    * Uses PayTR iframe token API for secure payment
    */
-  private async initializePayTRPayment(payment: any, order: any) {
+  private async initializePayTRPayment(payment: any, order: any, clientIp: string) {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
     try {
-      // Prepare buyer info
+      // Get shipping address from order
+      const shippingAddress = order.shippingAddress as any;
+      
+      // Prepare buyer info with actual shipping address
+      const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
+      const buyerFirstName = buyerName[0] || 'Müşteri';
+      const buyerLastName = buyerName.slice(1).join(' ') || '';
+
       const buyer = {
         id: order.buyer.id,
-        name: order.buyer.displayName?.split(' ')[0] || 'Müşteri',
-        surname: order.buyer.displayName?.split(' ').slice(1).join(' ') || '',
+        name: buyerFirstName,
+        surname: buyerLastName,
         email: order.buyer.email,
-        phone: order.buyer.phone || '+905000000000',
-        ip: '127.0.0.1', // Should come from request
-        address: 'Türkiye',
-        city: 'İstanbul',
+        phone: shippingAddress?.phone || order.buyer.phone || '+905000000000',
+        ip: clientIp,
+        address: shippingAddress?.address || shippingAddress?.fullAddress || 'Türkiye',
+        city: shippingAddress?.city || 'İstanbul',
       };
 
       // Prepare basket items
@@ -221,25 +343,18 @@ export class PaymentService {
         },
       });
 
+      // Return iframe URL and HTML for embedding
       return {
         paymentUrl: result.iframeUrl,
-        paymentHtml: `<iframe src="${result.iframeUrl}" frameborder="0" style="width:100%;height:600px;"></iframe>`,
+        paymentHtml: `<iframe src="${result.iframeUrl}" frameborder="0" style="width:100%;height:600px;border:none;"></iframe>`,
       };
     } catch (error: any) {
-      this.logger.error(`PayTR initialization error: ${error.message}`);
+      this.logger.error(`PayTR initialization error: ${error.message}`, error.stack);
       
-      // Fallback to simple redirect
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          providerPaymentId: `paytr_${payment.id}_${Date.now()}`,
-        },
-      });
-
-      return {
-        paymentUrl: `${this.configService.get('FRONTEND_URL')}/payment/paytr/${payment.id}`,
-        paymentHtml: undefined,
-      };
+      // Don't fallback - throw error so user knows payment failed
+      throw new BadRequestException(
+        error.message || 'PayTR ödeme başlatılamadı',
+      );
     }
   }
 
@@ -260,15 +375,13 @@ export class PaymentService {
       this.logger.log('Iyzico signature verified successfully');
     }
 
-    // In production: verify callback with iyzico SDK
-    // const checkoutForm = await iyzipay.checkoutForm.retrieve(request, callback);
-
-    // Find payment by provider conversation ID or payment ID
+    // Find payment by token or conversation ID
     const payment = await this.prisma.payment.findFirst({
       where: {
         OR: [
-          { providerConversationId: { contains: dto.conversationId || dto.token } },
-          { providerPaymentId: { contains: dto.conversationId || dto.token } },
+          { providerPaymentId: dto.token },
+          { providerConversationId: dto.conversationId || dto.token },
+          { metadata: { path: ['token'], equals: dto.token } },
         ],
       },
       include: { 
@@ -283,17 +396,39 @@ export class PaymentService {
     });
 
     if (!payment) {
+      this.logger.warn(`Payment not found for token: ${dto.token}`);
       throw new NotFoundException('Payment not found');
     }
 
-    // Process based on status
-    if (dto.status === 'success') {
-      await this.processSuccessfulPayment(payment, dto.paymentId || dto.token);
-    } else {
-      await this.processFailedPayment(payment, 'Iyzico payment failed');
-    }
+    // Retrieve checkout form result from Iyzico
+    try {
+      const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(dto.token);
 
-    return { status: 'ok' };
+      if (checkoutResult.status === 'success' && checkoutResult.paymentId) {
+        // Payment successful
+        await this.processSuccessfulPayment(
+          payment,
+          checkoutResult.paymentId,
+        );
+        return { status: 'ok', paymentId: checkoutResult.paymentId };
+      } else {
+        // Payment failed
+        const errorMessage = checkoutResult.errorMessage || 'Iyzico payment failed';
+        await this.processFailedPayment(payment, errorMessage);
+        return { status: 'error', message: errorMessage };
+      }
+    } catch (error: any) {
+      this.logger.error(`Error retrieving Iyzico checkout form: ${error.message}`);
+      
+      // Fallback: use status from DTO if available
+      if (dto.status === 'success') {
+        await this.processSuccessfulPayment(payment, dto.paymentId || dto.token);
+        return { status: 'ok' };
+      } else {
+        await this.processFailedPayment(payment, error.message || 'Iyzico payment failed');
+        return { status: 'error', message: error.message };
+      }
+    }
   }
 
   /**
@@ -374,17 +509,125 @@ export class PaymentService {
   }
 
   /**
+   * Log payment action to audit log
+   * Note: AuditLog requires adminUserId, so we only log admin actions
+   * For user actions, we store in payment metadata
+   */
+  private async logPaymentAction(
+    action: string,
+    paymentId: string,
+    orderId: string,
+    adminUserId?: string,
+    oldStatus?: PaymentStatus,
+    newStatus?: PaymentStatus,
+    metadata?: any,
+  ) {
+    try {
+      // Only log to AuditLog if adminUserId is provided (admin actions)
+      if (adminUserId) {
+        // Check if admin user exists
+        const adminUser = await this.prisma.adminUser.findUnique({
+          where: { id: adminUserId },
+        });
+
+        if (adminUser) {
+          await this.prisma.auditLog.create({
+            data: {
+              adminUserId,
+              action: `payment.${action}`,
+              entityType: 'Payment',
+              entityId: paymentId,
+              oldValue: oldStatus
+                ? {
+                    status: oldStatus,
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  }
+                : null,
+              newValue: newStatus
+                ? {
+                    status: newStatus,
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  }
+                : {
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  },
+            },
+          });
+        }
+      }
+
+      // For all actions (including user actions), store in payment metadata
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
+
+      if (payment) {
+        const auditHistory = (payment.metadata as any)?.auditHistory || [];
+        auditHistory.push({
+          action: `payment.${action}`,
+          timestamp: new Date().toISOString(),
+          adminUserId: adminUserId || null,
+          oldStatus,
+          newStatus,
+          ...metadata,
+        });
+
+        await this.prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            metadata: {
+              ...(payment.metadata as any || {}),
+              auditHistory,
+            },
+          },
+        });
+      }
+    } catch (error) {
+      // Log but don't fail payment operations
+      this.logger.error(`Failed to log payment action ${action}: ${error}`);
+    }
+  }
+
+  /**
    * Process successful payment
    * Requirement: Queue job publishing after payment (3.1)
    */
   private async processSuccessfulPayment(payment: any, transactionId?: string) {
     const result = await this.prisma.$transaction(async (tx) => {
+      const oldStatus = payment.status;
+
       // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
         data: { 
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
+        },
+      });
+
+      // Log payment completion (will be done after transaction)
+      // Store in metadata for now, will log to audit after transaction
+      const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat({
+        action: 'payment.completed',
+        timestamp: new Date().toISOString(),
+        oldStatus,
+        newStatus: PaymentStatus.completed,
+        transactionId: transactionId || payment.providerPaymentId,
+      });
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          metadata: {
+            ...(payment.metadata as any || {}),
+            auditHistory,
+          },
         },
       });
 
@@ -481,6 +724,8 @@ export class PaymentService {
    * Process failed payment
    */
   private async processFailedPayment(payment: any, reason: string) {
+    const oldStatus = payment.status;
+
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
@@ -489,18 +734,224 @@ export class PaymentService {
       },
     });
 
+    // Log payment failure
+    await this.logPaymentAction('failed', payment.id, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
+      reason,
+    });
+
     this.logger.warn(`Payment ${payment.id} failed: ${reason}`);
+
+    // Emit payment.failed event
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: payment.orderId },
+        include: {
+          buyer: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+
+      if (order) {
+        await this.eventService.emitPaymentFailed({
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          orderNumber: order.orderNumber,
+          buyerId: order.buyerId,
+          buyerEmail: order.buyer.email,
+          buyerName: order.buyer.displayName || order.buyer.email,
+          amount: Number(payment.amount),
+          provider: payment.provider,
+          failureReason: reason,
+        });
+
+        this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
+      }
+    } catch (error) {
+      // Log but don't fail - payment was already marked as failed
+      this.logger.error(`Failed to emit payment.failed event: ${error}`);
+    }
+  }
+
+  /**
+   * Retry a failed payment
+   * Creates a new payment for the same order
+   */
+  async retryPayment(paymentId: string, userId: string, req?: Request) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Ödeme bulunamadı');
+    }
+
+    // Verify user owns the order
+    if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
+      throw new ForbiddenException('Bu ödemeyi tekrar deneme yetkiniz yok');
+    }
+
+    // Only allow retrying failed payments
+    if (payment.status !== PaymentStatus.failed) {
+      throw new BadRequestException('Sadece başarısız ödemeler tekrar denenebilir');
+    }
+
+    // Verify order is still in pending_payment status
+    if (payment.order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException('Sipariş durumu ödeme tekrarına uygun değil');
+    }
+
+    // Create new payment record
+    const newPayment = await this.prisma.payment.create({
+      data: {
+        orderId: payment.orderId,
+        amount: payment.amount,
+        currency: payment.currency,
+        provider: payment.provider,
+        status: PaymentStatus.pending,
+        metadata: {
+          retriedFrom: paymentId,
+          retriedAt: new Date().toISOString(),
+          auditHistory: [{
+            action: 'payment.retried',
+            timestamp: new Date().toISOString(),
+            originalPaymentId: paymentId,
+            userId,
+          }],
+        },
+      },
+    });
+
+    // Log retry action on original payment
+    await this.logPaymentAction('retried', paymentId, payment.orderId, undefined, PaymentStatus.failed, undefined, {
+      newPaymentId: newPayment.id,
+      userId,
+    });
+
+    // Generate payment URL based on provider
+    let paymentUrl: string;
+    let paymentHtml: string | undefined;
+    const clientIp = this.getClientIp(req);
+
+    if (payment.provider === PaymentProvider.iyzico) {
+      const result = await this.initializeIyzicoPayment(newPayment, payment.order, clientIp);
+      paymentUrl = result.paymentUrl;
+      paymentHtml = result.paymentHtml;
+    } else {
+      const result = await this.initializePayTRPayment(newPayment, payment.order, clientIp);
+      paymentUrl = result.paymentUrl;
+      paymentHtml = result.paymentHtml;
+    }
+
+    this.logger.log(`Payment ${paymentId} retried, new payment ${newPayment.id} created`);
+
+    return {
+      success: true,
+      paymentId: payment.id,
+      newPaymentId: newPayment.id,
+      paymentUrl,
+      paymentHtml,
+      provider: payment.provider,
+      expiresIn: 300,
+    };
+  }
+
+  /**
+   * Cancel a pending payment
+   * Only allows canceling pending payments
+   */
+  async cancelPayment(paymentId: string, userId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { id: true, email: true, displayName: true } },
+            seller: { select: { id: true, email: true, displayName: true } },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Ödeme bulunamadı');
+    }
+
+    // Verify user owns the order
+    if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
+      throw new ForbiddenException('Bu ödemeyi iptal etme yetkiniz yok');
+    }
+
+    // Only allow canceling pending payments
+    if (payment.status !== PaymentStatus.pending) {
+      throw new BadRequestException('Sadece bekleyen ödemeler iptal edilebilir');
+    }
+
+    const oldStatus = payment.status;
+
+    // Update payment status to failed
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: PaymentStatus.failed,
+        failureReason: 'Kullanıcı tarafından iptal edildi',
+      },
+    });
+
+    this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
+
+    // Log payment cancellation
+    await this.logPaymentAction('cancelled', paymentId, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
+      reason: 'Kullanıcı tarafından iptal edildi',
+      userId,
+    });
+
+    // Emit payment.failed event
+    try {
+      await this.eventService.emitPaymentFailed({
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        orderNumber: payment.order.orderNumber,
+        buyerId: payment.order.buyerId,
+        buyerEmail: payment.order.buyer.email,
+        buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+        amount: Number(payment.amount),
+        provider: payment.provider,
+        failureReason: 'Kullanıcı tarafından iptal edildi',
+      });
+
+      this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
+    } catch (error) {
+      // Log but don't fail - payment was already cancelled
+      this.logger.error(`Failed to emit payment.failed event: ${error}`);
+    }
+
+    return {
+      success: true,
+      paymentId: payment.id,
+      message: 'Ödeme başarıyla iptal edildi',
+    };
   }
 
   /**
    * Process refund
    * Requirement: Refund handling (project.md)
    */
-  async processRefund(orderId: string) {
+  async processRefund(orderId: string, refundAmount?: number) {
     const payment = await this.prisma.payment.findFirst({
       where: {
         orderId,
         status: PaymentStatus.completed,
+      },
+      include: {
+        order: true,
       },
     });
 
@@ -508,27 +959,138 @@ export class PaymentService {
       throw new NotFoundException('Tamamlanmış ödeme bulunamadı');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Update payment status
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: { status: PaymentStatus.refunded },
-      });
+    const amountToRefund = refundAmount || Number(payment.amount);
 
-      // Cancel payment hold
-      await tx.paymentHold.updateMany({
-        where: {
+    try {
+      // Call provider refund API
+      let refundResult: any;
+
+      if (payment.provider === 'iyzico') {
+        // Iyzico refund requires paymentTransactionId
+        // For full refund, we need the transaction ID from the payment
+        if (!payment.providerPaymentId) {
+          throw new BadRequestException('Iyzico ödeme transaction ID bulunamadı');
+        }
+
+        refundResult = await this.iyzicoService.createPartialRefund(
+          payment.providerPaymentId,
+          amountToRefund,
+          '127.0.0.1', // IP not critical for refund, but can be added if needed
+        );
+
+        if (refundResult.status === 'failure') {
+          throw new BadRequestException(
+            refundResult.errorMessage || 'Iyzico iade işlemi başarısız',
+          );
+        }
+      } else if (payment.provider === 'paytr') {
+        // PayTR refund uses merchant_oid (order ID)
+        refundResult = await this.paytrService.createRefund(
           orderId,
-          status: PaymentHoldStatus.held,
-        },
-        data: { status: PaymentHoldStatus.cancelled },
+          amountToRefund,
+        );
+
+        if (refundResult.status !== 'success') {
+          throw new BadRequestException(
+            refundResult.err_msg || 'PayTR iade işlemi başarısız',
+          );
+        }
+      } else {
+        throw new BadRequestException(`Bilinmeyen ödeme sağlayıcı: ${payment.provider}`);
+      }
+
+      // Update payment status after successful refund
+      return this.prisma.$transaction(async (tx) => {
+        const oldStatus = payment.status;
+        const existingMetadata = (payment.metadata as any) || {};
+        const auditHistory = existingMetadata.auditHistory || [];
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.refunded,
+            metadata: {
+              ...existingMetadata,
+              refundAmount: amountToRefund,
+              refundedAt: new Date().toISOString(),
+              refundResult,
+              auditHistory: auditHistory.concat({
+                action: 'payment.refunded',
+                timestamp: new Date().toISOString(),
+                oldStatus,
+                newStatus: PaymentStatus.refunded,
+                refundAmount: amountToRefund,
+              }),
+            },
+          },
+        });
+
+        // Cancel payment hold
+        await tx.paymentHold.updateMany({
+          where: {
+            orderId,
+            status: PaymentHoldStatus.held,
+          },
+          data: { status: PaymentHoldStatus.cancelled },
+        });
+
+        // Update order status if full refund
+        if (amountToRefund >= Number(payment.amount)) {
+          await tx.order.update({
+            where: { id: orderId },
+            data: { status: OrderStatus.cancelled },
+          });
+        }
+
+        this.logger.log(`Refund processed for payment ${payment.id}: ${amountToRefund} TRY`);
+
+        const refundResponse = {
+          success: true,
+          paymentId: payment.id,
+          refundAmount: amountToRefund,
+          providerRefundId: refundResult.paymentId || refundResult.merchant_oid,
+        };
+
+        // Emit payment.refunded event
+        try {
+          const order = await tx.order.findUnique({
+            where: { id: orderId },
+            include: {
+              buyer: { select: { id: true, email: true, displayName: true } },
+              seller: { select: { id: true, email: true, displayName: true } },
+            },
+          });
+
+          if (order) {
+            await this.eventService.emitPaymentRefunded({
+              paymentId: payment.id,
+              orderId: orderId,
+              orderNumber: order.orderNumber,
+              buyerId: order.buyerId,
+              buyerEmail: order.buyer.email,
+              buyerName: order.buyer.displayName || order.buyer.email,
+              sellerId: order.sellerId,
+              sellerEmail: order.seller.email,
+              sellerName: order.seller.displayName || order.seller.email,
+              refundAmount: amountToRefund,
+              totalAmount: Number(payment.amount),
+              provider: payment.provider,
+              providerRefundId: refundResponse.providerRefundId,
+            });
+
+            this.logger.log(`payment.refunded event emitted for payment ${payment.id}`);
+          }
+        } catch (error) {
+          // Log but don't fail - refund was already processed
+          this.logger.error(`Failed to emit payment.refunded event: ${error}`);
+        }
+
+        return refundResponse;
       });
-
-      // In production: call provider refund API
-      this.logger.log(`Refund processed for payment ${payment.id}`);
-
-      return { success: true, paymentId: payment.id };
-    });
+    } catch (error: any) {
+      this.logger.error(`Refund error for payment ${payment.id}: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
@@ -559,6 +1121,42 @@ export class PaymentService {
     this.logger.log(`Payment hold ${hold.id} released to seller ${hold.sellerId}`);
 
     return { success: true, holdId: hold.id, amount: Number(hold.amount) };
+  }
+
+  /**
+   * Get payment status (lightweight for polling)
+   */
+  async getPaymentStatus(paymentId: string, userId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          select: {
+            buyerId: true,
+            sellerId: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Ödeme bulunamadı');
+    }
+
+    // Only buyer or seller can view
+    if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
+      throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+    }
+
+    return {
+      id: payment.id,
+      status: payment.status,
+      amount: Number(payment.amount),
+      currency: payment.currency,
+      provider: payment.provider,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    };
   }
 
   /**
@@ -630,5 +1228,164 @@ export class PaymentService {
       product: h.payment.order.product,
       createdAt: h.createdAt,
     }));
+  }
+
+  /**
+   * Get user's payment history
+   */
+  async getUserPayments(
+    userId: string,
+    options?: {
+      status?: PaymentStatus;
+      provider?: string;
+      startDate?: Date;
+      endDate?: Date;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      OR: [
+        { order: { buyerId: userId } },
+        { order: { sellerId: userId } },
+      ],
+    };
+
+    if (options?.status) {
+      where.status = options.status;
+    }
+
+    if (options?.provider) {
+      where.provider = options.provider;
+    }
+
+    if (options?.startDate || options?.endDate) {
+      where.createdAt = {};
+      if (options.startDate) {
+        where.createdAt.gte = options.startDate;
+      }
+      if (options.endDate) {
+        where.createdAt.lte = options.endDate;
+      }
+    }
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          order: {
+            include: {
+              product: { select: { id: true, title: true, images: true } },
+              buyer: { select: { id: true, displayName: true } },
+              seller: { select: { id: true, displayName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      payments: payments.map((p) => ({
+        id: p.id,
+        orderId: p.orderId,
+        orderNumber: p.order.orderNumber,
+        amount: Number(p.amount),
+        currency: p.currency,
+        provider: p.provider,
+        status: p.status,
+        failureReason: p.failureReason,
+        providerTransactionId: p.providerPaymentId || p.providerConversationId,
+        product: p.order.product,
+        buyer: p.order.buyer,
+        seller: p.order.seller,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        paidAt: p.paidAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Cancel expired pending payments
+   * Called by scheduler to automatically cancel payments older than timeout period
+   */
+  async cancelExpiredPayments() {
+    const timeoutMinutes = parseInt(
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '15',
+      10,
+    );
+    const timeoutDate = new Date();
+    timeoutDate.setMinutes(timeoutDate.getMinutes() - timeoutMinutes);
+
+    // Find pending payments older than timeout
+    const expiredPayments = await this.prisma.payment.findMany({
+      where: {
+        status: PaymentStatus.pending,
+        createdAt: {
+          lt: timeoutDate,
+        },
+      },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { id: true, email: true, displayName: true } },
+          },
+        },
+      },
+    });
+
+    let cancelledCount = 0;
+
+    for (const payment of expiredPayments) {
+      try {
+        // Update payment status to failed
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.failed,
+            failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
+          },
+        });
+
+        // Emit payment.failed event
+        try {
+          await this.eventService.emitPaymentFailed({
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            orderNumber: payment.order.orderNumber,
+            buyerId: payment.order.buyerId,
+            buyerEmail: payment.order.buyer.email,
+            buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+            amount: Number(payment.amount),
+            provider: payment.provider,
+            failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
+          });
+        } catch (error) {
+          // Log but don't fail
+          this.logger.error(`Failed to emit payment.failed event for payment ${payment.id}: ${error}`);
+        }
+
+        cancelledCount++;
+        this.logger.log(`Cancelled expired payment ${payment.id} for order ${payment.order.orderNumber}`);
+      } catch (error: any) {
+        this.logger.error(`Failed to cancel expired payment ${payment.id}: ${error.message}`);
+      }
+    }
+
+    return { count: cancelledCount };
   }
 }

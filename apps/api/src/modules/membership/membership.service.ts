@@ -18,10 +18,15 @@ import {
   UserMembershipResponseDto,
   MembershipLimitsDto,
 } from './dto';
+import { PaymentService } from '../payment/payment.service';
+import { PaymentProvider } from '../payment/dto';
 
 @Injectable()
 export class MembershipService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   // ==========================================================================
   // GET ALL TIERS

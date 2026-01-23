@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { api } from '@/lib/api';
-import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { api, paymentsApi } from '@/lib/api';
+import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 
 interface OrderDetail {
   id: string;
@@ -61,6 +61,12 @@ interface OrderDetail {
   };
   isBuyer: boolean;
   isSeller: boolean;
+  payment?: {
+    id: string;
+    status: string;
+    amount: number;
+    provider: string;
+  };
 }
 
 const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
@@ -81,6 +87,9 @@ export default function OrderDetailPage() {
   const { isAuthenticated, user } = useAuthStore();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<number | undefined>(undefined);
+  const [processingRefund, setProcessingRefund] = useState(false);
 
   const orderId = params?.id as string;
 
@@ -115,6 +124,26 @@ export default function OrderDetailPage() {
       loadOrder();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Durum güncellenemedi');
+    }
+  };
+
+  const handleRefund = async () => {
+    if (!order?.payment) {
+      toast.error('Ödeme bilgisi bulunamadı');
+      return;
+    }
+
+    setProcessingRefund(true);
+    try {
+      await paymentsApi.refund(order.id, refundAmount);
+      toast.success('İade işlemi başlatıldı');
+      setShowRefundModal(false);
+      setRefundAmount(undefined);
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İade işlemi başlatılamadı');
+    } finally {
+      setProcessingRefund(false);
     }
   };
 
@@ -282,6 +311,26 @@ export default function OrderDetailPage() {
                 </button>
               </div>
             )}
+
+            {/* Refund Button for Completed Payments */}
+            {order.payment && order.payment.status === 'completed' && (order.isBuyer || order.isSeller) && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">İade İşlemi</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.
+                </p>
+                <button
+                  onClick={() => {
+                    setRefundAmount(undefined);
+                    setShowRefundModal(true);
+                  }}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowUturnLeftIcon className="w-5 h-5" />
+                  İade Talebi Oluştur
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -353,6 +402,52 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Refund Modal */}
+        {showRefundModal && order?.payment && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">İade İşlemi</h2>
+              <p className="text-gray-600 mb-4">
+                Toplam ödeme tutarı: ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  İade Tutarı (Boş bırakırsanız tam iade yapılır)
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={order.payment.amount}
+                  step="0.01"
+                  value={refundAmount || ''}
+                  onChange={(e) => setRefundAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
+                  placeholder="İade tutarı (opsiyonel)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowRefundModal(false);
+                    setRefundAmount(undefined);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  disabled={processingRefund}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleRefund}
+                  disabled={processingRefund}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingRefund ? 'İşleniyor...' : 'İade Et'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
