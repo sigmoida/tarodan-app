@@ -10,10 +10,6 @@ export default function MembershipLayout() {
           backgroundColor: TarodanColors.background,
         },
       }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="checkout" />
-      <Stack.Screen name="success" />
-    </Stack>
+    />
   );
 }

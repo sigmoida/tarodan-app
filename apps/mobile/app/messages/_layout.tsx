@@ -8,10 +8,6 @@ export default function MessagesLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: TarodanColors.background },
       }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[threadId]" />
-      <Stack.Screen name="new" />
-    </Stack>
+    />
   );
 }

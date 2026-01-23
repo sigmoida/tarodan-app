@@ -344,13 +344,13 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>İlanlarım</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/orders')}>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/orders')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <Ionicons name="cube" size={22} color="#2196F3" />
               </View>
               <Text style={styles.quickActionText}>Siparişlerim</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/wishlist')}>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/favorites')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FCE4EC' }]}>
                 <Ionicons name="heart" size={22} color="#E91E63" />
               </View>
@@ -375,7 +375,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/membership')}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
             {user?.membershipTier === 'Premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
@@ -420,13 +420,13 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/support')}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/support')}>
             <Ionicons name="headset-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Destek Talebi</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/about')}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
             <Ionicons name="information-circle-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Hakkında</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />

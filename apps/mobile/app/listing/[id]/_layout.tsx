@@ -8,8 +8,6 @@ export default function ListingLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: TarodanColors.background },
       }}
-    >
-      <Stack.Screen name="edit" />
-    </Stack>
+    />
   );
 }

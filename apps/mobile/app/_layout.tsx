@@ -62,14 +62,11 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: theme.colors.primary },
             headerTintColor: '#fff',
             headerTitleStyle: { fontWeight: 'bold' },
+            headerShown: false,
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="product/[id]" options={{ title: 'Ürün Detay' }} />
-          <Stack.Screen name="collection/[id]" options={{ title: 'Koleksiyon' }} />
-          <Stack.Screen name="trade/[id]" options={{ title: 'Takas Detay' }} />
-          <Stack.Screen name="messages/[id]" options={{ title: 'Mesajlar' }} />
         </Stack>
       </PaperProvider>
     </QueryClientProvider>

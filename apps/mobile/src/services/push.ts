@@ -28,8 +28,17 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
   // Get Expo push token
   try {
+    // Skip push token in Expo Go (development) - it requires projectId
+    // Push notifications will work in production builds with EAS
+    const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
+    
+    if (!projectId) {
+      console.log('⚠️ Push notifications skipped (no projectId - normal in Expo Go)');
+      return null;
+    }
+    
     const tokenResponse = await Notifications.getExpoPushTokenAsync({
-      projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+      projectId,
     });
     token = tokenResponse.data;
 
@@ -38,11 +47,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
       token,
       platform: Platform.OS,
       deviceName: Device.modelName,
+    }).catch((err) => {
+      console.log('Failed to register push token with backend:', err.message);
     });
 
     console.log('Push token registered:', token);
-  } catch (error) {
-    console.error('Error getting push token:', error);
+  } catch (error: any) {
+    // Don't show error in development - this is expected in Expo Go
+    console.log('⚠️ Push notifications unavailable:', error.message);
   }
 
   // Configure notification channel for Android
