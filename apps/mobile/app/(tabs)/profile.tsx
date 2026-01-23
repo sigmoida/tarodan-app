@@ -393,6 +393,22 @@ export default function ProfileScreen() {
             <Text style={styles.menuItemText}>Güvenlik</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
+
+          {/* Business Panel - Web ile aynı */}
+          {user?.membershipTier?.toLowerCase() === 'business' && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/business')}>
+              <Ionicons name="business-outline" size={22} color={TarodanColors.primary} />
+              <Text style={[styles.menuItemText, { color: TarodanColors.primary }]}>İşletme Paneli</Text>
+              <Badge style={{ backgroundColor: '#FFA500', marginLeft: 8 }}>👑</Badge>
+              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/analytics')}>
+            <Ionicons name="stats-chart-outline" size={22} color={TarodanColors.textSecondary} />
+            <Text style={styles.menuItemText}>İstatistikler</Text>
+            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.menuSection}>

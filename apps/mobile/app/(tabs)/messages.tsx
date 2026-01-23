@@ -1,5 +1,5 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Avatar, Badge, FAB, ActivityIndicator, Searchbar, Divider } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { Text, Avatar, Badge, FAB, ActivityIndicator, Searchbar } from 'react-native-paper';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore'
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 
-export default function MessagesListScreen() {
+export default function MessagesTabScreen() {
   const { isAuthenticated, user, limits } = useAuthStore();
   const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -45,28 +45,11 @@ export default function MessagesListScreen() {
     }
   };
 
-  // Güvenli participant helper - store'dan gelen null/undefined durumlarını yakala
-  const safeGetOther = (thread: MessageThread) => {
-    try {
-      const result = getOtherParticipant(thread);
-      if (!result) {
-        return { id: '', displayName: 'Kullanıcı', avatarUrl: null };
-      }
-      return {
-        id: result.id || '',
-        displayName: result.displayName || 'Kullanıcı',
-        avatarUrl: result.avatarUrl || null,
-      };
-    } catch {
-      return { id: '', displayName: 'Kullanıcı', avatarUrl: null };
-    }
-  };
-
   const filteredThreads = threads.filter(thread => {
     if (!searchQuery) return true;
-    const other = safeGetOther(thread);
-    return other.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           (thread.product?.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const other = getOtherParticipant(thread);
+    return (other?.displayName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+           thread.product?.title?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const unreadCount = getUnreadCount();
@@ -96,16 +79,10 @@ export default function MessagesListScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Mesajlar</Text>
-          {unreadCount > 0 && (
-            <Badge style={styles.headerBadge}>{unreadCount}</Badge>
-          )}
-        </View>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle}>Mesajlar</Text>
+        {unreadCount > 0 && (
+          <Badge style={styles.headerBadge}>{unreadCount}</Badge>
+        )}
       </View>
 
       {/* Message Limit Banner */}
@@ -116,7 +93,7 @@ export default function MessagesListScreen() {
             Günlük mesaj: {dailyMessageCount}/{messageLimit}
           </Text>
           {dailyMessageCount >= messageLimit && (
-            <TouchableOpacity onPress={() => router.push('/upgrade')}>
+            <TouchableOpacity onPress={() => router.push('/pricing')}>
               <Text style={styles.upgradeLink}>Premium'a Geç</Text>
             </TouchableOpacity>
           )}
@@ -158,7 +135,7 @@ export default function MessagesListScreen() {
           }
         >
           {filteredThreads.map((thread) => {
-            const other = safeGetOther(thread);
+            const other = getOtherParticipant(thread);
             const hasUnread = thread.unreadCount > 0;
             
             return (
@@ -168,10 +145,10 @@ export default function MessagesListScreen() {
                 onPress={() => router.push(`/messages/${thread.id}`)}
               >
                 <View style={styles.avatarContainer}>
-                  {other.avatarUrl ? (
+                  {other?.avatarUrl ? (
                     <Avatar.Image size={50} source={{ uri: other.avatarUrl }} />
                   ) : (
-                    <Avatar.Text size={50} label={other.displayName.charAt(0).toUpperCase()} />
+                    <Avatar.Text size={50} label={(other?.displayName || 'K').charAt(0).toUpperCase()} />
                   )}
                   {hasUnread && (
                     <View style={styles.unreadDot} />
@@ -185,7 +162,7 @@ export default function MessagesListScreen() {
                       style={[styles.participantName, hasUnread && styles.unreadText]}
                       numberOfLines={1}
                     >
-                      {other.displayName}
+                      {other?.displayName || 'Kullanıcı'}
                     </Text>
                     <Text variant="bodySmall" style={styles.threadTime}>
                       {thread.lastMessage ? formatTime(thread.lastMessage.createdAt) : formatTime(thread.createdAt)}
@@ -252,11 +229,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     paddingHorizontal: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -66,7 +67,14 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary-500">TARODAN</h1>
+          <Image
+            src="/tarodan-logo.jpg"
+            alt="Tarodan Logo"
+            width={200}
+            height={65}
+            className="mx-auto object-contain"
+            priority
+          />
           <p className="text-gray-400 mt-2">Admin Panel</p>
         </div>
 

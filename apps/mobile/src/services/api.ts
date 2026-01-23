@@ -372,4 +372,27 @@ export const shippingApi = {
   getCarriers: () => api.get('/shipping/carriers'),
 };
 
+// Search API - Elasticsearch ile gerçek arama
+export const searchApi = {
+  // Elasticsearch ile ürün arama
+  products: (params?: {
+    q?: string;
+    categoryId?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    condition?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest';
+  }) => api.get('/search/products', { params }),
+  
+  // Autocomplete önerileri
+  autocomplete: (query: string) => 
+    api.get('/search/autocomplete', { params: { q: query } }),
+    
+  // Kullanıcı arama
+  users: (query: string, limit?: number) =>
+    api.get('/users/search', { params: { q: query, limit } }),
+};
+
 export default api;

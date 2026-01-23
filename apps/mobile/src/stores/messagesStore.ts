@@ -86,8 +86,21 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       const response = await messagesApi.getThreads();
       const threadsData = response.data?.threads || response.data?.data || response.data || [];
       
+      // Normalize thread data - API farklı format dönebilir
+      const normalizedThreads = (Array.isArray(threadsData) ? threadsData : []).map((t: any) => {
+        // API'den otherUser gelebilir veya participant1/participant2 gelebilir
+        const defaultParticipant = { id: '', displayName: 'Kullanıcı', avatarUrl: undefined };
+        
+        return {
+          ...t,
+          participant1: t.participant1 || t.sender || defaultParticipant,
+          participant2: t.participant2 || t.receiver || t.otherUser || defaultParticipant,
+          unreadCount: t.unreadCount || 0,
+        };
+      });
+      
       set({ 
-        threads: Array.isArray(threadsData) ? threadsData : [], 
+        threads: normalizedThreads, 
         isLoading: false 
       });
     } catch (error: any) {
@@ -244,10 +257,44 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const { user } = useAuthStore.getState();
     const currentUserId = user?.id;
     
-    if (thread.participant1Id === currentUserId) {
-      return thread.participant2;
+    // Güvenli varsayılan değer
+    const defaultParticipant = { 
+      id: '', 
+      displayName: 'Kullanıcı', 
+      avatarUrl: undefined 
+    };
+    
+    // Thread yoksa varsayılan dön
+    if (!thread) {
+      return defaultParticipant;
     }
-    return thread.participant1;
+    
+    // API'den otherUser olarak gelebilir
+    if ((thread as any).otherUser) {
+      const otherUser = (thread as any).otherUser;
+      return {
+        id: otherUser.id || '',
+        displayName: otherUser.displayName || otherUser.name || 'Kullanıcı',
+        avatarUrl: otherUser.avatarUrl || otherUser.avatar || undefined,
+      };
+    }
+    
+    // Participant1 ve Participant2 ile kontrol
+    if (thread.participant1Id === currentUserId) {
+      if (!thread.participant2) return defaultParticipant;
+      return {
+        id: thread.participant2.id || '',
+        displayName: thread.participant2.displayName || 'Kullanıcı',
+        avatarUrl: thread.participant2.avatarUrl,
+      };
+    }
+    
+    if (!thread.participant1) return defaultParticipant;
+    return {
+      id: thread.participant1.id || '',
+      displayName: thread.participant1.displayName || 'Kullanıcı',
+      avatarUrl: thread.participant1.avatarUrl,
+    };
   },
 }));
 

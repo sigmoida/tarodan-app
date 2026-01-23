@@ -1,8 +1,13 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 import { TarodanColors } from '../../src/theme';
+import { useMessagesStore } from '../../src/stores/messagesStore';
 
 export default function TabLayout() {
+  const { getUnreadCount } = useMessagesStore();
+  const unreadCount = getUnreadCount();
+
   return (
     <Tabs
       screenOptions={{
@@ -55,11 +60,31 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="trades"
+        name="messages"
         options={{
-          title: 'Takaslar',
+          title: 'Mesajlar',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="swap-horizontal" size={size} color={color} />
+            <View>
+              <Ionicons name="chatbubbles" size={size} color={color} />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  right: -8,
+                  top: -4,
+                  backgroundColor: TarodanColors.error,
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -81,6 +106,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="notifications"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="trades"
         options={{
           href: null,
         }}

@@ -45,26 +45,37 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await wishlistApi.get();
+      console.log('📦 Wishlist raw response:', JSON.stringify(response.data).substring(0, 500));
+      
+      // Backend returns: { id, userId, items: [...], totalItems, createdAt }
+      // items içinde: { id, productId, productTitle, productImage, productPrice, productCondition, sellerId, sellerName, addedAt }
       const wishlistData = response.data?.items || response.data?.data || response.data || [];
       
       // Map API response to our interface
       const items: WishlistItem[] = (Array.isArray(wishlistData) ? wishlistData : [])
-        .filter((item: any) => item && (item.product || item.productId))
+        .filter((item: any) => item && item.productId)
         .map((item: any) => ({
           id: item.id,
-          productId: item.productId || item.product?.id,
-          product: item.product || {
+          productId: item.productId,
+          product: {
             id: item.productId,
-            title: item.title || 'Ürün',
-            price: item.price || 0,
-            images: item.images || [],
-            condition: item.condition || 'good',
-            status: item.status || 'active',
-            seller: item.seller || { id: '', displayName: '' },
+            // Backend doğrudan productTitle, productImage vs. döndürüyor
+            title: item.productTitle || item.product?.title || 'Ürün',
+            price: item.productPrice || item.product?.price || 0,
+            images: item.productImage 
+              ? [{ url: item.productImage }] 
+              : (item.product?.images || []),
+            condition: item.productCondition || item.product?.condition || 'good',
+            status: item.productStatus || item.product?.status || 'active',
+            seller: {
+              id: item.sellerId || item.product?.seller?.id || '',
+              displayName: item.sellerName || item.product?.seller?.displayName || 'Satıcı',
+            },
           },
           addedAt: item.addedAt || item.added_at || new Date().toISOString(),
         }));
 
+      console.log('📦 Parsed wishlist items:', items.length);
       set({ items, isLoading: false });
     } catch (error: any) {
       console.error('Failed to fetch favorites:', error);
