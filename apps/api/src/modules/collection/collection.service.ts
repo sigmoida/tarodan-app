@@ -979,13 +979,10 @@ export class CollectionService {
       .map(like => this.mapCollectionToDto(like.collection, true));
 
     return {
-      data: collections,
-      meta: {
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-      },
+      collections,
+      total,
+      page,
+      pageSize,
     };
   }
 
