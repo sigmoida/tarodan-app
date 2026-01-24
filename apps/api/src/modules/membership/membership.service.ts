@@ -100,6 +100,8 @@ export class MembershipService {
       userId: membership.userId,
       tier: this.mapTierToDto(membership.tier),
       status: membership.status,
+      autoRenew: membership.autoRenew,
+      paymentMethodId: membership.paymentMethodId || undefined,
       currentPeriodStart: membership.currentPeriodStart,
       currentPeriodEnd: membership.currentPeriodEnd,
       cancelledAt: membership.cancelledAt || undefined,
@@ -380,6 +382,58 @@ export class MembershipService {
       data: {
         status: SubscriptionStatus.cancelled,
         cancelledAt: new Date(),
+      },
+    });
+
+    return this.getUserMembership(userId);
+  }
+
+  // ==========================================================================
+  // AUTO-RENEW TOGGLE
+  // ==========================================================================
+  async toggleAutoRenew(
+    userId: string,
+    autoRenew: boolean,
+    paymentMethodId?: string,
+  ): Promise<UserMembershipResponseDto> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+
+    // If enabling auto-renew, require a payment method
+    if (autoRenew && !paymentMethodId) {
+      // Check if user has any payment method
+      const existingMethod = await this.prisma.paymentMethod.findFirst({
+        where: { userId, isDefault: true },
+      });
+      
+      if (!existingMethod) {
+        throw new BadRequestException('Otomatik yenileme için kayıtlı bir kart gereklidir');
+      }
+      paymentMethodId = existingMethod.id;
+    }
+
+    // Validate payment method belongs to user
+    if (paymentMethodId) {
+      const paymentMethod = await this.prisma.paymentMethod.findFirst({
+        where: { id: paymentMethodId, userId },
+      });
+      
+      if (!paymentMethod) {
+        throw new BadRequestException('Geçersiz ödeme yöntemi');
+      }
+    }
+
+    await this.prisma.userMembership.update({
+      where: { userId },
+      data: {
+        autoRenew,
+        paymentMethodId: autoRenew ? paymentMethodId : null,
       },
     });
 
