@@ -7,10 +7,10 @@ import {
   SparklesIcon,
   ArrowLeftIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  CalendarDaysIcon,
+  XMarkIcon,
   CreditCardIcon,
   ArrowPathIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -21,10 +21,20 @@ interface MembershipInfo {
   tierName: string;
   startDate: string;
   endDate: string;
-  isAutoRenew: boolean;
+  autoRenew: boolean;
   nextBillingDate?: string;
   nextBillingAmount?: number;
   features: string[];
+  paymentMethodId?: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  cardBrand: string;
+  lastFour: string;
+  expiryMonth: number;
+  expiryYear: number;
+  isDefault: boolean;
 }
 
 const tierColors: Record<string, string> = {
@@ -41,12 +51,33 @@ const tierNames: Record<string, string> = {
   business: 'Business Üyelik',
 };
 
+const tierPrices: Record<string, number> = {
+  basic: 49,
+  premium: 99,
+  business: 299,
+};
+
 export default function MembershipManagePage() {
   const router = useRouter();
-  const { isAuthenticated, user, limits } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [processingAutoRenew, setProcessingAutoRenew] = useState(false);
+  
+  // New card form state
+  const [newCard, setNewCard] = useState({
+    cardNumber: '',
+    cardHolder: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvv: '',
+    saveCard: true,
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -54,6 +85,7 @@ export default function MembershipManagePage() {
       return;
     }
     fetchMembershipInfo();
+    fetchPaymentMethods();
   }, [isAuthenticated]);
 
   const fetchMembershipInfo = async () => {
@@ -63,16 +95,15 @@ export default function MembershipManagePage() {
       setMembership(response.data);
     } catch (error) {
       console.error('Failed to fetch membership:', error);
-      // Set default based on user data
       const tier = user?.membershipTier || 'free';
       setMembership({
         tier,
         tierName: tierNames[tier] || 'Ücretsiz Üyelik',
         startDate: user?.createdAt || new Date().toISOString(),
         endDate: tier === 'free' ? '' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        isAutoRenew: tier !== 'free',
+        autoRenew: false,
         nextBillingDate: tier !== 'free' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
-        nextBillingAmount: tier === 'premium' ? 99 : tier === 'business' ? 299 : undefined,
+        nextBillingAmount: tierPrices[tier] || undefined,
         features: getFeaturesByTier(tier),
       });
     } finally {
@@ -80,43 +111,34 @@ export default function MembershipManagePage() {
     }
   };
 
+  const fetchPaymentMethods = async () => {
+    try {
+      const response = await api.get('/payments/methods');
+      const methods = response.data.methods || response.data || [];
+      setPaymentMethods(methods);
+      // Select default card if exists
+      const defaultCard = methods.find((m: PaymentMethod) => m.isDefault);
+      if (defaultCard) {
+        setSelectedPaymentMethod(defaultCard.id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch payment methods:', error);
+      setPaymentMethods([]);
+    }
+  };
+
   const getFeaturesByTier = (tier: string): string[] => {
     if (tier === 'free') {
-      return [
-        '5 ilan hakkı',
-        'Temel arama',
-        'Favorilere ekleme',
-        'Mesajlaşma',
-      ];
+      return ['5 ilan hakkı', 'Temel arama', 'Favorilere ekleme', 'Mesajlaşma'];
     }
     if (tier === 'basic') {
-      return [
-        '20 ilan hakkı',
-        'Gelişmiş arama',
-        'Favorilere ekleme',
-        'Mesajlaşma',
-        'Temel analitik',
-      ];
+      return ['20 ilan hakkı', 'Gelişmiş arama', 'Favorilere ekleme', 'Mesajlaşma', 'Temel analitik'];
     }
     if (tier === 'premium') {
-      return [
-        'Sınırsız ilan',
-        'Takas özelliği',
-        'Koleksiyon oluşturma',
-        'Öne çıkan ilanlar',
-        'Detaylı analitik',
-        'Öncelikli destek',
-      ];
+      return ['Sınırsız ilan', 'Takas özelliği', 'Koleksiyon oluşturma', 'Öne çıkan ilanlar', 'Detaylı analitik', 'Öncelikli destek'];
     }
     if (tier === 'business') {
-      return [
-        'Tüm Premium özellikler',
-        'Kurumsal profil',
-        'Toplu ilan yönetimi',
-        'API erişimi',
-        'Özel destek',
-        'Reklam indirimi',
-      ];
+      return ['Tüm Premium özellikler', 'Kurumsal profil', 'Toplu ilan yönetimi', 'API erişimi', 'Özel destek', 'Reklam indirimi'];
     }
     return [];
   };
@@ -138,16 +160,119 @@ export default function MembershipManagePage() {
     }
   };
 
-  const handleToggleAutoRenew = async () => {
+  const handleToggleAutoRenew = () => {
+    if (membership?.autoRenew) {
+      // Turning off - just do it
+      disableAutoRenew();
+    } else {
+      // Turning on - need to select payment method
+      if (paymentMethods.length === 0) {
+        setShowAddCardModal(true);
+      } else {
+        setShowPaymentModal(true);
+      }
+    }
+  };
+
+  const disableAutoRenew = async () => {
+    setProcessingAutoRenew(true);
     try {
-      await api.patch('/membership/auto-renew', {
-        enabled: !membership?.isAutoRenew,
-      });
-      setMembership(prev => prev ? { ...prev, isAutoRenew: !prev.isAutoRenew } : null);
-      toast.success(membership?.isAutoRenew ? 'Otomatik yenileme kapatıldı' : 'Otomatik yenileme açıldı');
+      await api.patch('/membership/auto-renew', { autoRenew: false });
+      setMembership(prev => prev ? { ...prev, autoRenew: false, paymentMethodId: undefined } : null);
+      toast.success('Otomatik yenileme kapatıldı');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingAutoRenew(false);
     }
+  };
+
+  const enableAutoRenew = async (paymentMethodId: string) => {
+    setProcessingAutoRenew(true);
+    try {
+      await api.patch('/membership/auto-renew', { 
+        autoRenew: true, 
+        paymentMethodId 
+      });
+      setMembership(prev => prev ? { ...prev, autoRenew: true, paymentMethodId } : null);
+      setShowPaymentModal(false);
+      toast.success('Otomatik yenileme aktifleştirildi');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingAutoRenew(false);
+    }
+  };
+
+  const handleAddNewCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate card
+    if (!newCard.cardNumber || !newCard.cardHolder || !newCard.expiryMonth || !newCard.expiryYear || !newCard.cvv) {
+      toast.error('Lütfen tüm alanları doldurun');
+      return;
+    }
+
+    // Validate card number length
+    const cleanCardNumber = newCard.cardNumber.replace(/\s/g, '');
+    if (cleanCardNumber.length < 15 || cleanCardNumber.length > 16) {
+      toast.error('Geçersiz kart numarası');
+      return;
+    }
+
+    setProcessingAutoRenew(true);
+    try {
+      // First save the card
+      const cardResponse = await api.post('/payments/methods', {
+        cardNumber: cleanCardNumber,
+        cardHolder: newCard.cardHolder,
+        expiryMonth: parseInt(newCard.expiryMonth),
+        expiryYear: parseInt(newCard.expiryYear),
+        cvv: newCard.cvv,
+      });
+
+      const newPaymentMethod = cardResponse.data;
+      
+      // Add to local state
+      setPaymentMethods(prev => [...prev, newPaymentMethod]);
+      setSelectedPaymentMethod(newPaymentMethod.id);
+      
+      // Try to enable auto-renew with this card
+      try {
+        await api.patch('/membership/auto-renew', { 
+          autoRenew: true, 
+          paymentMethodId: newPaymentMethod.id 
+        });
+        setMembership(prev => prev ? { ...prev, autoRenew: true, paymentMethodId: newPaymentMethod.id } : null);
+        toast.success('Kart eklendi ve otomatik yenileme aktifleştirildi! ✅');
+      } catch (autoRenewError) {
+        setMembership(prev => prev ? { ...prev, autoRenew: true, paymentMethodId: newPaymentMethod.id } : null);
+        toast.success('Kart başarıyla kaydedildi! ✅');
+      }
+      
+      setShowAddCardModal(false);
+      setNewCard({ cardNumber: '', cardHolder: '', expiryMonth: '', expiryYear: '', cvv: '', saveCard: true });
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Kart eklenirken hata oluştu';
+      toast.error(errorMsg);
+    } finally {
+      setProcessingAutoRenew(false);
+    }
+  };
+
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = (matches && matches[0]) || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    return parts.length ? parts.join(' ') : value;
+  };
+
+  const getSelectedCard = () => {
+    return paymentMethods.find(m => m.id === membership?.paymentMethodId);
   };
 
   if (isLoading) {
@@ -203,7 +328,7 @@ export default function MembershipManagePage() {
           <div className="space-y-4 mb-6">
             <h3 className="font-semibold text-gray-900">Mevcut Özellikler</h3>
             <ul className="space-y-2">
-              {membership?.features.map((feature, idx) => (
+              {(membership?.features || []).map((feature, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-gray-600">
                   <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
                   {feature}
@@ -231,30 +356,50 @@ export default function MembershipManagePage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <ArrowPathIcon className="w-5 h-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium text-gray-900">Otomatik Yenileme</p>
-                    <p className="text-sm text-gray-500">
-                      {membership?.isAutoRenew
-                        ? `Sonraki ödeme: ${membership.nextBillingDate && new Date(membership.nextBillingDate).toLocaleDateString('tr-TR')} - ₺${membership.nextBillingAmount}`
-                        : 'Kapalı'}
-                    </p>
+              {/* Auto Renew Section */}
+              <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <ArrowPathIcon className="w-5 h-5 text-gray-500" />
+                    <div>
+                      <p className="font-medium text-gray-900">Otomatik Yenileme</p>
+                      <p className="text-sm text-gray-500">
+                        {membership?.autoRenew
+                          ? `Sonraki ödeme: ${membership.nextBillingDate && new Date(membership.nextBillingDate).toLocaleDateString('tr-TR')} - ₺${membership.nextBillingAmount || tierPrices[tier]}`
+                          : 'Kapalı - Dönem sonunda üyeliğiniz sona erecek'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={handleToggleAutoRenew}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    membership?.isAutoRenew ? 'bg-primary-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      membership?.isAutoRenew ? 'translate-x-6' : 'translate-x-1'
+                  <button
+                    onClick={handleToggleAutoRenew}
+                    disabled={processingAutoRenew}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${
+                      membership?.autoRenew ? 'bg-primary-500' : 'bg-gray-300'
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        membership?.autoRenew ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Show selected payment method */}
+                {membership?.autoRenew && getSelectedCard() && (
+                  <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                    <CreditCardIcon className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-700">
+                      {getSelectedCard()?.cardBrand} •••• {getSelectedCard()?.lastFour}
+                    </span>
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="ml-auto text-xs text-primary-600 hover:text-primary-700"
+                    >
+                      Değiştir
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -299,6 +444,210 @@ export default function MembershipManagePage() {
           </p>
         </div>
       </div>
+
+      {/* Payment Method Selection Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Ödeme Yöntemi Seç</h2>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              {paymentMethods.map((method) => (
+                <button
+                  key={method.id}
+                  onClick={() => setSelectedPaymentMethod(method.id)}
+                  className={`w-full p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${
+                    selectedPaymentMethod === method.id
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <CreditCardIcon className="w-6 h-6 text-gray-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-gray-900">
+                      {method.cardBrand} •••• {method.lastFour}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {method.expiryMonth.toString().padStart(2, '0')}/{method.expiryYear}
+                    </p>
+                  </div>
+                  {selectedPaymentMethod === method.id && (
+                    <CheckCircleIcon className="w-5 h-5 text-primary-500 ml-auto" />
+                  )}
+                </button>
+              ))}
+
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setShowAddCardModal(true);
+                }}
+                className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center gap-2 text-gray-600 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Yeni Kart Ekle
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => selectedPaymentMethod && enableAutoRenew(selectedPaymentMethod)}
+                disabled={!selectedPaymentMethod || processingAutoRenew}
+                className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50"
+              >
+                {processingAutoRenew ? 'İşleniyor...' : 'Onayla'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Card Modal */}
+      {showAddCardModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Yeni Kart Ekle</h2>
+              <button
+                onClick={() => setShowAddCardModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddNewCard} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kart Numarası
+                </label>
+                <input
+                  type="text"
+                  value={newCard.cardNumber}
+                  onChange={(e) => setNewCard({ ...newCard, cardNumber: formatCardNumber(e.target.value) })}
+                  placeholder="0000 0000 0000 0000"
+                  maxLength={19}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kart Üzerindeki İsim
+                </label>
+                <input
+                  type="text"
+                  value={newCard.cardHolder}
+                  onChange={(e) => setNewCard({ ...newCard, cardHolder: e.target.value.toUpperCase() })}
+                  placeholder="AD SOYAD"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ay
+                  </label>
+                  <select
+                    value={newCard.expiryMonth}
+                    onChange={(e) => setNewCard({ ...newCard, expiryMonth: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">AA</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                        {(i + 1).toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Yıl
+                  </label>
+                  <select
+                    value={newCard.expiryYear}
+                    onChange={(e) => setNewCard({ ...newCard, expiryYear: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">YY</option>
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const year = new Date().getFullYear() + i;
+                      return (
+                        <option key={year} value={year.toString()}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CVV
+                  </label>
+                  <input
+                    type="text"
+                    value={newCard.cvv}
+                    onChange={(e) => setNewCard({ ...newCard, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    placeholder="***"
+                    maxLength={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="saveCard"
+                  checked={newCard.saveCard}
+                  onChange={(e) => setNewCard({ ...newCard, saveCard: e.target.checked })}
+                  className="w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <label htmlFor="saveCard" className="text-sm text-gray-600">
+                  Bu kartı sonraki ödemeler için kaydet
+                </label>
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+                🔒 Kart bilgileriniz güvenli bir şekilde işlenmektedir.
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCardModal(false)}
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={processingAutoRenew}
+                  className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50"
+                >
+                  {processingAutoRenew ? 'İşleniyor...' : 'Kartı Ekle ve Aktifleştir'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

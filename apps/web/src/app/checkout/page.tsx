@@ -85,6 +85,18 @@ export default function CheckoutPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [saveCard, setSaveCard] = useState(false);
+  
+  // Saved cards state
+  const [savedCards, setSavedCards] = useState<Array<{
+    id: string;
+    cardBrand: string;
+    lastFour: string;
+    expiryMonth: number;
+    expiryYear: number;
+    isDefault: boolean;
+  }>>([]);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
+  const [useNewCard, setUseNewCard] = useState(true);
 
   // Get checkout items (either from cart or direct buy)
   const checkoutItems: CheckoutItem[] = directProduct ? [directProduct] : cartItems;
@@ -97,8 +109,26 @@ export default function CheckoutPage() {
     }
     if (isAuthenticated) {
       fetchAddresses();
+      fetchSavedCards();
     }
   }, [directProductId, isAuthenticated]);
+
+  const fetchSavedCards = async () => {
+    try {
+      const response = await api.get('/payments/methods');
+      const cards = response.data?.methods || response.data || [];
+      setSavedCards(cards);
+      // Select default card if exists
+      const defaultCard = cards.find((c: any) => c.isDefault);
+      if (defaultCard) {
+        setSelectedSavedCard(defaultCard.id);
+        setUseNewCard(false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch saved cards:', error);
+      setSavedCards([]);
+    }
+  };
 
   // Pre-populate new address form with user's profile info
   useEffect(() => {
@@ -468,8 +498,30 @@ export default function CheckoutPage() {
         }
       }
 
-      // This should not be reached if payment is initiated successfully
-      toast.error('Sipariş oluşturuldu ancak ödeme başlatılamadı');
+      // Save card if requested
+      if (isAuthenticated && saveCard && useNewCard && cardNumber && cardExpiry) {
+        try {
+          const [month, year] = cardExpiry.split('/');
+          await api.post('/payments/methods', {
+            cardNumber: cardNumber.replace(/\s/g, ''),
+            cardHolder: cardName,
+            expiryMonth: parseInt(month),
+            expiryYear: parseInt('20' + year),
+            cvv: cardCvc,
+          });
+          toast.success('Kart bilgileriniz kaydedildi!');
+        } catch (cardError) {
+          console.error('Failed to save card:', cardError);
+          // Don't block checkout for card save failure
+        }
+      }
+
+      toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
+      if (!directProductId) {
+        await clearCart();
+      }
+      
+      // Redirect based on auth status
       if (isAuthenticated) {
         router.push('/orders');
       } else {
@@ -881,85 +933,169 @@ export default function CheckoutPage() {
                     Kart Bilgileri
                   </h3>
                   
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Kart Üzerindeki İsim
-                      </label>
-                      <input
-                        type="text"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value.toUpperCase())}
-                        placeholder="AD SOYAD"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      />
+                  {/* Saved Cards Section */}
+                  {isAuthenticated && savedCards.length > 0 && (
+                    <div className="mb-6">
+                      <p className="text-sm font-medium text-gray-700 mb-3">Kayıtlı Kartlarım</p>
+                      <div className="space-y-2">
+                        {savedCards.map((card) => (
+                          <label
+                            key={card.id}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              !useNewCard && selectedSavedCard === card.id
+                                ? 'border-primary-500 bg-primary-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="savedCard"
+                              checked={!useNewCard && selectedSavedCard === card.id}
+                              onChange={() => {
+                                setSelectedSavedCard(card.id);
+                                setUseNewCard(false);
+                              }}
+                              className="text-primary-500"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">
+                                {card.cardBrand} •••• {card.lastFour}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {card.expiryMonth.toString().padStart(2, '0')}/{card.expiryYear}
+                              </p>
+                            </div>
+                            {card.isDefault && (
+                              <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-full">
+                                Varsayılan
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                        
+                        {/* New Card Option */}
+                        <label
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            useNewCard
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="savedCard"
+                            checked={useNewCard}
+                            onChange={() => setUseNewCard(true)}
+                            className="text-primary-500"
+                          />
+                          <div className="flex items-center gap-2">
+                            <PlusIcon className="w-5 h-5 text-gray-500" />
+                            <span className="font-medium text-gray-900">Yeni Kart ile Öde</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Kart Numarası
-                      </label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '').slice(0, 16);
-                          const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
-                          setCardNumber(formatted);
-                        }}
-                        placeholder="0000 0000 0000 0000"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
+                  )}
+                  
+                  {/* New Card Form - Show when no saved cards or new card selected */}
+                  {(savedCards.length === 0 || useNewCard) && (
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Son Kullanma Tarihi
+                          Kart Üzerindeki İsim
                         </label>
                         <input
                           type="text"
-                          value={cardExpiry}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-                            if (value.length >= 2) {
-                              setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
-                            } else {
-                              setCardExpiry(value);
-                            }
-                          }}
-                          placeholder="AA/YY"
-                          maxLength={5}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          value={cardName}
+                          onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                          placeholder="AD SOYAD"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         />
                       </div>
+                      
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CVV/CVC
+                          Kart Numarası
                         </label>
                         <input
-                          type="password"
-                          value={cardCvc}
-                          onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                          placeholder="•••"
-                          maxLength={4}
+                          type="text"
+                          value={cardNumber}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                            const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+                            setCardNumber(formatted);
+                          }}
+                          placeholder="0000 0000 0000 0000"
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                         />
                       </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Son Kullanma Tarihi
+                          </label>
+                          <input
+                            type="text"
+                            value={cardExpiry}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              if (value.length >= 2) {
+                                setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
+                              } else {
+                                setCardExpiry(value);
+                              }
+                            }}
+                            placeholder="AA/YY"
+                            maxLength={5}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            CVV/CVC
+                          </label>
+                          <input
+                            type="password"
+                            value={cardCvc}
+                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            placeholder="•••"
+                            maxLength={4}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                      
+                      {isAuthenticated && (
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={saveCard}
+                            onChange={(e) => setSaveCard(e.target.checked)}
+                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          />
+                          Bu kartı gelecekteki alışverişlerim için kaydet
+                        </label>
+                      )}
                     </div>
-                    
-                    {isAuthenticated && (
-                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={saveCard}
-                          onChange={(e) => setSaveCard(e.target.checked)}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        Bu kartı gelecekteki alışverişlerim için kaydet
+                  )}
+                  
+                  {/* CVV for saved card */}
+                  {!useNewCard && selectedSavedCard && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        CVV/CVC (Güvenlik için tekrar girin)
                       </label>
-                    )}
-                  </div>
+                      <input
+                        type="password"
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="•••"
+                        maxLength={4}
+                        className="w-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                      />
+                    </div>
+                  )}
                   
                   <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
                     <ShieldCheckIcon className="w-4 h-4 text-green-500" />

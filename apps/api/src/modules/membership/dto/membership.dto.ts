@@ -169,6 +169,8 @@ export class UserMembershipResponseDto {
   userId: string;
   tier: MembershipTierResponseDto;
   status: SubscriptionStatus;
+  autoRenew: boolean;
+  paymentMethodId?: string;
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   cancelledAt?: Date;

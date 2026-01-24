@@ -1230,6 +1230,162 @@ export class PaymentService {
     }));
   }
 
+  // ==========================================================================
+  // PAYMENT METHODS (Saved Cards)
+  // ==========================================================================
+
+  /**
+   * Get user's saved payment methods
+   */
+  async getPaymentMethods(userId: string) {
+    const methods = await this.prisma.paymentMethod.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    return {
+      methods: methods.map(m => ({
+        id: m.id,
+        cardBrand: m.cardBrand,
+        lastFour: m.lastFour,
+        expiryMonth: m.expiryMonth,
+        expiryYear: m.expiryYear,
+        isDefault: m.isDefault,
+        createdAt: m.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Add new payment method
+   * In real implementation, this would tokenize the card via payment provider
+   */
+  async addPaymentMethod(
+    userId: string,
+    dto: { cardNumber: string; cardHolder: string; expiryMonth: number; expiryYear: number; cvv: string },
+  ) {
+    // Extract card brand from card number (simple detection)
+    const cardNumber = dto.cardNumber.replace(/\s/g, '');
+    let cardBrand = 'Kart';
+    
+    if (cardNumber.startsWith('4')) {
+      cardBrand = 'Visa';
+    } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {
+      cardBrand = 'Mastercard';
+    } else if (cardNumber.startsWith('3')) {
+      cardBrand = 'Amex';
+    } else if (cardNumber.startsWith('9')) {
+      cardBrand = 'Troy';
+    }
+
+    const lastFour = cardNumber.slice(-4);
+
+    // Check for duplicate card
+    const existing = await this.prisma.paymentMethod.findFirst({
+      where: {
+        userId,
+        lastFour,
+        expiryMonth: dto.expiryMonth,
+        expiryYear: dto.expiryYear,
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Bu kart zaten kayıtlı');
+    }
+
+    // Check if this is the first card (make it default)
+    const existingCount = await this.prisma.paymentMethod.count({
+      where: { userId },
+    });
+
+    // In real implementation: tokenize card with Iyzico/PayTR
+    // const tokenId = await this.iyzicoService.tokenizeCard(dto);
+
+    const paymentMethod = await this.prisma.paymentMethod.create({
+      data: {
+        userId,
+        cardBrand,
+        lastFour,
+        expiryMonth: dto.expiryMonth,
+        expiryYear: dto.expiryYear,
+        isDefault: existingCount === 0,
+        tokenId: null, // Would be set from payment provider
+      },
+    });
+
+    return {
+      id: paymentMethod.id,
+      cardBrand: paymentMethod.cardBrand,
+      lastFour: paymentMethod.lastFour,
+      expiryMonth: paymentMethod.expiryMonth,
+      expiryYear: paymentMethod.expiryYear,
+      isDefault: paymentMethod.isDefault,
+      createdAt: paymentMethod.createdAt,
+    };
+  }
+
+  /**
+   * Delete a payment method
+   */
+  async deletePaymentMethod(userId: string, id: string) {
+    const method = await this.prisma.paymentMethod.findFirst({
+      where: { id, userId },
+    });
+
+    if (!method) {
+      throw new NotFoundException('Ödeme yöntemi bulunamadı');
+    }
+
+    await this.prisma.paymentMethod.delete({
+      where: { id },
+    });
+
+    // If deleted card was default, set another as default
+    if (method.isDefault) {
+      const nextDefault = await this.prisma.paymentMethod.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (nextDefault) {
+        await this.prisma.paymentMethod.update({
+          where: { id: nextDefault.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Set a payment method as default
+   */
+  async setDefaultPaymentMethod(userId: string, id: string) {
+    const method = await this.prisma.paymentMethod.findFirst({
+      where: { id, userId },
+    });
+
+    if (!method) {
+      throw new NotFoundException('Ödeme yöntemi bulunamadı');
+    }
+
+    // Remove default from all other cards
+    await this.prisma.paymentMethod.updateMany({
+      where: { userId, isDefault: true },
+      data: { isDefault: false },
+    });
+
+    // Set this card as default
+    await this.prisma.paymentMethod.update({
+      where: { id },
+      data: { isDefault: true },
+    });
+
+    return { success: true };
+  }
+
   /**
    * Get user's payment history
    */
