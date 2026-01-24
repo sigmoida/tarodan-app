@@ -24,8 +24,10 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory } from '@prisma/client';
 import { PaymentService } from '../payment/payment.service';
+import { MessagingService } from '../messaging/messaging.service';
+import { SupportService } from '../support/support.service';
 
 @Injectable()
 export class AdminService {
@@ -34,6 +36,8 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
+    private readonly messagingService: MessagingService,
+    private readonly supportService: SupportService,
   ) {}
 
   // ==================== COMMISSION RULES ====================
@@ -343,6 +347,12 @@ export class AdminService {
 
   /**
    * Ban user
+   * - Sets isBanned = true
+   * - Sets bannedAt, bannedReason, bannedBy
+   * - Sets active products to inactive
+   * - Sets pending products to rejected
+   * - Cancels active offers
+   * - All in a transaction (all or nothing)
    */
   async banUser(adminId: string, userId: string, dto: BanUserDto) {
     const user = await this.prisma.user.findUnique({
@@ -353,13 +363,62 @@ export class AdminService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // In a real implementation, you would add a 'banned' field to User model
-    // For now, we'll just log the action
-    await this.createAuditLog(adminId, 'user_ban', 'User', userId, null, { reason: dto.reason });
+    if ((user as any).isBanned) {
+      throw new BadRequestException('Kullanıcı zaten banlı');
+    }
 
-    this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
+    return this.prisma.$transaction(async (tx) => {
+      // 1. User'ı banla
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          isBanned: true,
+          bannedAt: new Date(),
+          bannedReason: dto.reason,
+          bannedBy: adminId,
+        } as any,
+      });
 
-    return { success: true, userId, reason: dto.reason };
+      // 2. Aktif ürünleri inactive yap
+      await tx.product.updateMany({
+        where: {
+          sellerId: userId,
+          status: ProductStatus.active,
+        },
+        data: {
+          status: ProductStatus.inactive,
+        },
+      });
+
+      // 3. Bekleyen ürünleri rejected yap
+      await tx.product.updateMany({
+        where: {
+          sellerId: userId,
+          status: ProductStatus.pending,
+        },
+        data: {
+          status: ProductStatus.rejected,
+        },
+      });
+
+      // 4. Aktif teklifleri cancelled yap (buyer olarak)
+      await tx.offer.updateMany({
+        where: {
+          buyerId: userId,
+          status: OfferStatus.pending,
+        },
+        data: {
+          status: OfferStatus.cancelled,
+        },
+      });
+
+      // 5. Audit log oluştur
+      await this.createAuditLog(adminId, 'user_ban', 'User', userId, user, updatedUser);
+
+      this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
+
+      return { success: true, userId, reason: dto.reason };
+    });
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -1019,6 +1078,9 @@ export class AdminService {
   /**
    * Unban user
    * Requirement: POST /admin/users/:id/unban (7.2)
+   * - Sets isBanned = false
+   * - Clears bannedAt, bannedReason, bannedBy
+   * - Does NOT automatically reactivate products (manual approval required)
    */
   async unbanUser(adminId: string, userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -1029,12 +1091,29 @@ export class AdminService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Log the unban action
-    await this.createAuditLog(adminId, 'user_unban', 'User', userId, null, { unbanned: true });
+    if (!(user as any).isBanned) {
+      throw new BadRequestException('Kullanıcı zaten banlı değil');
+    }
 
-    this.logger.log(`User ${userId} unbanned by admin ${adminId}`);
+    return this.prisma.$transaction(async (tx) => {
+      // 1. User'ı unban yap
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          isBanned: false,
+          bannedAt: null,
+          bannedReason: null,
+          bannedBy: null,
+        } as any,
+      });
 
-    return { success: true, userId };
+      // 2. Audit log oluştur
+      await this.createAuditLog(adminId, 'user_unban', 'User', userId, user, updatedUser);
+
+      this.logger.log(`User ${userId} unbanned by admin ${adminId}`);
+
+      return { success: true, userId };
+    });
   }
 
   /**
@@ -1963,10 +2042,9 @@ export class AdminService {
             buyer: true,
             seller: true,
             product: true,
-            shippingAddress: true,
           },
         },
-        paymentHolds: true,
+        paymentHold: true,
       },
     });
 
@@ -1997,13 +2075,13 @@ export class AdminService {
         product: payment.order.product,
         shippingAddress: payment.order.shippingAddress,
       },
-      paymentHolds: payment.paymentHolds.map((h) => ({
-        id: h.id,
-        amount: Number(h.amount),
-        status: h.status,
-        releaseAt: h.releaseAt,
-        releasedAt: h.releasedAt,
-      })),
+      paymentHold: payment.paymentHold ? {
+        id: payment.paymentHold.id,
+        amount: Number(payment.paymentHold.amount),
+        status: payment.paymentHold.status,
+        releaseAt: payment.paymentHold.releaseAt,
+        releasedAt: payment.paymentHold.releasedAt,
+      } : null,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       paidAt: payment.paidAt,
@@ -2218,11 +2296,8 @@ export class AdminService {
     );
 
     return {
-      success: true,
-      paymentId,
-      refundAmount,
-      reason: reason || 'Admin tarafından manuel iade',
       ...refundResult,
+      reason: reason || 'Admin tarafından manuel iade',
     };
   }
 
@@ -2273,5 +2348,949 @@ export class AdminService {
       message: 'Ödeme zorla iptal edildi',
       reason,
     };
+  }
+
+  // ==================== TRADE MANAGEMENT ====================
+
+  /**
+   * Get trades with filters for admin
+   */
+  async getTrades(query: {
+    status?: TradeStatus;
+    initiatorId?: string;
+    receiverId?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, initiatorId, receiverId, fromDate, toDate, page = 1, limit = 20 } = query;
+
+    const where: Prisma.TradeWhereInput = {};
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (initiatorId) {
+      where.initiatorId = initiatorId;
+    }
+
+    if (receiverId) {
+      where.receiverId = receiverId;
+    }
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        where.createdAt.lte = new Date(toDate);
+      }
+    }
+
+    const [total, trades] = await Promise.all([
+      this.prisma.trade.count({ where }),
+      this.prisma.trade.findMany({
+        where,
+        include: {
+          initiator: { select: { id: true, displayName: true, email: true } },
+          receiver: { select: { id: true, displayName: true, email: true } },
+          initiatorItems: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  price: true,
+                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                },
+              },
+            },
+          },
+          receiverItems: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  price: true,
+                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                },
+              },
+            },
+          },
+          shipments: true,
+          cashPayment: true,
+          dispute: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: trades,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Get trade by ID for admin
+   */
+  async getTradeById(tradeId: string) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      include: {
+        initiator: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+            addresses: true,
+          },
+        },
+        receiver: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+            addresses: true,
+          },
+        },
+        initiatorItems: {
+          include: {
+            product: {
+              include: {
+                images: { orderBy: { sortOrder: 'asc' } },
+                category: true,
+                seller: { select: { id: true, displayName: true } },
+              },
+            },
+          },
+        },
+        receiverItems: {
+          include: {
+            product: {
+              include: {
+                images: { orderBy: { sortOrder: 'asc' } },
+                category: true,
+                seller: { select: { id: true, displayName: true } },
+              },
+            },
+          },
+        },
+        shipments: {
+          include: {
+            events: { orderBy: { eventTime: 'asc' } },
+          },
+        },
+        cashPayment: true,
+        dispute: true,
+      },
+    });
+
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+
+    return trade;
+  }
+
+  /**
+   * Resolve trade dispute or cancel trade
+   */
+  async resolveTrade(adminId: string, tradeId: string, dto: { resolution: string; note?: string }) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      include: {
+        initiatorItems: true,
+        receiverItems: true,
+        dispute: true,
+      },
+    });
+
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Get all trade items
+      const allItems = await tx.tradeItem.findMany({
+        where: { tradeId },
+      });
+
+      const productIds = allItems.map((item) => item.productId);
+
+      let updatedTrade;
+      let newStatus: TradeStatus;
+
+      if (dto.resolution === 'cancel') {
+        // Cancel trade - make products active again
+        newStatus = TradeStatus.cancelled;
+
+        await tx.product.updateMany({
+          where: { id: { in: productIds } },
+          data: { status: ProductStatus.active },
+        });
+
+        updatedTrade = await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: newStatus,
+            cancelledAt: new Date(),
+            cancelReason: dto.note || 'Admin tarafından iptal edildi',
+          },
+        });
+      } else if (dto.resolution === 'favor_initiator' || dto.resolution === 'complete_trade') {
+        // Complete trade
+        newStatus = TradeStatus.completed;
+
+        await tx.product.updateMany({
+          where: { id: { in: productIds } },
+          data: { status: ProductStatus.sold },
+        });
+
+        updatedTrade = await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: newStatus,
+            completedAt: new Date(),
+          },
+        });
+
+        // Update dispute if exists
+        if (trade.dispute) {
+          await tx.tradeDispute.update({
+            where: { tradeId },
+            data: {
+              resolution: dto.resolution,
+              resolvedById: adminId,
+              resolvedAt: new Date(),
+              resolutionNotes: dto.note,
+            },
+          });
+        }
+      } else if (dto.resolution === 'favor_receiver') {
+        // Cancel and return products
+        newStatus = TradeStatus.cancelled;
+
+        await tx.product.updateMany({
+          where: { id: { in: productIds } },
+          data: { status: ProductStatus.active },
+        });
+
+        updatedTrade = await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: newStatus,
+            cancelledAt: new Date(),
+            cancelReason: dto.note || 'Alıcı lehine iptal edildi',
+          },
+        });
+
+        // Update dispute if exists
+        if (trade.dispute) {
+          await tx.tradeDispute.update({
+            where: { tradeId },
+            data: {
+              resolution: dto.resolution,
+              resolvedById: adminId,
+              resolvedAt: new Date(),
+              resolutionNotes: dto.note,
+            },
+          });
+        }
+      } else {
+        throw new BadRequestException('Geçersiz çözüm tipi. Geçerli değerler: cancel, favor_initiator, favor_receiver, complete_trade');
+      }
+
+      // Create audit log
+      await this.createAuditLog(adminId, 'trade_resolve', 'Trade', tradeId, trade, {
+        ...updatedTrade,
+        resolution: dto.resolution,
+        note: dto.note,
+      });
+
+      return { success: true, tradeId, resolution: dto.resolution, status: newStatus };
+    });
+  }
+
+  // ==================== MESSAGE MANAGEMENT ====================
+
+  /**
+   * Get messages for admin moderation
+   */
+  async getMessages(query: {
+    status?: MessageStatus;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, fromDate, toDate, page = 1, limit = 20 } = query;
+
+    const where: Prisma.MessageWhereInput = {};
+
+    if (status) {
+      where.status = status;
+    } else {
+      // Default to pending_approval if no status specified
+      where.status = MessageStatus.pending_approval;
+    }
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        where.createdAt.lte = new Date(toDate);
+      }
+    }
+
+    const [total, messages] = await Promise.all([
+      this.prisma.message.count({ where }),
+      this.prisma.message.findMany({
+        where,
+        include: {
+          sender: { select: { id: true, displayName: true, email: true } },
+          receiver: { select: { id: true, displayName: true, email: true } },
+          thread: { select: { id: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: messages,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Get message by ID for admin
+   */
+  async getMessageById(messageId: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        receiver: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        thread: {
+          include: {
+            messages: {
+              orderBy: { createdAt: 'asc' },
+              take: 50, // Last 50 messages in thread
+            },
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Mesaj bulunamadı');
+    }
+
+    return message;
+  }
+
+  /**
+   * Approve message
+   */
+  async approveMessage(adminId: string, messageId: string, notes?: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Mesaj bulunamadı');
+    }
+
+    // Use MessagingService to approve
+    const result = await this.messagingService.moderateMessage(messageId, adminId, 'approve');
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, {
+      ...result,
+      notes,
+    });
+
+    return { success: true, messageId, status: 'approved' };
+  }
+
+  /**
+   * Reject message
+   */
+  async rejectMessage(adminId: string, messageId: string, reason: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Mesaj bulunamadı');
+    }
+
+    // Use MessagingService to reject
+    await this.messagingService.moderateMessage(messageId, adminId, 'reject');
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, {
+      reason,
+    });
+
+    return { success: true, messageId, status: 'rejected', reason };
+  }
+
+  // ==================== SUPPORT TICKET MANAGEMENT ====================
+
+  /**
+   * Get support tickets with filters for admin
+   */
+  async getSupportTickets(query: {
+    status?: TicketStatus;
+    priority?: TicketPriority;
+    category?: TicketCategory;
+    assigneeId?: string;
+    creatorId?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, priority, category, assigneeId, creatorId, fromDate, toDate, page = 1, limit = 20 } = query;
+
+    // Use SupportService's getAllTickets method
+    const result = await this.supportService.getAllTickets(
+      page,
+      limit,
+      status,
+      priority,
+      category,
+      assigneeId,
+    );
+
+    // Filter by creatorId and date range if provided
+    let filteredTickets = result.tickets;
+
+    if (creatorId) {
+      filteredTickets = filteredTickets.filter((t) => t.creatorId === creatorId);
+    }
+
+    if (fromDate || toDate) {
+      const from = fromDate ? new Date(fromDate) : null;
+      const to = toDate ? new Date(toDate) : null;
+      filteredTickets = filteredTickets.filter((t) => {
+        const createdAt = new Date(t.createdAt);
+        if (from && createdAt < from) return false;
+        if (to && createdAt > to) return false;
+        return true;
+      });
+    }
+
+    return {
+      data: filteredTickets,
+      meta: {
+        total: filteredTickets.length,
+        page,
+        limit,
+        totalPages: Math.ceil(filteredTickets.length / limit),
+      },
+    };
+  }
+
+  /**
+   * Get support ticket by ID for admin
+   */
+  async getSupportTicketById(ticketId: string) {
+    // Use SupportService's getTicketById with admin flag
+    // Pass empty string for userId since admin can view any ticket
+    return this.supportService.getTicketById(ticketId, '', true);
+  }
+
+  /**
+   * Update support ticket
+   */
+  async updateSupportTicket(adminId: string, ticketId: string, dto: {
+    status?: TicketStatus;
+    priority?: TicketPriority;
+    assigneeId?: string;
+    note?: string;
+  }) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Destek talebi bulunamadı');
+    }
+
+    const oldTicket = { ...ticket };
+
+    // Update status if provided
+    if (dto.status) {
+      await this.supportService.updateTicketStatus(ticketId, adminId, {
+        status: dto.status,
+        note: dto.note,
+      });
+    }
+
+    // Update priority if provided
+    if (dto.priority) {
+      await this.supportService.updatePriority(ticketId, dto.priority);
+    }
+
+    // Update assignee if provided
+    if (dto.assigneeId !== undefined) {
+      await this.supportService.assignTicket(ticketId, { assigneeId: dto.assigneeId });
+    }
+
+    const updatedTicket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'support_ticket_update', 'SupportTicket', ticketId, oldTicket, updatedTicket);
+
+    return this.getSupportTicketById(ticketId);
+  }
+
+  /**
+   * Reply to support ticket
+   */
+  async replyToSupportTicket(adminId: string, ticketId: string, message: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Destek talebi bulunamadı');
+    }
+
+    // Use SupportService's addMessage with admin flag
+    await this.supportService.addMessage(ticketId, adminId, { content: message }, true);
+
+    // Update status to in_progress if it was waiting_customer
+    if (ticket.status === TicketStatus.waiting_customer) {
+      await this.supportService.updateTicketStatus(ticketId, adminId, {
+        status: TicketStatus.in_progress,
+      });
+    }
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'support_ticket_reply', 'SupportTicket', ticketId, ticket, {
+      ...ticket,
+      message,
+    });
+
+    return this.getSupportTicketById(ticketId);
+  }
+
+  // ==================== CATEGORY MANAGEMENT ====================
+
+  /**
+   * Generate slug from name
+   */
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  /**
+   * Get categories with tree structure
+   */
+  async getCategories() {
+    const categories = await this.prisma.category.findMany({
+      include: {
+        parent: true,
+        children: { orderBy: { sortOrder: 'asc' } },
+        _count: {
+          select: { products: true },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return {
+      data: categories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        parentId: c.parentId,
+        parent: c.parent ? { id: c.parent.id, name: c.parent.name } : null,
+        children: c.children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          slug: child.slug,
+        })),
+        sortOrder: c.sortOrder,
+        isActive: c.isActive,
+        productCount: c._count.products,
+        createdAt: c.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Create category
+   */
+  async createCategory(adminId: string, dto: {
+    name: string;
+    description?: string;
+    parentId?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }) {
+    // Check if parent exists
+    if (dto.parentId) {
+      const parent = await this.prisma.category.findUnique({
+        where: { id: dto.parentId },
+      });
+
+      if (!parent) {
+        throw new NotFoundException('Üst kategori bulunamadı');
+      }
+    }
+
+    // Generate slug
+    let slug = this.generateSlug(dto.name);
+    let slugExists = await this.prisma.category.findUnique({
+      where: { slug },
+    });
+
+    // If slug exists, append number
+    let counter = 1;
+    while (slugExists) {
+      slug = `${this.generateSlug(dto.name)}-${counter}`;
+      slugExists = await this.prisma.category.findUnique({
+        where: { slug },
+      });
+      counter++;
+    }
+
+    const category = await this.prisma.category.create({
+      data: {
+        name: dto.name,
+        slug,
+        description: dto.description,
+        parentId: dto.parentId,
+        sortOrder: dto.sortOrder || 0,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
+      },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'category_create', 'Category', category.id, null, category);
+
+    return category;
+  }
+
+  /**
+   * Update category
+   */
+  async updateCategory(adminId: string, categoryId: string, dto: {
+    name?: string;
+    description?: string;
+    parentId?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }) {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      include: { children: true },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Kategori bulunamadı');
+    }
+
+    // Check circular reference if parentId is being changed
+    if (dto.parentId && dto.parentId !== category.parentId) {
+      // Check if new parent is a child of this category
+      const isChild = category.children.some((child) => child.id === dto.parentId);
+      if (isChild) {
+        throw new BadRequestException('Kategori kendi alt kategorisini üst kategori olarak seçemez');
+      }
+
+      // Check if new parent exists
+      const newParent = await this.prisma.category.findUnique({
+        where: { id: dto.parentId },
+      });
+
+      if (!newParent) {
+        throw new NotFoundException('Üst kategori bulunamadı');
+      }
+    }
+
+    // Generate new slug if name changed
+    let slug = category.slug;
+    if (dto.name && dto.name !== category.name) {
+      slug = this.generateSlug(dto.name);
+      const slugExists = await this.prisma.category.findUnique({
+        where: { slug },
+      });
+
+      if (slugExists && slugExists.id !== categoryId) {
+        // Slug exists for another category, append number
+        let counter = 1;
+        while (slugExists) {
+          slug = `${this.generateSlug(dto.name)}-${counter}`;
+          const check = await this.prisma.category.findUnique({
+            where: { slug },
+          });
+          if (!check || check.id === categoryId) break;
+          counter++;
+        }
+      }
+    }
+
+    const oldCategory = { ...category };
+    const updatedCategory = await this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        name: dto.name,
+        slug,
+        description: dto.description,
+        parentId: dto.parentId,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'category_update', 'Category', categoryId, oldCategory, updatedCategory);
+
+    return updatedCategory;
+  }
+
+  /**
+   * Delete category
+   */
+  async deleteCategory(adminId: string, categoryId: string) {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      include: {
+        children: true,
+        _count: {
+          select: { products: true },
+        },
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Kategori bulunamadı');
+    }
+
+    // Check if category has products
+    if (category._count.products > 0) {
+      throw new BadRequestException('Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.');
+    }
+
+    // Check if category has children
+    if (category.children.length > 0) {
+      throw new BadRequestException('Bu kategorinin alt kategorileri bulunmaktadır. Önce alt kategorileri silin.');
+    }
+
+    await this.prisma.category.delete({
+      where: { id: categoryId },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'category_delete', 'Category', categoryId, category, null);
+
+    return { success: true, categoryId };
+  }
+
+  // ==================== MEMBERSHIP TIER MANAGEMENT ====================
+
+  /**
+   * Get membership tiers
+   */
+  async getMembershipTiers() {
+    const tiers = await this.prisma.membershipTier.findMany({
+      include: {
+        _count: {
+          select: { userMemberships: true },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return {
+      data: tiers.map((t) => ({
+        id: t.id,
+        type: t.type,
+        name: t.name,
+        description: t.description,
+        monthlyPrice: Number(t.monthlyPrice),
+        yearlyPrice: Number(t.yearlyPrice),
+        maxFreeListings: t.maxFreeListings,
+        maxTotalListings: t.maxTotalListings,
+        maxImagesPerListing: t.maxImagesPerListing,
+        canCreateCollections: t.canCreateCollections,
+        canTrade: t.canTrade,
+        isAdFree: t.isAdFree,
+        featuredListingSlots: t.featuredListingSlots,
+        commissionDiscount: Number(t.commissionDiscount),
+        isActive: t.isActive,
+        sortOrder: t.sortOrder,
+        userCount: t._count.userMemberships,
+        createdAt: t.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Update membership tier
+   */
+  async updateMembershipTier(adminId: string, tierId: string, dto: {
+    name?: string;
+    description?: string;
+    monthlyPrice?: number;
+    yearlyPrice?: number;
+    maxFreeListings?: number;
+    maxTotalListings?: number;
+    maxImagesPerListing?: number;
+    canCreateCollections?: boolean;
+    canTrade?: boolean;
+    isAdFree?: boolean;
+    featuredListingSlots?: number;
+    commissionDiscount?: number;
+    isActive?: boolean;
+    sortOrder?: number;
+  }) {
+    const tier = await this.prisma.membershipTier.findUnique({
+      where: { id: tierId },
+    });
+
+    if (!tier) {
+      throw new NotFoundException('Üyelik seviyesi bulunamadı');
+    }
+
+    const oldTier = { ...tier };
+
+    const updatedTier = await this.prisma.membershipTier.update({
+      where: { id: tierId },
+      data: {
+        name: dto.name,
+        description: dto.description,
+        monthlyPrice: dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
+        yearlyPrice: dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
+        maxFreeListings: dto.maxFreeListings,
+        maxTotalListings: dto.maxTotalListings,
+        maxImagesPerListing: dto.maxImagesPerListing,
+        canCreateCollections: dto.canCreateCollections,
+        canTrade: dto.canTrade,
+        isAdFree: dto.isAdFree,
+        featuredListingSlots: dto.featuredListingSlots,
+        commissionDiscount: dto.commissionDiscount !== undefined ? dto.commissionDiscount : undefined,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
+      },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'membership_tier_update', 'MembershipTier', tierId, oldTier, updatedTier);
+
+    return updatedTier;
+  }
+
+  // ==================== PRODUCT DELETION (ADMIN) ====================
+
+  /**
+   * Delete product (admin only)
+   * - Cannot delete sold products
+   * - Cannot delete reserved products
+   * - Cannot delete products with active orders
+   * - Soft delete (inactive) or hard delete based on conditions
+   */
+  async deleteProduct(adminId: string, productId: string, hardDelete: boolean = false) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        orders: {
+          where: {
+            status: {
+              in: [OrderStatus.pending_payment, OrderStatus.paid, OrderStatus.preparing, OrderStatus.shipped],
+            },
+          },
+        },
+        _count: {
+          select: { offers: true, orders: true },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // Check if product is sold
+    if (product.status === ProductStatus.sold) {
+      throw new BadRequestException('Satılmış ürünler silinemez');
+    }
+
+    // Check if product is reserved
+    if (product.status === ProductStatus.reserved) {
+      throw new BadRequestException('Rezerve edilmiş ürünler silinemez');
+    }
+
+    // Check if product has active orders
+    if (product.orders.length > 0) {
+      throw new BadRequestException('Aktif siparişi olan ürünler silinemez');
+    }
+
+    const oldProduct = { ...product };
+
+    if (hardDelete && product._count.offers === 0 && product._count.orders === 0) {
+      // Hard delete - only if no offers and no orders
+      await this.prisma.product.delete({
+        where: { id: productId },
+      });
+
+      // Create audit log
+      await this.createAuditLog(adminId, 'product_delete_hard', 'Product', productId, oldProduct, null);
+
+      return { success: true, productId, deleted: true };
+    } else {
+      // Soft delete - set to inactive
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: { status: ProductStatus.inactive },
+      });
+
+      // Create audit log
+      await this.createAuditLog(adminId, 'product_delete_soft', 'Product', productId, oldProduct, {
+        ...oldProduct,
+        status: ProductStatus.inactive,
+      });
+
+      return { success: true, productId, deleted: false, status: 'inactive' };
+    }
   }
 }

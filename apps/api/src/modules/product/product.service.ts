@@ -42,6 +42,11 @@ export class ProductService {
       throw new ForbiddenException('Kullanıcı bulunamadı');
     }
 
+    // Check if user is banned
+    if (seller.isBanned) {
+      throw new ForbiddenException('Hesabınız banlanmış. Yeni ürün ekleyemezsiniz.');
+    }
+
     // ========================================================================
     // MEMBERSHIP LISTING LIMIT CHECK
     // ========================================================================
@@ -353,6 +358,16 @@ export class ProductService {
     // Verify ownership
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('Bu ürünü düzenleme yetkiniz yok');
+    }
+
+    // Check if user is banned
+    const seller = await this.prisma.user.findUnique({
+      where: { id: sellerId },
+      select: { isBanned: true },
+    });
+
+    if (seller?.isBanned) {
+      throw new ForbiddenException('Hesabınız banlanmış. Ürün düzenleyemezsiniz.');
     }
 
     // Cannot update sold or reserved products

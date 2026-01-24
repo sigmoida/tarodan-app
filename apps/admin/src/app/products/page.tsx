@@ -270,12 +270,13 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Link
+                            href={`/admin/products/${product.id}`}
                             className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
-                          </button>
+                          </Link>
                           {product.status === 'pending' && (
                             <>
                               <button

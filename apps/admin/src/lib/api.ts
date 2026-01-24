@@ -92,7 +92,7 @@ export const adminApi = {
   getUsers: (params?: any) => api.get('/admin/users', { params }),
   getUser: (id: string) => api.get(`/admin/users/${id}`),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
-  banUser: (id: string) => api.post(`/admin/users/${id}/ban`),
+  banUser: (id: string, reason: string) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
   
   // Products
@@ -116,9 +116,10 @@ export const adminApi = {
   resolveTrade: (id: string, resolution: any) => api.post(`/admin/trades/${id}/resolve`, resolution),
   
   // Messages
-  getMessages: (params?: any) => api.get('/messages/admin/pending', { params }),
-  approveMessage: (id: string) => api.post(`/messages/admin/${id}/moderate`, { action: 'approve' }),
-  rejectMessage: (id: string) => api.post(`/messages/admin/${id}/moderate`, { action: 'reject' }),
+  getMessages: (params?: any) => api.get('/admin/messages', { params }),
+  getMessage: (id: string) => api.get(`/admin/messages/${id}`),
+  approveMessage: (id: string, notes?: string) => api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
+  rejectMessage: (id: string, reason: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
   
   // Support Tickets
   getTickets: (params?: any) => api.get('/admin/support-tickets', { params }),
@@ -150,7 +151,7 @@ export const adminApi = {
   updateMembershipTier: (id: string, data: any) => api.patch(`/admin/membership-tiers/${id}`, data),
   
   // Categories
-  getCategories: () => api.get('/categories'),
+  getCategories: () => api.get('/admin/categories'),
   createCategory: (data: any) => api.post('/admin/categories', data),
   updateCategory: (id: string, data: any) => api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),

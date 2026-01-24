@@ -4,6 +4,7 @@ export * from './auth.controller';
 export * from './admin-auth.controller';
 export * from './dto';
 export * from './guards';
+export * from './guards/banned-user.guard';
 export * from './decorators';
 export * from './interfaces';
 export * from './strategies';
