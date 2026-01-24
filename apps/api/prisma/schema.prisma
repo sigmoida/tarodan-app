@@ -35,7 +35,7 @@ model User {
   bannedAt                DateTime?                @map("banned_at")
   bannedReason            String?                  @map("banned_reason")
   bannedBy                String?                  @map("banned_by")
-  createdAt               DateTime                 @default(now()) @map("created_at")                @default(now()) @map("created_at")
+  createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
   birthDate               DateTime?                @map("birth_date")
   addresses               Address[]
