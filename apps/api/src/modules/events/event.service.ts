@@ -96,6 +96,34 @@ export interface OfferAcceptedPayload {
   sellerName: string;
 }
 
+export interface PaymentFailedPayload {
+  paymentId: string;
+  orderId: string;
+  orderNumber: string;
+  buyerId: string;
+  buyerEmail: string;
+  buyerName: string;
+  amount: number;
+  provider: string;
+  failureReason: string;
+}
+
+export interface PaymentRefundedPayload {
+  paymentId: string;
+  orderId: string;
+  orderNumber: string;
+  buyerId: string;
+  buyerEmail: string;
+  buyerName: string;
+  sellerId: string;
+  sellerEmail: string;
+  sellerName: string;
+  refundAmount: number;
+  totalAmount: number;
+  provider: string;
+  providerRefundId: string;
+}
+
 @Injectable()
 export class EventService {
   private readonly logger = new Logger(EventService.name);
@@ -470,5 +498,125 @@ export class EventService {
     });
 
     this.logger.log(`offer.accepted event emitted for offer ${payload.offerId}`);
+  }
+
+  /**
+   * Emit payment.failed event
+   * - Sends email notification to buyer about payment failure
+   * - Sends push notification to buyer
+   */
+  async emitPaymentFailed(payload: PaymentFailedPayload): Promise<void> {
+    this.logger.log(`Emitting payment.failed event for order ${payload.orderNumber}`);
+
+    // Queue email to buyer - Payment failed
+    await this.emailQueue.add('send-template', {
+      to: payload.buyerEmail,
+      template: 'payment-failed',
+      subject: `Ödeme Başarısız - ${payload.orderNumber}`,
+      templateData: {
+        orderNumber: payload.orderNumber,
+        buyerName: payload.buyerName,
+        amount: payload.amount,
+        provider: payload.provider,
+        failureReason: payload.failureReason,
+        orderId: payload.orderId,
+      },
+    }, {
+      priority: 1,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+
+    // Queue push notification to buyer
+    await this.pushQueue.add('send-notification', {
+      userId: payload.buyerId,
+      title: 'Ödeme Başarısız',
+      body: `Sipariş ${payload.orderNumber} için ödeme başarısız oldu.`,
+      data: {
+        type: 'payment_failed',
+        orderId: payload.orderId,
+        orderNumber: payload.orderNumber,
+      },
+    }, {
+      priority: 1,
+    });
+
+    this.logger.log(`payment.failed event emitted for order ${payload.orderNumber}`);
+  }
+
+  /**
+   * Emit payment.refunded event
+   * - Sends email notification to buyer and seller about refund
+   * - Sends push notifications
+   */
+  async emitPaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
+    this.logger.log(`Emitting payment.refunded event for order ${payload.orderNumber}`);
+
+    // Queue email to buyer - Refund processed
+    await this.emailQueue.add('send-template', {
+      to: payload.buyerEmail,
+      template: 'payment-refunded',
+      subject: `İade İşlemi Tamamlandı - ${payload.orderNumber}`,
+      templateData: {
+        orderNumber: payload.orderNumber,
+        buyerName: payload.buyerName,
+        refundAmount: payload.refundAmount,
+        totalAmount: payload.totalAmount,
+        provider: payload.provider,
+        orderId: payload.orderId,
+      },
+    }, {
+      priority: 1,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+
+    // Queue email to seller - Refund notification
+    await this.emailQueue.add('send-template', {
+      to: payload.sellerEmail,
+      template: 'payment-refunded-seller',
+      subject: `İade İşlemi - ${payload.orderNumber}`,
+      templateData: {
+        orderNumber: payload.orderNumber,
+        sellerName: payload.sellerName,
+        refundAmount: payload.refundAmount,
+        totalAmount: payload.totalAmount,
+        orderId: payload.orderId,
+      },
+    }, {
+      priority: 1,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+
+    // Queue push notification to buyer
+    await this.pushQueue.add('send-notification', {
+      userId: payload.buyerId,
+      title: 'İade İşlemi Tamamlandı',
+      body: `Sipariş ${payload.orderNumber} için ${payload.refundAmount.toFixed(2)} TL iade edildi.`,
+      data: {
+        type: 'payment_refunded',
+        orderId: payload.orderId,
+        orderNumber: payload.orderNumber,
+      },
+    }, {
+      priority: 1,
+    });
+
+    // Queue push notification to seller
+    await this.pushQueue.add('send-notification', {
+      userId: payload.sellerId,
+      title: 'İade İşlemi',
+      body: `Sipariş ${payload.orderNumber} için iade işlemi gerçekleştirildi.`,
+      data: {
+        type: 'payment_refunded',
+        orderId: payload.orderId,
+        orderNumber: payload.orderNumber,
+      },
+    }, {
+      priority: 1,
+    });
+
+    this.logger.log(`payment.refunded event emitted for order ${payload.orderNumber}`);
   }
 }

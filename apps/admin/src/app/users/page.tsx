@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import {
@@ -212,12 +213,13 @@ export default function UsersPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
-                          <button
+                          <Link
+                            href={`/admin/users/${user.id}`}
                             className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
-                          </button>
+                          </Link>
                           <button
                             onClick={() => handleBanUser(user.id, user.isBanned)}
                             className={`p-2 rounded-lg ${

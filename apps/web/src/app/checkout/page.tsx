@@ -431,24 +431,45 @@ export default function CheckoutPage() {
         const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
         
         if (orderId) {
-          // TESTING MODE: Skip payment, directly mark as paid
+          // Initiate payment for the order
           try {
-            await api.patch(`/orders/${orderId}/status`, { 
-              status: 'paid',
-              paymentStatus: 'completed'
-            });
-          } catch (statusError) {
-            console.log('Order status update skipped:', statusError);
+            const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
+            const paymentData = paymentResponse.data;
+
+            // Clear cart before redirecting to payment
+            if (!directProductId) {
+              await clearCart();
+            }
+
+            // Redirect to payment page
+            if (paymentData.paymentUrl) {
+              // For Iyzico, redirect directly to payment URL
+              if (paymentProvider === 'iyzico' && paymentData.paymentUrl.startsWith('http')) {
+                window.location.href = paymentData.paymentUrl;
+                return;
+              }
+              // For PayTR or other cases, go to payment page
+              router.push(`/payment/${paymentData.paymentId}`);
+              return;
+            } else if (paymentData.paymentId) {
+              router.push(`/payment/${paymentData.paymentId}`);
+              return;
+            } else {
+              throw new Error('Ödeme başlatılamadı');
+            }
+          } catch (paymentError: any) {
+            console.error('Payment initiation failed:', paymentError);
+            toast.error(
+              paymentError.response?.data?.message || 
+              'Ödeme başlatılamadı. Lütfen tekrar deneyin.'
+            );
+            throw paymentError;
           }
         }
       }
 
-      toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
-      if (!directProductId) {
-        await clearCart();
-      }
-      
-      // Redirect based on auth status
+      // This should not be reached if payment is initiated successfully
+      toast.error('Sipariş oluşturuldu ancak ödeme başlatılamadı');
       if (isAuthenticated) {
         router.push('/orders');
       } else {

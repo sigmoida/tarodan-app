@@ -1,15 +1,30 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
+import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PrismaModule } from '../../prisma';
 import { PaymentProvidersModule } from '../payment-providers';
 import { EventModule } from '../events';
+import { RawBodyMiddleware } from './middleware/raw-body.middleware';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, PaymentProvidersModule, EventModule],
+  imports: [
+    PrismaModule,
+    ConfigModule,
+    PaymentProvidersModule,
+    EventModule,
+    ScheduleModule.forRoot(),
+  ],
   controllers: [PaymentController],
-  providers: [PaymentService],
+  providers: [PaymentService, PaymentSchedulerService, RawBodyMiddleware],
   exports: [PaymentService],
 })
-export class PaymentModule {}
+export class PaymentModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RawBodyMiddleware)
+      .forRoutes('payments/callback/iyzico', 'payments/callback/paytr');
+  }
+}

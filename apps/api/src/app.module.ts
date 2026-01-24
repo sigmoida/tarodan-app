@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma';
-import { AuthModule, JwtAuthGuard } from './modules/auth';
+import { AuthModule, JwtAuthGuard, BannedUserGuard } from './modules/auth';
 import { UserModule } from './modules/user';
 import { ProductModule } from './modules/product';
 import { CategoryModule } from './modules/category';
@@ -143,6 +143,11 @@ import { EventModule } from './modules/events';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    // Global Banned User Guard (prevents banned users from accessing API)
+    {
+      provide: APP_GUARD,
+      useClass: BannedUserGuard,
     },
   ],
 })

@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AdminAuthController } from './admin-auth.controller';
 import { JwtStrategy, JwtRefreshStrategy, AdminJwtStrategy } from './strategies';
 import { NotificationModule } from '../notification/notification.module';
+import { BannedUserGuard } from './guards/banned-user.guard';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { NotificationModule } from '../notification/notification.module';
     JwtStrategy,
     JwtRefreshStrategy,
     AdminJwtStrategy,
+    BannedUserGuard,
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, BannedUserGuard],
 })
 export class AuthModule {}

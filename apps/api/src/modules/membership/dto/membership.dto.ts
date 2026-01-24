@@ -198,3 +198,6 @@ export class MembershipLimitsDto {
   tierName: string;
   tierType: MembershipTierType;
 }
+
+// Re-export payment DTOs
+export * from './membership-payment.dto';
