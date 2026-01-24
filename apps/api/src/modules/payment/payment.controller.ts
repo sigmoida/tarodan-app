@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -35,7 +37,6 @@ export class PaymentController {
 
   /**
    * POST /payments/initiate - Initiate payment
-   * Requirement: PayTR & Iyzico integration (project.md)
    */
   @Post('initiate')
   @UseGuards(JwtAuthGuard)
@@ -46,10 +47,6 @@ export class PaymentController {
     description: 'Payment initiated',
     type: PaymentInitResponseDto,
   })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid order or payment not allowed',
-  })
   async initiatePayment(
     @CurrentUser('id') userId: string,
     @Body() dto: InitiatePaymentDto,
@@ -59,29 +56,104 @@ export class PaymentController {
 
   /**
    * POST /payments/callback/iyzico - Iyzico webhook
-   * Public endpoint for payment provider callbacks
    */
   @Post('callback/iyzico')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Iyzico payment callback (webhook)' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Callback processed' })
   async iyzicoCallback(@Body() dto: IyzicoCallbackDto) {
     return this.paymentService.handleIyzicoCallback(dto);
   }
 
   /**
    * POST /payments/callback/paytr - PayTR webhook
-   * Public endpoint for payment provider callbacks
    */
   @Post('callback/paytr')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'PayTR payment callback (webhook)' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Callback processed' })
   async paytrCallback(@Body() dto: PayTRCallbackDto) {
     return this.paymentService.handlePayTRCallback(dto);
   }
+
+  // ============================================================
+  // PAYMENT METHODS - Must be BEFORE :id routes
+  // ============================================================
+
+  /**
+   * GET /payments/methods - Get user's saved payment methods
+   */
+  @Get('methods')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get saved payment methods' })
+  async getPaymentMethods(@CurrentUser('id') userId: string) {
+    return this.paymentService.getPaymentMethods(userId);
+  }
+
+  /**
+   * POST /payments/methods - Add new payment method
+   */
+  @Post('methods')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add new payment method' })
+  async addPaymentMethod(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { cardNumber: string; cardHolder: string; expiryMonth: number; expiryYear: number; cvv: string },
+  ) {
+    return this.paymentService.addPaymentMethod(userId, dto);
+  }
+
+  /**
+   * DELETE /payments/methods/:id - Delete payment method
+   */
+  @Delete('methods/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete payment method' })
+  @ApiParam({ name: 'id', description: 'Payment method ID' })
+  async deletePaymentMethod(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.paymentService.deletePaymentMethod(userId, id);
+  }
+
+  /**
+   * PATCH /payments/methods/:id/default - Set as default payment method
+   */
+  @Patch('methods/:id/default')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set default payment method' })
+  @ApiParam({ name: 'id', description: 'Payment method ID' })
+  async setDefaultPaymentMethod(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.paymentService.setDefaultPaymentMethod(userId, id);
+  }
+
+  // ============================================================
+  // HOLDS - Must be BEFORE :id routes  
+  // ============================================================
+
+  /**
+   * GET /payments/holds/me - Get seller's payment holds
+   */
+  @Get('holds/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current seller\'s payment holds' })
+  async getMyHolds(@CurrentUser('id') userId: string): Promise<PaymentHoldResponseDto[]> {
+    return this.paymentService.getSellerHolds(userId);
+  }
+
+  // ============================================================
+  // GENERIC :id routes - Must be LAST
+  // ============================================================
 
   /**
    * GET /payments/:id - Get payment details
@@ -91,33 +163,10 @@ export class PaymentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get payment details' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Payment details',
-    type: PaymentResponseDto,
-  })
   async findOne(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
   ): Promise<PaymentResponseDto> {
     return this.paymentService.findOne(id, userId);
-  }
-
-  /**
-   * GET /payments/holds/me - Get seller's payment holds
-   */
-  @Get('holds/me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current seller\'s payment holds' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of payment holds',
-    type: [PaymentHoldResponseDto],
-  })
-  async getMyHolds(
-    @CurrentUser('id') userId: string,
-  ): Promise<PaymentHoldResponseDto[]> {
-    return this.paymentService.getSellerHolds(userId);
   }
 }

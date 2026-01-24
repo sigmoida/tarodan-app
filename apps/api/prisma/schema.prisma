@@ -57,11 +57,31 @@ model User {
   membership              UserMembership?
   wishlist                Wishlist?
 
+  paymentMethods          PaymentMethod[]
+  productLikes            ProductLike[]
+  collectionLikes         CollectionLike[]
   @@index([email])
   @@index([isSeller])
   @@map("users")
 }
 
+
+model PaymentMethod {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  cardBrand   String   @map("card_brand")
+  lastFour    String   @map("last_four")
+  expiryMonth Int      @map("expiry_month")
+  expiryYear  Int      @map("expiry_year")
+  isDefault   Boolean  @default(false) @map("is_default")
+  tokenId     String?  @map("token_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("payment_methods")
+}
 model TwoFactorSecret {
   id          String   @id @default(uuid())
   userId      String   @unique @map("user_id")
@@ -201,6 +221,8 @@ model UserMembership {
   userId             String              @unique @map("user_id")
   tierId             String              @map("tier_id")
   status             SubscriptionStatus  @default(active)
+  autoRenew          Boolean             @default(false) @map("auto_renew")
+  paymentMethodId    String?             @map("payment_method_id")
   currentPeriodStart DateTime            @map("current_period_start")
   currentPeriodEnd   DateTime            @map("current_period_end")
   cancelledAt        DateTime?           @map("cancelled_at")
@@ -258,10 +280,12 @@ model Product {
   status            ProductStatus    @default(pending)
   isTradeEnabled    Boolean          @default(false) @map("is_trade_enabled")
   viewCount         Int              @default(0) @map("view_count")
+  likeCount         Int              @default(0) @map("like_count")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   version           Int              @default(1)
   collectionItems   CollectionItem[]
+  likes             ProductLike[]
   offers            Offer[]
   orders            Order[]
   images            ProductImage[]
@@ -290,6 +314,19 @@ model ProductImage {
   @@map("product_images")
 }
 
+model ProductLike {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([userId])
+  @@map("product_likes")
+}
+
 model Trade {
   id                   String            @id @default(uuid())
   tradeNumber          String            @unique @map("trade_number")
@@ -315,6 +352,7 @@ model Trade {
   cashPayment          TradeCashPayment?
   dispute              TradeDispute?
   initiatorItems       TradeItem[]       @relation("TradeInitiatorItems")
+  receiverItems        TradeItem[]       @relation("TradeReceiverItems")
   messages             TradeMessage[]
   shipments            TradeShipment[]
   initiator            User              @relation("TradeInitiator", fields: [initiatorId], references: [id])
@@ -335,7 +373,8 @@ model TradeItem {
   quantity             Int      @default(1)
   valueAtTrade         Decimal  @map("value_at_trade") @db.Decimal(10, 2)
   createdAt            DateTime @default(now()) @map("created_at")
-  tradeAsInitiatorItem Trade    @relation("TradeInitiatorItems", fields: [tradeId], references: [id], onDelete: Cascade, map: "trade_initiator_items_fk")
+  tradeAsInitiatorItem Trade?   @relation("TradeInitiatorItems", fields: [tradeId], references: [id], onDelete: Cascade, map: "trade_initiator_items_fk")
+  tradeAsReceiverItem  Trade?   @relation("TradeReceiverItems", fields: [tradeId], references: [id], onDelete: Cascade, map: "trade_receiver_items_fk")
   product              Product  @relation("TradeItemProduct", fields: [productId], references: [id])
 
   @@index([tradeId])
@@ -560,6 +599,7 @@ model Collection {
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
   items         CollectionItem[]
+  likes         CollectionLike[]
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, slug])
@@ -580,6 +620,19 @@ model CollectionItem {
 
   @@unique([collectionId, productId])
   @@map("collection_items")
+}
+
+model CollectionLike {
+  id           String     @id @default(uuid())
+  collectionId String     @map("collection_id")
+  userId       String     @map("user_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, userId])
+  @@index([userId])
+  @@map("collection_likes")
 }
 
 model SupportTicket {

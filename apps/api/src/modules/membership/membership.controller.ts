@@ -90,6 +90,18 @@ export class MembershipController {
     return this.membershipService.cancelSubscription(req.user.id);
   }
 
+  /**
+   * Toggle auto-renew setting
+   * PATCH /membership/auto-renew
+   */
+  @Patch('auto-renew')
+  async toggleAutoRenew(
+    @Request() req: any,
+    @Body() dto: { autoRenew: boolean; paymentMethodId?: string },
+  ): Promise<UserMembershipResponseDto> {
+    return this.membershipService.toggleAutoRenew(req.user.id, dto.autoRenew, dto.paymentMethodId);
+  }
+
   // ==========================================================================
   // ADMIN ENDPOINTS
   // ==========================================================================
