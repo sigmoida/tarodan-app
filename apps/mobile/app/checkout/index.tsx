@@ -3,9 +3,9 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoiding
 import { Text, TextInput, Button, RadioButton, Divider, ActivityIndicator, Snackbar } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
-import { useCartStore } from '../src/stores/cartStore';
-import { api } from '../src/services/api';
+import { TarodanColors } from '../../src/theme';
+import { useCartStore } from '../../src/stores/cartStore';
+import { api } from '../../src/services/api';
 
 interface ShippingAddress {
   fullName: string;
@@ -109,6 +109,12 @@ export default function CheckoutScreen() {
       showSnackbar('Teslimat adresi için ad soyad girin');
       return false;
     }
+    // Phone for shipping address - use guest phone if not filled
+    const addressPhone = shippingAddress.phone?.trim() || guestPhone.trim();
+    if (!addressPhone || addressPhone.length < 10) {
+      showSnackbar('Teslimat adresi için telefon numarası girin');
+      return false;
+    }
     if (!shippingAddress.city.trim()) {
       showSnackbar('Şehir seçin');
       return false;
@@ -143,24 +149,36 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Validate all items have valid productIds
+    for (const item of items) {
+      if (!item.productId || typeof item.productId !== 'string' || item.productId.length < 10) {
+        Alert.alert('Hata', `Geçersiz ürün ID: ${item.title}`);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       // Create order for each item
       for (const item of items) {
-        await api.post('/orders/guest', {
+        const addressPhone = (shippingAddress.phone?.trim() || guestPhone.trim());
+        const orderData = {
           productId: item.productId,
-          email: guestEmail,
-          phone: guestPhone,
-          guestName: guestName,
+          email: guestEmail.trim().toLowerCase(),
+          phone: guestPhone.trim(),
+          guestName: guestName.trim(),
           shippingAddress: {
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone || guestPhone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
+            fullName: shippingAddress.fullName.trim(),
+            phone: addressPhone,
+            city: shippingAddress.city.trim(),
+            district: shippingAddress.district.trim(),
+            address: shippingAddress.address.trim(),
+            zipCode: shippingAddress.zipCode?.trim() || undefined,
           },
-        });
+        };
+        console.log('📦 Sending order:', JSON.stringify(orderData));
+        const response = await api.post('/orders/guest', orderData);
+        console.log('✅ Order created:', JSON.stringify(response.data));
       }
 
       // Clear cart and show success
@@ -178,7 +196,13 @@ export default function CheckoutScreen() {
       );
     } catch (error: any) {
       console.error('Checkout error:', error);
-      showSnackbar(error.response?.data?.message || 'Sipariş oluşturulamadı');
+      console.error('Error response:', JSON.stringify(error.response?.data));
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error ||
+                          (Array.isArray(error.response?.data?.message) 
+                            ? error.response?.data?.message.join(', ') 
+                            : 'Sipariş oluşturulamadı');
+      Alert.alert('Hata', errorMessage);
     } finally {
       setLoading(false);
     }

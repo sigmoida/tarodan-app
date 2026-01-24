@@ -10,8 +10,6 @@ export default function CheckoutLayout() {
           backgroundColor: TarodanColors.background,
         },
       }}
-    >
-      <Stack.Screen name="success" />
-    </Stack>
+    />
   );
 }

@@ -658,36 +658,26 @@ export class OrderService {
         finalPrice = Number(offer.amount);
       }
 
-      // Check if user already exists with this email
-      let existingUser = await tx.user.findUnique({
-        where: { email: dto.email },
+      // Get or create a system guest user for all guest orders
+      // This avoids unique constraint issues - actual guest info stored in shippingAddress
+      const SYSTEM_GUEST_EMAIL = 'guest@tarodan.system';
+      let systemGuestUser = await tx.user.findUnique({
+        where: { email: SYSTEM_GUEST_EMAIL },
       });
 
-      let guestUser;
-      
-      if (existingUser) {
-        // If the user is a registered (non-guest) user, throw error
-        if (!existingUser.displayName?.startsWith('GUEST_')) {
-          throw new BadRequestException(
-            'Bu e-posta adresi kayıtlı bir hesaba ait. Lütfen giriş yaparak devam edin veya farklı bir e-posta adresi kullanın.'
-          );
-        }
-        // Use existing guest user
-        guestUser = existingUser;
-      } else {
-        // Create a new guest user
-        const guestId = `GUEST_${Date.now()}`;
-        guestUser = await tx.user.create({
+      if (!systemGuestUser) {
+        systemGuestUser = await tx.user.create({
           data: {
-            email: dto.email,
-            phone: dto.phone,
-            displayName: guestId,
-            passwordHash: '', // No password for guests
+            email: SYSTEM_GUEST_EMAIL,
+            displayName: 'GUEST_SYSTEM',
+            passwordHash: '',
             isVerified: false,
             isSeller: false,
           },
         });
       }
+
+      const guestUser = systemGuestUser;
 
       // Validate shipping address for guest checkout
       if (!dto.shippingAddress?.fullName?.trim()) {
@@ -716,7 +706,7 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Create order
+      // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -728,14 +718,20 @@ export class OrderService {
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
           shippingAddress: {
+            // Guest contact info
+            guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
+            guestEmail: dto.email?.trim(),
+            guestPhone: dto.phone?.trim(),
+            // Shipping address
             fullName: dto.shippingAddress.fullName.trim(),
             phone: dto.shippingAddress.phone.trim(),
             city: dto.shippingAddress.city.trim(),
             district: dto.shippingAddress.district.trim(),
             address: dto.shippingAddress.address.trim(),
             zipCode: dto.shippingAddress.zipCode?.trim() || null,
+            // Mark as guest order
+            isGuestOrder: true,
           },
-          // Store guest info in metadata
         },
         include: {
           product: {
@@ -808,8 +804,13 @@ export class OrderService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
-    // Verify email matches
-    if (order.buyer.email.toLowerCase() !== dto.email.toLowerCase()) {
+    // Verify email matches - check guest email in shippingAddress or buyer email
+    const shippingData = order.shippingAddress as any;
+    const guestEmail = shippingData?.guestEmail?.toLowerCase();
+    const buyerEmail = order.buyer.email?.toLowerCase();
+    const inputEmail = dto.email.toLowerCase();
+    
+    if (guestEmail !== inputEmail && buyerEmail !== inputEmail) {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 

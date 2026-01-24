@@ -137,7 +137,7 @@ export default function CollectionsScreen() {
     },
   });
 
-  const collections = apiCollections || MOCK_COLLECTIONS;
+  const collections = Array.isArray(apiCollections) ? apiCollections : MOCK_COLLECTIONS;
 
   const filteredCollections = collections.filter((c: any) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

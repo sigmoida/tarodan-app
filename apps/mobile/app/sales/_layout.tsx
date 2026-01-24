@@ -8,8 +8,6 @@ export default function SalesLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: TarodanColors.background },
       }}
-    >
-      <Stack.Screen name="index" />
-    </Stack>
+    />
   );
 }

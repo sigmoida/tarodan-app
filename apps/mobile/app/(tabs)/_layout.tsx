@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { TarodanColors } from '../../src/theme';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 
@@ -12,22 +12,24 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: TarodanColors.primary,
-        tabBarInactiveTintColor: TarodanColors.textLight,
+        tabBarInactiveTintColor: TarodanColors.textTertiary,
         tabBarStyle: {
           backgroundColor: TarodanColors.background,
-          borderTopColor: TarodanColors.border,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 65,
-          elevation: 8,
+          borderTopColor: TarodanColors.borderLight,
+          borderTopWidth: 1,
+          paddingBottom: 10,
+          paddingTop: 10,
+          height: 70,
+          elevation: 10,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
+          marginTop: 2,
         },
         headerShown: false,
       }}
@@ -36,8 +38,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Ana Sayfa',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -45,17 +47,19 @@ export default function TabLayout() {
         name="search"
         options={{
           title: 'Ara',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="sell"
         options={{
-          title: 'Satış Yap',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={TarodanColors.primary} />
+          title: '',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.sellButton}>
+              <Ionicons name="add" size={28} color="#fff" />
+            </View>
           ),
         }}
       />
@@ -63,23 +67,12 @@ export default function TabLayout() {
         name="messages"
         options={{
           title: 'Mesajlar',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, focused }) => (
             <View>
-              <Ionicons name="chatbubbles" size={size} color={color} />
+              <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
               {unreadCount > 0 && (
-                <View style={{
-                  position: 'absolute',
-                  right: -8,
-                  top: -4,
-                  backgroundColor: TarodanColors.error,
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  paddingHorizontal: 4,
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </Text>
                 </View>
@@ -92,8 +85,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -119,3 +112,39 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  sellButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: TarodanColors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: TarodanColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  badge: {
+    position: 'absolute',
+    right: -10,
+    top: -5,
+    backgroundColor: TarodanColors.error,
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: TarodanColors.background,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+});
