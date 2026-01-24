@@ -70,6 +70,7 @@ export default function EditListingPage() {
     status: 'active' as string,
   });
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -190,6 +191,46 @@ export default function EditListingPage() {
       toast.error(error.response?.data?.message || 'İlan güncellenemedi');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    setIsLoading(true);
+    try {
+      await listingsApi.update(id, { status: 'inactive' } as any);
+      setFormData({ ...formData, status: 'inactive' });
+      toast.success('İlan pasife alındı');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleActivate = async () => {
+    setIsLoading(true);
+    try {
+      await listingsApi.update(id, { status: 'active' } as any);
+      setFormData({ ...formData, status: 'active' });
+      toast.success('İlan aktif edildi');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsLoading(true);
+    try {
+      await api.delete(`/products/${id}`);
+      toast.success('İlan silindi');
+      router.push('/profile/listings');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İlan silinemedi');
+    } finally {
+      setIsLoading(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -464,8 +505,78 @@ export default function EditListingPage() {
                 {isLoading ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
               </button>
             </div>
+
+            {/* Status Actions */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">İlan Durumu</h3>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {formData.status === 'active' ? (
+                  <button
+                    type="button"
+                    onClick={handleDeactivate}
+                    disabled={isLoading}
+                    className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+                  >
+                    🔒 İlanı Pasife Al
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleActivate}
+                    disabled={isLoading}
+                    className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+                  >
+                    ✅ İlanı Aktif Et
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  disabled={isLoading}
+                  className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+                >
+                  🗑️ İlanı Sil
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                {formData.status === 'active' 
+                  ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.' 
+                  : 'Aktif ilanlar listelemede görünür.'}
+              </p>
+            </div>
           </form>
         </motion.div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-4">İlanı Sil</h3>
+              <p className="text-gray-600 mb-6">
+                Bu ilanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve ilan kalıcı olarak silinir.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 font-medium"
+                >
+                  {isLoading ? 'Siliniyor...' : 'Evet, Sil'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </main>
     </div>
   );

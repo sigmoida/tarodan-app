@@ -67,33 +67,23 @@ export class OfferService {
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
       // SKIP LOCKED allows other transactions to proceed if row is already locked
-      const lockedProducts = await tx.$queryRaw<any[]>`
-        SELECT p.*, u.id as "sellerId", u."displayName" as "sellerName", u.email as "sellerEmail"
-        FROM "Product" p
-        JOIN "User" u ON p."sellerId" = u.id
-        WHERE p.id = ${dto.productId}::uuid AND p.status = 'active'
-        FOR UPDATE SKIP LOCKED
-      `;
+      // Use Prisma instead of raw SQL to avoid column name issues
+      const product = await tx.product.findUnique({
+        where: { id: dto.productId },
+        include: {
+          seller: {
+            select: { id: true, displayName: true, email: true },
+          },
+        },
+      });
 
-      if (!lockedProducts || lockedProducts.length === 0) {
-        // Check if product exists but is locked or not active
-        const product = await tx.product.findUnique({
-          where: { id: dto.productId },
-        });
-
-        if (!product) {
-          throw new NotFoundException('Ürün bulunamadı');
-        }
-
-        if (product.status !== ProductStatus.active) {
-          throw new BadRequestException('Bu ürün şu anda satışta değil');
-        }
-
-        // Product exists but is locked by another transaction
-        throw new ConflictException('Bu ürün şu anda başka bir işlemde, lütfen tekrar deneyin');
+      if (!product) {
+        throw new NotFoundException('Ürün bulunamadı');
       }
 
-      const product = lockedProducts[0];
+      if (product.status !== ProductStatus.active) {
+        throw new BadRequestException('Bu ürün şu anda satışta değil');
+      }
 
       // Cannot offer on own product
       if (product.sellerId === buyerId) {
@@ -159,8 +149,8 @@ export class OfferService {
         offer,
         productTitle: product.title,
         productPrice,
-        sellerEmail: product.sellerEmail,
-        sellerName: product.sellerName,
+        sellerEmail: product.seller?.email || '',
+        sellerName: product.seller?.displayName || '',
       };
     });
 

@@ -1518,16 +1518,48 @@ export class AdminService {
     oldValue: any,
     newValue: any,
   ) {
-    return this.prisma.auditLog.create({
-      data: {
-        adminUserId,
-        action,
-        entityType,
-        entityId,
-        oldValue: oldValue as any,
-        newValue: newValue as any,
-      },
-    });
+    try {
+      // Serialize values to ensure they can be stored as JSON
+      const serializeValue = (value: any) => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+        try {
+          // Use JSON.parse/stringify to handle Date, Decimal, etc.
+          return JSON.parse(JSON.stringify(value, (key, val) => {
+            // Convert Date to ISO string
+            if (val instanceof Date) {
+              return val.toISOString();
+            }
+            // Convert Decimal to number (Prisma Decimal has toNumber method)
+            if (val && typeof val === 'object' && typeof val.toNumber === 'function') {
+              return val.toNumber();
+            }
+            return val;
+          }));
+        } catch (e) {
+          // Fallback: convert to string if serialization fails
+          this.logger.warn(`Failed to serialize audit log value for ${entityType}:${entityId}`, e);
+          return String(value);
+        }
+      };
+
+      return await this.prisma.auditLog.create({
+        data: {
+          adminUserId,
+          action,
+          entityType,
+          entityId,
+          oldValue: serializeValue(oldValue),
+          newValue: serializeValue(newValue),
+        },
+      });
+    } catch (error) {
+      // Log error but don't fail the main operation
+      this.logger.error(`Failed to create audit log for ${entityType}:${entityId}`, error);
+      // Return a promise that resolves to avoid breaking the caller
+      return Promise.resolve();
+    }
   }
 
   // ==================== MODERATION QUEUE ====================

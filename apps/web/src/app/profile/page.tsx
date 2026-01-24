@@ -399,11 +399,15 @@ export default function ProfilePage() {
                 {[
                   { label: 'Mesajlarım', href: '/messages', icon: '💬' },
                   { label: 'Favorilerim', href: '/wishlist', icon: '❤️' },
+                  { label: 'Tekliflerim', href: '/offers', icon: '🏷️' },
+                  { label: 'Takaslarım', href: '/trades', icon: '🔄' },
                   { label: 'Takip Ettiklerim', href: '/profile/following', icon: '👥' },
-                  { label: 'Üyelik', href: '/pricing', icon: '⭐' },
-                  { label: 'Destek', href: '/support', icon: '🎫' },
+                  { label: 'Beğenilen Koleksiyonlar', href: '/collections/liked', icon: '📚' },
+                  { label: 'Kayıtlı Aramalar', href: '/saved-searches', icon: '🔍' },
+                  { label: 'Ödeme Yöntemleri', href: '/payment-methods', icon: '💳' },
                   { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
-                  { label: 'İstatistikler', href: '/profile/statistics', icon: '📈' },
+                  { label: 'Üyelik Yönetimi', href: '/membership/manage', icon: '👑' },
+                  { label: 'Destek', href: '/support', icon: '🎫' },
                   { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },
                   ...(profile.membership?.tier.type === 'business' ? [
                     { label: 'İşletme Paneli', href: '/profile/business', icon: '📊' }

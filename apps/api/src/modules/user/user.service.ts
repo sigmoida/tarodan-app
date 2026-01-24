@@ -360,6 +360,22 @@ export class UserService {
   }
 
   /**
+   * Check if current user is following target user
+   */
+  async checkFollowing(currentUserId: string, targetUserId: string) {
+    const follow = await this.prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUserId,
+          followingId: targetUserId,
+        },
+      },
+    });
+
+    return { following: !!follow };
+  }
+
+  /**
    * Follow a user
    */
   async followUser(currentUserId: string, targetUserId: string) {

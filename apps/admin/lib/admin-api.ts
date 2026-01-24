@@ -58,8 +58,8 @@ export const rejectProduct = (id: string, reason: string) =>
 // Orders
 export const getOrders = (params?: any) => adminApi.get('/orders', { params });
 export const getOrder = (id: string) => adminApi.get(`/orders/${id}`);
-export const updateOrderStatus = (id: string, status: string) => 
-  adminApi.patch(`/orders/${id}/status`, { status });
+export const updateOrderStatus = (id: string, status: string, notes?: string) => 
+  adminApi.patch(`/orders/${id}`, { status, notes });
 
 // Analytics
 export const getSalesAnalytics = (params?: any) => adminApi.get('/analytics/sales', { params });

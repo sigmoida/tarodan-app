@@ -90,12 +90,18 @@ export default function CollectionDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
+      // Remove 'collection-' prefix if present (legacy URL format)
+      let idOrSlug = collectionIdOrSlug;
+      if (idOrSlug.startsWith('collection-')) {
+        idOrSlug = idOrSlug.replace('collection-', '');
+      }
+      
       // Try UUID endpoint first if it looks like a UUID, otherwise try slug
       let response;
-      if (isUUID(collectionIdOrSlug)) {
-        response = await collectionsApi.getOne(collectionIdOrSlug);
+      if (isUUID(idOrSlug)) {
+        response = await collectionsApi.getOne(idOrSlug);
       } else {
-        response = await collectionsApi.getBySlug(collectionIdOrSlug);
+        response = await collectionsApi.getBySlug(idOrSlug);
       }
       const data = response.data.collection || response.data;
       setCollection(data);
@@ -133,8 +139,14 @@ export default function CollectionDetailPage() {
     }
 
     try {
-      console.log('Liking collection with ID:', collection.id);
-      const response = await collectionsApi.like(collection.id);
+      // Use collectionIdOrSlug (from URL) instead of collection.id to support both UUID and slug
+      // Remove 'collection-' prefix if present (legacy URL format)
+      let idToUse = collectionIdOrSlug || collection.id;
+      if (idToUse.startsWith('collection-')) {
+        idToUse = idToUse.replace('collection-', '');
+      }
+      console.log('Liking collection with ID/Slug:', idToUse);
+      const response = await collectionsApi.like(idToUse);
       const { liked, likeCount } = response.data || {};
       
       setIsLiked(liked !== undefined ? liked : !isLiked);
@@ -147,7 +159,11 @@ export default function CollectionDetailPage() {
     } catch (error: any) {
       console.error('Failed to like collection:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Beğeni işlemi başarısız';
-      toast.error(errorMessage);
+      if (error?.response?.status === 404) {
+        toast.error('Koleksiyon bulunamadı');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 

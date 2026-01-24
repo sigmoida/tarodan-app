@@ -80,6 +80,23 @@ export class CollectionController {
   }
 
   /**
+   * Get liked collections
+   * GET /collections/liked
+   */
+  @Get('liked')
+  async getLikedCollections(
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+  ): Promise<CollectionListResponseDto> {
+    return this.collectionService.getLikedCollections(
+      req.user.id,
+      page,
+      pageSize,
+    );
+  }
+
+  /**
    * Get user's collections (public)
    * GET /collections/user/:userId
    */
@@ -113,16 +130,71 @@ export class CollectionController {
   }
 
   /**
+   * Like a collection
+   * POST /collections/:id/like
+   * Accepts both UUID and slug
+   * MUST be before @Get(':id') to avoid route conflicts
+   */
+  @Post(':id/like')
+  @HttpCode(HttpStatus.OK)
+  async likeCollection(
+    @Param('id') idOrSlug: string,
+    @Request() req: any,
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
+    }
+    try {
+      return await this.collectionService.likeCollection(idOrSlug, req.user.id);
+    } catch (error) {
+      console.error('Error in likeCollection controller:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unlike a collection
+   * DELETE /collections/:id/like
+   * Accepts both UUID and slug
+   */
+  @Delete(':id/like')
+  @HttpCode(HttpStatus.OK)
+  async unlikeCollection(
+    @Param('id') idOrSlug: string,
+    @Request() req: any,
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
+    }
+    try {
+      return await this.collectionService.unlikeCollection(idOrSlug, req.user.id);
+    } catch (error) {
+      console.error('Error in unlikeCollection controller:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get collection by ID (public for public collections)
    * GET /collections/:id
+   * Accepts UUID, collection- prefixed ID, or slug
    */
   @Public()
   @Get(':id')
   async getCollectionById(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') idOrSlug: string,
     @Request() req: any,
   ): Promise<CollectionResponseDto> {
-    return this.collectionService.getCollectionById(id, req.user?.id);
+    // Check if it's a UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    // Check if it's a collection- prefixed ID (from seed data)
+    const isCollectionId = idOrSlug.startsWith('collection-');
+    
+    if (isUUID || isCollectionId) {
+      return this.collectionService.getCollectionById(idOrSlug, req.user?.id);
+    } else {
+      return this.collectionService.getCollectionBySlug(idOrSlug, req.user?.id);
+    }
   }
 
   /**
@@ -196,20 +268,4 @@ export class CollectionController {
     return this.collectionService.reorderItems(id, req.user.id, dto);
   }
 
-  /**
-   * Like a collection
-   * POST /collections/:id/like
-   * Accepts both UUID and slug
-   */
-  @Post(':id/like')
-  @HttpCode(HttpStatus.OK)
-  async likeCollection(
-    @Param('id') idOrSlug: string,
-    @Request() req: any,
-  ): Promise<{ liked: boolean; likeCount: number }> {
-    if (!req.user || !req.user.id) {
-      throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
-    }
-    return this.collectionService.likeCollection(idOrSlug, req.user.id);
-  }
 }

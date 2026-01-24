@@ -63,8 +63,21 @@ export default function SellerProfilePage() {
     if (sellerId) {
       fetchSeller();
       fetchProducts();
+      if (isAuthenticated && user?.id !== sellerId) {
+        checkFollowingStatus();
+      }
     }
-  }, [sellerId]);
+  }, [sellerId, isAuthenticated]);
+
+  const checkFollowingStatus = async () => {
+    try {
+      const response = await api.get(`/users/${sellerId}/follow`);
+      setIsFollowing(response.data.following);
+    } catch (error) {
+      // User not authenticated or error
+      setIsFollowing(false);
+    }
+  };
 
   const fetchSeller = async () => {
     try {

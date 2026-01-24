@@ -1,270 +1,97 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ArrowsRightLeftIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  TruckIcon,
-  ShieldCheckIcon,
-  CurrencyDollarIcon,
-  UserGroupIcon,
-} from '@heroicons/react/24/outline';
-import { tradesApi } from '@/lib/api';
+import { ArrowsRightLeftIcon, ClockIcon, CheckCircleIcon, XCircleIcon, TruckIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import api from '@/lib/api';
 
-interface TradeItem {
+interface TradeProduct {
   id: string;
-  productId: string;
-  productTitle: string;
-  productImage?: string;
-  side: string;
-  quantity: number;
-  valueAtTrade: number;
+  title: string;
+  price: number;
+  imageUrl?: string;
 }
 
 interface Trade {
   id: string;
   tradeNumber: string;
   status: string;
-  // New API format
-  initiatorId?: string;
-  initiatorName?: string;
-  receiverId?: string;
-  receiverName?: string;
-  initiatorItems?: TradeItem[];
-  receiverItems?: TradeItem[];
-  // Old API format fallback
-  initiator?: {
-    id: string;
-    username?: string;
-    displayName?: string;
-  };
-  receiver?: {
-    id: string;
-    username?: string;
-    displayName?: string;
-  };
-  initiator_listings?: TradeItem[];
-  receiver_listings?: TradeItem[];
-  // Cash fields
+  initiatorId: string;
+  receiverId: string;
+  initiator: { id: string; displayName?: string };
+  receiver: { id: string; displayName?: string };
+  initiatorItems: Array<{ product: TradeProduct }>;
+  receiverItems: Array<{ product: TradeProduct }>;
   cashAmount?: number;
-  cash_amount?: number;
-  cashPayerId?: string;
-  cashDirection?: string;
-  // Dates
-  createdAt?: string;
-  created_at?: string;
+  createdAt: string;
+  responseDeadline: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Bekliyor', color: 'bg-yellow-100 text-yellow-700', icon: ClockIcon },
-  accepted: { label: 'Kabul Edildi', color: 'bg-orange-100 text-orange-700', icon: CheckCircleIcon },
-  rejected: { label: 'Reddedildi', color: 'bg-red-100 text-red-700', icon: XCircleIcon },
-  initiator_shipped: { label: 'Kargo Gönderildi', color: 'bg-purple-100 text-purple-700', icon: TruckIcon },
-  receiver_shipped: { label: 'Kargo Gönderildi', color: 'bg-purple-100 text-purple-700', icon: TruckIcon },
-  confirmed: { label: 'Tamamlandı', color: 'bg-green-100 text-green-700', icon: CheckCircleIcon },
-  cancelled: { label: 'İptal Edildi', color: 'bg-gray-100 text-gray-700', icon: XCircleIcon },
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+  pending: { label: 'Bekliyor', color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
+  accepted: { label: 'Kabul Edildi', color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
+  rejected: { label: 'Reddedildi', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+  initiator_shipped: { label: 'Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+  receiver_shipped: { label: 'Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+  both_shipped: { label: 'Karşılıklı Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+  completed: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
+  cancelled: { label: 'İptal Edildi', color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
+  disputed: { label: 'Anlaşmazlık', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
 };
 
-const FILTER_TABS = [
-  { value: '', label: 'Tümü' },
-  { value: 'pending', label: 'Bekleyen' },
-  { value: 'accepted', label: 'Aktif' },
-  { value: 'confirmed', label: 'Tamamlanan' },
-];
-
 export default function TradesPage() {
-  const { isAuthenticated } = useAuthStore();
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuthStore();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('');
+  const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchTrades();
-    } else {
-      setIsLoading(false);
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/trades');
+      return;
     }
-  }, [activeFilter, isAuthenticated]);
+    fetchTrades();
+  }, [isAuthenticated, filter]);
 
   const fetchTrades = async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, any> = {};
-      if (activeFilter) params.status = activeFilter;
-      
-      const response = await tradesApi.getAll(params);
-      // Handle different response structures
-      const tradesData = response.data?.trades || response.data?.data || response.data || [];
-      setTrades(Array.isArray(tradesData) ? tradesData : []);
+      const params = filter !== 'all' ? { type: filter } : {};
+      const response = await api.get('/trades', { params });
+      setTrades(response.data.data || response.data.trades || []);
     } catch (error) {
       console.error('Failed to fetch trades:', error);
-      setTrades([]);
+      toast.error('Takaslar yüklenemedi');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Guest user - show informational landing page
-  if (!isAuthenticated) {
+  const getStatusBadge = (status: string) => {
+    const config = statusConfig[status] || statusConfig.pending;
+    const Icon = config.icon;
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-primary-500 to-orange-500 text-white py-16">
-          <div className="max-w-4xl mx-auto px-4 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <ArrowsRightLeftIcon className="w-20 h-20 mx-auto mb-6 opacity-90" />
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                Güvenli Takas Sistemi
-              </h1>
-              <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
-                Koleksiyonunuzdaki modelleri diğer koleksiyonerlerle güvenle takas edin. 
-                Para ödemeden koleksiyonunuzu büyütün!
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link
-                  href="/login?redirect=/trades"
-                  className="px-8 py-4 bg-white text-primary-500 font-semibold rounded-xl hover:bg-orange-50 transition-colors"
-                >
-                  Giriş Yap
-                </Link>
-                <Link
-                  href="/register?redirect=/trades"
-                  className="px-8 py-4 bg-transparent text-white font-semibold rounded-xl border-2 border-white hover:bg-white/10 transition-colors"
-                >
-                  Ücretsiz Üye Ol
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </div>
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+        <Icon className="w-4 h-4" />
+        {config.label}
+      </span>
+    );
+  };
 
-        {/* Features Section */}
-        <div className="max-w-6xl mx-auto px-4 py-16">
-          <h2 className="text-2xl font-bold text-center mb-12 text-gray-900">
-            Takas Nasıl Çalışır?
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
-            >
-              <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">1. Teklif Gönder</h3>
-              <p className="text-gray-600">
-                Beğendiğiniz bir ilanda "Takas Teklifi" butonuna tıklayın ve kendi ürünlerinizi seçin.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
-            >
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <CurrencyDollarIcon className="w-8 h-8 text-green-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">2. Nakit Fark Ekle</h3>
-              <p className="text-gray-600">
-                Değer farkı varsa nakit ekleyebilirsiniz. Ödeme platformda güvende tutulur.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center"
-            >
-              <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <ShieldCheckIcon className="w-8 h-8 text-orange-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">3. Güvenli Teslimat</h3>
-              <p className="text-gray-600">
-                Her iki taraf da kargoyu gönderir. Onay sonrası takas tamamlanır.
-              </p>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Benefits Section */}
-        <div className="bg-gray-50 py-16">
-          <div className="max-w-4xl mx-auto px-4">
-            <h2 className="text-2xl font-bold text-center mb-12 text-gray-900">
-              Neden Takas Yapmalısınız?
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4">
-                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                <div>
-                  <h4 className="font-semibold text-gray-900">Para Harcamadan Büyüyün</h4>
-                  <p className="text-gray-600">İhtiyacınız olmayan modelleri değerlenin</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                <div>
-                  <h4 className="font-semibold text-gray-900">Nadir Modellere Ulaşın</h4>
-                  <p className="text-gray-600">Satışta olmayan modelleri takas ile bulun</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                <div>
-                  <h4 className="font-semibold text-gray-900">%100 Güvenli</h4>
-                  <p className="text-gray-600">Platform koruması ve anlaşmazlık desteği</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                <div>
-                  <h4 className="font-semibold text-gray-900">Toplulukla Bağ Kurun</h4>
-                  <p className="text-gray-600">Diğer koleksiyonerlerle tanışın</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center mt-12">
-              <Link
-                href="/listings?tradeOnly=true"
-                className="inline-flex items-center gap-2 text-primary-500 font-semibold hover:text-primary-600"
-              >
-                <UserGroupIcon className="w-5 h-5" />
-                Takas Kabul Eden İlanları Gör
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* CTA Section */}
-        <div className="py-16">
-          <div className="max-w-2xl mx-auto px-4 text-center">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">
-              Hemen Takas Yapmaya Başla!
-            </h2>
-            <p className="text-gray-600 mb-8">
-              Ücretsiz üye ol ve ilk takas teklifini gönder.
-            </p>
-            <Link
-              href="/register?redirect=/trades"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
-            >
-              <ArrowsRightLeftIcon className="w-5 h-5" />
-              Ücretsiz Başla
-            </Link>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-xl" />
+            ))}
           </div>
         </div>
       </div>
@@ -273,195 +100,154 @@ export default function TradesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Takaslarım</h1>
-          <p className="text-gray-600">Takas tekliflerinizi yönetin</p>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
+            Takaslarım
+          </h1>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-          {FILTER_TABS.map((tab) => (
+        {/* Filters */}
+        <div className="flex gap-2 mb-6">
+          {[
+            { value: 'all', label: 'Tümü' },
+            { value: 'sent', label: 'Gönderilen' },
+            { value: 'received', label: 'Gelen' },
+          ].map((f) => (
             <button
-              key={tab.value}
-              onClick={() => setActiveFilter(tab.value)}
-              className={`px-4 py-2 rounded-full font-medium transition-colors whitespace-nowrap ${
-                activeFilter === tab.value
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              key={f.value}
+              onClick={() => setFilter(f.value as any)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === f.value
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
               }`}
             >
-              {tab.label}
+              {f.label}
             </button>
           ))}
         </div>
 
         {/* Trades List */}
-        {isLoading ? (
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="card p-6 animate-pulse">
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 bg-gray-200 rounded-lg" />
-                  <div className="w-12 h-12 bg-gray-200 rounded-full" />
-                  <div className="w-20 h-20 bg-gray-200 rounded-lg" />
-                  <div className="flex-1">
-                    <div className="h-5 bg-gray-200 rounded w-1/2 mb-2" />
-                    <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : trades.length === 0 ? (
-          <div className="text-center py-16">
-            <ArrowsRightLeftIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Henüz takas yok</h3>
+        {trades.length === 0 ? (
+          <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
+            <ArrowsRightLeftIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Henüz Takas Yok
+            </h2>
             <p className="text-gray-600 mb-6">
-              İlanlara göz atın ve takas teklifleri gönderin
+              Takas teklifleri burada görünecek.
             </p>
-            <Link href="/listings" className="btn-primary">
-              İlanlara Göz At
+            <Link
+              href="/listings"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors"
+            >
+              İlanları Keşfet
             </Link>
           </div>
         ) : (
           <div className="space-y-4">
-            {trades.map((trade, index) => {
-              const statusConfig = STATUS_CONFIG[trade.status] || STATUS_CONFIG.pending;
-              const StatusIcon = statusConfig.icon;
-              
-              // Handle different API response structures
-              const initiatorListings = trade.initiator_listings || trade.initiatorItems || trade.offeredProducts || [];
-              const receiverListings = trade.receiver_listings || trade.receiverItems || trade.requestedProducts || [];
-              const initiatorUser = trade.initiator || trade.initiatorUser;
-              const receiverUser = trade.receiver || trade.receiverUser;
-              const cashAmount = trade.cash_amount ?? trade.cashAmount ?? 0;
-              const createdAt = trade.created_at || trade.createdAt;
-              
-              // Helper to get item image
-              const getItemImage = (item: TradeItem) => {
-                if (item.productImage) return item.productImage;
-                return 'https://placehold.co/64x64/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-              };
-              
-              // Helper to get item title
-              const getItemTitle = (item: TradeItem) => {
-                return item.productTitle || 'Ürün';
-              };
+            {trades.map((trade) => {
+              const isSent = trade.initiatorId === user?.id;
+              const otherUser = isSent ? trade.receiver : trade.initiator;
+              const myItems = isSent ? trade.initiatorItems : trade.receiverItems;
+              const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
               
               return (
-                <motion.div
+                <Link
                   key={trade.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
+                  href={`/trades/${trade.id}`}
+                  className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all"
                 >
-                  <Link href={`/trades/${trade.id}`}>
-                    <div className="card p-6 hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className={`badge ${statusConfig.color}`}>
-                          <StatusIcon className="w-4 h-4 mr-1" />
-                          {statusConfig.label}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {createdAt ? new Date(createdAt).toLocaleDateString('tr-TR') : '-'}
-                        </span>
-                      </div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">
+                        #{trade.tradeNumber}
+                      </p>
+                      <p className="font-medium text-gray-900">
+                        {isSent ? 'Gönderilen' : 'Gelen'} • {otherUser?.displayName || 'Kullanıcı'}
+                      </p>
+                    </div>
+                    {getStatusBadge(trade.status)}
+                  </div>
 
-                      <div className="flex items-center gap-4">
-                        {/* My Items */}
-                        <div className="flex -space-x-3">
-                          {initiatorListings.length > 0 ? (
-                            <>
-                              {initiatorListings.slice(0, 3).map((item, i) => (
-                                <div
-                                  key={i}
-                                  className="w-16 h-16 rounded-lg overflow-hidden border-2 border-white shadow-sm bg-gray-100"
-                                >
-                                  <Image
-                                    src={getItemImage(item)}
-                                    alt={getItemTitle(item)}
-                                    width={64}
-                                    height={64}
-                                    className="object-cover w-full h-full"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                              {initiatorListings.length > 3 && (
-                                <div className="w-16 h-16 rounded-lg bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
-                                  <span className="text-sm font-medium text-gray-500">
-                                    +{initiatorListings.length - 3}
-                                  </span>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
-                              <span className="text-xs text-gray-400">Yok</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Swap Icon */}
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                          <ArrowsRightLeftIcon className="w-6 h-6 text-gray-500" />
-                        </div>
-
-                        {/* Their Items */}
-                        <div className="flex -space-x-3">
-                          {receiverListings.length > 0 ? (
-                            <>
-                              {receiverListings.slice(0, 3).map((item, i) => (
-                                <div
-                                  key={i}
-                                  className="w-16 h-16 rounded-lg overflow-hidden border-2 border-white shadow-sm bg-gray-100"
-                                >
-                                  <Image
-                                    src={getItemImage(item)}
-                                    alt={getItemTitle(item)}
-                                    width={64}
-                                    height={64}
-                                    className="object-cover w-full h-full"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                              {receiverListings.length > 3 && (
-                                <div className="w-16 h-16 rounded-lg bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
-                                  <span className="text-sm font-medium text-gray-500">
-                                    +{receiverListings.length - 3}
-                                  </span>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
-                              <span className="text-xs text-gray-400">Yok</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Trade Info */}
-                        <div className="flex-1 ml-4">
-                          <p className="font-medium text-gray-900">
-                            {trade.initiatorName || initiatorUser?.username || initiatorUser?.displayName || 'Kullanıcı'} ↔ {trade.receiverName || receiverUser?.username || receiverUser?.displayName || 'Kullanıcı'}
-                          </p>
-                          {cashAmount > 0 && (
-                            <p className="text-sm text-green-600 font-medium">
-                              +₺{cashAmount.toLocaleString('tr-TR')} nakit
-                            </p>
-                          )}
-                        </div>
+                  <div className="flex items-center gap-4">
+                    {/* My Items */}
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 mb-2">
+                        {isSent ? 'Verdiğiniz' : 'Aldığınız'}
+                      </p>
+                      <div className="flex gap-2">
+                        {myItems.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden relative">
+                            {item.product?.imageUrl && (
+                              <Image
+                                src={item.product.imageUrl}
+                                alt={item.product.title}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {myItems.length > 3 && (
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 text-sm font-medium">
+                            +{myItems.length - 3}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </Link>
-                </motion.div>
+
+                    {/* Arrow */}
+                    <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500 flex-shrink-0" />
+
+                    {/* Their Items */}
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 mb-2">
+                        {isSent ? 'Aldığınız' : 'Verdiğiniz'}
+                      </p>
+                      <div className="flex gap-2">
+                        {theirItems.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden relative">
+                            {item.product?.imageUrl && (
+                              <Image
+                                src={item.product.imageUrl}
+                                alt={item.product.title}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {theirItems.length > 3 && (
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 text-sm font-medium">
+                            +{theirItems.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {trade.cashAmount && trade.cashAmount > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-sm text-gray-600">
+                        Nakit Fark: <span className="font-semibold text-orange-600">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-4 text-sm text-gray-500">
+                    {new Date(trade.createdAt).toLocaleDateString('tr-TR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </div>
+                </Link>
               );
             })}
           </div>
@@ -470,5 +256,3 @@ export default function TradesPage() {
     </div>
   );
 }
-
-

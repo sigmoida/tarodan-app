@@ -125,19 +125,19 @@ export default function MembershipCheckoutPage() {
     setIsProcessing(true);
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // In production, this would call the actual payment API
-      // await membershipApi.subscribe(tier, period);
+      // Call the actual membership subscription API
+      await membershipApi.subscribe({
+        tierType: tier,
+        billingPeriod: period,
+      });
       
       toast.success('Üyeliğiniz başarıyla yükseltildi!');
       
-      // Refresh user data
+      // Refresh user data to update membership info
       await refreshUserData();
       
       // Redirect to success page
-      router.push('/membership/success');
+      router.push('/membership/success?tier=' + tier);
     } catch (error: any) {
       console.error('Payment error:', error);
       toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu');

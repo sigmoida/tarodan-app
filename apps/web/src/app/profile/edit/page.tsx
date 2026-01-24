@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
+import { ArrowLeftIcon, CameraIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,7 +13,10 @@ export default function EditProfilePage() {
   const router = useRouter();
   const { isAuthenticated, user, setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isBusinessTier = user?.membershipTier === 'business';
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
@@ -43,8 +47,55 @@ export default function EditProfilePage() {
         taxId: (user as any).taxId || '',
         taxOffice: (user as any).taxOffice || '',
       });
+      // Set profile photo if exists
+      if ((user as any).profilePhotoUrl || (user as any).avatarUrl) {
+        setProfilePhoto((user as any).profilePhotoUrl || (user as any).avatarUrl);
+      }
     }
   }, [isAuthenticated, user]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen bir resim dosyası seçin');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dosya boyutu 5MB\'dan küçük olmalıdır');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'profile');
+
+      const response = await api.post('/media/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const uploadedUrl = response.data.url || response.data.fileUrl;
+      
+      // Update user profile with new photo URL
+      const updateResponse = await api.patch('/users/me', { profilePhotoUrl: uploadedUrl });
+      const updatedUser = updateResponse.data.user || updateResponse.data;
+      
+      setProfilePhoto(uploadedUrl);
+      setUser(updatedUser);
+      toast.success('Profil fotoğrafı güncellendi');
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      toast.error(error.response?.data?.message || 'Fotoğraf yüklenemedi');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +133,49 @@ export default function EditProfilePage() {
           <h1 className="text-2xl font-bold mb-6">Profili Düzenle</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Profile Photo */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="relative">
+                <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-700 border-4 border-gray-600">
+                  {profilePhoto ? (
+                    <Image
+                      src={profilePhoto}
+                      alt="Profil Fotoğrafı"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserCircleIcon className="w-20 h-20 text-gray-500" />
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="absolute bottom-0 right-0 w-10 h-10 bg-primary-500 hover:bg-primary-600 rounded-full flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  {uploadingPhoto ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CameraIcon className="w-5 h-5 text-white" />
+                  )}
+                </button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+              <p className="text-sm text-gray-400 mt-2">
+                Fotoğraf değiştirmek için kamera ikonuna tıklayın
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Görünen İsim

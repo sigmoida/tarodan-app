@@ -216,6 +216,8 @@ export const collectionsApi = {
     api.get('/collections/browse', { params }),
   getMyCollections: (params?: Record<string, any>) =>
     api.get('/collections/me', { params }),
+  getLiked: (params?: Record<string, any>) =>
+    api.get('/collections/liked', { params }),
   getOne: (id: string) => api.get(`/collections/${id}`),
   getBySlug: (slug: string) => api.get(`/collections/slug/${slug}`),
   create: (data: { name: string; description?: string; coverImageUrl?: string; isPublic?: boolean }) =>
@@ -228,6 +230,7 @@ export const collectionsApi = {
   removeItem: (id: string, itemId: string) =>
     api.delete(`/collections/${id}/items/${itemId}`),
   like: (id: string) => api.post(`/collections/${id}/like`),
+  unlike: (id: string) => api.delete(`/collections/${id}/like`),
 };
 
 // Categories
@@ -240,9 +243,10 @@ export const categoriesApi = {
 // Membership
 export const membershipApi = {
   getTiers: () => api.get('/membership/tiers'),
-  getCurrentMembership: () => api.get('/membership'),
-  subscribe: (tierId: string, billingCycle: 'monthly' | 'yearly') =>
-    api.post('/membership/subscribe', { tierId, billingCycle }),
+  getCurrentMembership: () => api.get('/membership/me'),
+  getLimits: () => api.get('/membership/me/limits'),
+  subscribe: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly' }) =>
+    api.post('/membership/subscribe', data),
   cancel: () => api.post('/membership/cancel'),
 };
 

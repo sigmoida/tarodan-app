@@ -156,6 +156,22 @@ export class UserController {
   }
 
   /**
+   * GET /users/:id/follow
+   * Check if current user is following target user
+   */
+  @Get(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Takip durumunu kontrol et' })
+  @ApiResponse({ status: 200, description: 'Takip durumu' })
+  async checkFollowing(
+    @CurrentUser('id') currentUserId: string,
+    @Param('id') targetUserId: string,
+  ) {
+    return this.userService.checkFollowing(currentUserId, targetUserId);
+  }
+
+  /**
    * POST /users/:id/follow
    * Follow a user
    */

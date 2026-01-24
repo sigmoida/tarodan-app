@@ -65,7 +65,11 @@ export class CollectionService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1 } },
+              include: { 
+                images: { 
+                  take: 1
+                } 
+              },
             },
           },
           orderBy: { sortOrder: 'asc' },
@@ -83,6 +87,17 @@ export class CollectionService {
     collectionId: string,
     viewerId?: string,
   ): Promise<CollectionResponseDto> {
+    // First get basic collection info
+    const basicCollection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+      select: { id: true },
+    });
+
+    if (!basicCollection) {
+      throw new NotFoundException('Koleksiyon bulunamadı');
+    }
+
+    // Now get full collection with relations
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
       include: {
@@ -90,7 +105,11 @@ export class CollectionService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1 } },
+              select: {
+                id: true,
+                title: true,
+                price: true,
+              },
             },
           },
           orderBy: { sortOrder: 'asc' },
@@ -102,6 +121,37 @@ export class CollectionService {
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
 
+    // Fetch images separately for each product
+    const productIds = collection.items?.map(item => item.productId).filter(Boolean) || [];
+    if (productIds.length > 0) {
+      const productImages = await this.prisma.productImage.findMany({
+        where: { productId: { in: productIds } },
+        orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+      });
+      
+      const imagesByProduct = new Map<string, any[]>();
+      for (const img of productImages) {
+        if (!imagesByProduct.has(img.productId)) {
+          imagesByProduct.set(img.productId, []);
+        }
+        const arr = imagesByProduct.get(img.productId)!;
+        if (arr.length < 1) {
+          arr.push({ url: img.url });
+        }
+      }
+      
+      // Attach images to products
+      if (collection.items) {
+        for (const item of collection.items) {
+          if (item.product && imagesByProduct.has(item.product.id)) {
+            (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+          } else if (item.product) {
+            (item.product as any).images = [];
+          }
+        }
+      }
+    }
+
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
       throw new ForbiddenException('Bu koleksiyon özel');
@@ -110,12 +160,10 @@ export class CollectionService {
     // Check if viewer has liked this collection
     let isLiked = false;
     if (viewerId) {
-      const like = await this.prisma.collectionLike.findUnique({
+      const like = await this.prisma.collectionLike.findFirst({
         where: {
-          collectionId_userId: {
-            collectionId: collection.id,
-            userId: viewerId,
-          },
+          collectionId: collection.id,
+          userId: viewerId,
         },
       });
       isLiked = !!like;
@@ -147,21 +195,65 @@ export class CollectionService {
 
     let collection = null;
     for (const s of slugsToTry) {
-      collection = await this.prisma.collection.findFirst({
+      const basic = await this.prisma.collection.findFirst({
         where: { slug: s },
+        select: { id: true },
+      });
+      
+      if (!basic) continue;
+      
+      collection = await this.prisma.collection.findFirst({
+        where: { id: basic.id },
         include: {
           user: { select: { id: true, displayName: true } },
           items: {
             include: {
               product: {
-                include: { images: { take: 1 } },
+                select: {
+                  id: true,
+                  title: true,
+                  price: true,
+                },
               },
             },
             orderBy: { sortOrder: 'asc' },
           },
         },
       });
-      if (collection) break;
+      
+      if (collection) {
+        // Fetch images separately for each product
+        const productIds = collection.items?.map(item => item.productId).filter(Boolean) || [];
+        if (productIds.length > 0) {
+          const productImages = await this.prisma.productImage.findMany({
+            where: { productId: { in: productIds } },
+            orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+          });
+          
+          const imagesByProduct = new Map<string, any[]>();
+          for (const img of productImages) {
+            if (!imagesByProduct.has(img.productId)) {
+              imagesByProduct.set(img.productId, []);
+            }
+            const arr = imagesByProduct.get(img.productId)!;
+            if (arr.length < 1) {
+              arr.push({ url: img.url });
+            }
+          }
+          
+          // Attach images to products
+          if (collection.items) {
+            for (const item of collection.items) {
+              if (item.product && imagesByProduct.has(item.product.id)) {
+                (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+              } else if (item.product) {
+                (item.product as any).images = [];
+              }
+            }
+          }
+        }
+        break;
+      }
     }
 
     if (!collection) {
@@ -176,12 +268,10 @@ export class CollectionService {
     // Check if viewer has liked this collection
     let isLiked = false;
     if (viewerId) {
-      const like = await this.prisma.collectionLike.findUnique({
+      const like = await this.prisma.collectionLike.findFirst({
         where: {
-          collectionId_userId: {
-            collectionId: collection.id,
-            userId: viewerId,
-          },
+          collectionId: collection.id,
+          userId: viewerId,
         },
       });
       isLiked = !!like;
@@ -432,7 +522,11 @@ export class CollectionService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1 } },
+              include: { 
+                images: { 
+                  take: 1
+                } 
+              },
             },
           },
           orderBy: { sortOrder: 'asc' },
@@ -599,17 +693,32 @@ export class CollectionService {
   // LIKE COLLECTION
   // ==========================================================================
   async likeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    // Check if idOrSlug is UUID or slug
+    console.log('[likeCollection] Starting with idOrSlug:', idOrSlug, 'userId:', userId);
+    
+    // Check if idOrSlug is UUID or collection- prefixed ID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const isCollectionId = idOrSlug.startsWith('collection-');
+    
+    console.log('[likeCollection] isUUID:', isUUID, 'isCollectionId:', isCollectionId);
     
     // Find collection by ID or slug
     let collection;
     try {
-      if (isUUID) {
+      if (isUUID || isCollectionId) {
+        // Try to find by ID first
         collection = await this.prisma.collection.findUnique({
           where: { id: idOrSlug },
-          select: { id: true, likeCount: true },
+          select: { id: true, likeCount: true, isPublic: true, userId: true },
         });
+        
+        // If not found and it's a collection- prefixed ID, try to find by slug (strip prefix)
+        if (!collection && isCollectionId) {
+          const slug = idOrSlug.replace('collection-', '');
+          collection = await this.prisma.collection.findFirst({
+            where: { slug },
+            select: { id: true, likeCount: true, isPublic: true, userId: true },
+          });
+        }
       } else {
         // For slug, we need to find by slug (slug is unique per user, not globally)
         // First try to find public collection with this slug
@@ -647,65 +756,236 @@ export class CollectionService {
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
 
-    if (!collection) {
-      console.error(`Collection not found: idOrSlug=${idOrSlug}, isUUID=${isUUID}, userId=${userId}`);
+    if (!collection || !collection.id) {
+      console.error(`[likeCollection] Collection not found: idOrSlug=${idOrSlug}, isUUID=${isUUID}, userId=${userId}`);
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
+    
+    console.log('[likeCollection] Found collection:', collection.id, 'likeCount:', collection.likeCount);
 
     // Check if user already liked this collection
-    const existingLike = await this.prisma.collectionLike.findUnique({
-      where: {
-        collectionId_userId: {
+    // Use findFirst to avoid composite key issues
+    let existingLike;
+    try {
+      existingLike = await this.prisma.collectionLike.findFirst({
+        where: {
           collectionId: collection.id,
           userId: userId,
         },
-      },
-    });
+      });
+      console.log('[likeCollection] Existing like:', existingLike ? 'found' : 'not found');
+    } catch (findError) {
+      console.error('[likeCollection] Error finding existing like:', findError);
+      throw findError;
+    }
 
     let liked: boolean;
     let likeCount: number;
 
-    if (existingLike) {
-      // Unlike: Remove the like and decrement count
-      await this.prisma.$transaction([
-        this.prisma.collectionLike.delete({
-          where: {
-            collectionId_userId: {
+    try {
+      if (existingLike) {
+        console.log('[likeCollection] Removing like...');
+        // Unlike: Remove the like and decrement count
+        await this.prisma.$transaction(async (tx) => {
+          // Find the like first, then delete by ID
+          const likeToDelete = await tx.collectionLike.findFirst({
+            where: {
               collectionId: collection.id,
               userId: userId,
             },
-          },
-        }),
-        this.prisma.collection.update({
-          where: { id: collection.id },
-          data: { likeCount: { decrement: 1 } },
-        }),
-      ]);
+          });
+          
+          console.log('[likeCollection] Like to delete:', likeToDelete?.id);
+          
+          if (likeToDelete) {
+            await tx.collectionLike.delete({
+              where: { id: likeToDelete.id },
+            });
+            console.log('[likeCollection] Like deleted');
+          }
+          await tx.collection.update({
+            where: { id: collection.id },
+            data: { likeCount: { decrement: 1 } },
+          });
+          console.log('[likeCollection] Like count decremented');
+        });
 
-      liked = false;
-      likeCount = collection.likeCount - 1;
-    } else {
-      // Like: Add the like and increment count
-      await this.prisma.$transaction([
-        this.prisma.collectionLike.create({
-          data: {
-            collectionId: collection.id,
-            userId: userId,
-          },
-        }),
-        this.prisma.collection.update({
-          where: { id: collection.id },
-          data: { likeCount: { increment: 1 } },
-        }),
-      ]);
+        liked = false;
+        likeCount = Math.max(0, (collection.likeCount || 0) - 1);
+        console.log('[likeCollection] Unlike complete, new count:', likeCount);
+      } else {
+        console.log('[likeCollection] Adding like...');
+        // Like: Add the like and increment count
+        await this.prisma.$transaction(async (tx) => {
+          // Check if like already exists (race condition protection)
+          const existing = await tx.collectionLike.findFirst({
+            where: {
+              collectionId: collection.id,
+              userId: userId,
+            },
+          });
+          
+          console.log('[likeCollection] Existing check in transaction:', existing ? 'found' : 'not found');
+          
+          if (!existing) {
+            await tx.collectionLike.create({
+              data: {
+                collectionId: collection.id,
+                userId: userId,
+              },
+            });
+            console.log('[likeCollection] Like created');
+          }
+          await tx.collection.update({
+            where: { id: collection.id },
+            data: { likeCount: { increment: 1 } },
+          });
+          console.log('[likeCollection] Like count incremented');
+        });
 
-      liked = true;
-      likeCount = collection.likeCount + 1;
+        liked = true;
+        likeCount = (collection.likeCount || 0) + 1;
+        console.log('[likeCollection] Like complete, new count:', likeCount);
+      }
+    } catch (error) {
+      console.error('[likeCollection] Error in transaction:', error);
+      throw error;
     }
 
     return {
       liked,
       likeCount,
+    };
+  }
+
+  // ==========================================================================
+  // UNLIKE COLLECTION
+  // ==========================================================================
+  async unlikeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    // Check if idOrSlug is UUID or collection- prefixed ID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const isCollectionId = idOrSlug.startsWith('collection-');
+    
+    // Find collection by ID or slug
+    let collection;
+    if (isUUID || isCollectionId) {
+      collection = await this.prisma.collection.findUnique({
+        where: { id: idOrSlug },
+        select: { id: true, likeCount: true },
+      });
+      
+      if (!collection && isCollectionId) {
+        const slug = idOrSlug.replace('collection-', '');
+        collection = await this.prisma.collection.findFirst({
+          where: { slug },
+          select: { id: true, likeCount: true },
+        });
+      }
+    } else {
+      collection = await this.prisma.collection.findFirst({
+        where: { slug: idOrSlug },
+        select: { id: true, likeCount: true },
+      });
+    }
+
+    if (!collection) {
+      throw new NotFoundException('Koleksiyon bulunamadı');
+    }
+
+    // Find and delete the like
+    const existingLike = await this.prisma.collectionLike.findFirst({
+      where: {
+        collectionId: collection.id,
+        userId: userId,
+      },
+    });
+
+    if (!existingLike) {
+      return {
+        liked: false,
+        likeCount: collection.likeCount || 0,
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionLike.delete({
+        where: { id: existingLike.id },
+      });
+      await tx.collection.update({
+        where: { id: collection.id },
+        data: { likeCount: { decrement: 1 } },
+      });
+    });
+
+    return {
+      liked: false,
+      likeCount: Math.max(0, (collection.likeCount || 0) - 1),
+    };
+  }
+
+  // ==========================================================================
+  // GET LIKED COLLECTIONS
+  // ==========================================================================
+  async getLikedCollections(
+    userId: string,
+    page: number = 1,
+    pageSize: number = 20,
+  ): Promise<CollectionListResponseDto> {
+    const skip = (page - 1) * pageSize;
+
+    const [likedCollections, total] = await Promise.all([
+      this.prisma.collectionLike.findMany({
+        where: { userId },
+        include: {
+          collection: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  avatarUrl: true,
+                },
+              },
+              items: {
+                take: 4,
+                orderBy: { sortOrder: 'asc' },
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      title: true,
+                      images: {
+                        take: 1,
+                        select: { url: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.collectionLike.count({
+        where: { userId },
+      }),
+    ]);
+
+    const collections = likedCollections
+      .filter(like => like.collection && like.collection.isPublic)
+      .map(like => this.mapCollectionToDto(like.collection, true));
+
+    return {
+      data: collections,
+      meta: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
     };
   }
 
@@ -729,26 +1009,73 @@ export class CollectionService {
       description: collection.description || undefined,
       coverImageUrl: collection.coverImageUrl || undefined,
       isPublic: collection.isPublic,
-      viewCount: collection.viewCount,
-      likeCount: collection.likeCount,
+      viewCount: collection.viewCount ?? 0,
+      likeCount: collection.likeCount ?? 0,
       itemCount: collection.items?.length ?? 0,
-      items: collection.items?.map((item: any) => this.mapItemToDto(item)),
-      isLiked: isLiked,
+      items: (collection.items && Array.isArray(collection.items)) 
+        ? collection.items.map((item: any) => {
+            try {
+              return this.mapItemToDto(item);
+            } catch (itemError) {
+              console.error('Error mapping item:', itemError, item);
+              return null;
+            }
+          }).filter((item: any) => item !== null)
+        : [],
+      isLiked: isLiked ?? false,
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
     };
   }
 
   private mapItemToDto(item: any): CollectionItemResponseDto {
-    return {
-      id: item.id,
-      productId: item.product.id,
-      productTitle: item.product.title,
-      productImage: item.product.images?.[0]?.url,
-      productPrice: parseFloat(item.product.price),
-      sortOrder: item.sortOrder,
-      isFeatured: item.isFeatured,
-      addedAt: item.addedAt,
-    };
+    try {
+      if (!item || !item.product) {
+        // Product was deleted or item is invalid, return minimal data
+        return {
+          id: item?.id || '',
+          productId: item?.productId || '',
+          productTitle: 'Ürün bulunamadı',
+          productImage: undefined,
+          productPrice: 0,
+          sortOrder: item?.sortOrder || 0,
+          isFeatured: item?.isFeatured || false,
+          addedAt: item?.addedAt || new Date(),
+        };
+      }
+      
+      const product = item.product;
+      // Safely access images array - handle both array and null/undefined
+      let firstImage = null;
+      if (product) {
+        if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+          firstImage = product.images[0];
+        }
+      }
+      
+      return {
+        id: item.id || '',
+        productId: product.id || '',
+        productTitle: product.title || 'İsimsiz Ürün',
+        productImage: firstImage?.url || undefined,
+        productPrice: product.price ? parseFloat(String(product.price)) : 0,
+        sortOrder: item.sortOrder || 0,
+        isFeatured: item.isFeatured || false,
+        addedAt: item.addedAt || new Date(),
+      };
+    } catch (error) {
+      console.error('Error mapping collection item to DTO:', error, item);
+      // Return safe fallback
+      return {
+        id: item?.id || '',
+        productId: item?.productId || '',
+        productTitle: 'Hata: Ürün bilgisi yüklenemedi',
+        productImage: undefined,
+        productPrice: 0,
+        sortOrder: item?.sortOrder || 0,
+        isFeatured: item?.isFeatured || false,
+        addedAt: item?.addedAt || new Date(),
+      };
+    }
   }
 }

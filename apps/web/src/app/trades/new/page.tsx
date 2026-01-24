@@ -4,96 +4,67 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import {
-  ArrowsRightLeftIcon,
-  ArrowLeftIcon,
-  PlusIcon,
-  MinusIcon,
-  CheckIcon,
-  CurrencyDollarIcon,
-  ChatBubbleLeftRightIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowsRightLeftIcon, ArrowLeftIcon, PlusIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { tradesApi, listingsApi } from '@/lib/api';
+import { productsApi, userApi } from '@/lib/api';
+import api from '@/lib/api';
 
 interface Product {
   id: string;
   title: string;
   price: number;
-  images: Array<{ url: string } | string>;
-  condition?: string;
+  images?: Array<{ url: string } | string>;
   isTradeEnabled?: boolean;
-  seller?: {
-    id: string;
-    displayName: string;
-  };
-  sellerId?: string;
 }
 
 export default function NewTradePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated } = useAuthStore();
-  
-  // Product to request (from URL)
   const listingId = searchParams.get('listing');
   
-  const [requestedProduct, setRequestedProduct] = useState<Product | null>(null);
+  const { user, isAuthenticated, limits } = useAuthStore();
+  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business' || user?.membershipTier === 'basic');
+  
+  const [targetProduct, setTargetProduct] = useState<Product | null>(null);
   const [myProducts, setMyProducts] = useState<Product[]>([]);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [cashAmount, setCashAmount] = useState<number>(0);
-  const [cashDirection, setCashDirection] = useState<'give' | 'receive'>('give');
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [cashAmount, setCashAmount] = useState<string>('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('Takas teklifi için giriş yapmalısınız');
       router.push(`/login?redirect=/trades/new?listing=${listingId}`);
       return;
     }
-
+    
+    if (!canTrade) {
+      toast.error('Takas özelliği için Premium üyelik gereklidir');
+      router.push('/pricing');
+      return;
+    }
+    
     if (listingId) {
       fetchData();
-    } else {
-      toast.error('Takas yapılacak ürün belirtilmedi');
-      router.push('/listings');
     }
-  }, [listingId, isAuthenticated]);
+  }, [isAuthenticated, canTrade, listingId]);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch the requested product
-      const productResponse = await listingsApi.getOne(listingId!);
-      const product = productResponse.data.product || productResponse.data;
+      // Fetch target product
+      const productRes = await productsApi.getOne(listingId!);
+      const productData = productRes.data.product || productRes.data;
+      setTargetProduct(productData);
       
-      if (!product.isTradeEnabled) {
-        toast.error('Bu ürün takas için uygun değil');
-        router.push(`/listings/${listingId}`);
-        return;
-      }
-      
-      // Check if it's own product
-      if (product.sellerId === user?.id || product.seller?.id === user?.id) {
-        toast.error('Kendi ürününüzle takas yapamazsınız');
-        router.push(`/listings/${listingId}`);
-        return;
-      }
-      
-      setRequestedProduct(product);
-      
-      // Fetch my active products (all of them - user wants to offer their own items)
-      const myProductsResponse = await listingsApi.getAll({
-        sellerId: user?.id,
-        status: 'active',
-      });
-      
-      const products = myProductsResponse.data.products || myProductsResponse.data.data || myProductsResponse.data || [];
-      setMyProducts(Array.isArray(products) ? products : []);
+      // Fetch my trade-enabled products
+      const myProductsRes = await userApi.getMyProducts();
+      const products = myProductsRes.data.data || myProductsRes.data.products || [];
+      // Filter only trade-enabled products
+      const tradeableProducts = products.filter((p: Product) => p.isTradeEnabled && p.id !== listingId);
+      setMyProducts(tradeableProducts);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Veriler yüklenemedi');
@@ -102,74 +73,60 @@ export default function NewTradePage() {
     }
   };
 
-  const toggleProduct = (productId: string) => {
-    setSelectedProductIds((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    );
-  };
-
   const getProductImage = (product: Product): string => {
     if (!product.images || product.images.length === 0) {
       return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
     }
-    const firstImage = product.images[0];
-    if (typeof firstImage === 'string') return firstImage;
-    return firstImage.url || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    const img = product.images[0];
+    return typeof img === 'string' ? img : img.url;
   };
 
-  const calculateValues = () => {
-    const myTotal = myProducts
-      .filter((p) => selectedProductIds.includes(p.id))
+  const toggleProduct = (productId: string) => {
+    setSelectedProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const calculateTotal = () => {
+    const productsTotal = myProducts
+      .filter(p => selectedProducts.includes(p.id))
       .reduce((sum, p) => sum + Number(p.price), 0);
-    
-    const theirTotal = requestedProduct ? Number(requestedProduct.price) : 0;
-    const difference = theirTotal - myTotal;
-    
-    return { myTotal, theirTotal, difference };
+    const cash = parseFloat(cashAmount) || 0;
+    return productsTotal + cash;
   };
-
-  const { myTotal, theirTotal, difference } = calculateValues();
 
   const handleSubmit = async () => {
-    if (selectedProductIds.length === 0) {
-      toast.error('En az bir ürün seçmelisiniz');
+    if (selectedProducts.length === 0 && !cashAmount) {
+      toast.error('En az bir ürün seçin veya nakit fark girin');
       return;
     }
 
-    if (!requestedProduct) {
-      toast.error('Talep edilen ürün bulunamadı');
+    if (!targetProduct) {
+      toast.error('Hedef ürün bulunamadı');
+      return;
+    }
+
+    // Get sellerId from targetProduct
+    const sellerId = (targetProduct as any).sellerId || (targetProduct as any).seller?.id;
+    if (!sellerId) {
+      toast.error('Satıcı bilgisi bulunamadı');
       return;
     }
 
     setIsSubmitting(true);
-
     try {
-      // Calculate cash amount
-      let finalCashAmount = 0;
-      if (cashAmount > 0) {
-        finalCashAmount = cashDirection === 'give' ? cashAmount : -cashAmount;
-      }
-
-      const tradeData = {
-        receiverId: requestedProduct.sellerId || requestedProduct.seller?.id || '',
-        initiatorItems: selectedProductIds.map((id) => ({
-          productId: id,
-          quantity: 1,
-        })),
-        receiverItems: [
-          {
-            productId: requestedProduct.id,
-            quantity: 1,
-          },
-        ],
-        cashAmount: finalCashAmount || undefined,
+      const payload = {
+        receiverId: sellerId,
+        initiatorItems: selectedProducts.map(id => ({ productId: id, quantity: 1 })),
+        receiverItems: [{ productId: targetProduct.id, quantity: 1 }],
+        cashAmount: parseFloat(cashAmount) || undefined,
         message: message || undefined,
       };
 
-      await tradesApi.create(tradeData);
-      
+      await api.post('/trades', payload);
       toast.success('Takas teklifi gönderildi!');
       router.push('/trades');
     } catch (error: any) {
@@ -183,30 +140,25 @@ export default function NewTradePage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-8" />
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="card p-6">
-                <div className="h-64 bg-gray-200 rounded-lg mb-4" />
-                <div className="h-6 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-gray-200 rounded w-1/2" />
-              </div>
-              <div className="card p-6">
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="w-20 h-20 bg-gray-200 rounded-lg" />
-                      <div className="flex-1">
-                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                        <div className="h-4 bg-gray-200 rounded w-1/2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-64 bg-gray-200 rounded-xl" />
+            <div className="h-64 bg-gray-200 rounded-xl" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!targetProduct) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <p className="text-gray-600 mb-4">Ürün bulunamadı</p>
+          <Link href="/listings" className="text-primary-500 hover:text-primary-600">
+            İlanlara Dön
+          </Link>
         </div>
       </div>
     );
@@ -214,287 +166,216 @@ export default function NewTradePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="mb-8">
+          <Link
+            href={`/listings/${listingId}`}
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+            Geri Dön
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
+            Takas Teklifi Oluştur
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Takas etmek istediğiniz ürünleri seçin
+          </p>
+        </div>
+
+        {/* Target Product */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            İstediğiniz Ürün
+          </h2>
+          <div className="flex items-center gap-4">
+            <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+              <Image
+                src={getProductImage(targetProduct)}
+                alt={targetProduct.title}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900 line-clamp-2">
+                {targetProduct.title}
+              </h3>
+              <p className="text-xl font-bold text-primary-500 mt-1">
+                ₺{Number(targetProduct.price).toLocaleString('tr-TR')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* My Products */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Teklif Edeceğiniz Ürünler
+          </h2>
+          
+          {myProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600 mb-4">
+                Takasa açık ürününüz bulunmuyor. Önce ilanlarınızdan birini takasa açık hale getirin.
+              </p>
+              <Link
+                href="/profile/listings"
+                className="text-primary-500 hover:text-primary-600 font-medium"
+              >
+                İlanlarıma Git →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {myProducts.map((product) => {
+                const isSelected = selectedProducts.includes(product.id);
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => toggleProduct(product.id)}
+                    className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                      isSelected
+                        ? 'border-orange-500 ring-2 ring-orange-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                        <CheckIcon className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <div className="aspect-square relative bg-gray-100">
+                      <Image
+                        src={getProductImage(product)}
+                        alt={product.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                    <div className="p-3 text-left">
+                      <p className="text-sm font-medium text-gray-900 line-clamp-1">
+                        {product.title}
+                      </p>
+                      <p className="text-sm font-bold text-primary-500">
+                        ₺{Number(product.price).toLocaleString('tr-TR')}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Cash Addition */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Nakit Fark (Opsiyonel)
+          </h2>
+          <p className="text-gray-600 text-sm mb-4">
+            Takas değerini dengelemek için nakit fark ekleyebilirsiniz.
+          </p>
+          <div className="relative max-w-xs">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
+            <input
+              type="number"
+              value={cashAmount}
+              onChange={(e) => setCashAmount(e.target.value)}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Message */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Mesaj (Opsiyonel)
+          </h2>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Satıcıya bir mesaj bırakın..."
+            rows={4}
+            maxLength={500}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+          />
+          <p className="text-sm text-gray-500 mt-2 text-right">
+            {message.length}/500
+          </p>
+        </div>
+
+        {/* Summary */}
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Teklif Özeti
+          </h2>
+          <div className="space-y-2 text-gray-700">
+            <div className="flex justify-between">
+              <span>Seçilen Ürünler:</span>
+              <span className="font-medium">{selectedProducts.length} adet</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Ürün Toplam Değeri:</span>
+              <span className="font-medium">
+                ₺{myProducts
+                  .filter(p => selectedProducts.includes(p.id))
+                  .reduce((sum, p) => sum + Number(p.price), 0)
+                  .toLocaleString('tr-TR')}
+              </span>
+            </div>
+            {parseFloat(cashAmount) > 0 && (
+              <div className="flex justify-between">
+                <span>Nakit Fark:</span>
+                <span className="font-medium">₺{parseFloat(cashAmount).toLocaleString('tr-TR')}</span>
+              </div>
+            )}
+            <div className="border-t border-orange-200 pt-2 mt-2">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Toplam Teklif:</span>
+                <span className="text-orange-600">₺{calculateTotal().toLocaleString('tr-TR')}</span>
+              </div>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>İstenen Ürün:</span>
+              <span className="font-medium">₺{Number(targetProduct.price).toLocaleString('tr-TR')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit */}
+        <div className="flex gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="flex-1 px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6" />
+            Vazgeç
           </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Takas Teklifi Oluştur</h1>
-            <p className="text-gray-600">Ürünlerinizi seçin ve teklif gönderin</p>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Requested Product (What I Want) */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold">
-                1
-              </span>
-              İstediğim Ürün
-            </h2>
-
-            {requestedProduct && (
-              <div className="relative">
-                <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 mb-4">
-                  <Image
-                    src={getProductImage(requestedProduct)}
-                    alt={requestedProduct.title}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{requestedProduct.title}</h3>
-                <p className="text-2xl font-bold text-primary-500 mb-2">
-                  ₺{Number(requestedProduct.price).toLocaleString('tr-TR')}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Satıcı: {requestedProduct.seller?.displayName || 'Satıcı'}
-                </p>
-                {requestedProduct.condition && (
-                  <p className="text-gray-500 text-sm mt-1">
-                    Durum: {requestedProduct.condition}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* My Products (What I Offer) */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-bold">
-                2
-              </span>
-              Teklif Ettiğim Ürünler
-              {selectedProductIds.length > 0 && (
-                <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                  {selectedProductIds.length} seçili
-                </span>
-              )}
-            </h2>
-
-            {myProducts.length === 0 ? (
-              <div className="text-center py-12">
-                <ArrowsRightLeftIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Aktif ürününüz yok
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Takas teklifi göndermek için en az bir aktif ürününüz olmalı.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Link href="/listings/new" className="btn-primary">
-                    Yeni Ürün Listele
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {myProducts.map((product) => {
-                  const isSelected = selectedProductIds.includes(product.id);
-                  return (
-                    <motion.button
-                      key={product.id}
-                      onClick={() => toggleProduct(product.id)}
-                      className={`w-full flex items-center gap-4 p-3 rounded-xl border-2 transition-all text-left ${
-                        isSelected
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                        <Image
-                          src={getProductImage(product)}
-                          alt={product.title}
-                          fill
-                          className="object-cover"
-                        />
-                        {isSelected && (
-                          <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                            <CheckIcon className="w-8 h-8 text-green-600" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{product.title}</p>
-                        <p className="text-primary-500 font-semibold">
-                          ₺{Number(product.price).toLocaleString('tr-TR')}
-                        </p>
-                      </div>
-                      <div
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                          isSelected
-                            ? 'border-green-500 bg-green-500'
-                            : 'border-gray-300'
-                        }`}
-                      >
-                        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Trade Summary & Options */}
-        {myProducts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card p-6 mt-8"
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || (selectedProducts.length === 0 && !cashAmount)}
+            className="flex-1 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                3
-              </span>
-              Takas Özeti
-            </h2>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* Value Summary */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="font-semibold mb-3">Değer Karşılaştırması</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Benim teklifim:</span>
-                    <span className="font-semibold text-green-600">
-                      ₺{myTotal.toLocaleString('tr-TR')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">İstediğim ürün:</span>
-                    <span className="font-semibold text-orange-600">
-                      ₺{theirTotal.toLocaleString('tr-TR')}
-                    </span>
-                  </div>
-                  <hr />
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Fark:</span>
-                    <span
-                      className={`font-bold ${
-                        difference > 0
-                          ? 'text-red-600'
-                          : difference < 0
-                          ? 'text-green-600'
-                          : 'text-gray-600'
-                      }`}
-                    >
-                      {difference > 0 ? '+' : ''}₺{difference.toLocaleString('tr-TR')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cash Balance */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <CurrencyDollarIcon className="w-5 h-5" />
-                  Nakit Fark Ekle (Opsiyonel)
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={cashDirection}
-                      onChange={(e) => setCashDirection(e.target.value as 'give' | 'receive')}
-                      className="input flex-1"
-                    >
-                      <option value="give">Ben vereceğim</option>
-                      <option value="receive">Ben alacağım</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCashAmount(Math.max(0, cashAmount - 50))}
-                      className="p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                    >
-                      <MinusIcon className="w-4 h-4" />
-                    </button>
-                    <input
-                      type="number"
-                      value={cashAmount}
-                      onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value)))}
-                      className="input text-center flex-1"
-                      min={0}
-                      step={50}
-                    />
-                    <button
-                      onClick={() => setCashAmount(cashAmount + 50)}
-                      className="p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {cashAmount > 0 && (
-                      <>
-                        {cashDirection === 'give'
-                          ? `₺${cashAmount} fark ödeyeceksiniz`
-                          : `₺${cashAmount} fark alacaksınız`}
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Message */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                  Mesaj (Opsiyonel)
-                </h3>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Satıcıya mesajınız..."
-                  rows={3}
-                  maxLength={500}
-                  className="input w-full resize-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">{message.length}/500</p>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <p className="text-gray-600">
-                  {selectedProductIds.length} ürün teklif ediyorsunuz
-                </p>
-                {cashAmount > 0 && (
-                  <p className="text-sm text-gray-500">
-                    + ₺{cashAmount} {cashDirection === 'give' ? 'nakit fark' : 'nakit fark alacaksınız'}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={selectedProductIds.length === 0 || isSubmitting}
-                className="btn-trade w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 text-lg"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    Gönderiliyor...
-                  </>
-                ) : (
-                  <>
-                    <ArrowsRightLeftIcon className="w-6 h-6" />
-                    Takas Teklifi Gönder
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        )}
+            {isSubmitting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Gönderiliyor...
+              </>
+            ) : (
+              <>
+                <ArrowsRightLeftIcon className="w-5 h-5" />
+                Takas Teklifi Gönder
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -120,11 +120,11 @@ export class TradeService {
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
-    // Validate receiver membership - must be premium to receive trade
+    // Validate receiver membership - must have trade capability to receive trade
     const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
     if (!receiverCanTrade.allowed) {
       throw new BadRequestException(
-        'Takas teklifi gönderilemiyor. Alıcı kullanıcı Premium üyelik gerektiren takas özelliğine sahip değil.',
+        receiverCanTrade.reason || 'Takas teklifi gönderilemiyor. Alıcı kullanıcı takas özelliğine sahip değil.',
       );
     }
 

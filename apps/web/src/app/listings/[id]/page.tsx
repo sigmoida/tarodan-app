@@ -24,7 +24,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
-import { listingsApi, wishlistApi, collectionsApi, api } from '@/lib/api';
+import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
@@ -98,6 +98,10 @@ export default function ListingDetailPage() {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -284,6 +288,71 @@ export default function ListingDetailPage() {
     }
     
     router.push(`/checkout?productId=${listing.id}`);
+  };
+
+  const handleMakeOffer = () => {
+    if (!isAuthenticated) {
+      setAuthModalConfig({
+        title: 'Giriş Yapmanız Gerekiyor',
+        message: 'Teklif vermek için giriş yapmalısınız.',
+        icon: <BoltIcon className="w-12 h-12 text-orange-500" />,
+      });
+      setShowAuthModal(true);
+      return;
+    }
+    
+    if (!listing || listing.status !== 'active') {
+      toast.error('Bu ürün şu anda satışta değil');
+      return;
+    }
+    
+    if (isOwner) {
+      toast.error('Kendi ürününüze teklif veremezsiniz');
+      return;
+    }
+    
+    setOfferAmount('');
+    setOfferMessage('');
+    setShowOfferModal(true);
+  };
+
+  const handleSubmitOffer = async () => {
+    if (!listing) return;
+    
+    const amount = parseFloat(offerAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Geçerli bir tutar giriniz');
+      return;
+    }
+    
+    const minOffer = Number(listing.price) * 0.5; // Minimum %50
+    if (amount < minOffer) {
+      toast.error(`Minimum teklif tutarı: ${minOffer.toFixed(2)} TL (Ürün fiyatının %50'si)`);
+      return;
+    }
+    
+    if (amount >= Number(listing.price)) {
+      toast.error('Teklif tutarı ürün fiyatından düşük olmalıdır');
+      return;
+    }
+    
+    setIsSubmittingOffer(true);
+    try {
+      await offersApi.create({
+        productId: listing.id,
+        amount: amount,
+        message: offerMessage.trim() || undefined,
+      });
+      toast.success('Teklifiniz başarıyla gönderildi');
+      setShowOfferModal(false);
+      setOfferAmount('');
+      setOfferMessage('');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Teklif gönderilemedi';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingOffer(false);
+    }
   };
 
   const isOwner = listing && (listing.sellerId === user?.id || listing.seller?.id === user?.id);
@@ -1073,12 +1142,26 @@ export default function ListingDetailPage() {
                       router.push(`/trades/new?listing=${listing.id}`);
                     }}
                     disabled={listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 ${
-                      listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${
+                      listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
                     }`}
                   >
                     <ArrowsRightLeftIcon className="w-5 h-5" />
                     Takas Teklifi
+                  </button>
+                )}
+                {!isOwner && (
+                  <button
+                    onClick={handleMakeOffer}
+                    disabled={listing.status !== 'active'}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${
+                      listing.status !== 'active'
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                        : 'btn-secondary'
+                    }`}
+                  >
+                    <BoltIcon className="w-5 h-5" />
+                    Teklif Ver
                   </button>
                 )}
                 <button
@@ -1297,6 +1380,85 @@ export default function ListingDetailPage() {
         message={authModalConfig.message}
         icon={authModalConfig.icon}
       />
+
+      {/* Offer Modal */}
+      {showOfferModal && listing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Teklif Ver</h2>
+              <button
+                onClick={() => setShowOfferModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ürün Fiyatı
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  {Number(listing.price).toLocaleString('tr-TR')} TL
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimum teklif: {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Teklif Tutarınız (TL)
+                </label>
+                <input
+                  type="number"
+                  value={offerAmount}
+                  onChange={(e) => setOfferAmount(e.target.value)}
+                  placeholder="Teklif tutarını giriniz"
+                  min={Math.round(Number(listing.price) * 0.5)}
+                  max={Number(listing.price) - 1}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mesaj (Opsiyonel)
+                </label>
+                <textarea
+                  value={offerMessage}
+                  onChange={(e) => setOfferMessage(e.target.value)}
+                  placeholder="Satıcıya iletmek istediğiniz mesaj..."
+                  rows={4}
+                  maxLength={500}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {offerMessage.length}/500 karakter
+                </p>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowOfferModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSubmitOffer}
+                  disabled={isSubmittingOffer || !offerAmount}
+                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingOffer ? 'Gönderiliyor...' : 'Teklif Gönder'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Trade Premium Required Modal */}
       {showTradeModal && (
