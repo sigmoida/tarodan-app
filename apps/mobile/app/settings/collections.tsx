@@ -58,7 +58,7 @@ export default function CollectionsScreen() {
     enabled: isAuthenticated,
   });
 
-  const collections = collectionsData || MOCK_COLLECTIONS;
+  const collections = Array.isArray(collectionsData) ? collectionsData : MOCK_COLLECTIONS;
 
   const onRefresh = async () => {
     setRefreshing(true);

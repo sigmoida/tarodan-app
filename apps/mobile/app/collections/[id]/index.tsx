@@ -4,8 +4,8 @@ import { Text, Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Car
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
+import { api } from '../../../src/services/api';
+import { TarodanColors } from '../../../src/theme';
 
 const { width } = Dimensions.get('window');
 

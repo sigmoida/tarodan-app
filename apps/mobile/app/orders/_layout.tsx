@@ -8,9 +8,6 @@ export default function OrdersLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: TarodanColors.background },
       }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[id]" />
-    </Stack>
+    />
   );
 }

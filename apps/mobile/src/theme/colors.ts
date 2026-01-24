@@ -1,55 +1,77 @@
-// Tarodan Theme Colors - Synced with Web Design
+// Tarodan Theme Colors - Enhanced for Better UX
 // Web globals.css: --primary: #f97316, --primary-dark: #ea580c
 export const TarodanColors = {
   // Primary Colors (synced with web Tailwind orange-500/600)
   primary: '#f97316', // Main orange - matches web
   primaryDark: '#ea580c', // orange-600
-  primaryLight: '#fb923c', // orange-400
+  primaryLight: '#FFF7ED', // Very light orange for backgrounds
+  primaryMedium: '#FFEDD5', // Light orange for cards/highlights
   
   // Secondary Colors
-  secondary: '#212121', // matches web --text-primary
-  secondaryLight: '#757575', // matches web --text-secondary
+  secondary: '#1F2937', // Darker for better contrast
+  secondaryLight: '#6B7280', // Better readable gray
   
   // Accent Colors (synced with web)
-  accent: '#4CAF50', // Green - matches web --accent-green
-  accentLight: '#81C784',
-  accentBlue: '#2196F3', // matches web --accent-blue
+  accent: '#10B981', // Emerald green - more modern
+  accentLight: '#D1FAE5',
+  accentBlue: '#3B82F6', // Better blue
+  accentBlueLite: '#DBEAFE',
   
-  // Background Colors (synced with web)
-  background: '#FAFAFA', // matches web --background
-  backgroundSecondary: '#F5F5F5',
+  // Background Colors - Cleaner whites
+  background: '#FFFFFF', // Pure white for main background
+  backgroundSecondary: '#F9FAFB', // Very light gray
+  backgroundTertiary: '#F3F4F6', // Slightly darker for sections
   surface: '#FFFFFF', // matches web --surface
-  surfaceVariant: '#F5F5F5',
+  surfaceVariant: '#F9FAFB',
   
-  // Text Colors (synced with web)
-  textPrimary: '#212121', // matches web --text-primary
-  textSecondary: '#757575', // matches web --text-secondary
-  textLight: '#9E9E9E',
+  // Text Colors - Better contrast
+  textPrimary: '#111827', // Almost black for best readability
+  textSecondary: '#4B5563', // Darker gray for secondary text
+  textTertiary: '#9CA3AF', // Light gray for hints
+  textLight: '#6B7280', // Medium gray
   textOnPrimary: '#FFFFFF',
+  textOnDark: '#FFFFFF',
   
-  // Status Colors
-  success: '#4CAF50', // synced with accent green
-  warning: '#FFC107',
-  error: '#F44336',
-  info: '#2196F3', // synced with accent blue
+  // Status Colors - More vibrant
+  success: '#10B981', // Emerald
+  successLight: '#D1FAE5',
+  warning: '#F59E0B', // Amber
+  warningLight: '#FEF3C7',
+  error: '#EF4444', // Red
+  errorLight: '#FEE2E2',
+  info: '#3B82F6', // Blue
+  infoLight: '#DBEAFE',
   
-  // Badge Colors
-  badgeNew: '#4CAF50', // green
-  badgeRare: '#9C27B0', // purple
-  badgeDiscount: '#F44336', // red
-  badgeTrade: '#2196F3', // blue
+  // Badge Colors - More modern
+  badgeNew: '#10B981', // green
+  badgeRare: '#8B5CF6', // purple
+  badgeDiscount: '#EF4444', // red
+  badgeTrade: '#3B82F6', // blue
+  badgePremium: '#F59E0B', // gold
   
-  // Border Colors (synced with web)
-  border: '#E0E0E0', // matches web --border
-  borderLight: '#EEEEEE',
+  // Border Colors - Softer
+  border: '#E5E7EB', // Softer gray
+  borderLight: '#F3F4F6',
+  borderDark: '#D1D5DB',
   
   // Price Colors
-  price: '#f97316', // orange like primary
-  priceOld: '#9E9E9E',
+  price: '#EA580C', // Darker orange for better readability
+  priceOld: '#9CA3AF',
+  priceSale: '#DC2626',
   
   // Rating Colors
-  star: '#FFC107', // amber
-  starEmpty: '#E0E0E0',
+  star: '#F59E0B', // amber
+  starEmpty: '#E5E7EB',
+  
+  // Card shadows and overlays
+  shadow: 'rgba(0, 0, 0, 0.1)',
+  shadowDark: 'rgba(0, 0, 0, 0.15)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+  overlayLight: 'rgba(255, 255, 255, 0.9)',
+  
+  // Gradient colors
+  gradientStart: '#f97316',
+  gradientEnd: '#F59E0B',
 };
 
 // Scale/Size Options matching web

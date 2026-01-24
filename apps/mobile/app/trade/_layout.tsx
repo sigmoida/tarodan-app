@@ -5,28 +5,9 @@ export default function TradeLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: TarodanColors.primary,
-        },
-        headerTintColor: TarodanColors.textOnPrimary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false,
+        contentStyle: { backgroundColor: TarodanColors.background },
       }}
-    >
-      <Stack.Screen 
-        name="new" 
-        options={{ 
-          title: 'Yeni Takas Teklifi',
-          headerShown: false,
-        }} 
-      />
-      <Stack.Screen 
-        name="[id]" 
-        options={{ 
-          title: 'Takas Detayı',
-        }} 
-      />
-    </Stack>
+    />
   );
 }
