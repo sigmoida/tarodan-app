@@ -9,6 +9,7 @@ import {
   MembershipTierType,
   SubscriptionStatus,
   ProductStatus,
+  OrderStatus,
 } from '@prisma/client';
 import {
   SubscribeDto,
@@ -18,10 +19,17 @@ import {
   UserMembershipResponseDto,
   MembershipLimitsDto,
 } from './dto';
+import { PaymentService } from '../payment/payment.service';
+import { PaymentProvider } from '../payment/dto';
+import { Request } from 'express';
+import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
 
 @Injectable()
 export class MembershipService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   // ==========================================================================
   // GET ALL TIERS
@@ -236,6 +244,116 @@ export class MembershipService {
     }
 
     return this.getUserMembership(userId);
+  }
+
+  // ==========================================================================
+  // INITIATE MEMBERSHIP PAYMENT
+  // ==========================================================================
+  async initiateMembershipPayment(
+    userId: string,
+    provider: PaymentProvider,
+    req?: Request,
+  ): Promise<MembershipPaymentInitResponseDto> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+
+    if (membership.tier.type === MembershipTierType.free) {
+      throw new BadRequestException('Ücretsiz üyelik için ödeme gerekmez');
+    }
+
+    const price = membership.tier.monthlyPrice.toNumber() || membership.tier.yearlyPrice.toNumber();
+
+    if (price === 0) {
+      throw new BadRequestException('Bu üyelik seviyesi için ödeme gerekmez');
+    }
+
+    // Find platform seller for membership orders
+    const platformSeller = await this.prisma.user.findFirst({
+      where: {
+        email: 'platform@tarodan.com',
+        sellerType: 'platform',
+      },
+    });
+
+    if (!platformSeller) {
+      throw new NotFoundException('Platform seller bulunamadı');
+    }
+
+    // Find or create a virtual product for membership
+    // Use a category - we'll need to find a default category
+    const defaultCategory = await this.prisma.category.findFirst({
+      where: { isActive: true },
+    });
+
+    if (!defaultCategory) {
+      throw new NotFoundException('Kategori bulunamadı');
+    }
+
+    // Create or find virtual product for membership
+    const virtualProductId = `membership-${membership.tierId}`;
+    let product = await this.prisma.product.findUnique({
+      where: { id: virtualProductId },
+    });
+
+    if (!product) {
+      product = await this.prisma.product.create({
+        data: {
+          id: virtualProductId,
+          sellerId: platformSeller.id,
+          categoryId: defaultCategory.id,
+          title: `${membership.tier.name} Üyelik`,
+          description: `Üyelik ödemesi için sanal ürün`,
+          price: price,
+          condition: 'new',
+          status: ProductStatus.active,
+        },
+      });
+    }
+
+    // Generate order number
+    const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    // Create order for membership payment
+    const order = await this.prisma.order.create({
+      data: {
+        orderNumber,
+        buyerId: userId,
+        sellerId: platformSeller.id,
+        productId: product.id,
+        totalAmount: price,
+        commissionAmount: 0, // No commission for membership
+        shippingCost: 0,
+        status: OrderStatus.pending_payment,
+        shippingAddress: {
+          type: 'membership',
+        } as any,
+      },
+    });
+
+    // Initiate payment with the created order
+    const paymentResult = await this.paymentService.initiatePayment(
+      userId,
+      {
+        orderId: order.id,
+        provider,
+      },
+      req,
+    );
+
+    return {
+      paymentId: paymentResult.paymentId,
+      membershipPaymentId: membership.id,
+      paymentUrl: paymentResult.paymentUrl || '',
+      paymentHtml: paymentResult.paymentHtml,
+      provider: paymentResult.provider,
+      expiresIn: paymentResult.expiresIn || 300,
+    };
   }
 
   // ==========================================================================

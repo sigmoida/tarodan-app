@@ -76,13 +76,17 @@ export default function MessagesPage() {
   };
 
   const handleReject = async (messageId: string) => {
-    if (!confirm('Bu mesajı reddetmek istediğinize emin misiniz?')) return;
+    const reason = prompt('Red nedeni:');
+    if (!reason || !reason.trim()) {
+      toast.error('Red nedeni gereklidir');
+      return;
+    }
     try {
-      await adminApi.rejectMessage(messageId);
+      await adminApi.rejectMessage(messageId, reason);
       toast.success('Mesaj reddedildi');
       loadMessages();
-    } catch (error) {
-      toast.error('İşlem başarısız');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
     }
   };
 

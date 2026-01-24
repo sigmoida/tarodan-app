@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { MagnifyingGlassIcon, EyeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -179,12 +180,13 @@ export default function TradesPage() {
                       <td>{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</td>
                       <td>
                         <div className="flex gap-1">
-                          <button
+                          <Link
+                            href={`/admin/trades/${trade.id}`}
                             className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
-                          </button>
+                          </Link>
                           {trade.hasDispute && (
                             <button
                               className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"

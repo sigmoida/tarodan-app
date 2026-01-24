@@ -274,6 +274,16 @@ export class OrderService {
    * - Cannot buy own product
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
+    // Check if user is banned
+    const buyer = await this.prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { isBanned: true },
+    });
+
+    if (buyer?.isBanned) {
+      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Get product with seller info - using Prisma instead of raw SQL
       // Transaction provides isolation for concurrent purchases
@@ -480,6 +490,15 @@ export class OrderService {
    * - Commission is calculated automatically
    */
   async create(buyerId: string, dto: CreateOrderDto) {
+    // Check if user is banned
+    const buyer = await this.prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { isBanned: true },
+    });
+
+    if (buyer?.isBanned) {
+      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+    }
     let productIdForCache: string | null = null;
     
     const result = await this.prisma.$transaction(async (tx) => {

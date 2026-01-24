@@ -205,27 +205,27 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-4">
-                  <Link
-                    href="/login"
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/login"
                     className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
-                  >
-                    Giriş yap
-                  </Link>
-                  <Link
-                    href="/register"
+                >
+                  Giriş yap
+                </Link>
+                <Link
+                  href="/register"
                     className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
-                  >
-                    Üye Ol
-                  </Link>
-                  <Link
-                    href="/cart"
+                >
+                  Üye Ol
+                </Link>
+                <Link
+                  href="/cart"
                     className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
-                  >
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    Sepetim
-                  </Link>
-                </div>
+                >
+                  <ShoppingCartIcon className="w-5 h-5" />
+                  Sepetim
+                </Link>
+              </div>
               </>
             )}
 

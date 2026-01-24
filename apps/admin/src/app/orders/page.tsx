@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import { MagnifyingGlassIcon, EyeIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -255,12 +256,13 @@ export default function OrdersPage() {
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
-                          <button
-                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
-                            title="Detay"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </button>
+                            <Link
+                              href={`/admin/orders/${order.id}`}
+                              className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                              title="Detay"
+                            >
+                              <EyeIcon className="h-5 w-5" />
+                            </Link>
                         </div>
                       </td>
                     </tr>
