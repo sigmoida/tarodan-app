@@ -51,11 +51,10 @@ export const ProductConditionLabels: Record<ProductCondition, string> = {
 /**
  * Membership Tier Types and Labels
  */
-export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
+export type MembershipTier = 'free' | 'premium' | 'business';
 
 export const MembershipTierLabels: Record<MembershipTier, string> = {
   free: 'Ücretsiz',
-  basic: 'Temel',
   premium: 'Premium',
   business: 'İş',
 };

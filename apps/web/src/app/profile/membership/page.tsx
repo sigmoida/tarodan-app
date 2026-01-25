@@ -69,7 +69,6 @@ export default function MembershipPage() {
   const currentTier = membership?.tier || 'free';
   const tierNames: Record<string, string> = {
     free: 'Ücretsiz',
-    basic: 'Temel',
     premium: 'Premium',
     business: 'İş',
   };
@@ -134,11 +133,15 @@ export default function MembershipPage() {
                 </div>
               </>
             )}
-            {currentTier === 'basic' && (
+            {currentTier === 'premium' && (
               <>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
-                  <span>50 aktif ilan hakkı</span>
+                  <span>Sınırsız aktif ilan</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckIcon className="w-5 h-5 text-green-400" />
+                  <span>15 resim/ilan</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
@@ -146,15 +149,23 @@ export default function MembershipPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
-                  <span>Koleksiyon oluşturma</span>
+                  <span>Sınırsız koleksiyon (Digital Garage)</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckIcon className="w-5 h-5 text-green-400" />
+                  <span>Reklamsız deneyim</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckIcon className="w-5 h-5 text-green-400" />
+                  <span>3 öne çıkan ilan</span>
                 </div>
               </>
             )}
-            {(currentTier === 'premium' || currentTier === 'business') && (
+            {currentTier === 'business' && (
               <>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
-                  <span>{currentTier === 'premium' ? '200' : '1000'} aktif ilan hakkı</span>
+                  <span>1000 aktif ilan hakkı</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
@@ -166,7 +177,11 @@ export default function MembershipPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckIcon className="w-5 h-5 text-green-400" />
-                  <span>Öncelikli destek</span>
+                  <span>7/24 öncelikli destek</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckIcon className="w-5 h-5 text-green-400" />
+                  <span>Özel API erişimi</span>
                 </div>
               </>
             )}

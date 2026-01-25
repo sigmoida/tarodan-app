@@ -51,12 +51,6 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
     canTrade: false,
     canCreateCollections: false,
   },
-  basic: {
-    maxListings: 25,
-    maxImagesPerListing: 10,
-    canTrade: true,
-    canCreateCollections: true,
-  },
   premium: {
     maxListings: -1,
     maxImagesPerListing: 15,
@@ -86,7 +80,7 @@ const extractMembershipTier = (user: any): MembershipTier => {
   
   if (normalizedTier.includes('premium') || normalizedTier === 'premium') return 'premium';
   if (normalizedTier.includes('business') || normalizedTier === 'business') return 'business';
-  if (normalizedTier.includes('basic') || normalizedTier === 'basic') return 'basic';
+  if (normalizedTier.includes('basic') || normalizedTier === 'basic') return 'premium'; // BASIC üyeleri PREMIUM'a map et
   return 'free';
 };
 
@@ -116,6 +110,7 @@ const mapApiUser = (apiUser: any): User => ({
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   limits: MembershipLimits | null;
@@ -139,6 +134,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: true,
       limits: null,
@@ -149,17 +145,21 @@ export const useAuthStore = create<AuthState>()(
         console.log('[AuthStore] API response:', response.data);
         const { user: apiUser, tokens } = response.data;
         const token = tokens.accessToken;
+        const refreshToken = tokens.refreshToken;
         console.log('[AuthStore] Token extracted:', token ? 'yes' : 'no');
         
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', token);
-          console.log('[AuthStore] Token saved to localStorage');
+          if (refreshToken) {
+            localStorage.setItem('refresh_token', refreshToken);
+          }
+          console.log('[AuthStore] Tokens saved to localStorage');
         }
         
         const user = mapApiUser(apiUser);
         const limits = TIER_LIMITS[user.membershipTier];
         
-        set({ user, token, isAuthenticated: true, limits });
+        set({ user, token, refreshToken, isAuthenticated: true, limits });
         console.log('[AuthStore] State updated, isAuthenticated: true, tier:', user.membershipTier);
       },
       
@@ -177,9 +177,10 @@ export const useAuthStore = create<AuthState>()(
         
         if (typeof window !== 'undefined') {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
         }
         
-        set({ user: null, token: null, isAuthenticated: false, limits: null });
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
       },
       
       checkAuth: async () => {
@@ -189,6 +190,9 @@ export const useAuthStore = create<AuthState>()(
           const token = typeof window !== 'undefined' 
             ? localStorage.getItem('auth_token') 
             : null;
+          const refreshToken = typeof window !== 'undefined'
+            ? localStorage.getItem('refresh_token')
+            : null;
             
           if (token) {
             // Use /users/me for more complete profile data
@@ -196,15 +200,16 @@ export const useAuthStore = create<AuthState>()(
             const apiUser = response.data.user || response.data;
             const user = mapApiUser(apiUser);
             const limits = TIER_LIMITS[user.membershipTier];
-            set({ user, token, isAuthenticated: true, limits });
+            set({ user, token, refreshToken, isAuthenticated: true, limits });
           } else {
-            set({ user: null, token: null, isAuthenticated: false, limits: null });
+            set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
           }
         } catch (error) {
           if (typeof window !== 'undefined') {
             localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
           }
-          set({ user: null, token: null, isAuthenticated: false, limits: null });
+          set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
         } finally {
           set({ isLoading: false });
         }
@@ -255,7 +260,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ token: state.token }),
+      partialize: (state) => ({ token: state.token, refreshToken: state.refreshToken }),
     }
   )
 );

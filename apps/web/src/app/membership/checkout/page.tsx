@@ -15,25 +15,16 @@ import { useAuthStore } from '@/stores/authStore';
 import { membershipApi } from '@/lib/api';
 
 const TIER_DETAILS: Record<string, { name: string; price: number; features: string[] }> = {
-  basic: {
-    name: 'Temel Üyelik',
-    price: 99,
-    features: [
-      '50 aktif ilan hakkı',
-      'Takas yapma',
-      'Koleksiyon oluşturma',
-      'Mesajlaşma',
-    ],
-  },
   premium: {
     name: 'Premium Üyelik',
-    price: 199,
+    price: 99,
     features: [
-      '200 aktif ilan hakkı',
+      'Sınırsız aktif ilan',
+      '15 resim/ilan',
       'Takas yapma',
-      'Sınırsız koleksiyon',
+      'Sınırsız koleksiyon (Digital Garage)',
       'Reklamsız deneyim',
-      'Öncelikli destek',
+      '3 öne çıkan ilan',
     ],
   },
   business: {
@@ -55,7 +46,7 @@ export default function MembershipCheckoutPage() {
   const searchParams = useSearchParams();
   const { isAuthenticated, user, refreshUserData } = useAuthStore();
   
-  const tier = searchParams.get('tier') || 'basic';
+  const tier = searchParams.get('tier') || 'premium';
   const period = (searchParams.get('period') || 'monthly') as 'monthly' | 'yearly';
   
   const [isProcessing, setIsProcessing] = useState(false);

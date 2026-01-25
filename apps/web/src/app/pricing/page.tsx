@@ -37,45 +37,25 @@ export default function PricingPage() {
         { text: t('nav.trades'), included: false },
         { text: t('collection.collections'), included: false },
         { text: t('membership.noAds'), included: false },
-        { text: t('membership.prioritySupport'), included: false },
       ],
       popular: false,
       color: 'gray',
     },
     {
-      id: 'basic',
-      name: t('membership.basic'),
-      price: 99,
-      period: t('membership.perMonth'),
-      description: t('membership.features'),
-      features: [
-        { text: `50 ${t('membership.listingsLimit')}`, included: true },
-        { text: t('search.search'), included: true },
-        { text: t('message.messages'), included: true },
-        { text: t('nav.trades'), included: true },
-        { text: t('collection.collections'), included: true },
-        { text: t('membership.noAds'), included: false },
-        { text: t('membership.prioritySupport'), included: false },
-      ],
-      popular: true,
-      color: 'blue',
-    },
-    {
       id: 'premium',
       name: t('membership.premium'),
-      price: 199,
+      price: 99,
       period: t('membership.perMonth'),
       description: t('membership.mostPopular'),
       features: [
-        { text: `200 ${t('membership.listingsLimit')}`, included: true },
-        { text: t('search.search'), included: true },
-        { text: t('message.messages'), included: true },
+        { text: `${t('membership.unlimited')} ${t('membership.listingsLimit')}`, included: true },
+        { text: '15 resim/ilan', included: true },
         { text: t('nav.trades'), included: true },
         { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
         { text: t('membership.noAds'), included: true },
-        { text: t('membership.prioritySupport'), included: true },
+        { text: '3 öne çıkan ilan', included: true },
       ],
-      popular: false,
+      popular: true,
       color: 'purple',
     },
     {
@@ -194,7 +174,8 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="flex justify-center mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
           {MEMBERSHIP_TIERS.map((tier, index) => {
             const displayPrice = selectedPeriod === 'yearly' && tier.price > 0
               ? Math.round(tier.price * 12 * 0.8)
@@ -300,6 +281,7 @@ export default function PricingPage() {
               </motion.div>
             );
           })}
+          </div>
         </div>
 
         {selectedTier && selectedTier !== 'free' && selectedTier !== currentTier && (
