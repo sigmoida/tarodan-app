@@ -60,6 +60,9 @@ export class AuthResponseDto {
 
   @ApiProperty({ type: TokensDto })
   tokens: TokensDto;
+
+  @ApiProperty({ required: false })
+  message?: string;
 }
 
 export class AdminUserResponseDto extends UserResponseDto {

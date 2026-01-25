@@ -116,7 +116,7 @@ interface AuthState {
   limits: MembershipLimits | null;
   
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string, phone?: string, birthDate?: string) => Promise<void>;
+  register: (username: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -163,8 +163,8 @@ export const useAuthStore = create<AuthState>()(
         console.log('[AuthStore] State updated, isAuthenticated: true, tier:', user.membershipTier);
       },
       
-      register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string) => {
-        await authApi.register({ displayName, email, password, phone, birthDate });
+      register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
+        await authApi.register({ displayName, email, password, phone, birthDate, acceptsMarketingEmails: acceptMarketing });
         await get().login(email, password);
       },
       

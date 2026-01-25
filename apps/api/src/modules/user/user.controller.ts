@@ -55,6 +55,48 @@ export class UserController {
   }
 
   /**
+   * GET /users/me/analytics
+   * Get user analytics data
+   */
+  @Get('me/analytics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Kullanıcı analitik verileri',
+    description: 'Görüntüleme, beğeni, satış ve gelir istatistiklerini döner.'
+  })
+  @ApiQuery({ name: 'period', required: false, enum: ['7d', '30d', '90d'], description: 'Dönem filtresi' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Analitik verileri',
+    schema: {
+      type: 'object',
+      properties: {
+        totalViews: { type: 'number' },
+        totalFavorites: { type: 'number' },
+        totalSales: { type: 'number' },
+        totalRevenue: { type: 'number' },
+        activeListings: { type: 'number' },
+        pendingOrders: { type: 'number' },
+        viewsChange: { type: 'number' },
+        favoritesChange: { type: 'number' },
+        salesChange: { type: 'number' },
+        revenueChange: { type: 'number' },
+        topProducts: { type: 'array', items: { type: 'object' } },
+        dailyViews: { type: 'array', items: { type: 'object' } },
+        recentActivity: { type: 'array', items: { type: 'object' } },
+        categoryStats: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
+  async getUserAnalytics(
+    @CurrentUser('id') userId: string,
+    @Query('period') period?: '7d' | '30d' | '90d',
+  ) {
+    return this.userService.getUserAnalytics(userId, period || '30d');
+  }
+
+  /**
    * POST /users/me/seller
    * Upgrade to seller account
    */
@@ -201,6 +243,58 @@ export class UserController {
     @Param('id') targetUserId: string,
   ) {
     return this.userService.unfollowUser(currentUserId, targetUserId);
+  }
+
+  // ==========================================================================
+  // USER BLOCKING
+  // ==========================================================================
+
+  /**
+   * POST /users/:id/block
+   * Block a user
+   */
+  @Post(':id/block')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kullanıcıyı engelle' })
+  @ApiResponse({ status: 200, description: 'Kullanıcı engellendi' })
+  @ApiResponse({ status: 400, description: 'Geçersiz istek' })
+  @ApiResponse({ status: 404, description: 'Kullanıcı bulunamadı' })
+  async blockUser(
+    @CurrentUser('id') currentUserId: string,
+    @Param('id') targetUserId: string,
+  ) {
+    return this.userService.blockUser(currentUserId, targetUserId);
+  }
+
+  /**
+   * DELETE /users/:id/block
+   * Unblock a user
+   */
+  @Delete(':id/block')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Engeli kaldır' })
+  @ApiResponse({ status: 200, description: 'Engel kaldırıldı' })
+  @ApiResponse({ status: 404, description: 'Engel bulunamadı' })
+  async unblockUser(
+    @CurrentUser('id') currentUserId: string,
+    @Param('id') targetUserId: string,
+  ) {
+    return this.userService.unblockUser(currentUserId, targetUserId);
+  }
+
+  /**
+   * GET /users/me/blocked
+   * Get list of blocked users
+   */
+  @Get('me/blocked')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Engellenen kullanıcılar listesi' })
+  @ApiResponse({ status: 200, description: 'Engellenen kullanıcılar' })
+  async getBlockedUsers(@CurrentUser('id') userId: string) {
+    return this.userService.getBlockedUsers(userId);
   }
 
   // ==========================================================================

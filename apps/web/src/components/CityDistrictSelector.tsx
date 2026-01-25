@@ -42,12 +42,30 @@ export default function CityDistrictSelector({
     console.log('🔄 City prop changed to:', city);
   }, [city]);
 
+  // Turkish character normalization for search
+  const normalizeForSearch = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'i')
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/Ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/Ö/g, 'o')
+      .replace(/ç/g, 'c')
+      .replace(/Ç/g, 'c');
+  };
+
   const filteredCities = citySearch.trim()
-    ? cities.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
+    ? cities.filter(c => normalizeForSearch(c).includes(normalizeForSearch(citySearch)))
     : cities;
 
   const filteredDistricts = districtSearch.trim()
-    ? districts.filter(d => d.toLowerCase().includes(districtSearch.toLowerCase()))
+    ? districts.filter(d => normalizeForSearch(d).includes(normalizeForSearch(districtSearch)))
     : districts;
 
   // Close dropdowns when clicking outside

@@ -7,8 +7,35 @@ import {
   Matches,
   IsBoolean,
   IsDateString,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+// Custom validator for 18+ age check
+@ValidatorConstraint({ name: 'isAdult', async: false })
+export class IsAdultConstraint implements ValidatorConstraintInterface {
+  validate(birthDate: string, args: ValidationArguments) {
+    if (!birthDate) return true; // Optional field, let other validators handle required check
+    
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age >= 18;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return 'Kayıt olmak için en az 18 yaşında olmanız gerekmektedir';
+  }
+}
 
 export class RegisterDto {
   @ApiProperty({
@@ -47,13 +74,13 @@ export class RegisterDto {
   @MaxLength(100, { message: 'İsim en fazla 100 karakter olabilir' })
   displayName: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '1990-01-15',
-    description: 'Birth date (YYYY-MM-DD)',
+    description: 'Birth date (YYYY-MM-DD) - Must be 18 or older',
   })
-  @IsOptional()
   @IsDateString({}, { message: 'Geçerli bir tarih giriniz (YYYY-MM-DD)' })
-  birthDate?: string;
+  @Validate(IsAdultConstraint)
+  birthDate: string;
 
   @ApiPropertyOptional({
     example: false,
@@ -62,4 +89,20 @@ export class RegisterDto {
   @IsOptional()
   @IsBoolean()
   isSeller?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Consent for marketing emails',
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Consent for push notifications',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notificationConsent?: boolean;
 }

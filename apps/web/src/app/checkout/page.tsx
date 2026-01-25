@@ -90,6 +90,24 @@ export default function CheckoutPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [saveCard, setSaveCard] = useState(false);
+
+  // Phone formatting helper
+  const formatPhoneNumber = (value: string): string => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    // Limit to 10 digits
+    const limited = digits.slice(0, 10);
+    // Format as XXX XXX XX XX
+    if (limited.length <= 3) return limited;
+    if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
+    if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
+    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    return formatted;
+  };
   
   // Saved cards state
   const [savedCards, setSavedCards] = useState<Array<{
@@ -232,10 +250,15 @@ export default function CheckoutPage() {
         setSelectedAddressId(defaultAddr.id);
       } else if (validAddresses.length > 0) {
         setSelectedAddressId(validAddresses[0].id);
+      } else {
+        // No addresses - automatically show the address form
+        setShowAddressForm(true);
       }
     } catch (error) {
       console.error('Failed to fetch addresses:', error);
       setAddresses([]);
+      // On error, show address form so user can still checkout
+      setShowAddressForm(true);
     }
   };
 
@@ -295,6 +318,15 @@ export default function CheckoutPage() {
       // Check if form has all required fields including phone
       const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
       
+      console.log('=== CHECKOUT DEBUG ===');
+      console.log('isAuthenticated:', isAuthenticated);
+      console.log('selectedAddressId:', selectedAddressId);
+      console.log('addresses.length:', addresses.length);
+      console.log('hasSavedAddress:', hasSavedAddress);
+      console.log('newAddress:', JSON.stringify(newAddress, null, 2));
+      console.log('hasFormAddress:', hasFormAddress);
+      console.log('showAddressForm:', showAddressForm);
+      
       // Get shipping address - prefer saved address for logged-in users, otherwise use form
       let shippingAddress: any;
       let contactEmail: string;
@@ -309,16 +341,25 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
+        
+        // Validate phone is available
+        const addressPhone = selectedAddress.phone || user?.phone;
+        if (!addressPhone) {
+          toast.error('Teslimat adresi için telefon numarası gereklidir');
+          setIsLoading(false);
+          return;
+        }
+        
         shippingAddress = {
           fullName: selectedAddress.fullName,
-          phone: selectedAddress.phone || user?.phone || '',
+          phone: addressPhone,
           city: selectedAddress.city,
           district: selectedAddress.district,
           address: selectedAddress.address,
-          zipCode: selectedAddress.zipCode,
+          zipCode: selectedAddress.zipCode || undefined,
         };
         contactEmail = user?.email || '';
-        contactPhone = user?.phone || selectedAddress.phone || '';
+        contactPhone = addressPhone;
         contactName = selectedAddress.fullName || user?.displayName || '';
       } else if (hasFormAddress) {
         // Use form address (guest or logged-in user without saved addresses)
@@ -428,7 +469,36 @@ export default function CheckoutPage() {
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;
             } else if (shippingAddress) {
-              payload.shippingAddress = shippingAddress;
+              // Validate all required fields are not empty
+              if (!shippingAddress.fullName?.trim()) {
+                throw new Error('Teslimat adresi için ad soyad gereklidir');
+              }
+              if (!shippingAddress.phone?.trim()) {
+                throw new Error('Teslimat adresi için telefon gereklidir');
+              }
+              if (!shippingAddress.city?.trim()) {
+                throw new Error('Teslimat adresi için şehir gereklidir');
+              }
+              if (!shippingAddress.district?.trim()) {
+                throw new Error('Teslimat adresi için ilçe gereklidir');
+              }
+              if (!shippingAddress.address?.trim()) {
+                throw new Error('Teslimat adresi için açık adres gereklidir');
+              }
+              // Remove spaces from phone number for API
+              const cleanPhone = shippingAddress.phone.replace(/\s/g, '');
+              // Add +90 prefix if not present
+              const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : 
+                                     cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
+              
+              payload.shippingAddress = {
+                fullName: shippingAddress.fullName.trim(),
+                phone: formattedPhone,
+                city: shippingAddress.city.trim(),
+                district: shippingAddress.district.trim(),
+                address: shippingAddress.address.trim(),
+                zipCode: shippingAddress.zipCode?.trim() || undefined,
+              };
             } else {
               throw new Error(locale === 'en' ? 'Shipping address not found' : 'Teslimat adresi bulunamadı');
             }
@@ -437,12 +507,24 @@ export default function CheckoutPage() {
             orderResponse = await ordersApi.directBuy(payload);
           } else {
             // Guest user: use guest checkout endpoint
+            // Format phone numbers properly
+            const cleanContactPhone = contactPhone?.replace(/\s/g, '') || '';
+            const formattedContactPhone = cleanContactPhone.startsWith('+90') ? cleanContactPhone : 
+                                          cleanContactPhone.startsWith('0') ? '+9' + cleanContactPhone : '+90' + cleanContactPhone;
+            
+            const cleanAddrPhone = shippingAddress?.phone?.replace(/\s/g, '') || '';
+            const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone : 
+                                       cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
+            
             const guestPayload = {
               productId: item.productId,
               email: contactEmail,
-              phone: contactPhone,
+              phone: formattedContactPhone,
               guestName: contactName,
-              shippingAddress,
+              shippingAddress: {
+                ...shippingAddress,
+                phone: formattedAddrPhone,
+              },
             };
             
             console.log('Guest checkout payload:', JSON.stringify(guestPayload, null, 2));
@@ -450,17 +532,29 @@ export default function CheckoutPage() {
           }
         } catch (orderError: any) {
           console.error('Order creation failed:', orderError);
-          const errorMessage = orderError.response?.data?.message || 
-                              orderError.response?.data?.error || 
-                              orderError.message ||
-                              (locale === 'en' ? 'Failed to create order' : 'Sipariş oluşturulamadı');
+          console.error('Full error response:', orderError.response?.data);
+          console.error('Request config:', orderError.config);
           
-          // Handle array of error messages
-          if (Array.isArray(errorMessage)) {
-            toast.error(errorMessage.join(', '));
-          } else {
-            toast.error(errorMessage);
+          // Extract error message from various possible locations
+          let errorMessage = 'Sipariş oluşturulamadı';
+          
+          if (orderError.response?.data) {
+            const data = orderError.response.data;
+            if (Array.isArray(data.message)) {
+              errorMessage = data.message.join(', ');
+            } else if (typeof data.message === 'string') {
+              errorMessage = data.message;
+            } else if (data.error) {
+              errorMessage = data.error;
+            } else if (typeof data === 'string') {
+              errorMessage = data;
+            }
+          } else if (orderError.message) {
+            errorMessage = orderError.message;
           }
+          
+          console.error('Extracted error message:', errorMessage);
+          toast.error(errorMessage);
           throw orderError;
         }
 
@@ -674,13 +768,19 @@ export default function CheckoutPage() {
                             onChange={(e) => setNewAddress({ ...newAddress, fullName: e.target.value })}
                             className="input"
                           />
-                          <input
-                            type="tel"
-                            placeholder={t('checkout.phone')}
-                            value={newAddress.phone}
-                            onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-                            className="input"
-                          />
+                          <div className="flex">
+                            <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg">
+                              +90
+                            </span>
+                            <input
+                              type="tel"
+                              placeholder="5XX XXX XX XX"
+                              value={newAddress.phone}
+                              onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value) })}
+                              maxLength={13}
+                              className="input rounded-l-none"
+                            />
+                          </div>
                         </div>
                         <CityDistrictSelector
                           city={newAddress.city}
@@ -746,14 +846,20 @@ export default function CheckoutPage() {
                         required
                       />
                     </div>
-                    <input
-                      type="tel"
-                      placeholder={t('checkout.guestPhone') + ' *'}
-                      value={guestPhone}
-                      onChange={(e) => setGuestPhone(e.target.value)}
-                      className="input"
-                      required
-                    />
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg">
+                        +90
+                      </span>
+                      <input
+                        type="tel"
+                        placeholder="5XX XXX XX XX *"
+                        value={guestPhone}
+                        onChange={(e) => setGuestPhone(handlePhoneChange(e.target.value))}
+                        maxLength={13}
+                        className="input rounded-l-none flex-1"
+                        required
+                      />
+                    </div>
                     
                     <hr className="my-4" />
                     <h3 className="font-semibold">{t('checkout.shippingAddress')}</h3>
@@ -773,13 +879,19 @@ export default function CheckoutPage() {
                         onChange={(e) => setNewAddress({ ...newAddress, fullName: e.target.value })}
                         className="input"
                       />
-                      <input
-                        type="tel"
-                        placeholder={t('checkout.phone')}
-                        value={newAddress.phone}
-                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-                        className="input"
-                      />
+                      <div className="flex">
+                        <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm">
+                          +90
+                        </span>
+                        <input
+                          type="tel"
+                          placeholder="5XX XXX XX XX"
+                          value={newAddress.phone}
+                          onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value) })}
+                          maxLength={13}
+                          className="input rounded-l-none flex-1"
+                        />
+                      </div>
                     </div>
                     <CityDistrictSelector
                       city={newAddress.city}
@@ -1068,9 +1180,9 @@ export default function CheckoutPage() {
                           <input
                             type="password"
                             value={cardCvc}
-                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
                             placeholder="•••"
-                            maxLength={4}
+                            maxLength={3}
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                           />
                         </div>
@@ -1099,9 +1211,9 @@ export default function CheckoutPage() {
                       <input
                         type="password"
                         value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
                         placeholder="•••"
-                        maxLength={4}
+                        maxLength={3}
                         className="w-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                       />
                     </div>

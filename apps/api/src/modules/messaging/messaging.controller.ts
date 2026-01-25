@@ -99,6 +99,15 @@ export class MessagingController {
     return this.messagingService.sendMessage(id, req.user.id, dto);
   }
 
+  /**
+   * Get remaining daily messages
+   * GET /messages/daily-limit
+   */
+  @Get('daily-limit')
+  async getDailyLimit(@Request() req: any) {
+    return this.messagingService.getRemainingDailyMessages(req.user.id);
+  }
+
   // ==========================================================================
   // ADMIN ENDPOINTS
   // ==========================================================================

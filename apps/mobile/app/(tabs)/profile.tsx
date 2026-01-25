@@ -363,6 +363,33 @@ export default function ProfileScreen() {
               <Text style={styles.quickActionText}>Mesajlar</Text>
             </TouchableOpacity>
           </View>
+          {/* Second row of quick actions */}
+          <View style={[styles.quickActions, { marginTop: 12 }]}>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/liked-collections')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#F3E5F5' }]}>
+                <Ionicons name="albums" size={22} color="#9C27B0" />
+              </View>
+              <Text style={styles.quickActionText}>Beğenilen{'\n'}Koleksiyonlar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/trades')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FFF8E1' }]}>
+                <Ionicons name="swap-horizontal" size={22} color="#FFA000" />
+              </View>
+              <Text style={styles.quickActionText}>Takaslarım</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/analytics')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E0F7FA' }]}>
+                <Ionicons name="stats-chart" size={22} color="#00ACC1" />
+              </View>
+              <Text style={styles.quickActionText}>İstatistikler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/help')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#ECEFF1' }]}>
+                <Ionicons name="help-circle" size={22} color="#607D8B" />
+              </View>
+              <Text style={styles.quickActionText}>Yardım</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Menu */}

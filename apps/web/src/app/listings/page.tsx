@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
@@ -10,9 +10,11 @@ import {
   FunnelIcon,
   ArrowsRightLeftIcon,
   XMarkIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { listingsApi, searchApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 
 interface Listing {
   id: string | number;
@@ -50,6 +52,13 @@ export default function ListingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [showFilters, setShowFilters] = useState(false);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const recentSearchesRef = useRef<HTMLDivElement>(null);
+  
+  // Recent searches store
+  const { searches: recentSearches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
+  
   const [filters, setFilters] = useState({
     brand: searchParams.get('brand') || '',
     scale: searchParams.get('scale') || '',
@@ -117,38 +126,80 @@ export default function ListingsPage() {
       // Map sortBy to search API format
       const sortByMap: Record<string, string> = {
         'created_desc': 'newest',
-        'created_asc': 'newest', // ES doesn't have oldest, use newest
+        'created_asc': 'oldest',
         'price_asc': 'price_asc',
         'price_desc': 'price_desc',
       };
 
-      // Use Elasticsearch when there's a search query for better fuzzy/partial matching
+      // Use Elasticsearch when there's a search query
       if (searchQuery && searchQuery.trim()) {
-        const searchParams: Record<string, any> = {
-          pageSize: 100,
-          page: 1,
-        };
-        
-        if (urlCategoryId) searchParams.categoryId = urlCategoryId;
-        if (mappedCondition) searchParams.condition = mappedCondition;
-        if (filters.minPrice) searchParams.minPrice = Number(filters.minPrice);
-        if (filters.maxPrice) searchParams.maxPrice = Number(filters.maxPrice);
-        if (filters.sortBy) searchParams.sortBy = sortByMap[filters.sortBy] || 'relevance';
+        try {
+          const esParams: Record<string, any> = {
+            pageSize: 100,
+            page: 1,
+          };
+          
+          if (urlCategoryId) esParams.categoryId = urlCategoryId;
+          if (mappedCondition) esParams.condition = mappedCondition;
+          if (filters.minPrice) esParams.minPrice = Number(filters.minPrice);
+          if (filters.maxPrice) esParams.maxPrice = Number(filters.maxPrice);
+          if (filters.sortBy) esParams.sortBy = sortByMap[filters.sortBy] || 'relevance';
 
-        const response = await searchApi.products(searchQuery.trim(), searchParams);
-        // Map ES results to listing format
-        const results = response.data.results || [];
-        setListings(results.map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          price: r.price,
-          description: r.description,
-          condition: r.condition,
-          images: r.imageUrl ? [{ url: r.imageUrl }] : [],
-          seller: { displayName: r.sellerName },
-          category: { name: r.categoryName },
-          isTradeEnabled: false,
-        })));
+          const response = await searchApi.products(searchQuery.trim(), esParams);
+          const results = response.data.results || response.data.data || [];
+          
+          if (results.length > 0) {
+            // Map ES results to listing format
+            setListings(results.map((r: any) => ({
+              id: r.id,
+              title: r.title,
+              price: r.price,
+              description: r.description,
+              condition: r.condition,
+              images: r.imageUrl ? [{ url: r.imageUrl }] : (r.images || []),
+              seller: r.seller || { displayName: r.sellerName },
+              category: { name: r.categoryName },
+              isTradeEnabled: r.isTradeEnabled || r.trade_available || false,
+            })));
+          } else {
+            // Fallback to database search if ES returns empty
+            const dbParams: Record<string, any> = {
+              limit: 100,
+              page: 1,
+              search: searchQuery.trim(),
+            };
+            if (urlCategoryId) dbParams.categoryId = urlCategoryId;
+            if (mappedCondition) dbParams.condition = mappedCondition;
+            if (filters.minPrice) dbParams.minPrice = Number(filters.minPrice);
+            if (filters.maxPrice) dbParams.maxPrice = Number(filters.maxPrice);
+            if (filters.brand) dbParams.brand = filters.brand;
+            if (filters.scale) dbParams.scale = filters.scale;
+            if (filters.tradeOnly) dbParams.tradeOnly = true;
+            if (filters.sortBy) dbParams.sortBy = filters.sortBy;
+
+            const dbResponse = await listingsApi.getAll(dbParams);
+            setListings(dbResponse.data.data || dbResponse.data.products || []);
+          }
+        } catch (esError) {
+          console.error('ES search failed, falling back to DB:', esError);
+          // Fallback to database search on ES error
+          const dbParams: Record<string, any> = {
+            limit: 100,
+            page: 1,
+            search: searchQuery.trim(),
+          };
+          if (urlCategoryId) dbParams.categoryId = urlCategoryId;
+          if (mappedCondition) dbParams.condition = mappedCondition;
+          if (filters.minPrice) dbParams.minPrice = Number(filters.minPrice);
+          if (filters.maxPrice) dbParams.maxPrice = Number(filters.maxPrice);
+          if (filters.brand) dbParams.brand = filters.brand;
+          if (filters.scale) dbParams.scale = filters.scale;
+          if (filters.tradeOnly) dbParams.tradeOnly = true;
+          if (filters.sortBy) dbParams.sortBy = filters.sortBy;
+
+          const dbResponse = await listingsApi.getAll(dbParams);
+          setListings(dbResponse.data.data || dbResponse.data.products || []);
+        }
       } else {
         // Use regular products API when no search query
         const params: Record<string, any> = {
@@ -170,6 +221,7 @@ export default function ListingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch listings:', error);
+      setListings([]);
     } finally {
       setIsLoading(false);
     }
@@ -177,8 +229,40 @@ export default function ListingsPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (searchQuery.trim()) {
+      addSearch(searchQuery.trim());
+    }
+    setShowRecentSearches(false);
     fetchListings();
   };
+  
+  const handleRecentSearchClick = (query: string) => {
+    setSearchQuery(query);
+    setShowRecentSearches(false);
+    // Trigger search with the selected query
+    addSearch(query);
+    // Update URL and fetch
+    const params = new URLSearchParams(window.location.search);
+    params.set('search', query);
+    router.push(`/listings?${params.toString()}`);
+  };
+  
+  // Close recent searches dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        recentSearchesRef.current && 
+        !recentSearchesRef.current.contains(event.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node)
+      ) {
+        setShowRecentSearches(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const clearFilters = () => {
     setFilters({
@@ -209,18 +293,71 @@ export default function ListingsPage() {
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row gap-4 items-center">
-            {/* Search */}
-            <form onSubmit={handleSearch} className="flex-1 w-full">
+            {/* Search with Recent Searches */}
+            <form onSubmit={handleSearch} className="flex-1 w-full relative">
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder={t('nav.searchPlaceholderMobile')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowRecentSearches(true)}
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
                 />
               </div>
+              
+              {/* Recent Searches Dropdown */}
+              {showRecentSearches && recentSearches.length > 0 && (
+                <div 
+                  ref={recentSearchesRef}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <ClockIcon className="w-4 h-4" />
+                      {t('search.recentSearches')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        clearSearches();
+                      }}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      {t('search.clearAll')}
+                    </button>
+                  </div>
+                  <ul>
+                    {recentSearches.map((query, index) => (
+                      <li key={index}>
+                        <button
+                          type="button"
+                          onClick={() => handleRecentSearchClick(query)}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center justify-between group"
+                        >
+                          <span className="flex items-center gap-2">
+                            <ClockIcon className="w-4 h-4 text-gray-400" />
+                            {query}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeSearch(query);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </button>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </form>
 
             {/* Sort Dropdown */}

@@ -29,6 +29,7 @@ import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AdminService {
@@ -40,6 +41,7 @@ export class AdminService {
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
+    private readonly cache: CacheService,
   ) {}
 
   // ==================== COMMISSION RULES ====================
@@ -505,6 +507,10 @@ export class AdminService {
       // Don't fail the request if indexing fails
     }
 
+    // Invalidate product cache so the product appears in listings
+    await this.cache.del(`product:${productId}`);
+    await this.cache.delPattern('products:list:*');
+
     return { success: true, productId, status: 'active' };
   }
 
@@ -526,6 +532,10 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'product_reject', 'Product', productId, product, { ...updated, reason: dto.reason });
+
+    // Invalidate product cache
+    await this.cache.del(`product:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { success: true, productId, status: 'rejected', reason: dto.reason };
   }
