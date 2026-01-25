@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 import { v4 as uuidv4 } from 'uuid';
+import { MembershipService } from '../membership/membership.service';
 
 // Sharp is optional - image resizing will be skipped if not available
 let sharp: any;
@@ -39,7 +40,10 @@ export class MediaService {
   private readonly minioClient: Minio.Client;
   private readonly defaultBucket: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private membershipService: MembershipService,
+  ) {
     const portStr = this.configService.get<string>('MINIO_PORT') || '9000';
     const port = parseInt(portStr, 10);
     
