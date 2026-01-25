@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
+import { SearchService } from '../search/search.service';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma } from '@prisma/client';
 
@@ -20,6 +21,7 @@ export class ProductService {
     private readonly cache: CacheService,
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
+    private readonly searchService: SearchService,
   ) {}
 
   /**
@@ -131,7 +133,17 @@ export class ProductService {
     // Invalidate product list cache
     await this.cache.delPattern('products:list:*');
 
-    return this.formatProductResponse(product);
+    // Index to Elasticsearch (only if status is active)
+    if (product.status === ProductStatus.active) {
+      try {
+        await this.searchService.indexProduct(product.id);
+      } catch (error) {
+        console.error('Failed to index product to Elasticsearch:', error);
+        // Don't fail the request if indexing fails
+      }
+    }
+
+    return await this.formatProductResponse(product);
   }
 
   /**
@@ -285,8 +297,12 @@ export class ProductService {
           },
         });
 
+        const formattedProducts = await Promise.all(
+          products.map((p) => this.formatProductResponse(p))
+        );
+
         return {
-          data: products.map((p) => this.formatProductResponse(p)),
+          data: formattedProducts,
           meta: {
             total,
             page,
@@ -343,7 +359,7 @@ export class ProductService {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
-        return this.formatProductResponse(product);
+        return await this.formatProductResponse(product);
       },
       { ttl: 600 }, // 10 minutes cache
     );
@@ -475,7 +491,25 @@ export class ProductService {
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
 
-      return this.formatProductResponse(updated);
+      // Update Elasticsearch index (only if status is active)
+      if (updated.status === ProductStatus.active) {
+        try {
+          await this.searchService.indexProduct(updated.id);
+        } catch (error) {
+          console.error('Failed to update product in Elasticsearch:', error);
+          // Don't fail the request if indexing fails
+        }
+      } else {
+        // Remove from index if status changed to non-active
+        try {
+          await this.searchService.removeProduct(updated.id);
+        } catch (error) {
+          console.error('Failed to remove product from Elasticsearch:', error);
+          // Don't fail the request if indexing fails
+        }
+      }
+
+      return await this.formatProductResponse(updated);
     } catch (error) {
       if (error.code === 'P2025') {
         throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
@@ -516,6 +550,17 @@ export class ProductService {
     // Invalidate cache
     await this.cache.del(`products:detail:${id}`);
     await this.cache.delPattern('products:list:*');
+    // Invalidate user's membership limits cache to refresh listing counts
+    await this.cache.del(`membership:limits:${sellerId}`);
+    await this.cache.del(`membership:${sellerId}`);
+
+    // Remove from Elasticsearch index
+    try {
+      await this.searchService.removeProduct(id);
+    } catch (error) {
+      console.error('Failed to remove product from Elasticsearch:', error);
+      // Don't fail the request if indexing fails
+    }
 
     return { message: 'Ürün silindi' };
   }
@@ -555,7 +600,7 @@ export class ProductService {
       throw new ForbiddenException('Bu ürünü görüntüleme yetkiniz yok');
     }
 
-    return this.formatProductResponse(product);
+    return await this.formatProductResponse(product);
   }
 
   /**
@@ -566,7 +611,15 @@ export class ProductService {
 
     const where: Prisma.ProductWhereInput = {
       sellerId,
-      ...(status && status.trim() !== '' ? { status: status as ProductStatus } : {}), // Allow filtering by status for own products
+      ...(status && status.trim() !== '' 
+        ? { status: status as ProductStatus } 
+        : { 
+            // Exclude inactive, draft, and deleted listings from default view
+            status: { 
+              notIn: [ProductStatus.inactive, ProductStatus.draft] 
+            } 
+          }
+      ),
     };
 
     const total = await this.prisma.product.count({ where });
@@ -593,11 +646,15 @@ export class ProductService {
       },
     });
 
-    return {
-      data: products.map((p) => ({
-        ...this.formatProductResponse(p),
+    const formattedProducts = await Promise.all(
+      products.map(async (p) => ({
+        ...(await this.formatProductResponse(p)),
         pendingOffersCount: p._count.offers,
-      })),
+      }))
+    );
+
+    return {
+      data: formattedProducts,
       meta: {
         total,
         page,
@@ -610,7 +667,18 @@ export class ProductService {
   /**
    * Format product response
    */
-  private formatProductResponse(product: any) {
+  private async formatProductResponse(product: any) {
+    // Get seller's active listings count
+    let sellerListingsCount = 0;
+    if (product.seller?.id) {
+      sellerListingsCount = await this.prisma.product.count({
+        where: {
+          sellerId: product.seller.id,
+          status: ProductStatus.active,
+        },
+      });
+    }
+
     return {
       id: product.id,
       title: product.title,
@@ -632,6 +700,8 @@ export class ProductService {
             displayName: product.seller.displayName,
             isVerified: product.seller.isVerified,
             sellerType: product.seller.sellerType,
+            listings_count: sellerListingsCount,
+            productsCount: sellerListingsCount,
           }
         : undefined,
       category: product.category
@@ -911,14 +981,21 @@ export class ProductService {
    * Returns counts by status and membership limit info
    */
   async getSellerListingStats(sellerId: string) {
-    // Get all listing counts by status
-    const [pending, active, reserved, sold, rejected, total] = await Promise.all([
+    // Get all listing counts by status (exclude inactive and draft)
+    const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
-      this.prisma.product.count({ where: { sellerId } }),
+      this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
+      // Total should exclude inactive and draft listings
+      this.prisma.product.count({ 
+        where: { 
+          sellerId,
+          status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
+        } 
+      }),
     ]);
 
     // Active listings = pending + active + reserved (counts against limit)
@@ -935,7 +1012,8 @@ export class ProductService {
         reserved,
         sold,
         rejected,
-        total,
+        inactive,
+        total, // Total excluding inactive and draft
         activeListings, // This counts against the limit
       },
       // Membership limits

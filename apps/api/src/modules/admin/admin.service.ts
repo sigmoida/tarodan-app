@@ -28,6 +28,7 @@ import { ProductStatus, OrderStatus, Prisma, PaymentStatus, OfferStatus, TradeSt
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
+import { SearchService } from '../search/search.service';
 
 @Injectable()
 export class AdminService {
@@ -38,6 +39,7 @@ export class AdminService {
     private readonly paymentService: PaymentService,
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
+    private readonly searchService: SearchService,
   ) {}
 
   // ==================== COMMISSION RULES ====================
@@ -494,6 +496,14 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
+
+    // Index to Elasticsearch when product is approved
+    try {
+      await this.searchService.indexProduct(productId);
+    } catch (error) {
+      this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
+      // Don't fail the request if indexing fails
+    }
 
     return { success: true, productId, status: 'active' };
   }

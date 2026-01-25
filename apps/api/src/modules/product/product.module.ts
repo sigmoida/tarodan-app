@@ -3,9 +3,10 @@ import { ProductService } from './product.service';
 import { ProductController } from './product.controller';
 import { ProductSchedulerService } from './product-scheduler.service';
 import { MembershipModule } from '../membership/membership.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [forwardRef(() => MembershipModule)],
+  imports: [forwardRef(() => MembershipModule), SearchModule],
   controllers: [ProductController],
   providers: [ProductService, ProductSchedulerService],
   exports: [ProductService, ProductSchedulerService],

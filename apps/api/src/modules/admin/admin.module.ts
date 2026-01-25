@@ -6,9 +6,10 @@ import { AuthModule } from '../auth';
 import { PaymentModule } from '../payment';
 import { MessagingModule } from '../messaging';
 import { SupportModule } from '../support';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, PaymentModule, MessagingModule, SupportModule],
+  imports: [PrismaModule, AuthModule, PaymentModule, MessagingModule, SupportModule, SearchModule],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],
