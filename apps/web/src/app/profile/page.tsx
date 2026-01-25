@@ -568,6 +568,8 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+          </motion.div>
+        )}
 
         {/* Menu Sections */}
         <div className="space-y-6 pb-8">
