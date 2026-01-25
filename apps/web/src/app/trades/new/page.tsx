@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ArrowsRightLeftIcon, ArrowLeftIcon, PlusIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { productsApi, userApi } from '@/lib/api';
+import { listingsApi, userApi } from '@/lib/api';
 import api from '@/lib/api';
 
 interface Product {
@@ -55,7 +55,7 @@ export default function NewTradePage() {
     setIsLoading(true);
     try {
       // Fetch target product
-      const productRes = await productsApi.getOne(listingId!);
+      const productRes = await listingsApi.getOne(listingId!);
       const productData = productRes.data.product || productRes.data;
       setTargetProduct(productData);
       

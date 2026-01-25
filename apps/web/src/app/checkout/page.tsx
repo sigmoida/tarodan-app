@@ -303,16 +303,25 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
+        
+        // Validate phone is available
+        const addressPhone = selectedAddress.phone || user?.phone;
+        if (!addressPhone) {
+          toast.error('Teslimat adresi için telefon numarası gereklidir');
+          setIsLoading(false);
+          return;
+        }
+        
         shippingAddress = {
           fullName: selectedAddress.fullName,
-          phone: selectedAddress.phone || user?.phone || '',
+          phone: addressPhone,
           city: selectedAddress.city,
           district: selectedAddress.district,
           address: selectedAddress.address,
-          zipCode: selectedAddress.zipCode,
+          zipCode: selectedAddress.zipCode || undefined,
         };
         contactEmail = user?.email || '';
-        contactPhone = user?.phone || selectedAddress.phone || '';
+        contactPhone = addressPhone;
         contactName = selectedAddress.fullName || user?.displayName || '';
       } else if (hasFormAddress) {
         // Use form address (guest or logged-in user without saved addresses)
@@ -422,7 +431,30 @@ export default function CheckoutPage() {
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;
             } else if (shippingAddress) {
-              payload.shippingAddress = shippingAddress;
+              // Validate all required fields are not empty
+              if (!shippingAddress.fullName?.trim()) {
+                throw new Error('Teslimat adresi için ad soyad gereklidir');
+              }
+              if (!shippingAddress.phone?.trim()) {
+                throw new Error('Teslimat adresi için telefon gereklidir');
+              }
+              if (!shippingAddress.city?.trim()) {
+                throw new Error('Teslimat adresi için şehir gereklidir');
+              }
+              if (!shippingAddress.district?.trim()) {
+                throw new Error('Teslimat adresi için ilçe gereklidir');
+              }
+              if (!shippingAddress.address?.trim()) {
+                throw new Error('Teslimat adresi için açık adres gereklidir');
+              }
+              payload.shippingAddress = {
+                fullName: shippingAddress.fullName.trim(),
+                phone: shippingAddress.phone.trim(),
+                city: shippingAddress.city.trim(),
+                district: shippingAddress.district.trim(),
+                address: shippingAddress.address.trim(),
+                zipCode: shippingAddress.zipCode?.trim() || undefined,
+              };
             } else {
               throw new Error('Teslimat adresi bulunamadı');
             }

@@ -291,7 +291,7 @@ export default function OrderDetailPage() {
                   Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir.
                 </p>
                 <button
-                  onClick={() => toast.info('Kargo bilgisi girme özelliği geliştiriliyor...')}
+                  onClick={() => toast('Kargo bilgisi girme özelliği geliştiriliyor...', { icon: 'ℹ️' })}
                   className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                   Kargo Bilgisi Gir

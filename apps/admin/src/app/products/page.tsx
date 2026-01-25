@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   MagnifyingGlassIcon,
   CheckIcon,

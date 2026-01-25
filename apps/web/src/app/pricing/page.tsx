@@ -113,11 +113,11 @@ export default function PricingPage() {
 
   const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
-      toast.info('Ücretsiz plan zaten mevcut');
+      toast('Ücretsiz plan zaten mevcut', { icon: 'ℹ️' });
       return;
     }
     if (tierId === currentTier) {
-      toast.info('Bu plan zaten aktif');
+      toast('Bu plan zaten aktif', { icon: 'ℹ️' });
       return;
     }
     setSelectedTier(tierId);

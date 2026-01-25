@@ -28,6 +28,7 @@ import { ProductStatus, OrderStatus, Prisma, PaymentStatus, OfferStatus, TradeSt
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AdminService {
@@ -38,6 +39,7 @@ export class AdminService {
     private readonly paymentService: PaymentService,
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
+    private readonly cache: CacheService,
   ) {}
 
   // ==================== COMMISSION RULES ====================
@@ -495,6 +497,10 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
 
+    // Invalidate product cache so the product appears in listings
+    await this.cache.del(`product:${productId}`);
+    await this.cache.delPattern('products:list:*');
+
     return { success: true, productId, status: 'active' };
   }
 
@@ -516,6 +522,10 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'product_reject', 'Product', productId, product, { ...updated, reason: dto.reason });
+
+    // Invalidate product cache
+    await this.cache.del(`product:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { success: true, productId, status: 'rejected', reason: dto.reason };
   }
