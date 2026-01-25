@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api } from '@/lib/api';
+import { listingsApi, api, mediaApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 
