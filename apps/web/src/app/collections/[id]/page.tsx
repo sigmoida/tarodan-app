@@ -361,20 +361,22 @@ export default function CollectionDetailPage() {
                   {t('collection.edit')}
                 </Link>
               )}
-              <button
-                onClick={handleLike}
-                className={`p-2 rounded-lg transition-colors ${
-                  isLiked
-                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                    : 'bg-gray-700 hover:bg-gray-600 text-white'
-                }`}
-              >
-                {isLiked ? (
-                  <HeartIconSolid className="w-6 h-6" />
-                ) : (
-                  <HeartIcon className="w-6 h-6" />
-                )}
-              </button>
+              {!isOwner && (
+                <button
+                  onClick={handleLike}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isLiked
+                      ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                      : 'bg-gray-700 hover:bg-gray-600 text-white'
+                  }`}
+                >
+                  {isLiked ? (
+                    <HeartIconSolid className="w-6 h-6" />
+                  ) : (
+                    <HeartIcon className="w-6 h-6" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

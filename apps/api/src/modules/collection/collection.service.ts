@@ -761,6 +761,11 @@ export class CollectionService {
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
     
+    // Prevent users from liking their own collections
+    if (collection.userId === userId) {
+      throw new BadRequestException('Kendi koleksiyonunuzu beğenemezsiniz');
+    }
+    
     console.log('[likeCollection] Found collection:', collection.id, 'likeCount:', collection.likeCount);
 
     // Check if user already liked this collection
