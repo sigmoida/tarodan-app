@@ -2,7 +2,7 @@
  * Create Listing Screen - Expo Compatible
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,23 +21,65 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Camera from 'expo-camera';
 import { endpoints } from '../../services/api';
 
-const BRANDS = ['Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Minichamps', 'AutoArt', 'Diğer'];
-const SCALES = ['1:18', '1:24', '1:43', '1:64', '1:87', 'Diğer'];
-const CONDITIONS = ['Yeni', 'Mükemmel', 'İyi', 'Orta', 'Koleksiyonluk'];
-const CATEGORIES = ['Vintage', 'Spor', 'Muscle', 'Kamyon', 'F1', 'Custom', 'Diğer'];
+// Product condition values matching backend enum
+const CONDITIONS = [
+  { value: 'mint', label: 'Mükemmel (Mint)' },
+  { value: 'near_mint', label: 'Çok İyi (Near Mint)' },
+  { value: 'very_good', label: 'İyi (Very Good)' },
+  { value: 'good', label: 'Orta (Good)' },
+  { value: 'fair', label: 'Kullanılmış (Fair)' },
+];
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  children?: Category[];
+}
 
 const CreateListingScreen = ({ navigation }: any) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [brand, setBrand] = useState('');
-  const [scale, setScale] = useState('');
   const [condition, setCondition] = useState('');
-  const [category, setCategory] = useState('');
-  const [year, setYear] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [tradeAvailable, setTradeAvailable] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Categories from API
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+  
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const response = await endpoints.categories.getAll();
+      // Flatten categories for easier selection (include children)
+      const flatCategories: Category[] = [];
+      const addCategory = (cat: Category, prefix = '') => {
+        flatCategories.push({
+          ...cat,
+          name: prefix ? `${prefix} > ${cat.name}` : cat.name,
+        });
+        if (cat.children) {
+          cat.children.forEach(child => addCategory(child, cat.name));
+        }
+      };
+      (response.data || response).forEach((cat: Category) => addCategory(cat));
+      setCategories(flatCategories);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      Alert.alert('Hata', 'Kategoriler yüklenemedi');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
 
   const requestPermissions = async () => {
     const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
@@ -109,16 +151,20 @@ const CreateListingScreen = ({ navigation }: any) => {
       Alert.alert('Hata', 'Başlık gerekli');
       return;
     }
+    if (title.trim().length < 5) {
+      Alert.alert('Hata', 'Başlık en az 5 karakter olmalıdır');
+      return;
+    }
     if (!price.trim() || isNaN(Number(price))) {
       Alert.alert('Hata', 'Geçerli bir fiyat girin');
       return;
     }
-    if (!brand) {
-      Alert.alert('Hata', 'Marka seçin');
+    if (Number(price) < 1) {
+      Alert.alert('Hata', 'Fiyat en az 1 TL olmalıdır');
       return;
     }
-    if (!scale) {
-      Alert.alert('Hata', 'Ölçek seçin');
+    if (!categoryId) {
+      Alert.alert('Hata', 'Kategori seçin');
       return;
     }
     if (!condition) {
@@ -133,30 +179,50 @@ const CreateListingScreen = ({ navigation }: any) => {
     setIsLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('price', price);
-      formData.append('brand', brand);
-      formData.append('scale', scale);
-      formData.append('condition', condition);
-      formData.append('category', category);
-      formData.append('year', year);
-      formData.append('isTradeEnabled', tradeAvailable.toString());
+      // First upload images, then create product with image URLs
+      const imageUrls: string[] = [];
       
-      images.forEach((uri, index) => {
-        const filename = uri.split('/').pop() || `image_${index}.jpg`;
+      for (const uri of images) {
+        const formData = new FormData();
+        const filename = uri.split('/').pop() || `image_${Date.now()}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
         
-        formData.append('images', {
+        formData.append('file', {
           uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
           type,
           name: filename,
         } as any);
-      });
+        
+        try {
+          const uploadResponse = await endpoints.upload.image(formData);
+          if (uploadResponse.url) {
+            imageUrls.push(uploadResponse.url);
+          }
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          // Continue with other images
+        }
+      }
+      
+      if (imageUrls.length === 0) {
+        Alert.alert('Hata', 'Fotoğraflar yüklenemedi. Lütfen tekrar deneyin.');
+        setIsLoading(false);
+        return;
+      }
 
-      await endpoints.products.create(formData);
+      // Create product with JSON body (not FormData)
+      const productData = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        price: Number(price),
+        categoryId,
+        condition,
+        isTradeEnabled: tradeAvailable,
+        imageUrls,
+      };
+
+      await endpoints.products.create(productData);
       
       Alert.alert('Başarılı', 'İlan oluşturuldu ve onaya gönderildi', [
         { text: 'Tamam', onPress: () => navigation.goBack() }
@@ -169,6 +235,7 @@ const CreateListingScreen = ({ navigation }: any) => {
     }
   };
 
+  // Generic select field for string options
   const SelectField = ({ 
     label, 
     value, 
@@ -178,7 +245,7 @@ const CreateListingScreen = ({ navigation }: any) => {
   }: { 
     label: string; 
     value: string; 
-    options: string[]; 
+    options: { value: string; label: string }[]; 
     onChange: (v: string) => void;
     required?: boolean;
   }) => (
@@ -191,19 +258,50 @@ const CreateListingScreen = ({ navigation }: any) => {
       >
         {options.map((option) => (
           <TouchableOpacity
-            key={option}
-            style={[styles.optionChip, value === option && styles.optionChipActive]}
-            onPress={() => onChange(option)}
+            key={option.value}
+            style={[styles.optionChip, value === option.value && styles.optionChipActive]}
+            onPress={() => onChange(option.value)}
           >
             <Text style={[
               styles.optionChipText, 
-              value === option && styles.optionChipTextActive
+              value === option.value && styles.optionChipTextActive
             ]}>
-              {option}
+              {option.label}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
+    </View>
+  );
+  
+  // Category select field
+  const CategorySelectField = () => (
+    <View style={styles.field}>
+      <Text style={styles.label}>Kategori *</Text>
+      {categoriesLoading ? (
+        <ActivityIndicator size="small" color="#e94560" />
+      ) : (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.optionsContainer}
+        >
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.optionChip, categoryId === cat.id && styles.optionChipActive]}
+              onPress={() => setCategoryId(cat.id)}
+            >
+              <Text style={[
+                styles.optionChipText, 
+                categoryId === cat.id && styles.optionChipTextActive
+              ]}>
+                {cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 
@@ -285,23 +383,8 @@ const CreateListingScreen = ({ navigation }: any) => {
         />
       </View>
 
-      {/* Brand */}
-      <SelectField 
-        label="Marka" 
-        value={brand} 
-        options={BRANDS} 
-        onChange={setBrand}
-        required
-      />
-
-      {/* Scale */}
-      <SelectField 
-        label="Ölçek" 
-        value={scale} 
-        options={SCALES} 
-        onChange={setScale}
-        required
-      />
+      {/* Category - from API */}
+      <CategorySelectField />
 
       {/* Condition */}
       <SelectField 
@@ -311,28 +394,6 @@ const CreateListingScreen = ({ navigation }: any) => {
         onChange={setCondition}
         required
       />
-
-      {/* Category */}
-      <SelectField 
-        label="Kategori" 
-        value={category} 
-        options={CATEGORIES} 
-        onChange={setCategory}
-      />
-
-      {/* Year */}
-      <View style={styles.field}>
-        <Text style={styles.label}>Model Yılı</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Örn: 2023"
-          placeholderTextColor="#9E9E9E"
-          value={year}
-          onChangeText={setYear}
-          keyboardType="numeric"
-          maxLength={4}
-        />
-      </View>
 
       {/* Trade Available */}
       <View style={styles.switchField}>

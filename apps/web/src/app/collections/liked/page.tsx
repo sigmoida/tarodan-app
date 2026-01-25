@@ -51,11 +51,28 @@ export default function LikedCollectionsPage() {
   const loadLikedCollections = async () => {
     setLoading(true);
     setError(null);
+    console.log('[LikedCollections] Loading... User:', user?.id, 'isAuthenticated:', isAuthenticated);
+    console.log('[LikedCollections] Auth token:', localStorage.getItem('auth_token')?.substring(0, 30) + '...');
     try {
-      const response = await api.get('/collections/liked');
-      setCollections(response.data?.data || response.data?.collections || response.data || []);
+      const response = await collectionsApi.getLiked();
+      const data = response.data;
+      console.log('[LikedCollections] API Response:', JSON.stringify(data, null, 2).substring(0, 500));
+      // Handle different response formats
+      const collectionsList = data?.collections || data?.data || (Array.isArray(data) ? data : []);
+      console.log('[LikedCollections] Parsed collections count:', collectionsList.length);
+      setCollections(collectionsList);
     } catch (err: any) {
       console.error('Liked collections load error:', err);
+      console.error('Error details:', err.response?.data);
+      
+      // Check if it's an auth error
+      if (err.response?.status === 401) {
+        setError(t('auth.sessionExpired'));
+        // Redirect to login
+        router.push('/login?redirect=/collections/liked');
+        return;
+      }
+      
       setError(t('collection.loadFailed'));
       setCollections([]);
     } finally {

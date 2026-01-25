@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { api, listingsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
+import ReportModal from '@/components/ReportModal';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Seller {
@@ -59,6 +60,7 @@ export default function SellerProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [tab, setTab] = useState<'listings' | 'reviews'>('listings');
 
   useEffect(() => {
@@ -163,7 +165,7 @@ export default function SellerProfilePage() {
       setShowAuthModal(true);
       return;
     }
-    toast(t('common.comingSoon'));
+    setShowReportModal(true);
   };
 
   const getImageUrl = (images: any[]): string => {
@@ -391,6 +393,18 @@ export default function SellerProfilePage() {
         onClose={() => setShowAuthModal(false)}
         message={t('auth.authRequiredMessage')}
       />
+
+      {/* Report Modal */}
+      {seller && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          entityType="user"
+          entityId={seller.id}
+          entityName={seller.displayName}
+          locale={locale}
+        />
+      )}
     </div>
   );
 }

@@ -15,6 +15,11 @@ import {
   ChatBubbleLeftRightIcon,
   HeartIcon,
   PlusIcon,
+  ShoppingBagIcon,
+  TagIcon,
+  MapPinIcon,
+  CogIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
@@ -200,31 +205,83 @@ export default function Navbar() {
                     )}
                   </Link>
                   {/* Dropdown menu */}
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {t('profile.myProfile')}
-                    </Link>
-                    <Link
-                      href="/orders"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {t('order.myOrders')}
-                    </Link>
-                    <button
-                      onClick={() => {
-                        logout();
-                        router.push('/');
-                        setIsOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-                    >
-                      {t('common.logout')}
-                    </button>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                    {/* User info header */}
+                    <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-100">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    
+                    {/* Quick Actions */}
+                    <div className="py-2">
+                      <Link
+                        href="/profile"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <UserCircleIcon className="w-5 h-5" />
+                        {t('profile.myProfile')}
+                      </Link>
+                      <Link
+                        href="/profile/listings"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <ShoppingBagIcon className="w-5 h-5" />
+                        {t('nav.myListings')}
+                      </Link>
+                      <Link
+                        href="/orders"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <TagIcon className="w-5 h-5" />
+                        {t('order.myOrders')}
+                      </Link>
+                      <Link
+                        href="/wishlist"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <HeartIcon className="w-5 h-5" />
+                        {t('nav.favorites')}
+                      </Link>
+                    </div>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-100"></div>
+                    
+                    {/* Settings & Support */}
+                    <div className="py-2">
+                      <Link
+                        href="/profile/addresses"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <MapPinIcon className="w-5 h-5" />
+                        {t('address.myAddresses')}
+                      </Link>
+                      <Link
+                        href="/profile/settings"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <CogIcon className="w-5 h-5" />
+                        {t('nav.settings')}
+                      </Link>
+                    </div>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-100"></div>
+                    
+                    {/* Logout */}
+                    <div className="py-2">
+                      <button
+                        onClick={() => {
+                          logout();
+                          router.push('/');
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                        {t('common.logout')}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>

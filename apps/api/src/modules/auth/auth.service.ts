@@ -54,6 +54,24 @@ export class AuthService {
       }
     }
 
+    // Validate age (18+) - double check at server level
+    if (dto.birthDate) {
+      const birth = new Date(dto.birthDate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      
+      if (age < 18) {
+        throw new BadRequestException('Kayıt olmak için en az 18 yaşında olmanız gerekmektedir');
+      }
+    } else {
+      throw new BadRequestException('Doğum tarihi zorunludur');
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
@@ -64,12 +82,16 @@ export class AuthService {
         phone: dto.phone,
         passwordHash,
         displayName: dto.displayName,
-        birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+        birthDate: new Date(dto.birthDate),
         isSeller: dto.isSeller ?? false,
         sellerType: dto.isSeller ? SellerType.individual : null,
         isVerified: false, // Email verification required
+        isEmailVerified: false, // Will be true after email verification
       },
     });
+
+    // Send email verification
+    await this.sendEmailVerification(user.id, user.email);
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
@@ -86,7 +108,97 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       tokens,
+      message: 'Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.',
     };
+  }
+
+  /**
+   * Send email verification link
+   */
+  async sendEmailVerification(userId: string, email: string): Promise<void> {
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 3600000); // 24 hours
+
+    // Delete existing tokens for this user
+    await this.prisma.emailVerificationToken.deleteMany({
+      where: { userId },
+    });
+
+    // Create new token
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId,
+        token: hashedToken,
+        email,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    await this.notificationService.sendEmailVerification(userId, verificationToken);
+  }
+
+  /**
+   * Verify email with token
+   * POST /auth/verify-email
+   */
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
+      where: { token: hashedToken },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new BadRequestException('Geçersiz veya süresi dolmuş doğrulama linki');
+    }
+
+    if (verificationToken.usedAt) {
+      throw new BadRequestException('Bu doğrulama linki daha önce kullanılmış');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      throw new BadRequestException('Doğrulama linkinin süresi dolmuş');
+    }
+
+    // Mark email as verified
+    await this.prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: { isEmailVerified: true },
+    });
+
+    // Mark token as used
+    await this.prisma.emailVerificationToken.update({
+      where: { id: verificationToken.id },
+      data: { usedAt: new Date() },
+    });
+
+    return { message: 'Email adresiniz başarıyla doğrulandı!' };
+  }
+
+  /**
+   * Resend email verification
+   * POST /auth/resend-verification
+   */
+  async resendEmailVerification(userId: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    if (user.isEmailVerified) {
+      throw new BadRequestException('Email adresi zaten doğrulanmış');
+    }
+
+    await this.sendEmailVerification(userId, user.email);
+
+    return { message: 'Doğrulama emaili tekrar gönderildi' };
   }
 
   /**

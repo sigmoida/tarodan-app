@@ -85,15 +85,13 @@ export default function EditListingPage() {
   const fetchListing = async () => {
     setIsFetching(true);
     try {
-      const response = await listingsApi.getOne(id);
+      // Use /products/my/:id endpoint to fetch user's own product (any status)
+      // This allows editing pending/inactive listings too
+      const response = await api.get(`/products/my/${id}`);
       const listing = response.data.product || response.data;
       
-      // Check if user is the owner
-      if (listing.sellerId !== user?.id && listing.seller?.id !== user?.id) {
-        toast.error('Bu ilanı düzenleme yetkiniz yok');
-        router.push(`/listings/${id}`);
-        return;
-      }
+      // The /products/my/:id endpoint already validates ownership
+      // So we don't need to check seller again here
 
       setFormData({
         title: listing.title || '',
@@ -110,7 +108,7 @@ export default function EditListingPage() {
     } catch (error: any) {
       console.error('Failed to fetch listing:', error);
       toast.error(error.response?.data?.message || 'İlan yüklenemedi');
-      router.push(`/listings/${id}`);
+      router.push('/profile/listings');
     } finally {
       setIsFetching(false);
     }

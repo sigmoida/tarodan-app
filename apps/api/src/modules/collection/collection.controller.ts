@@ -84,16 +84,33 @@ export class CollectionController {
    * GET /collections/liked
    */
   @Get('liked')
+  @HttpCode(HttpStatus.OK)
   async getLikedCollections(
     @Request() req: any,
     @Query('page') page?: number,
     @Query('pageSize') pageSize?: number,
   ): Promise<CollectionListResponseDto> {
-    return this.collectionService.getLikedCollections(
-      req.user.id,
-      page,
-      pageSize,
-    );
+    // Force no caching
+    req.res?.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    req.res?.setHeader('Pragma', 'no-cache');
+    req.res?.setHeader('Expires', '0');
+    
+    console.log('\n=== LIKED COLLECTIONS REQUEST ===');
+    console.log('User:', req.user?.id, req.user?.email);
+    
+    if (!req.user || !req.user.id) {
+      console.error('[getLikedCollections] NOT AUTHENTICATED');
+      return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
+    }
+    
+    try {
+      const result = await this.collectionService.getLikedCollections(req.user.id, page, pageSize);
+      console.log(`[getLikedCollections] Found ${result.collections.length} collections for user ${req.user.id}`);
+      return result;
+    } catch (error) {
+      console.error('[getLikedCollections] Error:', error);
+      return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
+    }
   }
 
   /**
@@ -141,11 +158,15 @@ export class CollectionController {
     @Param('id') idOrSlug: string,
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
+    console.log(`[likeCollection] Request: idOrSlug=${idOrSlug}, userId=${req.user?.id}`);
+    
     if (!req.user || !req.user.id) {
       throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
     }
     try {
-      return await this.collectionService.likeCollection(idOrSlug, req.user.id);
+      const result = await this.collectionService.likeCollection(idOrSlug, req.user.id);
+      console.log(`[likeCollection] Result: liked=${result.liked}, likeCount=${result.likeCount}`);
+      return result;
     } catch (error) {
       console.error('Error in likeCollection controller:', error);
       throw error;

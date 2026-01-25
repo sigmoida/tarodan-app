@@ -22,6 +22,7 @@ import { RatingModule } from './modules/rating';
 import { WishlistModule } from './modules/wishlist';
 import { CollectionModule } from './modules/collection';
 import { SupportModule } from './modules/support';
+import { UserReportModule } from './modules/user-report';
 
 // PHASE 3 - Security & Auth Hardening (AUDIT REMEDIATION)
 import { SecurityModule } from './modules/security';
@@ -102,6 +103,7 @@ import { EventModule } from './modules/events';
     WishlistModule,     // GAP-011: Wishlist/Favorites (MEDIUM)
     CollectionModule,   // GAP-012: Collections System (MEDIUM)
     SupportModule,      // GAP-013: Support Ticket System (MEDIUM)
+    UserReportModule,   // User-generated reports for products, users, collections
 
     // PHASE 3 - Security Modules
     SecurityModule,     // GAP-004 to GAP-009, GAP-017, GAP-018: Security & Auth

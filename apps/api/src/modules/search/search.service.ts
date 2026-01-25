@@ -390,6 +390,12 @@ export class SearchService implements OnModuleInit {
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
 
+      // If ES returns 0 results, fallback to database search
+      if (hits.length === 0 && query) {
+        console.log('Elasticsearch returned 0 results, falling back to database search');
+        return this.fallbackSearch(options);
+      }
+
       return {
         results: hits.map((hit: any) => ({
           id: hit._source.id,

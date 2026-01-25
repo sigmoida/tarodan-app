@@ -307,6 +307,15 @@ export class OrderService {
    * - Cannot buy own product
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
+    this.logger.log(`[createDirectOrder] Starting order for buyer: ${buyerId}`);
+    this.logger.log(`[createDirectOrder] DTO: ${JSON.stringify(dto)}`);
+    
+    // Validate DTO has necessary address info
+    if (!dto.shippingAddressId && !dto.shippingAddress) {
+      this.logger.error('[createDirectOrder] No shipping address provided');
+      throw new BadRequestException('Teslimat adresi gereklidir (shippingAddressId veya shippingAddress)');
+    }
+    
     // Check if user is banned
     const buyer = await this.prisma.user.findUnique({
       where: { id: buyerId },

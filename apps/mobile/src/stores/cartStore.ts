@@ -21,13 +21,17 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   lastUpdated: number;
+  isLoading: boolean;
   
   // Actions
   addItem: (item: Omit<CartItem, 'id' | 'quantity' | 'addedAt'>) => void;
+  addToCart: (productId: string) => Promise<void>;
   removeItem: (itemId: string) => void;
+  removeByProductId: (productId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
   cleanExpiredItems: () => void;
+  onPurchaseComplete: (productIds: string[]) => void;
   
   // Computed
   getSubtotal: () => number;
@@ -41,6 +45,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       lastUpdated: Date.now(),
+      isLoading: false,
 
       addItem: (item) => {
         const items = get().items;
@@ -64,8 +69,36 @@ export const useCartStore = create<CartState>()(
         }
       },
 
+      addToCart: async (productId: string) => {
+        set({ isLoading: true });
+        try {
+          // This would typically fetch product details from API
+          // For now, just add with basic info
+          const items = get().items;
+          const existingIndex = items.findIndex(i => i.productId === productId);
+
+          if (existingIndex >= 0) {
+            const newItems = [...items];
+            newItems[existingIndex].quantity += 1;
+            newItems[existingIndex].addedAt = Date.now();
+            set({ items: newItems, lastUpdated: Date.now(), isLoading: false });
+          } else {
+            // In real app, fetch product details here
+            set({ isLoading: false });
+          }
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
       removeItem: (itemId) => {
         const items = get().items.filter(i => i.id !== itemId);
+        set({ items, lastUpdated: Date.now() });
+      },
+
+      removeByProductId: (productId: string) => {
+        const items = get().items.filter(i => i.productId !== productId);
         set({ items, lastUpdated: Date.now() });
       },
 
@@ -94,6 +127,12 @@ export const useCartStore = create<CartState>()(
         if (items.length !== get().items.length) {
           set({ items, lastUpdated: Date.now() });
         }
+      },
+
+      // Remove purchased items from cart
+      onPurchaseComplete: (productIds: string[]) => {
+        const items = get().items.filter(item => !productIds.includes(item.productId));
+        set({ items, lastUpdated: Date.now() });
       },
 
       getSubtotal: () => {

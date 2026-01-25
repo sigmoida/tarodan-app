@@ -142,13 +142,10 @@ export default function CollectionDetailPage() {
     }
 
     try {
-      // Use collectionIdOrSlug (from URL) instead of collection.id to support both UUID and slug
-      // Remove 'collection-' prefix if present (legacy URL format)
-      let idToUse = collectionIdOrSlug || collection.id;
-      if (idToUse.startsWith('collection-')) {
-        idToUse = idToUse.replace('collection-', '');
-      }
-      console.log('Liking collection with ID/Slug:', idToUse);
+      // Use the actual collection.id (UUID) from the loaded collection object
+      // This ensures we always use the correct ID regardless of URL format
+      const idToUse = collection.id;
+      console.log('Liking collection with ID:', idToUse, 'URL param was:', collectionIdOrSlug);
       const response = await collectionsApi.like(idToUse);
       const { liked, likeCount } = response.data || {};
       

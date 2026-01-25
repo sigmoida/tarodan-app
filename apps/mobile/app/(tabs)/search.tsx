@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput } from 'react-native';
 import { Text, Card, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { productsApi, searchApi } from '../../src/services/api';
 import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
+import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -30,10 +31,22 @@ export default function SearchScreen() {
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
   const [tradeOnly, setTradeOnly] = useState(false);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
   
   // Modal states
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
+
+  // Recent searches store
+  const { searches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
+  const recentSearchQueries = searches.map((s) => s.query);
+
+  // Save search when user submits
+  useEffect(() => {
+    if (debouncedQuery && debouncedQuery.length >= 2) {
+      addSearch(debouncedQuery);
+    }
+  }, [debouncedQuery]);
 
   // Debounce search
   const handleSearchChange = useCallback((text: string) => {
@@ -43,6 +56,13 @@ export default function SearchScreen() {
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Handle recent search selection
+  const handleRecentSearchSelect = (query: string) => {
+    setSearchQuery(query);
+    setDebouncedQuery(query);
+    setShowRecentSearches(false);
+  };
 
   const queryParams = useMemo(() => {
     // Sadece değeri olan parametreleri gönder - boş string API'de 400 hatası veriyor
@@ -226,10 +246,40 @@ export default function SearchScreen() {
           placeholder="Model, marka veya anahtar kelime..."
           value={searchQuery}
           onChangeText={handleSearchChange}
+          onFocus={() => setShowRecentSearches(true)}
+          onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
           style={styles.searchBar}
           inputStyle={styles.searchInput}
           iconColor={TarodanColors.textSecondary}
         />
+        
+        {/* Recent Searches Dropdown */}
+        {showRecentSearches && recentSearchQueries.length > 0 && !searchQuery && (
+          <View style={styles.recentSearchesDropdown}>
+            <View style={styles.recentSearchesHeader}>
+              <Text style={styles.recentSearchesTitle}>Son Aramalar</Text>
+              <TouchableOpacity onPress={clearSearches}>
+                <Text style={styles.clearRecentText}>Temizle</Text>
+              </TouchableOpacity>
+            </View>
+            {recentSearchQueries.map((query, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.recentSearchItem}
+                onPress={() => handleRecentSearchSelect(query)}
+              >
+                <Ionicons name="time-outline" size={18} color={TarodanColors.textSecondary} />
+                <Text style={styles.recentSearchText}>{query}</Text>
+                <TouchableOpacity
+                  onPress={() => removeSearch(query)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={18} color={TarodanColors.textLight} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Filter & Sort Row */}
@@ -631,6 +681,58 @@ const styles = StyleSheet.create({
   searchSection: {
     padding: 16,
     backgroundColor: TarodanColors.background,
+    position: 'relative',
+    zIndex: 10,
+  },
+  recentSearchesDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 16,
+    right: 16,
+    backgroundColor: TarodanColors.background,
+    borderRadius: 12,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    zIndex: 100,
+    marginTop: -8,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: TarodanColors.border,
+  },
+  recentSearchesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TarodanColors.textPrimary,
+  },
+  clearRecentText: {
+    fontSize: 13,
+    color: TarodanColors.primary,
+    fontWeight: '500',
+  },
+  recentSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: TarodanColors.border,
+  },
+  recentSearchText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    color: TarodanColors.textPrimary,
   },
   searchBar: {
     backgroundColor: TarodanColors.surfaceVariant,

@@ -208,6 +208,8 @@ export const collectionsApi = {
     api.get('/collections/browse', { params }),
   getMyCollections: (params?: Record<string, any>) =>
     api.get('/collections/me', { params }),
+  getLikedCollections: (params?: Record<string, any>) =>
+    api.get('/collections/liked', { params }),
   getOne: (id: string) => 
     api.get(`/collections/${id}`),
   getBySlug: (slug: string) => 
@@ -224,6 +226,8 @@ export const collectionsApi = {
     api.delete(`/collections/${id}/items/${itemId}`),
   like: (id: string) => 
     api.post(`/collections/${id}/like`),
+  unlike: (id: string) =>
+    api.delete(`/collections/${id}/like`),
 };
 
 // Trades API - Web ile aynı endpoint'ler
@@ -311,6 +315,17 @@ export const userApi = {
   unfollow: (userId: string) => api.delete(`/users/${userId}/follow`),
 };
 
+// User Reports API - İçerik raporlama
+export const userReportsApi = {
+  create: (data: {
+    type: 'product' | 'user' | 'collection' | 'message';
+    targetId: string;
+    reason: 'spam' | 'inappropriate_content' | 'fake_product' | 'scam' | 'harassment' | 'hate_speech' | 'counterfeit' | 'wrong_category' | 'misleading_info' | 'other';
+    description?: string;
+  }) => api.post('/user-reports', data),
+  getMyReports: () => api.get('/user-reports/me'),
+};
+
 // Addresses API - Web ile aynı endpoint'ler
 export const addressesApi = {
   getAll: () => api.get('/users/me/addresses'),
@@ -393,6 +408,50 @@ export const searchApi = {
   // Kullanıcı arama
   users: (query: string, limit?: number) =>
     api.get('/users/search', { params: { q: query, limit } }),
+};
+
+// Upload API
+export const uploadApi = {
+  image: (formData: FormData) => 
+    api.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+  images: (formData: FormData) => 
+    api.post('/upload/images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+};
+
+// =============================================================================
+// ENDPOINTS OBJECT - Unified API access
+// =============================================================================
+export const endpoints = {
+  auth: authApi,
+  products: {
+    ...productsApi,
+    create: (data: Record<string, any>) => api.post('/products', data).then(res => res.data),
+    getAll: (params?: Record<string, any>) => api.get('/products', { params }).then(res => res.data),
+    getOne: (id: string | number) => api.get(`/products/${id}`).then(res => res.data),
+  },
+  categories: {
+    getAll: () => api.get('/categories').then(res => res.data),
+    getOne: (id: string) => api.get(`/categories/${id}`).then(res => res.data),
+  },
+  orders: ordersApi,
+  messages: messagesApi,
+  collections: collectionsApi,
+  trades: tradesApi,
+  offers: offersApi,
+  ratings: ratingsApi,
+  user: userApi,
+  addresses: addressesApi,
+  payments: paymentsApi,
+  membership: membershipApi,
+  notifications: notificationsApi,
+  shipping: shippingApi,
+  search: searchApi,
+  upload: uploadApi,
+  wishlist: wishlistApi,
 };
 
 export default api;

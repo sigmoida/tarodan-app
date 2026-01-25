@@ -158,18 +158,55 @@ export default function AddressesPage() {
             <h1 className="text-3xl font-bold mb-2">{t('address.myAddresses')}</h1>
             <p className="text-gray-600">{t('address.manageAddresses')}</p>
           </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setEditingId(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
-          >
-            <PlusIcon className="w-5 h-5" />
-            {t('address.newAddress')}
-          </button>
+          {addresses.length >= 3 ? (
+            <div className="text-right">
+              <p className="text-sm text-orange-600 font-medium mb-1">
+                {locale === 'en' ? 'Address limit reached (3/3)' : 'Adres limiti doldu (3/3)'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {locale === 'en' 
+                  ? 'Delete an address to add a new one' 
+                  : 'Yeni adres eklemek için bir adres silin'}
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingId(null);
+                setShowForm(true);
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
+            >
+              <PlusIcon className="w-5 h-5" />
+              {t('address.newAddress')}
+              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                {addresses.length}/3
+              </span>
+            </button>
+          )}
         </div>
+
+        {/* Address Limit Warning */}
+        {addresses.length >= 3 && !showForm && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📍</span>
+              <div>
+                <p className="font-medium text-orange-800">
+                  {locale === 'en' 
+                    ? 'You have reached the maximum address limit' 
+                    : 'Maksimum adres limitine ulaştınız'}
+                </p>
+                <p className="text-sm text-orange-700">
+                  {locale === 'en' 
+                    ? 'You can save up to 3 addresses. To add a new address, please delete one of your existing addresses first.'
+                    : '3 adet adres kaydedebilirsiniz. Yeni bir adres eklemek için mevcut adreslerinizden birini silmeniz gerekmektedir.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showForm && (
           <motion.div
@@ -212,13 +249,27 @@ export default function AddressesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('checkout.phone')} <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    required
-                  />
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm font-medium">
+                      +90
+                    </span>
+                    <input
+                      type="tel"
+                      value={formData.phone.replace('+90', '').replace(/\s/g, '').slice(0, 10).replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4').trim()}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        const formatted = '+90' + digits;
+                        setFormData({ ...formData, phone: formatted });
+                      }}
+                      placeholder="5XX XXX XX XX"
+                      maxLength={14}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-r-lg"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {locale === 'en' ? '10 digits without country code' : '10 rakam (ülke kodu olmadan)'}
+                  </p>
                 </div>
               </div>
 

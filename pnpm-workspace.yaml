@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
+  - "!apps/admin_backup"
+  - "!apps/admin-1"
   - "packages/*"

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { ProductStatus } from '@prisma/client';
 import {
   AddToWishlistDto,
@@ -13,7 +14,10 @@ import {
 
 @Injectable()
 export class WishlistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   // ==========================================================================
   // GET OR CREATE WISHLIST
@@ -110,20 +114,31 @@ export class WishlistService {
       return this.mapItemToDto(existingItem);
     }
 
-    const item = await this.prisma.wishlistItem.create({
-      data: {
-        wishlistId: wishlist.id,
-        productId: dto.productId,
-      },
-      include: {
-        product: {
-          include: {
-            images: { take: 1 },
-            seller: { select: { id: true, displayName: true } },
+    // Use transaction to create wishlist item and increment like count
+    const [item] = await this.prisma.$transaction([
+      this.prisma.wishlistItem.create({
+        data: {
+          wishlistId: wishlist.id,
+          productId: dto.productId,
+        },
+        include: {
+          product: {
+            include: {
+              images: { take: 1 },
+              seller: { select: { id: true, displayName: true } },
+            },
           },
         },
-      },
-    });
+      }),
+      // Also increment the product's likeCount for accurate display
+      this.prisma.product.update({
+        where: { id: dto.productId },
+        data: { likeCount: { increment: 1 } },
+      }),
+    ]);
+
+    // Invalidate product cache so likeCount updates immediately
+    await this.cache.del(`products:detail:${dto.productId}`);
 
     return this.mapItemToDto(item);
   }
@@ -153,9 +168,20 @@ export class WishlistService {
       throw new NotFoundException('Ürün istek listenizde değil');
     }
 
-    await this.prisma.wishlistItem.delete({
-      where: { id: item.id },
-    });
+    // Use transaction to delete wishlist item and decrement like count
+    await this.prisma.$transaction([
+      this.prisma.wishlistItem.delete({
+        where: { id: item.id },
+      }),
+      // Also decrement the product's likeCount for accurate display
+      this.prisma.product.update({
+        where: { id: productId },
+        data: { likeCount: { decrement: 1 } },
+      }),
+    ]);
+
+    // Invalidate product cache so likeCount updates immediately
+    await this.cache.del(`products:detail:${productId}`);
   }
 
   // ==========================================================================

@@ -4,8 +4,9 @@ import { Text, Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackb
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { productsApi, ratingsApi } from '../../src/services/api';
+import { productsApi, ratingsApi, userReportsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { Alert } from 'react-native';
 import { useCartStore } from '../../src/stores/cartStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { useFavoritesStore } from '../../src/stores/favoritesStore';
@@ -209,6 +210,49 @@ export default function ProductDetailScreen() {
     }
   };
 
+  const handleReport = () => {
+    if (!isAuthenticated) {
+      setSnackbar({ visible: true, message: 'Raporlamak için giriş yapmalısınız', type: 'error' });
+      return;
+    }
+
+    const REPORT_REASONS = [
+      { key: 'spam', label: 'Spam' },
+      { key: 'fake_product', label: 'Sahte Ürün' },
+      { key: 'scam', label: 'Dolandırıcılık' },
+      { key: 'counterfeit', label: 'Taklit Ürün' },
+      { key: 'wrong_category', label: 'Yanlış Kategori' },
+      { key: 'misleading_info', label: 'Yanıltıcı Bilgi' },
+      { key: 'inappropriate_content', label: 'Uygunsuz İçerik' },
+      { key: 'other', label: 'Diğer' },
+    ];
+
+    Alert.alert(
+      'İlanı Raporla',
+      'Bu ilanı neden raporlamak istiyorsunuz?',
+      [
+        ...REPORT_REASONS.map((reason) => ({
+          text: reason.label,
+          onPress: async () => {
+            try {
+              await userReportsApi.create({
+                type: 'product',
+                targetId: productId,
+                reason: reason.key as any,
+              });
+              setSnackbar({ visible: true, message: 'Raporunuz alındı. Teşekkür ederiz!', type: 'success' });
+            } catch (error: any) {
+              const message = error.response?.data?.message || 'Rapor gönderilemedi';
+              setSnackbar({ visible: true, message, type: 'error' });
+            }
+          },
+        })),
+        { text: 'İptal', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  };
+
   if (isLoading && !product) {
     return (
       <View style={styles.loadingContainer}>
@@ -228,6 +272,9 @@ export default function ProductDetailScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleReport} style={styles.headerButton}>
+            <Ionicons name="flag-outline" size={22} color="#fff" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color="#fff" />
           </TouchableOpacity>

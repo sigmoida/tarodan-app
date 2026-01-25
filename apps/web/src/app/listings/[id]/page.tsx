@@ -28,6 +28,7 @@ import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
+import ReportModal from '@/components/ReportModal';
 import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 
@@ -94,6 +95,7 @@ export default function ListingDetailPage() {
   const [loadingCollections, setLoadingCollections] = useState(false);
   const [addingToCollection, setAddingToCollection] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [authModalConfig, setAuthModalConfig] = useState({
     title: '',
     message: '',
@@ -448,10 +450,18 @@ export default function ListingDetailPage() {
       if (isFavorite) {
         await wishlistApi.remove(id);
         setIsFavorite(false);
+        // Update displayed like count
+        if (listing) {
+          setListing({ ...listing, likeCount: Math.max(0, (listing.likeCount || 1) - 1) });
+        }
         toast.success(t('product.removedFromFavorites'));
       } else {
         await wishlistApi.add(id);
         setIsFavorite(true);
+        // Update displayed like count
+        if (listing) {
+          setListing({ ...listing, likeCount: (listing.likeCount || 0) + 1 });
+        }
         toast.success(t('product.addToFavorites'));
       }
     } catch (error: any) {
@@ -987,7 +997,7 @@ export default function ListingDetailPage() {
                       });
                       setShowAuthModal(true);
                     } else {
-                      toast(t('common.comingSoon'));
+                      setShowReportModal(true);
                     }
                   }}
                   className="p-2 rounded-full hover:bg-red-50 transition-colors"
@@ -1117,29 +1127,31 @@ export default function ListingDetailPage() {
                       </span>
                     </div>
                   </div>
-                  {isAuthenticated ? (
-                    <Link
-                      href={`/messages?user=${listing.seller.id}&listing=${listing.id}`}
-                      className="btn-secondary flex items-center gap-2"
-                    >
-                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                      {t('product.sendMessage')}
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setAuthModalConfig({
-                          title: t('product.sendMessageToSeller'),
-                          message: t('product.sendMessageToSellerMsg'),
-                          icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-orange-500" />,
-                        });
-                        setShowAuthModal(true);
-                      }}
-                      className="btn-secondary flex items-center gap-2"
-                    >
-                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                      {t('product.sendMessage')}
-                    </button>
+                  {!isOwner && (
+                    isAuthenticated ? (
+                      <Link
+                        href={`/messages?user=${listing.seller.id}&listing=${listing.id}`}
+                        className="btn-secondary flex items-center gap-2"
+                      >
+                        <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                        {t('product.sendMessage')}
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAuthModalConfig({
+                            title: t('product.sendMessageToSeller'),
+                            message: t('product.sendMessageToSellerMsg'),
+                            icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-orange-500" />,
+                          });
+                          setShowAuthModal(true);
+                        }}
+                        className="btn-secondary flex items-center gap-2"
+                      >
+                        <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                        {t('product.sendMessage')}
+                      </button>
+                    )
                   )}
                 </div>
               </div>
@@ -1187,23 +1199,42 @@ export default function ListingDetailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {/* Primary Action: Buy Now */}
-              <button
-                onClick={handleBuyNow}
-                disabled={listing.status !== 'active'}
-                className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
-                  listing.status === 'active' 
-                    ? 'btn-primary' 
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
-                }`}
-              >
-                <BoltIcon className="w-6 h-6" />
-                {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
-              </button>
+              {/* Owner Notice */}
+              {isOwner && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <p className="text-blue-800 font-medium">
+                    {locale === 'en' ? 'This is your listing' : 'Bu sizin ilanınız'}
+                  </p>
+                  <div className="flex gap-2 justify-center mt-3">
+                    <Link href={`/listings/${listing.id}/edit`} className="btn-secondary text-sm">
+                      {locale === 'en' ? 'Edit Listing' : 'İlanı Düzenle'}
+                    </Link>
+                    <Link href="/profile/listings" className="btn-secondary text-sm">
+                      {locale === 'en' ? 'My Listings' : 'İlanlarım'}
+                    </Link>
+                  </div>
+                </div>
+              )}
 
-              {/* Secondary Actions */}
+              {/* Primary Action: Buy Now - Hide for owner */}
+              {!isOwner && (
+                <button
+                  onClick={handleBuyNow}
+                  disabled={listing.status !== 'active'}
+                  className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
+                    listing.status === 'active' 
+                      ? 'btn-primary' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                  }`}
+                >
+                  <BoltIcon className="w-6 h-6" />
+                  {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
+                </button>
+              )}
+
+              {/* Secondary Actions - Hide most for owner */}
               <div className="flex gap-3">
-                {isTradeAvailable && (
+                {isTradeAvailable && !isOwner && (
                   <button
                     onClick={() => {
                       if (listing.status !== 'active') {
@@ -1248,6 +1279,7 @@ export default function ListingDetailPage() {
                     {t('product.makeOffer')}
                   </button>
                 )}
+                {!isOwner && (
                   <button
                     onClick={handleCartToggle}
                     disabled={isAddingToCart || listing.status !== 'active'}
@@ -1265,22 +1297,25 @@ export default function ListingDetailPage() {
                       : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
                     }
                   </button>
-                <button
-                  onClick={handleToggleFavorite}
-                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
-                >
-                  {isFavorite ? (
-                    <>
-                      <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                      {t('product.removeFromFavorites')}
-                    </>
-                  ) : (
-                    <>
-                      <HeartIcon className="w-5 h-5" />
-                      {t('product.addToFavorites')}
-                    </>
-                  )}
-                </button>
+                )}
+                {!isOwner && (
+                  <button
+                    onClick={handleToggleFavorite}
+                    className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                  >
+                    {isFavorite ? (
+                      <>
+                        <HeartSolidIcon className="w-5 h-5 text-red-500" />
+                        {t('product.removeFromFavorites')}
+                      </>
+                    ) : (
+                      <>
+                        <HeartIcon className="w-5 h-5" />
+                        {t('product.addToFavorites')}
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1464,6 +1499,18 @@ export default function ListingDetailPage() {
         message={authModalConfig.message}
         icon={authModalConfig.icon}
       />
+
+      {/* Report Modal */}
+      {listing && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          entityType="product"
+          entityId={listing.id}
+          entityName={listing.title}
+          locale={locale}
+        />
+      )}
 
       {/* Offer Modal */}
       {showOfferModal && listing && (

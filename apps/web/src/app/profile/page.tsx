@@ -3,6 +3,28 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import {
+  UserCircleIcon,
+  CogIcon,
+  ShoppingBagIcon,
+  HeartIcon,
+  ChatBubbleLeftRightIcon,
+  TagIcon,
+  ArrowsRightLeftIcon,
+  MapPinIcon,
+  CreditCardIcon,
+  ChartBarIcon,
+  StarIcon,
+  CheckBadgeIcon,
+  PencilSquareIcon,
+  ChevronRightIcon,
+  SparklesIcon,
+  RectangleStackIcon,
+  BellIcon,
+  DocumentTextIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
@@ -47,6 +69,13 @@ interface UserProfile {
   membershipTier?: string;
 }
 
+const tierDefaults: Record<string, MembershipTier> = {
+  free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
+  basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
+  premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
+  business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -59,7 +88,6 @@ export default function ProfilePage() {
       router.push('/login');
       return;
     }
-    // First use authStore user data immediately, then refresh
     if (user) {
       setProfileFromAuthStore();
     }
@@ -68,15 +96,7 @@ export default function ProfilePage() {
 
   const setProfileFromAuthStore = () => {
     if (!user) return;
-    
-    // Get membership tier info
     const tierType = user.membershipTier || 'free';
-    const tierDefaults: Record<string, MembershipTier> = {
-      free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-      basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
-      premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
-      business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
-    };
     
     setProfile({
       id: user.id,
@@ -108,7 +128,6 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      // Use /users/me for profile data
       const [profileResponse, statsResponse, ordersResponse, productsResponse, tradesResponse, collectionsResponse] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
@@ -125,23 +144,10 @@ export default function ProfilePage() {
       const tradesCount = tradesResponse?.data?.meta?.total || tradesResponse?.data?.data?.length || tradesResponse?.data?.trades?.length || 0;
       const collectionsCount = collectionsResponse?.data?.meta?.total || collectionsResponse?.data?.data?.length || collectionsResponse?.data?.collections?.length || 0;
       
-      if (!profileData) {
-        // If no profile data, keep using authStore data
-        return;
-      }
+      if (!profileData) return;
       
-      // Get membership info from API response
       const membershipFromApi = profileData.membership;
       const tierType = membershipFromApi?.tier?.type || profileData.membershipTier || user?.membershipTier || 'free';
-      
-      // Build membership tier object
-      const tierDefaults: Record<string, MembershipTier> = {
-        free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-        basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
-        premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
-        business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
-      };
-      
       const tierInfo = membershipFromApi?.tier || tierDefaults[tierType] || tierDefaults.free;
       
       setProfile({
@@ -157,24 +163,18 @@ export default function ProfilePage() {
           expiresAt: membershipFromApi?.expiresAt || null,
         },
         stats: {
-          productsCount: productsCount || profileData.listingCount || (statsData.productsCount ?? statsData.listings ?? statsData.products ?? 
-                        profileData._count?.products ?? user?.listingCount ?? 0),
-          ordersCount: ordersCount || (statsData.ordersCount ?? statsData.orders ?? 
-                      profileData._count?.orders ?? user?.totalPurchases ?? 0),
-          tradesCount: tradesCount || (statsData.tradesCount ?? statsData.trades ?? 
-                      profileData._count?.trades ?? 0),
-          collectionsCount: collectionsCount || (statsData.collectionsCount ?? statsData.collections ?? 
-                           profileData._count?.collections ?? 0),
+          productsCount: productsCount || profileData.listingCount || (statsData.productsCount ?? 0),
+          ordersCount: ordersCount || (statsData.ordersCount ?? 0),
+          tradesCount: tradesCount || (statsData.tradesCount ?? 0),
+          collectionsCount: collectionsCount || (statsData.collectionsCount ?? 0),
           rating: statsData.rating ?? profileData.rating ?? user?.rating ?? 0,
           reviewsCount: statsData.reviewsCount ?? statsData.totalRatings ?? user?.totalRatings ?? 0,
         },
       });
       
-      // Also refresh authStore user data
       refreshUserData();
     } catch (error) {
       console.error('Profile load error:', error);
-      // Fallback to auth store user data already set
     } finally {
       setLoading(false);
     }
@@ -185,23 +185,77 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
+
+  const tierColors = {
+    free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+    basic: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+    premium: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
+    business: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
+  };
+
+  const currentTierColor = tierColors[profile?.membership?.tier.type as keyof typeof tierColors] || tierColors.free;
+
+  // Quick action menu items
+  const quickActions = [
+    { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', color: 'text-orange-500' },
+    { icon: TagIcon, label: t('order.myOrders'), href: '/orders', color: 'text-blue-500' },
+    { icon: HeartIcon, label: t('nav.favorites'), href: '/wishlist', color: 'text-red-500' },
+    { icon: ChatBubbleLeftRightIcon, label: t('nav.messages'), href: '/messages', color: 'text-green-500' },
+  ];
+
+  // Menu sections
+  const menuSections = [
+    {
+      title: t('common.shopping'),
+      items: [
+        { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', desc: 'İlanlarınızı yönetin' },
+        { icon: TagIcon, label: t('order.myOrders'), href: '/orders', desc: 'Sipariş geçmişiniz' },
+        { icon: HeartIcon, label: t('nav.favorites'), href: '/wishlist', desc: 'Favori ürünleriniz' },
+        { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz' },
+      ],
+    },
+    {
+      title: t('nav.collections'),
+      items: [
+        { icon: RectangleStackIcon, label: t('collection.myCollections'), href: '/collections', desc: 'Koleksiyonlarınız' },
+        { icon: StarIcon, label: 'Beğenilen Koleksiyonlar', href: '/collections/liked', desc: 'Beğendiğiniz koleksiyonlar' },
+      ],
+    },
+    {
+      title: t('profile.accountSettings'),
+      items: [
+        { icon: UserCircleIcon, label: t('profile.editProfile'), href: '/profile/edit', desc: 'Profil bilgilerinizi düzenleyin' },
+        { icon: MapPinIcon, label: t('address.myAddresses'), href: '/profile/addresses', desc: 'Teslimat adresleriniz' },
+        { icon: CreditCardIcon, label: t('payment.paymentMethods'), href: '/profile/payments', desc: 'Ödeme yöntemleriniz' },
+        { icon: BellIcon, label: t('nav.notifications'), href: '/profile/notifications', desc: 'Bildirim ayarları' },
+        { icon: ShieldCheckIcon, label: 'Güvenlik', href: '/profile/security', desc: 'Şifre ve güvenlik ayarları' },
+      ],
+    },
+    {
+      title: t('common.more'),
+      items: [
+        { icon: ChartBarIcon, label: t('analytics.analytics'), href: '/profile/statistics', desc: 'Satış ve görüntüleme istatistikleri' },
+        { icon: DocumentTextIcon, label: t('footer.support'), href: '/support', desc: 'Yardım ve destek' },
+        { icon: CogIcon, label: t('nav.settings'), href: '/profile/settings', desc: 'Uygulama ayarları' },
+      ],
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-          </div>
-        ) : profile ? (
-          <div className="space-y-8">
-            {/* Profile Header */}
-            <div className="bg-gray-800 rounded-xl p-6">
-              <div className="flex items-start gap-6">
-                <div className="w-24 h-24 bg-primary-500/20 rounded-full flex items-center justify-center text-4xl">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      {/* Header with gradient */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 pt-8 pb-24">
+        <div className="max-w-5xl mx-auto px-4">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+            </div>
+          ) : profile && (
+            <div className="flex items-center gap-6">
+              {/* Avatar */}
+              <div className="relative">
+                <div className="w-24 h-24 md:w-28 md:h-28 bg-white rounded-full flex items-center justify-center text-4xl font-bold text-orange-500 shadow-lg ring-4 ring-white/30">
                   {profile.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -209,245 +263,203 @@ export default function ProfilePage() {
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    profile.displayName.charAt(0)
+                    profile.displayName.charAt(0).toUpperCase()
                   )}
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-2xl font-bold">{profile.displayName}</h1>
-                    {profile.isVerified && (
-                      <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
-                        ✓ {t('common.approved')}
-                      </span>
-                    )}
-                    {profile.membership && (
-                      <span className={`px-3 py-1 text-xs rounded-full font-semibold ${
-                        profile.membership.tier.type === 'business' 
-                          ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' 
-                          : profile.membership.tier.type === 'premium'
-                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                            : profile.membership.tier.type === 'basic'
-                              ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                              : 'bg-gray-600 text-gray-200'
-                      }`}>
-                        {profile.membership.tier.type === 'business' && '👑 '}
-                        {profile.membership.tier.type === 'premium' && '⭐ '}
-                        {profile.membership.tier.type === 'basic' && '🔷 '}
-                        {profile.membership.tier.name}
-                      </span>
-                    )}
+                {profile.isVerified && (
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5 shadow-lg">
+                    <CheckBadgeIcon className="w-5 h-5 text-white" />
                   </div>
-                  <p className="text-gray-400 mt-1">{profile.email}</p>
-                  {profile.bio && <p className="text-gray-300 mt-2">{profile.bio}</p>}
-                  <p className="text-gray-500 text-sm mt-2">
-                    {t('profile.memberSince')}: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
+                )}
+              </div>
+              
+              {/* User Info */}
+              <div className="flex-1 text-white">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl md:text-3xl font-bold">{profile.displayName}</h1>
+                  {profile.membership && (
+                    <span className={`px-3 py-1 text-xs rounded-full font-semibold bg-white/20 backdrop-blur-sm`}>
+                      {profile.membership.tier.type === 'business' && '👑 '}
+                      {profile.membership.tier.type === 'premium' && '⭐ '}
+                      {profile.membership.tier.type === 'basic' && '🔷 '}
+                      {profile.membership.tier.name}
+                    </span>
+                  )}
+                </div>
+                <p className="text-orange-100 mt-1">{profile.email}</p>
+                <p className="text-orange-200 text-sm mt-1">
+                  {t('profile.memberSince')}: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
+                </p>
+              </div>
+              
+              {/* Edit Button */}
+              <Link
+                href="/profile/edit"
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white transition-colors"
+              >
+                <PencilSquareIcon className="w-5 h-5" />
+                <span>{t('profile.editProfile')}</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-5xl mx-auto px-4 -mt-16">
+        {/* Stats Cards */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+        >
+          {quickActions.map((action, i) => (
+            <Link
+              key={action.label}
+              href={action.href}
+              className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 group"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl bg-gray-50 group-hover:bg-orange-50 transition-colors`}>
+                  <action.icon className={`w-6 h-6 ${action.color}`} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {action.label === t('nav.myListings') && (profile?.stats?.productsCount ?? 0)}
+                    {action.label === t('order.myOrders') && (profile?.stats?.ordersCount ?? 0)}
+                    {action.label === t('nav.favorites') && '—'}
+                    {action.label === t('nav.messages') && '—'}
                   </p>
+                  <p className="text-sm text-gray-500">{action.label}</p>
                 </div>
-                <Link
-                  href="/profile/edit"
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                >
-                  {t('profile.editProfile')}
-                </Link>
               </div>
-            </div>
+            </Link>
+          ))}
+        </motion.div>
 
-            {/* Stats */}
+        {/* Membership Card */}
+        {profile?.membership && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-xl ${currentTierColor.bg}`}>
+                  <SparklesIcon className={`w-6 h-6 ${currentTierColor.text}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{profile.membership.tier.name} Üyelik</h3>
+                  <p className="text-sm text-gray-500">Mevcut planınız</p>
+                </div>
+              </div>
+              {profile.membership.tier.type === 'free' && (
+                <Link
+                  href="/pricing"
+                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-xl transition-all shadow-sm hover:shadow-md"
+                >
+                  Yükselt
+                </Link>
+              )}
+            </div>
+            
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: t('nav.myListings'), value: profile.stats?.productsCount ?? 0, href: '/profile/listings' },
-                { label: t('order.myOrders'), value: profile.stats?.ordersCount ?? 0, href: '/orders' },
-                { label: t('trade.myTrades'), value: profile.stats?.tradesCount ?? 0, href: '/trades' },
-                { label: t('collection.myCollections'), value: profile.stats?.collectionsCount ?? 0, href: '/collections' },
-              ].map((stat) => (
-                <Link
-                  key={stat.label}
-                  href={stat.href}
-                  className="bg-gray-800 rounded-xl p-4 hover:bg-gray-750 transition-colors"
-                >
-                  <p className="text-3xl font-bold text-primary-400">{stat.value}</p>
-                  <p className="text-gray-400">{stat.label}</p>
-                </Link>
-              ))}
+              <div className="text-center p-4 bg-gray-50 rounded-xl">
+                <p className="text-2xl font-bold text-orange-500">
+                  {profile.membership.tier.maxTotalListings === -1 ? '∞' : profile.membership.tier.maxTotalListings}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">{t('membership.listingsLimit')}</p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-xl">
+                <p className="text-2xl font-bold text-orange-500">{profile.membership.tier.maxImagesPerListing}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('product.images')}</p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-xl">
+                <p className="text-2xl font-bold text-orange-500">{profile.membership.tier.featuredListingSlots}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('membership.featuredListings')}</p>
+              </div>
+              <div className="text-center p-4 bg-gray-50 rounded-xl">
+                <p className="text-2xl font-bold text-green-500">
+                  %{(profile.membership.tier.commissionDiscount * 100).toFixed(0)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">{t('membership.savePercent')}</p>
+              </div>
             </div>
 
-            {/* Rating */}
-            {profile.stats && profile.stats.rating > 0 && (
-              <div className="bg-gray-800 rounded-xl p-6">
-                <h2 className="text-xl font-semibold mb-4">{t('profile.reviews')}</h2>
-                <div className="flex items-center gap-4">
-                  <div className="text-4xl font-bold text-yellow-400">
-                    {profile.stats.rating.toFixed(1)}
-                  </div>
-                  <div>
-                    <div className="flex text-yellow-400">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <svg
-                          key={star}
-                          className={`w-6 h-6 ${
-                            star <= (profile.stats?.rating ?? 0) ? 'fill-current' : 'text-gray-600'
-                          }`}
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                    <p className="text-gray-400 text-sm">{profile.stats?.reviewsCount ?? 0} {t('review.reviews').toLowerCase()}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Membership Features */}
-            {profile.membership && (
-              <div className={`rounded-xl p-6 ${
-                profile.membership.tier.type === 'business' 
-                  ? 'bg-gradient-to-br from-orange-900/30 to-amber-900/30 border border-orange-500/30' 
-                  : profile.membership.tier.type === 'premium'
-                    ? 'bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30'
-                    : profile.membership.tier.type === 'basic'
-                      ? 'bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border border-blue-500/30'
-                      : 'bg-gray-800'
+            <div className="flex flex-wrap gap-2 mt-4">
+              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                profile.membership.tier.canTrade 
+                  ? 'bg-green-50 text-green-700' 
+                  : 'bg-red-50 text-red-600'
               }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    {profile.membership.tier.type === 'business' && '👑'}
-                    {profile.membership.tier.type === 'premium' && '⭐'}
-                    {profile.membership.tier.type === 'basic' && '🔷'}
-                    {profile.membership.tier.name}
-                  </h2>
-                  {profile.membership.tier.type === 'free' && (
-                    <Link
-                      href="/pricing"
-                      className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      {t('membership.upgrade')}
-                    </Link>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="text-center p-3 bg-black/20 rounded-lg">
-                    <p className="text-2xl font-bold text-primary-400">
-                      {profile.membership.tier.maxTotalListings === -1 ? '∞' : profile.membership.tier.maxTotalListings}
-                    </p>
-                    <p className="text-xs text-gray-400">{t('membership.listingsLimit')}</p>
-                  </div>
-                  <div className="text-center p-3 bg-black/20 rounded-lg">
-                    <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.maxImagesPerListing}</p>
-                    <p className="text-xs text-gray-400">{t('product.images')}</p>
-                  </div>
-                  <div className="text-center p-3 bg-black/20 rounded-lg">
-                    <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.featuredListingSlots}</p>
-                    <p className="text-xs text-gray-400">{t('membership.featuredListings')}</p>
-                  </div>
-                  <div className="text-center p-3 bg-black/20 rounded-lg">
-                    <p className="text-2xl font-bold text-green-400">
-                      %{(profile.membership.tier.commissionDiscount * 100).toFixed(1).replace('.0', '')}
-                    </p>
-                    <p className="text-xs text-gray-400">{t('membership.savePercent')}</p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs ${
-                    profile.membership.tier.canTrade 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {profile.membership.tier.canTrade ? '✓' : '✗'} {t('nav.trades')}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-xs ${
-                    profile.membership.tier.canCreateCollections 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {profile.membership.tier.canCreateCollections ? '✓' : '✗'} {t('nav.collections')}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-xs ${
-                    profile.membership.tier.isAdFree 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-gray-500/20 text-gray-400'
-                  }`}>
-                    {profile.membership.tier.isAdFree ? `✓ ${t('membership.noAds')}` : t('membership.noAds')}
-                  </span>
-                </div>
-              </div>
-            )}
+                {profile.membership.tier.canTrade ? '✓' : '✗'} {t('nav.trades')}
+              </span>
+              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                profile.membership.tier.canCreateCollections 
+                  ? 'bg-green-50 text-green-700' 
+                  : 'bg-red-50 text-red-600'
+              }`}>
+                {profile.membership.tier.canCreateCollections ? '✓' : '✗'} {t('nav.collections')}
+              </span>
+              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                profile.membership.tier.isAdFree 
+                  ? 'bg-green-50 text-green-700' 
+                  : 'bg-gray-100 text-gray-500'
+              }`}>
+                {profile.membership.tier.isAdFree ? '✓' : '✗'} {t('membership.noAds')}
+              </span>
+            </div>
+          </motion.div>
+        )}
 
-            {/* Business Dashboard - Only for business accounts */}
-            {profile.membership?.tier.type === 'business' && (
-              <div className="bg-gradient-to-br from-orange-900/40 to-amber-900/40 border border-orange-500/30 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                      📊 {t('analytics.analytics')}
-                    </h2>
-                    <p className="text-gray-400 text-sm mt-1">
-                      {t('analytics.overview')}
-                    </p>
-                  </div>
-                  <Link
-                    href="/profile/business"
-                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl"
-                  >
-                    {t('common.view')} →
-                  </Link>
-                </div>
+        {/* Menu Sections */}
+        <div className="space-y-6 pb-8">
+          {menuSections.map((section, sectionIndex) => (
+            <motion.div 
+              key={section.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + sectionIndex * 0.05 }}
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h2 className="font-semibold text-gray-900">{section.title}</h2>
               </div>
-            )}
-
-            {/* Quick Links */}
-            <div className="bg-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">{t('common.more')}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: t('nav.messages'), href: '/messages', icon: '💬' },
-                  { label: t('nav.favorites'), href: '/wishlist', icon: '❤️' },
-                  { label: t('offer.myOffers'), href: '/offers', icon: '🏷️' },
-                  { label: t('trade.myTrades'), href: '/trades', icon: '🔄' },
-                  { label: t('profile.following'), href: '/profile/following', icon: '👥' },
-                  { label: t('collection.collections'), href: '/collections/liked', icon: '📚' },
-                  { label: t('search.recentSearches'), href: '/saved-searches', icon: '🔍' },
-                  { label: t('payment.paymentMethods'), href: '/payment-methods', icon: '💳' },
-                  { label: t('address.myAddresses'), href: '/profile/addresses', icon: '📍' },
-                  { label: t('membership.manageMembership'), href: '/membership/manage', icon: '👑' },
-                  { label: t('nav.membership'), href: '/pricing', icon: '⭐' },
-                  { label: t('footer.support'), href: '/support', icon: '🎫' },
-                  { label: t('nav.payments'), href: '/profile/payments', icon: '💳' },
-                  { label: t('analytics.analytics'), href: '/profile/statistics', icon: '📈' },
-                  { label: t('nav.settings'), href: '/profile/settings', icon: '⚙️' },
-                  ...(profile.membership?.tier.type === 'business' ? [
-                    { label: t('analytics.analytics'), href: '/profile/business', icon: '📊' }
-                  ] : []),
-                ].map((link) => (
+              <div className="divide-y divide-gray-50">
+                {section.items.map((item) => (
                   <Link
-                    key={link.label}
-                    href={link.href}
-                    className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors"
+                    key={item.label}
+                    href={item.href}
+                    className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
                   >
-                    <span className="text-2xl">{link.icon}</span>
-                    <span>{link.label}</span>
+                    <div className="p-2 rounded-xl bg-gray-100 group-hover:bg-orange-100 transition-colors">
+                      <item.icon className="w-5 h-5 text-gray-600 group-hover:text-orange-600 transition-colors" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.label}</p>
+                      <p className="text-sm text-gray-500">{item.desc}</p>
+                    </div>
+                    <ChevronRightIcon className="w-5 h-5 text-gray-300 group-hover:text-orange-400 transition-colors" />
                   </Link>
                 ))}
               </div>
-            </div>
+            </motion.div>
+          ))}
 
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
-            >
-              {t('common.logout')}
-            </button>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-400">{t('error.somethingWrong')}</p>
-          </div>
-        )}
-      </main>
+          {/* Logout Button */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            onClick={handleLogout}
+            className="w-full py-4 bg-white border border-red-200 text-red-600 font-medium rounded-2xl hover:bg-red-50 transition-colors shadow-sm"
+          >
+            {t('common.logout')}
+          </motion.button>
+        </div>
+      </div>
     </div>
   );
 }

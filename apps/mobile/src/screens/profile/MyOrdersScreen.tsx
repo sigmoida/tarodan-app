@@ -15,22 +15,37 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import api from '../../services/api';
 
+// Backend order status values
 const STATUS_LABELS: Record<string, string> = {
+  pending_payment: 'Ödeme Bekliyor',
+  paid: 'Ödendi',
+  preparing: 'Hazırlanıyor',
+  shipped: 'Kargoda',
+  delivered: 'Teslim Edildi',
+  completed: 'Tamamlandı',
+  cancelled: 'İptal Edildi',
+  refund_requested: 'İade Talebi',
+  refunded: 'İade Edildi',
+  // Legacy status mappings for backwards compatibility
   pending: 'Onay Bekliyor',
   confirmed: 'Onaylandı',
   processing: 'Hazırlanıyor',
-  shipped: 'Kargoda',
-  delivered: 'Teslim Edildi',
-  cancelled: 'İptal Edildi',
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  pending_payment: '#FFC107',
+  paid: '#2196F3',
+  preparing: '#9C27B0',
+  shipped: '#FF9800',
+  delivered: '#4CAF50',
+  completed: '#4CAF50',
+  cancelled: '#9E9E9E',
+  refund_requested: '#FF5722',
+  refunded: '#795548',
+  // Legacy status mappings
   pending: '#FFC107',
   confirmed: '#2196F3',
   processing: '#9C27B0',
-  shipped: '#FF9800',
-  delivered: '#4CAF50',
-  cancelled: '#9E9E9E',
 };
 
 const MyOrdersScreen = ({ navigation }: any) => {

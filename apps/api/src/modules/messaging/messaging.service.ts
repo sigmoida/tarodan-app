@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { ContentFilterService } from './content-filter.service';
@@ -20,8 +21,13 @@ import {
   PendingMessagesResponseDto,
 } from './dto';
 
+// Daily message limit
+const DAILY_MESSAGE_LIMIT = 50;
+
 @Injectable()
 export class MessagingService {
+  private readonly logger = new Logger(MessagingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentFilterService: ContentFilterService,
@@ -111,6 +117,9 @@ export class MessagingService {
     senderId: string,
     dto: SendMessageDto,
   ): Promise<MessageResponseDto> {
+    // Check daily message limit
+    await this.checkDailyMessageLimit(senderId);
+
     // Get thread and verify sender is participant
     const thread = await this.prisma.messageThread.findUnique({
       where: { id: threadId },
@@ -511,6 +520,54 @@ export class MessagingService {
       flaggedReason: message.flaggedReason || undefined,
       readAt: message.readAt || undefined,
       createdAt: message.createdAt,
+    };
+  }
+
+  // ==========================================================================
+  // HELPER: Check daily message limit
+  // ==========================================================================
+  private async checkDailyMessageLimit(userId: string): Promise<void> {
+    // Get start of today (UTC)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    // Count messages sent today
+    const messageCount = await this.prisma.message.count({
+      where: {
+        senderId: userId,
+        createdAt: {
+          gte: today,
+        },
+      },
+    });
+
+    if (messageCount >= DAILY_MESSAGE_LIMIT) {
+      this.logger.warn(`User ${userId} exceeded daily message limit (${messageCount}/${DAILY_MESSAGE_LIMIT})`);
+      throw new BadRequestException(
+        `Günlük mesaj limitinize (${DAILY_MESSAGE_LIMIT}) ulaştınız. Yarın tekrar deneyin.`
+      );
+    }
+  }
+
+  // ==========================================================================
+  // Get remaining daily messages
+  // ==========================================================================
+  async getRemainingDailyMessages(userId: string): Promise<{ remaining: number; limit: number }> {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const messageCount = await this.prisma.message.count({
+      where: {
+        senderId: userId,
+        createdAt: {
+          gte: today,
+        },
+      },
+    });
+
+    return {
+      remaining: Math.max(0, DAILY_MESSAGE_LIMIT - messageCount),
+      limit: DAILY_MESSAGE_LIMIT,
     };
   }
 }

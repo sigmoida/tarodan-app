@@ -17,17 +17,27 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useListingsStore } from '../../stores/listingsStore';
 import { useCartStore } from '../../stores/cartStore';
+import { useAuthStore } from '../../stores/authStore';
 
 const { width } = Dimensions.get('window');
 
 const ListingDetailScreen = ({ route, navigation }: any) => {
   const { id } = route.params;
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const { currentListing: listing, fetchListing, isLoading } = useListingsStore();
+  const { currentListing: listing, fetchListing, isLoading, incrementView } = useListingsStore();
   const { addToCart, isLoading: cartLoading } = useCartStore();
+  const { user } = useAuthStore();
+
+  // Check if current user is the owner
+  const isOwner = user?.id === listing?.seller?.id;
 
   useEffect(() => {
     fetchListing(id);
+    
+    // Only increment view count if not the owner
+    if (!isOwner && user?.id !== listing?.seller?.id) {
+      incrementView?.(id);
+    }
   }, [id]);
 
   const handleAddToCart = async () => {
@@ -164,40 +174,60 @@ const ListingDetailScreen = ({ route, navigation }: any) => {
             <Icon name="chevron-forward" size={24} color="#BDBDBD" />
           </TouchableOpacity>
 
-          {/* Message Seller Button */}
-          <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-            <Icon name="chatbubble-outline" size={20} color="#E53935" />
-            <Text style={styles.messageButtonText}>Satıcıya Mesaj Gönder</Text>
-          </TouchableOpacity>
+          {/* Message Seller Button - Hide if owner */}
+          {!isOwner && (
+            <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
+              <Icon name="chatbubble-outline" size={20} color="#E53935" />
+              <Text style={styles.messageButtonText}>Satıcıya Mesaj Gönder</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Owner Actions */}
+          {isOwner && (
+            <View style={styles.ownerActionsContainer}>
+              <Text style={styles.ownerBadge}>
+                <Icon name="person" size={14} color="#4CAF50" /> Bu sizin ilanınız
+              </Text>
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={() => navigation.navigate('EditListing', { id })}
+              >
+                <Icon name="create-outline" size={20} color="#2196F3" />
+                <Text style={styles.editButtonText}>İlanı Düzenle</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={styles.actionBar}>
-        {listing.trade_available && (
-          <TouchableOpacity 
-            style={styles.tradeButton}
-            onPress={handleTrade}
-          >
-            <Icon name="swap-horizontal" size={22} color="#4CAF50" />
-            <Text style={styles.tradeButtonText}>Takas Teklifi</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity 
-          style={[styles.buyButton, !listing.trade_available && { flex: 1 }]}
-          onPress={handleAddToCart}
-          disabled={cartLoading}
-        >
-          {cartLoading ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <>
-              <Icon name="cart" size={22} color="#FFF" />
-              <Text style={styles.buyButtonText}>Sepete Ekle</Text>
-            </>
+      {/* Bottom Action Bar - Hide for owner */}
+      {!isOwner && (
+        <View style={styles.actionBar}>
+          {listing.trade_available && (
+            <TouchableOpacity 
+              style={styles.tradeButton}
+              onPress={handleTrade}
+            >
+              <Icon name="swap-horizontal" size={22} color="#4CAF50" />
+              <Text style={styles.tradeButtonText}>Takas Teklifi</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={[styles.buyButton, !listing.trade_available && { flex: 1 }]}
+            onPress={handleAddToCart}
+            disabled={cartLoading}
+          >
+            {cartLoading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Icon name="cart" size={22} color="#FFF" />
+                <Text style={styles.buyButtonText}>Sepete Ekle</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -364,6 +394,34 @@ const styles = StyleSheet.create({
   },
   messageButtonText: {
     color: '#E53935',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  ownerActionsContainer: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 32,
+  },
+  ownerBadge: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    borderRadius: 12,
+    paddingVertical: 14,
+  },
+  editButtonText: {
+    color: '#2196F3',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

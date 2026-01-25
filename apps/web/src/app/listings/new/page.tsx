@@ -168,6 +168,20 @@ export default function NewListingPage() {
     return result;
   };
 
+  // Filter out brand and scale categories since we have separate fields for those
+  const filterCategoryDuplicates = (cats: Category[]): Category[] => {
+    // Brand names to exclude from categories (these are in the Brand dropdown)
+    const brandSlugs = ['hot-wheels', 'hot-wheels-premium', 'hot-wheels-rlc', 'matchbox', 'tomica', 'tomica-limited-vintage', 'majorette', 'm2-machines', 'greenlight', 'johnny-lightning'];
+    // Scale slugs to exclude (these are in the Scale dropdown)
+    const scaleSlugs = ['scale-118', 'scale-124', 'scale-143', 'scale-164'];
+    
+    return cats.filter(cat => {
+      const slug = cat.slug.toLowerCase();
+      // Keep if not a brand or scale category
+      return !brandSlugs.includes(slug) && !scaleSlugs.includes(slug);
+    });
+  };
+
   const addImageUrl = () => {
     const maxImages = limits?.maxImagesPerListing || 10;
     if (newImageUrl.trim() && formData.imageUrls.length < maxImages) {
@@ -230,7 +244,7 @@ export default function NewListingPage() {
     }
   };
 
-  const flatCategories = flattenCategories(categories);
+  const flatCategories = filterCategoryDuplicates(flattenCategories(categories));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -342,9 +356,10 @@ export default function NewListingPage() {
             {/* Category & Condition */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Kategori <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ürün Tipi <span className="text-red-500">*</span>
                 </label>
+                <p className="text-xs text-gray-500 mb-2">Ürününüzün genel kategorisi (Vintage, Limited Edition, vb.)</p>
                 <select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
@@ -361,9 +376,10 @@ export default function NewListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Durum <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ürün Durumu <span className="text-red-500">*</span>
                 </label>
+                <p className="text-xs text-gray-500 mb-2">Ürünün fiziksel kondisyonu</p>
                 <select
                   value={formData.condition}
                   onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
@@ -382,9 +398,10 @@ export default function NewListingPage() {
             {/* Brand & Scale */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Marka
                 </label>
+                <p className="text-xs text-gray-500 mb-2">Hot Wheels, Matchbox, Tomica vb.</p>
                 <select
                   value={formData.brand}
                   onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
@@ -400,9 +417,10 @@ export default function NewListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ölçek
                 </label>
+                <p className="text-xs text-gray-500 mb-2">1:64, 1:43, 1:18 vb.</p>
                 <select
                   value={formData.scale}
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}

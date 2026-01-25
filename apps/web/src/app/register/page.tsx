@@ -31,7 +31,33 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [acceptMarketing, setAcceptMarketing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Phone number formatting helper
+  const formatPhoneNumber = (value: string): string => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    // Limit to 10 digits
+    const limited = digits.slice(0, 10);
+    // Format as XXX XXX XX XX
+    if (limited.length <= 3) return limited;
+    if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
+    if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
+    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setPhone(formatted);
+  };
+
+  // Calculate minimum birth date (18 years ago)
+  const getMaxBirthDate = (): string => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today.toISOString().split('T')[0];
+  };
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -72,6 +98,27 @@ export default function RegisterPage() {
       return;
     }
 
+    // Birth date validation - must be 18+
+    if (!birthDate) {
+      toast.error(locale === 'en' ? 'Please enter your birth date' : 'Lütfen doğum tarihinizi girin');
+      return;
+    }
+
+    const birthDateObj = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birthDateObj.getFullYear();
+    const monthDiff = today.getMonth() - birthDateObj.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+      age--;
+    }
+    
+    if (age < 18) {
+      toast.error(locale === 'en' 
+        ? 'You must be at least 18 years old to register. If you are under 18, please ask your parent or guardian to create an account.'
+        : 'Kayıt olmak için 18 yaşından büyük olmalısınız. 18 yaşından küçükseniz, lütfen ebeveyn veya vasinizden hesap oluşturmasını isteyin.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       toast.error(t('validation.passwordMatch'));
       return;
@@ -94,9 +141,12 @@ export default function RegisterPage() {
       return;
     }
 
+    // Format phone for API (remove spaces, add country code if needed)
+    const formattedPhone = phone ? '+90' + phone.replace(/\s/g, '') : undefined;
+
     setIsLoading(true);
     try {
-      await register(displayName, email, password, phone || undefined, birthDate || undefined);
+      await register(displayName, email, password, formattedPhone, birthDate, acceptMarketing);
       toast.success(locale === 'en' ? 'Registration successful! Welcome.' : 'Kayıt başarılı! Hoş geldiniz.');
       window.location.href = '/';
     } catch (error: any) {
@@ -206,21 +256,27 @@ export default function RegisterPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('auth.phone')}
                 </label>
-                <div className="relative">
-                  <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <div className="relative flex">
+                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-xl text-gray-500 text-sm font-medium">
+                    +90
+                  </span>
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="05XX XXX XX XX"
-                    className="input pl-12"
+                    onChange={handlePhoneChange}
+                    placeholder="5XX XXX XX XX"
+                    maxLength={14}
+                    className="input rounded-l-none flex-1 pl-3"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {locale === 'en' ? '10 digits without country code' : 'Ülke kodu olmadan 10 rakam'}
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('auth.birthDate')}
+                  {t('auth.birthDate')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -228,10 +284,14 @@ export default function RegisterPage() {
                     type="date"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
-                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                    max={getMaxBirthDate()}
+                    required
                     className="input pl-12"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {locale === 'en' ? 'You must be at least 18 years old' : '18 yaşından büyük olmalısınız'}
+                </p>
               </div>
             </div>
 
@@ -310,6 +370,20 @@ export default function RegisterPage() {
                     'nı okudum ve kabul ediyorum.
                   </>
                 )}
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptMarketing}
+                onChange={(e) => setAcceptMarketing(e.target.checked)}
+                className="w-5 h-5 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-600">
+                {locale === 'en' 
+                  ? 'I want to receive promotional emails, campaigns and special offers.'
+                  : 'Reklam ve kampanya e-postalarını, özel teklifleri almak istiyorum.'}
               </span>
             </label>
 

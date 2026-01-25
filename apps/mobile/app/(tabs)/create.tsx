@@ -1,4 +1,4 @@
-import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ProgressBar, Banner, Portal, Dialog } from 'react-native-paper';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { productsApi, categoriesApi } from '../../src/services/api';
+import { productsApi, categoriesApi, uploadApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { canPerformAction, getUpgradeMessage, getRemainingCount } from '../../src/utils/membershipLimits';
@@ -134,6 +134,36 @@ export default function CreateScreen() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ListingForm) => {
+      // First, upload images to get URLs
+      const uploadedImageUrls: string[] = [];
+      
+      for (const uri of images) {
+        try {
+          const formData = new FormData();
+          const filename = uri.split('/').pop() || `image_${Date.now()}.jpg`;
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          
+          formData.append('file', {
+            uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+            type,
+            name: filename,
+          } as any);
+          
+          const uploadResponse = await uploadApi.image(formData);
+          if (uploadResponse.url) {
+            uploadedImageUrls.push(uploadResponse.url);
+          }
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          // Continue with other images
+        }
+      }
+      
+      if (uploadedImageUrls.length === 0 && images.length > 0) {
+        throw new Error('Fotoğraflar yüklenemedi. Lütfen tekrar deneyin.');
+      }
+
       // Prepare payload matching API DTO
       const payload = {
         title: data.title,
@@ -144,7 +174,7 @@ export default function CreateScreen() {
         brand: data.brand,
         scale: data.scale,
         isTradeEnabled: data.isTradeEnabled,
-        imageUrls: images.length > 0 ? images : undefined,
+        imageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       };
 
       // Web ile aynı endpoint: POST /products
@@ -161,7 +191,7 @@ export default function CreateScreen() {
       setTimeout(() => router.push('/settings/my-listings'), 1500);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'İlan oluşturulamadı';
+      const message = error.response?.data?.message || error.message || 'İlan oluşturulamadı';
       setSnackbar({ visible: true, message });
     },
   });

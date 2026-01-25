@@ -828,13 +828,13 @@ export class CollectionService {
           console.log('[likeCollection] Existing check in transaction:', existing ? 'found' : 'not found');
           
           if (!existing) {
-            await tx.collectionLike.create({
+            const newLike = await tx.collectionLike.create({
               data: {
                 collectionId: collection.id,
                 userId: userId,
               },
             });
-            console.log('[likeCollection] Like created');
+            console.log('[likeCollection] Like created with ID:', newLike.id, 'for collection:', collection.id, 'by user:', userId);
           }
           await tx.collection.update({
             where: { id: collection.id },
@@ -931,32 +931,50 @@ export class CollectionService {
     page: number = 1,
     pageSize: number = 20,
   ): Promise<CollectionListResponseDto> {
-    const skip = (page - 1) * pageSize;
+    console.log(`\n\n========================================`);
+    console.log(`[getLikedCollections] Starting for user: ${userId}, page: ${page}`);
+    console.log(`========================================\n`);
+    
+    if (!userId) {
+      console.error('[getLikedCollections] No userId provided');
+      return {
+        collections: [],
+        total: 0,
+        page,
+        pageSize,
+      };
+    }
+    
+    try {
+      const skip = (page - 1) * pageSize;
 
-    const [likedCollections, total] = await Promise.all([
-      this.prisma.collectionLike.findMany({
-        where: { userId },
-        include: {
-          collection: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  avatarUrl: true,
+      console.log(`[getLikedCollections] Querying database...`);
+      
+      const [likedCollections, total] = await Promise.all([
+        this.prisma.collectionLike.findMany({
+          where: { userId },
+          include: {
+            collection: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    displayName: true,
+                    avatarUrl: true,
+                  },
                 },
-              },
-              items: {
-                take: 4,
-                orderBy: { sortOrder: 'asc' },
-                include: {
-                  product: {
-                    select: {
-                      id: true,
-                      title: true,
-                      images: {
-                        take: 1,
-                        select: { url: true },
+                items: {
+                  take: 4,
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    product: {
+                      select: {
+                        id: true,
+                        title: true,
+                        images: {
+                          take: 1,
+                          select: { url: true },
+                        },
                       },
                     },
                   },
@@ -964,26 +982,70 @@ export class CollectionService {
               },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      this.prisma.collectionLike.count({
-        where: { userId },
-      }),
-    ]);
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: pageSize,
+        }),
+        this.prisma.collectionLike.count({
+          where: { userId },
+        }),
+      ]);
 
-    const collections = likedCollections
-      .filter(like => like.collection && like.collection.isPublic)
-      .map(like => this.mapCollectionToDto(like.collection, true));
+      console.log(`[getLikedCollections] Found ${likedCollections.length} liked collections, total: ${total}`);
+      
+      // Debug: Log each like to see what's happening
+      likedCollections.forEach((like, index) => {
+        console.log(`[getLikedCollections] Like ${index + 1}:`, {
+          likeId: like.id,
+          collectionId: like.collectionId,
+          hasCollection: !!like.collection,
+          collectionName: like.collection?.name,
+          isPublic: like.collection?.isPublic,
+        });
+      });
 
-    return {
-      collections,
-      total,
-      page,
-      pageSize,
-    };
+      // Don't filter by isPublic for owned collections - show all liked
+      const collections = likedCollections
+        .filter(like => {
+          if (!like.collection) {
+            console.log('[getLikedCollections] Filtered out: no collection data');
+            return false;
+          }
+          // Show both public collections and user's own private collections
+          if (!like.collection.isPublic && like.collection.userId !== userId) {
+            console.log(`[getLikedCollections] Filtered out: private collection ${like.collection.name}`);
+            return false;
+          }
+          return true;
+        })
+        .map(like => {
+          try {
+            return this.mapCollectionToDto(like.collection, true);
+          } catch (err) {
+            console.error('[getLikedCollections] Error mapping collection:', err, like.collection?.id);
+            return null;
+          }
+        })
+        .filter(collection => collection !== null);
+
+      console.log(`[getLikedCollections] Returning ${collections.length} collections after filtering`);
+
+      return {
+        collections,
+        total,
+        page,
+        pageSize,
+      };
+    } catch (error) {
+      console.error('[getLikedCollections] Database error:', error);
+      // Return empty result instead of throwing
+      return {
+        collections: [],
+        total: 0,
+        page,
+        pageSize,
+      };
+    }
   }
 
   // ==========================================================================
