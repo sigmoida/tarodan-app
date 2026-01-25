@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ArrowsRightLeftIcon, ArrowLeftIcon, PlusIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { productsApi, userApi } from '@/lib/api';
+import { listingsApi, userApi } from '@/lib/api';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -25,8 +25,31 @@ export default function NewTradePage() {
   const listingId = searchParams.get('listing');
   const { t, locale } = useTranslation();
   
-  const { user, isAuthenticated, limits } = useAuthStore();
-  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business' || user?.membershipTier === 'basic');
+  const { user, isAuthenticated, limits, checkAuth, refreshUserData } = useAuthStore();
+  
+  // Ensure auth is checked on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      checkAuth();
+    }
+  }, [isAuthenticated, checkAuth]);
+  
+  // Check canTrade: prefer limits, fallback to membership tier
+  // If limits is not loaded yet, check membership tier directly
+  const canTrade = limits 
+    ? limits.canTrade 
+    : (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  
+  // Debug: Log membership info
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('[Trades/New] User membership:', {
+        membershipTier: user.membershipTier,
+        limits: limits,
+        canTrade: canTrade,
+      });
+    }
+  }, [isAuthenticated, user, limits, canTrade]);
   
   const [targetProduct, setTargetProduct] = useState<Product | null>(null);
   const [myProducts, setMyProducts] = useState<Product[]>([]);
@@ -57,7 +80,7 @@ export default function NewTradePage() {
     setIsLoading(true);
     try {
       // Fetch target product
-      const productRes = await productsApi.getOne(listingId!);
+      const productRes = await listingsApi.getOne(listingId!);
       const productData = productRes.data.product || productRes.data;
       setTargetProduct(productData);
       
@@ -134,7 +157,17 @@ export default function NewTradePage() {
       router.push('/trades');
     } catch (error: any) {
       console.error('Failed to create trade:', error);
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to send trade offer' : 'Takas teklifi gönderilemedi'));
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.message || error.message || (locale === 'en' ? 'Failed to send trade offer' : 'Takas teklifi gönderilemedi');
+      
+      // If error is about membership, refresh user data and show specific message
+      if (errorMessage.includes('Takas özelliği') || errorMessage.includes('üyeliğinizde mevcut değil') || errorMessage.includes('takas özelliğine sahip değil')) {
+        // Refresh user data to get latest membership info
+        await refreshUserData();
+        toast.error(errorMessage);
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }

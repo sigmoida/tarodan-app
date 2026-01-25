@@ -117,12 +117,26 @@ export class TradeService {
     // Validate initiator membership - must be premium to create trade
     const initiatorCanTrade = await this.membershipService.canCreateTrade(initiatorId);
     if (!initiatorCanTrade.allowed) {
+      console.error(`[Trade] Initiator ${initiatorId} cannot trade:`, initiatorCanTrade.reason);
+      const initiatorMembership = await this.membershipService.getUserMembership(initiatorId);
+      console.error(`[Trade] Initiator membership:`, {
+        tier: initiatorMembership.tier.type,
+        tierName: initiatorMembership.tier.name,
+        canTrade: initiatorMembership.tier.canTrade,
+      });
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
     // Validate receiver membership - must have trade capability to receive trade
     const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
     if (!receiverCanTrade.allowed) {
+      console.error(`[Trade] Receiver ${dto.receiverId} cannot trade:`, receiverCanTrade.reason);
+      const receiverMembership = await this.membershipService.getUserMembership(dto.receiverId);
+      console.error(`[Trade] Receiver membership:`, {
+        tier: receiverMembership.tier.type,
+        tierName: receiverMembership.tier.name,
+        canTrade: receiverMembership.tier.canTrade,
+      });
       throw new BadRequestException(
         receiverCanTrade.reason || 'Takas teklifi gönderilemiyor. Alıcı kullanıcı takas özelliğine sahip değil.',
       );
