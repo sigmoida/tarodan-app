@@ -12,6 +12,7 @@ import { PrismaModule } from '../../prisma';
 import { SendGridProvider } from './providers/sendgrid.provider';
 import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
+import { SmtpProvider } from './providers/smtp.provider';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
@@ -21,12 +22,14 @@ import { SmsProvider } from './providers/sms.provider';
     SendGridProvider,
     ExpoPushProvider,
     SmsProvider,
+    SmtpProvider,
   ],
   exports: [
     NotificationService,
     SendGridProvider,
     ExpoPushProvider,
     SmsProvider,
+    SmtpProvider,
   ],
 })
 export class NotificationModule {}

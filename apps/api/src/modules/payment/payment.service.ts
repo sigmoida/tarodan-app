@@ -13,6 +13,7 @@ import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus } from '@p
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
+import { InvoiceService } from '../invoice/invoice.service';
 import { Request } from 'express';
 import * as crypto from 'crypto';
 
@@ -28,6 +29,7 @@ export class PaymentService {
     private readonly iyzicoService: IyzicoService,
     private readonly paytrService: PayTRService,
     private readonly eventService: EventService,
+    private readonly invoiceService: InvoiceService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
     this.iyzicoSecretKey = this.configService.get('IYZICO_SECRET_KEY') || '';
@@ -91,12 +93,11 @@ export class PaymentService {
   }
 
   /**
-   * Initiate payment for an order
+   * Unified payment initiation for both authenticated and guest users
    * POST /payments/initiate
-   * Requirement: PayTR & Iyzico integration (project.md)
    */
-  async initiatePayment(buyerId: string, dto: InitiatePaymentDto, req?: Request) {
-    // Verify order exists and belongs to buyer
+  async initiatePaymentUnified(userId: string | null, dto: InitiatePaymentDto, req?: Request) {
+    // Verify order exists
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
       include: {
@@ -110,14 +111,48 @@ export class PaymentService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
-    if (order.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+    // Check if this is a guest order
+    const shippingAddress = order.shippingAddress as any;
+    const isGuestOrder = shippingAddress?.isGuestOrder === true;
+
+    // Validate access
+    if (userId) {
+      // Authenticated user - must be the buyer
+      if (order.buyerId !== userId) {
+        throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+      }
+    } else {
+      // Guest user - order must be a guest order
+      if (!isGuestOrder) {
+        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+      }
     }
 
     if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
     }
 
+    return this.processPaymentInitiation(order, dto, req);
+  }
+
+  /**
+   * Initiate payment for an order (legacy - for backward compatibility)
+   */
+  async initiatePayment(buyerId: string, dto: InitiatePaymentDto, req?: Request) {
+    return this.initiatePaymentUnified(buyerId, dto, req);
+  }
+
+  /**
+   * Initiate payment for a guest order (legacy - for backward compatibility)
+   */
+  async initiateGuestPayment(dto: InitiatePaymentDto, req?: Request) {
+    return this.initiatePaymentUnified(null, dto, req);
+  }
+
+  /**
+   * Common payment initiation logic for both authenticated and guest users
+   */
+  private async processPaymentInitiation(order: any, dto: InitiatePaymentDto, req?: Request) {
     // Check for existing pending payment
     const existingPayment = await this.prisma.payment.findFirst({
       where: {
@@ -151,7 +186,7 @@ export class PaymentService {
     await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {
       amount: Number(order.totalAmount),
       provider: dto.provider,
-      buyerId: buyerId,
+      buyerId: order.buyerId,
     });
 
     // Generate payment URL based on provider
@@ -183,35 +218,59 @@ export class PaymentService {
    */
   private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
     try {
-      const callbackUrl = `${this.configService.get('FRONTEND_URL')}/payment/callback/iyzico?paymentId=${payment.id}`;
+      const callbackUrl = `${this.configService.get('FRONTEND_URL')}/api/payment/callback/iyzico?paymentId=${payment.id}`;
       const shippingAddress = order.shippingAddress as any;
 
-      // Prepare buyer information
-      const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
-      const buyerFirstName = buyerName[0] || 'Müşteri';
-      const buyerLastName = buyerName.slice(1).join(' ') || '';
+      // Check if this is a guest order
+      const isGuestOrder = shippingAddress?.isGuestOrder === true;
+
+      // Prepare buyer information - handle guest orders
+      let buyerFirstName: string;
+      let buyerLastName: string;
+      let buyerEmail: string;
+      let buyerPhone: string;
+
+      if (isGuestOrder) {
+        // For guest orders, use guest info from shippingAddress
+        const guestName = shippingAddress?.guestName || shippingAddress?.fullName || 'Misafir Müşteri';
+        const nameParts = guestName.split(' ');
+        buyerFirstName = nameParts[0] || 'Misafir';
+        buyerLastName = nameParts.slice(1).join(' ') || 'Müşteri';
+        buyerEmail = shippingAddress?.guestEmail || 'guest@tarodan.com';
+        buyerPhone = shippingAddress?.guestPhone || shippingAddress?.phone || '+905000000000';
+      } else {
+        // For authenticated users
+        const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
+        buyerFirstName = buyerName[0] || 'Müşteri';
+        buyerLastName = buyerName.slice(1).join(' ') || 'Müşteri';
+        buyerEmail = order.buyer.email;
+        buyerPhone = order.buyer.phone || '+905000000000';
+      }
+
+      // Ensure names are not empty (iyzico requires non-empty values)
+      if (!buyerFirstName || buyerFirstName.trim() === '') buyerFirstName = 'Müşteri';
+      if (!buyerLastName || buyerLastName.trim() === '') buyerLastName = 'Müşteri';
 
       // Prepare basket items
       const basketItems = [{
         id: order.product.id,
-        name: order.product.title,
+        name: order.product.title.substring(0, 50), // iyzico has a limit
         category1: 'Koleksiyon',
         itemType: 'PHYSICAL' as const,
         price: Number(order.totalAmount).toFixed(2),
       }];
 
-      // Prepare addresses
-      const shippingAddr = shippingAddress ? {
-        contactName: shippingAddress.fullName || `${buyerFirstName} ${buyerLastName}`,
-        city: shippingAddress.city || 'İstanbul',
+      // Prepare addresses - ensure no empty values
+      const addressLine = shippingAddress?.address || 'Türkiye';
+      const cityName = shippingAddress?.city || 'İstanbul';
+      const contactName = shippingAddress?.fullName || `${buyerFirstName} ${buyerLastName}`;
+
+      const shippingAddr = {
+        contactName: contactName,
+        city: cityName,
         country: 'Turkey',
-        address: shippingAddress.address || '',
-        zipCode: shippingAddress.zipCode || '',
-      } : {
-        contactName: `${buyerFirstName} ${buyerLastName}`,
-        city: 'İstanbul',
-        country: 'Turkey',
-        address: '',
+        address: addressLine.length > 0 ? addressLine : 'Türkiye',
+        zipCode: shippingAddress?.zipCode || '34000',
       };
 
       // Initialize checkout form
@@ -229,11 +288,11 @@ export class PaymentService {
           id: order.buyer.id,
           name: buyerFirstName,
           surname: buyerLastName,
-          gsmNumber: order.buyer.phone || '+905000000000',
-          email: order.buyer.email,
-          identityNumber: '00000000000', // Should be collected from user
+          gsmNumber: buyerPhone.startsWith('+') ? buyerPhone : `+90${buyerPhone.replace(/^0/, '')}`,
+          email: buyerEmail,
+          identityNumber: '11111111111', // Test TC Kimlik No for sandbox
           registrationAddress: shippingAddr.address,
-          ip: clientIp,
+          ip: clientIp || '127.0.0.1',
           city: shippingAddr.city,
           country: 'Turkey',
         },
@@ -438,6 +497,78 @@ export class PaymentService {
         await this.processFailedPayment(payment, error.message || 'Iyzico payment failed');
         return { status: 'error', message: error.message };
       }
+    }
+  }
+
+  /**
+   * Verify Iyzico checkout form result using token
+   * Called by frontend after iyzico redirects back
+   */
+  async verifyIyzicoCheckoutForm(token: string, paymentId?: string) {
+    this.logger.log(`Verifying Iyzico checkout form with token: ${token}`);
+
+    // Find payment by token or paymentId
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [
+          { id: paymentId || '' },
+          { providerPaymentId: token },
+          { metadata: { path: ['token'], equals: token } },
+        ],
+      },
+      include: { 
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      this.logger.warn(`Payment not found for token: ${token}, paymentId: ${paymentId}`);
+      return { success: false, status: 'error', message: 'Ödeme bulunamadı' };
+    }
+
+    // If payment is already processed, return its status
+    if (payment.status === PaymentStatus.completed) {
+      return { success: true, status: 'success', paymentId: payment.id, orderId: payment.orderId };
+    }
+
+    if (payment.status === PaymentStatus.failed) {
+      return { success: false, status: 'failed', message: 'Ödeme başarısız oldu' };
+    }
+
+    // Retrieve checkout form result from Iyzico
+    try {
+      const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(token);
+
+      this.logger.log(`Iyzico checkout result: ${JSON.stringify(checkoutResult)}`);
+
+      if (checkoutResult.status === 'success' && checkoutResult.paymentId) {
+        // Payment successful - process it
+        await this.processSuccessfulPayment(
+          payment,
+          checkoutResult.paymentId,
+        );
+        return { 
+          success: true, 
+          status: 'success', 
+          paymentId: payment.id, 
+          orderId: payment.orderId,
+          iyzicoPaymentId: checkoutResult.paymentId,
+        };
+      } else {
+        // Payment failed
+        const errorMessage = checkoutResult.errorMessage || 'Ödeme başarısız';
+        await this.processFailedPayment(payment, errorMessage);
+        return { success: false, status: 'failed', message: errorMessage };
+      }
+    } catch (error: any) {
+      this.logger.error(`Error verifying Iyzico checkout form: ${error.message}`);
+      return { success: false, status: 'error', message: error.message || 'Doğrulama hatası' };
     }
   }
 
@@ -698,6 +829,17 @@ export class PaymentService {
     try {
       const shippingAddressData = result.shippingAddress as any;
       
+      // Check if this is a guest order and get actual buyer info
+      const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+      const actualBuyerEmail = isGuestOrder
+        ? (shippingAddressData?.guestEmail || shippingAddressData?.email || result.buyer.email)
+        : result.buyer.email;
+      const actualBuyerName = isGuestOrder
+        ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
+        : (result.buyer.displayName || result.buyer.email);
+      
+      this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
+      
       await this.eventService.emitOrderPaid({
         orderId: result.id,
         orderNumber: result.orderNumber,
@@ -707,8 +849,8 @@ export class PaymentService {
         productTitle: result.product.title,
         totalAmount: Number(result.totalAmount),
         commissionAmount: Number(result.commissionAmount),
-        buyerEmail: result.buyer.email,
-        buyerName: result.buyer.displayName || result.buyer.email,
+        buyerEmail: actualBuyerEmail,
+        buyerName: actualBuyerName,
         sellerEmail: result.seller.email,
         sellerName: result.seller.displayName || result.seller.email,
         paymentMethod: payment.provider,
@@ -727,6 +869,16 @@ export class PaymentService {
     } catch (error) {
       // Log but don't fail - payment was already successful
       this.logger.error(`Failed to emit order.paid event: ${error}`);
+    }
+
+    // Generate and send invoice to buyer
+    // Requirement: "After payment, invoices will be sent to users automatically"
+    try {
+      await this.invoiceService.generateAndSendInvoice(result.id);
+      this.logger.log(`Invoice generated and sent for order ${result.orderNumber}`);
+    } catch (error) {
+      // Log but don't fail - payment was already successful
+      this.logger.error(`Failed to generate invoice for order ${result.orderNumber}: ${error}`);
     }
   }
 
@@ -1134,9 +1286,9 @@ export class PaymentService {
   }
 
   /**
-   * Get payment status (lightweight for polling)
+   * Unified get payment status (works for both auth and guest)
    */
-  async getPaymentStatus(paymentId: string, userId: string) {
+  async getPaymentStatusUnified(paymentId: string, userId: string | null) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
@@ -1144,6 +1296,7 @@ export class PaymentService {
           select: {
             buyerId: true,
             sellerId: true,
+            shippingAddress: true,
           },
         },
       },
@@ -1153,9 +1306,21 @@ export class PaymentService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
-    // Only buyer or seller can view
-    if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+    // Check if this is a guest order
+    const shippingAddress = payment.order.shippingAddress as any;
+    const isGuestOrder = shippingAddress?.isGuestOrder === true;
+
+    // Validate access
+    if (userId) {
+      // Authenticated user - must be buyer or seller
+      if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
+        throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+      }
+    } else {
+      // Guest user - order must be a guest order
+      if (!isGuestOrder) {
+        throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+      }
     }
 
     return {
@@ -1167,6 +1332,20 @@ export class PaymentService {
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     };
+  }
+
+  /**
+   * Get payment status (legacy - for backward compatibility)
+   */
+  async getPaymentStatus(paymentId: string, userId: string) {
+    return this.getPaymentStatusUnified(paymentId, userId);
+  }
+
+  /**
+   * Get payment status for guest orders (legacy - for backward compatibility)
+   */
+  async getGuestPaymentStatus(paymentId: string) {
+    return this.getPaymentStatusUnified(paymentId, null);
   }
 
   /**

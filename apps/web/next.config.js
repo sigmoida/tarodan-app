@@ -48,13 +48,27 @@ const nextConfig = {
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001',
   },
   async rewrites() {
-    return [
-      // API proxy - forward /api requests to backend
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*',
-      },
-    ];
+    return {
+      // beforeFiles rewrites are checked before pages/public files
+      // which allows us to exclude certain paths from rewrites
+      beforeFiles: [
+        // Keep payment callback in Next.js (handled by app/api route)
+        {
+          source: '/api/payment/callback/:path*',
+          destination: '/api/payment/callback/:path*',
+        },
+      ],
+      // afterFiles rewrites are checked after pages/public files
+      afterFiles: [
+        // API proxy - forward /api requests to backend
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:3001/api/:path*',
+        },
+      ],
+      // fallback rewrites for requests that don't match any page/file
+      fallback: [],
+    };
   },
 };
 

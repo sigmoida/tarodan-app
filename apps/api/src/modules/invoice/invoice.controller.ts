@@ -4,11 +4,9 @@ import {
   Post,
   Param,
   Query,
-  Res,
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
 import { JwtAuthGuard } from '../auth/guards';
@@ -46,26 +44,6 @@ export class InvoiceController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.invoiceService.getByOrderId(orderId, user.sub);
-  }
-
-  /**
-   * Download invoice PDF
-   */
-  @Get(':id/download')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Download invoice PDF' })
-  @ApiResponse({ status: 200, description: 'PDF file' })
-  async downloadInvoice(
-    @Param('id', ParseUUIDPipe) invoiceId: string,
-    @CurrentUser() user: JwtPayload,
-    @Res() res: Response,
-  ) {
-    const pdfBuffer = await this.invoiceService.downloadInvoice(invoiceId, user.sub);
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoiceId}.html"`);
-    res.send(pdfBuffer);
   }
 
   /**

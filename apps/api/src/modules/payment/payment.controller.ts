@@ -47,12 +47,11 @@ export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   /**
-   * POST /payments/initiate - Initiate payment
+   * POST /payments/initiate - Initiate payment (works for both authenticated and guest users)
    */
   @Post('initiate')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Public() // Allow guest access - service will validate
   @ApiOperation({ summary: 'Initiate payment for an order' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -60,11 +59,45 @@ export class PaymentController {
     type: PaymentInitResponseDto,
   })
   async initiatePayment(
-    @CurrentUser('id') userId: string,
     @Body() dto: InitiatePaymentDto,
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
-    return this.paymentService.initiatePayment(userId, dto, req);
+    // Extract user ID from JWT if present (optional auth)
+    const authHeader = req.headers.authorization;
+    let userId: string | null = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        userId = decoded.sub || decoded.id;
+      } catch (e) {
+        // Token invalid or expired - treat as guest
+        userId = null;
+      }
+    }
+    
+    return this.paymentService.initiatePaymentUnified(userId, dto, req);
+  }
+
+  /**
+   * POST /payments/initiate-guest - Initiate payment for guest order (alias)
+   */
+  @Post('initiate-guest')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  @Public()
+  @ApiOperation({ summary: 'Initiate payment for a guest order' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Payment initiated for guest',
+    type: PaymentInitResponseDto,
+  })
+  async initiateGuestPayment(
+    @Body() dto: InitiatePaymentDto,
+    @Req() req: Request,
+  ): Promise<PaymentInitResponseDto> {
+    return this.paymentService.initiatePaymentUnified(null, dto, req);
   }
 
   /**
@@ -83,6 +116,19 @@ export class PaymentController {
     // Get raw body for signature verification
     const rawBody = (req as any).rawBody || JSON.stringify(dto);
     return this.paymentService.handleIyzicoCallback(dto, rawBody, signature);
+  }
+
+  /**
+   * POST /payments/iyzico/verify - Verify iyzico checkout form result
+   */
+  @Post('iyzico/verify')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify iyzico checkout form result using token' })
+  async verifyIyzicoPayment(
+    @Body() dto: { token: string; paymentId?: string },
+  ) {
+    return this.paymentService.verifyIyzicoCheckoutForm(dto.token, dto.paymentId);
   }
 
   /**
@@ -176,11 +222,10 @@ export class PaymentController {
   // ============================================================
 
   /**
-   * GET /payments/:id/status - Get payment status (lightweight for polling)
+   * GET /payments/:id/status - Get payment status (works for both auth and guest)
    */
   @Get(':id/status')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Public() // Allow guest access
   @ApiOperation({ summary: 'Get payment status (lightweight)' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
   @ApiResponse({
@@ -189,9 +234,39 @@ export class PaymentController {
   })
   async getPaymentStatus(
     @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @Req() req: Request,
   ) {
-    return this.paymentService.getPaymentStatus(id, userId);
+    // Extract user ID from JWT if present
+    const authHeader = req.headers.authorization;
+    let userId: string | null = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        userId = decoded.sub || decoded.id;
+      } catch (e) {
+        userId = null;
+      }
+    }
+    
+    return this.paymentService.getPaymentStatusUnified(id, userId);
+  }
+
+  /**
+   * GET /payments/:id/status-guest - Get payment status for guest (alias)
+   */
+  @Get(':id/status-guest')
+  @Public()
+  @ApiOperation({ summary: 'Get payment status for guest (lightweight)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Payment status for guest order',
+  })
+  async getGuestPaymentStatus(@Param('id') id: string) {
+    return this.paymentService.getPaymentStatusUnified(id, null);
   }
 
   /**

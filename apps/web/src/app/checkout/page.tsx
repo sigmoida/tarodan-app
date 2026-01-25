@@ -467,7 +467,7 @@ export default function CheckoutPage() {
         const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
         
         if (orderId) {
-          // Initiate payment for the order
+          // Initiate payment for the order (same endpoint works for both auth and guest)
           try {
             const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
             const paymentData = paymentResponse.data;
@@ -485,10 +485,16 @@ export default function CheckoutPage() {
                 return;
               }
               // For PayTR or other cases, go to payment page
-              router.push(`/payment/${paymentData.paymentId}`);
+              const paymentPageUrl = isAuthenticated 
+                ? `/payment/${paymentData.paymentId}`
+                : `/payment/${paymentData.paymentId}?guest=true`;
+              router.push(paymentPageUrl);
               return;
             } else if (paymentData.paymentId) {
-              router.push(`/payment/${paymentData.paymentId}`);
+              const paymentPageUrl = isAuthenticated 
+                ? `/payment/${paymentData.paymentId}`
+                : `/payment/${paymentData.paymentId}?guest=true`;
+              router.push(paymentPageUrl);
               return;
             } else {
               throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');

@@ -169,10 +169,14 @@ export const ordersApi = {
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
     api.post('/payments/initiate', { orderId, provider }),
+  initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+    api.post('/payments/initiate-guest', { orderId, provider }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>
     api.get(`/payments/${paymentId}/status`),
+  getStatusLightGuest: (paymentId: string) =>
+    api.get(`/payments/${paymentId}/status-guest`),
   getMyPayments: (params?: {
     status?: string;
     provider?: string;

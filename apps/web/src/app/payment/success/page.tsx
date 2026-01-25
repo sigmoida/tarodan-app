@@ -19,12 +19,14 @@ export default function PaymentSuccessPage() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
+  const isGuestCheckout = searchParams.get('guest') === 'true';
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Allow access for authenticated users OR guest checkout
+    if (!isAuthenticated && !isGuestCheckout) {
       router.push('/login');
       return;
     }
@@ -34,11 +36,14 @@ export default function PaymentSuccessPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, isAuthenticated]);
+  }, [paymentId, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
-      const response = await paymentsApi.getStatus(paymentId!);
+      // Use guest endpoint if guest checkout
+      const response = isGuestCheckout 
+        ? await paymentsApi.getStatusLightGuest(paymentId!)
+        : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
     } catch (error) {
       console.error('Failed to fetch payment:', error);
@@ -124,26 +129,32 @@ export default function PaymentSuccessPage() {
           {/* Info Message */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-blue-800">
-              <strong>{locale === 'en' ? 'Information:' : 'Bilgilendirme:'}</strong> {locale === 'en' ? 'Order confirmation email has been sent to your email address. You can track your order status from the ' : 'Sipariş onay e-postası e-posta adresinize gönderildi. Sipariş durumunuzu '}
-              <Link href="/orders" className="underline font-medium">
-                {locale === 'en' ? 'My Orders' : 'Siparişlerim'}
-              </Link>
-              {locale === 'en' ? ' page.' : ' sayfasından takip edebilirsiniz.'}
+              <strong>{locale === 'en' ? 'Information:' : 'Bilgilendirme:'}</strong>{' '}
+              {isGuestCheckout 
+                ? (locale === 'en' 
+                    ? 'Order confirmation email has been sent to your email address.' 
+                    : 'Sipariş onay e-postası e-posta adresinize gönderildi.')
+                : (locale === 'en' 
+                    ? <>Order confirmation email has been sent to your email address. You can track your order status from the <Link href="/orders" className="underline font-medium">My Orders</Link> page.</>
+                    : <>Sipariş onay e-postası e-posta adresinize gönderildi. Sipariş durumunuzu <Link href="/orders" className="underline font-medium">Siparişlerim</Link> sayfasından takip edebilirsiniz.</>)
+              }
             </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/orders"
-              className="btn-primary flex items-center justify-center gap-2"
-            >
-              {locale === 'en' ? 'Go to My Orders' : 'Siparişlerime Git'}
-              <ArrowRightIcon className="w-5 h-5" />
-            </Link>
+            {!isGuestCheckout && (
+              <Link
+                href="/orders"
+                className="btn-primary flex items-center justify-center gap-2"
+              >
+                {locale === 'en' ? 'Go to My Orders' : 'Siparişlerime Git'}
+                <ArrowRightIcon className="w-5 h-5" />
+              </Link>
+            )}
             <Link
               href="/listings"
-              className="btn-secondary flex items-center justify-center gap-2"
+              className={`${isGuestCheckout ? 'btn-primary' : 'btn-secondary'} flex items-center justify-center gap-2`}
             >
               {locale === 'en' ? 'Continue Shopping' : 'Alışverişe Devam Et'}
             </Link>

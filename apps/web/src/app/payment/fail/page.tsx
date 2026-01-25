@@ -21,12 +21,14 @@ export default function PaymentFailPage() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
+  const isGuestCheckout = searchParams.get('guest') === 'true';
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Allow access for authenticated users OR guest checkout
+    if (!isAuthenticated && !isGuestCheckout) {
       router.push('/login');
       return;
     }
@@ -36,11 +38,14 @@ export default function PaymentFailPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, isAuthenticated]);
+  }, [paymentId, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
-      const response = await paymentsApi.getStatus(paymentId!);
+      // Use guest endpoint if guest checkout
+      const response = isGuestCheckout 
+        ? await paymentsApi.getStatusLightGuest(paymentId!)
+        : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
     } catch (error) {
       console.error('Failed to fetch payment:', error);
@@ -50,6 +55,12 @@ export default function PaymentFailPage() {
   };
 
   const handleRetryPayment = async () => {
+    // Guest users should go back to listings to start again
+    if (isGuestCheckout) {
+      router.push('/listings');
+      return;
+    }
+
     if (!paymentId) {
       if (payment?.orderId) {
         router.push(`/checkout?orderId=${payment.orderId}`);
@@ -178,19 +189,30 @@ export default function PaymentFailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={handleRetryPayment}
-              className="btn-primary flex items-center justify-center gap-2"
-            >
-              {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
-            </button>
-            <Link
-              href="/orders"
-              className="btn-secondary flex items-center justify-center gap-2"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              {locale === 'en' ? 'Back to My Orders' : 'Siparişlerime Dön'}
-            </Link>
+            {isGuestCheckout ? (
+              <Link
+                href="/listings"
+                className="btn-primary flex items-center justify-center gap-2"
+              >
+                {locale === 'en' ? 'Back to Listings' : 'İlanlara Dön'}
+              </Link>
+            ) : (
+              <>
+                <button
+                  onClick={handleRetryPayment}
+                  className="btn-primary flex items-center justify-center gap-2"
+                >
+                  {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
+                </button>
+                <Link
+                  href="/orders"
+                  className="btn-secondary flex items-center justify-center gap-2"
+                >
+                  <ArrowLeftIcon className="w-5 h-5" />
+                  {locale === 'en' ? 'Back to My Orders' : 'Siparişlerime Dön'}
+                </Link>
+              </>
+            )}
           </div>
         </motion.div>
       </div>

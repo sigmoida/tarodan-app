@@ -8,6 +8,7 @@ import { PrismaModule } from '../../prisma';
 import { PaymentProvidersModule } from '../payment-providers';
 import { EventModule } from '../events';
 import { RawBodyMiddleware } from './middleware/raw-body.middleware';
+import { InvoiceModule } from '../invoice/invoice.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RawBodyMiddleware } from './middleware/raw-body.middleware';
     PaymentProvidersModule,
     EventModule,
     ScheduleModule.forRoot(),
+    InvoiceModule,
   ],
   controllers: [PaymentController],
   providers: [PaymentService, PaymentSchedulerService, RawBodyMiddleware],

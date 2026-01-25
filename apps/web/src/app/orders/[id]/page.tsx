@@ -385,6 +385,28 @@ export default function OrderDetailPage() {
               </Link>
             </div>
 
+            {/* Invoice Section - Show only for paid orders */}
+            {order.status !== 'pending_payment' && order.status !== 'cancelled' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {locale === 'en' ? 'Invoice' : 'Fatura'}
+                </h2>
+                <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm text-green-800">
+                    {locale === 'en' 
+                      ? 'Your invoice has been sent to your email address after the payment was completed.'
+                      : 'Faturanız ödeme tamamlandıktan sonra e-posta adresinize gönderildi.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Help */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Help' : 'Yardım'}</h2>

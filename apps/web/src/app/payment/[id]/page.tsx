@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   CreditCardIcon,
@@ -17,8 +17,10 @@ import { useAuthStore } from '@/stores/authStore';
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
   const paymentId = params.id as string;
+  const isGuestCheckout = searchParams.get('guest') === 'true';
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,19 +28,23 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Allow access for authenticated users OR guest checkout
+    if (!isAuthenticated && !isGuestCheckout) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }
 
     fetchPayment();
-  }, [paymentId, isAuthenticated]);
+  }, [paymentId, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
       // Use lightweight status endpoint for polling
-      const response = await paymentsApi.getStatusLight(paymentId);
+      // Use guest endpoint if guest checkout
+      const response = isGuestCheckout 
+        ? await paymentsApi.getStatusLightGuest(paymentId)
+        : await paymentsApi.getStatusLight(paymentId);
       const paymentData = response.data;
 
       setPayment(paymentData);
@@ -55,7 +61,8 @@ export default function PaymentPage() {
     } catch (error: any) {
       console.error('Failed to fetch payment:', error);
       toast.error('Ödeme bilgisi yüklenemedi');
-      router.push('/orders');
+      // Redirect to home for guests, orders page for authenticated users
+      router.push(isGuestCheckout ? '/' : '/orders');
     } finally {
       setIsLoading(false);
     }
@@ -66,17 +73,20 @@ export default function PaymentPage() {
     // Poll for payment status
     const interval = setInterval(async () => {
       try {
-        const response = await paymentsApi.getStatus(paymentId);
+        // Use guest endpoint if guest checkout
+        const response = isGuestCheckout
+          ? await paymentsApi.getStatusLightGuest(paymentId)
+          : await paymentsApi.getStatus(paymentId);
         const paymentData = response.data;
 
         if (paymentData.status === 'completed') {
           clearInterval(interval);
           toast.success('Ödeme başarıyla tamamlandı!');
-          router.push(`/payment/success?paymentId=${paymentId}`);
+          router.push(`/payment/success?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
         } else if (paymentData.status === 'failed') {
           clearInterval(interval);
           toast.error('Ödeme başarısız oldu');
-          router.push(`/payment/fail?paymentId=${paymentId}`);
+          router.push(`/payment/fail?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
         }
       } catch (error) {
         console.error('Failed to check payment status:', error);

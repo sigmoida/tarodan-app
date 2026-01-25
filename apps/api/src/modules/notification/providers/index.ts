@@ -5,3 +5,4 @@
 export * from './sendgrid.provider';
 export * from './expo-push.provider';
 export * from './sms.provider';
+export * from './smtp.provider';

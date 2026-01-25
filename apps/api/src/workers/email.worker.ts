@@ -27,19 +27,38 @@ export interface EmailJobData {
 @Processor('email')
 export class EmailWorker {
   private readonly logger = new Logger(EmailWorker.name);
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null;
+  private readonly enabled: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    // Initialize SendGrid transporter
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'apikey',
-        pass: this.configService.get('SENDGRID_API_KEY'),
-      },
-    });
+    // Initialize SMTP transporter (Gmail or other SMTP provider)
+    const host = this.configService.get<string>('SMTP_HOST', '');
+    const port = this.configService.get<number>('SMTP_PORT', 587);
+    const user = this.configService.get<string>('SMTP_USER', '');
+    const pass = this.configService.get<string>('SMTP_PASS', '');
+    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
+
+    this.enabled = !!(host && user && pass);
+
+    if (this.enabled) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: {
+          user,
+          pass,
+        },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+      this.logger.log(`Email worker initialized with SMTP: ${host}:${port}`);
+    } else {
+      this.logger.warn('SMTP not configured - emails will be logged only');
+      // Create a mock transporter that just logs
+      this.transporter = null;
+    }
   }
 
   @Process('send')
@@ -48,9 +67,15 @@ export class EmailWorker {
 
     const { to, subject, html, text, from, replyTo, attachments } = job.data;
 
+    // If SMTP not configured, just log and return success
+    if (!this.enabled || !this.transporter) {
+      this.logger.log(`[EMAIL-MOCK] To: ${to}, Subject: ${subject}`);
+      return { success: true, messageId: `mock-${Date.now()}` };
+    }
+
     try {
       const mailOptions: nodemailer.SendMailOptions = {
-        from: from || this.configService.get('EMAIL_FROM', 'noreply@tarodan.com'),
+        from: from || this.configService.get('MAIL_FROM', 'noreply@tarodan.com'),
         to,
         subject,
         html,
