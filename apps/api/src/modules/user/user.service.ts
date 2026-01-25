@@ -1094,7 +1094,7 @@ export class UserService {
       collections.map(async (collection) => {
         // Count sold products in this collection
         const salesCount = collection.items.filter(
-          (item) => item.product.status === 'sold'
+          (item) => item.product && item.product.status === 'sold'
         ).length;
 
         // Calculate engagement score
@@ -1156,13 +1156,15 @@ export class UserService {
         bio: topCollection.user.bio,
         isVerified: topCollection.user.isVerified,
       },
-      items: displayItems.map(item => ({
-        id: item.id,
-        productId: item.product.id,
-        productTitle: item.product.title,
-        productPrice: Number(item.product.price),
-        productImage: item.product.images[0]?.url,
-      })),
+      items: displayItems
+        .filter(item => item.product !== null)
+        .map(item => ({
+          id: item.id,
+          productId: item.product!.id,
+          productTitle: item.product!.title,
+          productPrice: Number(item.product!.price),
+          productImage: item.product!.images[0]?.url,
+        })),
     };
   }
 
@@ -1296,7 +1298,7 @@ export class UserService {
     // Calculate collection scores and get top 4
     const collectionsWithScores = allCollections.map(collection => {
       const salesCount = collection.items.filter(
-        item => item.product.status === 'sold'
+        item => item.product && item.product.status === 'sold'
       ).length;
       const score = collection.viewCount * 1 + collection.likeCount * 5 + salesCount * 20;
       return { collection, score };
@@ -1308,13 +1310,13 @@ export class UserService {
     // Format collections with preview items (only active products)
     const formattedCollections = topCollections.map(collection => {
       const activeItems = collection.items
-        .filter(item => item.product.status === 'active')
+        .filter(item => item.product && item.product.status === 'active')
         .slice(0, 3)
         .map(item => ({
           id: item.id,
-          productTitle: item.product.title,
-          productPrice: Number(item.product.price),
-          productImage: item.product.images[0]?.url,
+          productTitle: item.product!.title,
+          productPrice: Number(item.product!.price),
+          productImage: item.product!.images[0]?.url,
         }));
 
       return {

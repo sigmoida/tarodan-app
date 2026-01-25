@@ -153,11 +153,6 @@ export default function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-4 ml-8">
-            {/* Language Switcher - Desktop */}
-            <div className="hidden md:block">
-              <LanguageSwitcher variant="minimal" />
-            </div>
-            
             {isAuthenticated ? (
               <>
                 {/* Yeni İlan Ekle Butonu - Desktop */}
@@ -212,9 +207,17 @@ export default function Navbar() {
                   {/* Dropdown menu */}
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
                     {/* User info header */}
-                    <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-100">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-100 relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
+                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                        {/* Language Switcher - Top Right */}
+                        <div className="flex-shrink-0">
+                          <LanguageSwitcher variant="minimal" />
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Quick Actions */}

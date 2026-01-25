@@ -122,7 +122,7 @@ export class CollectionService {
     }
 
     // Fetch images separately for each product
-    const productIds = collection.items?.map(item => item.productId).filter(Boolean) || [];
+    const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
     if (productIds.length > 0) {
       const productImages = await this.prisma.productImage.findMany({
         where: { productId: { in: productIds } },
@@ -169,8 +169,10 @@ export class CollectionService {
       isLiked = !!like;
     }
 
-    // Increment view count if not owner
-    if (viewerId !== collection.userId) {
+    // Increment view count only if viewer is not the owner
+    // If viewerId is provided and matches owner, don't increment
+    // Otherwise increment (anonymous users or different users)
+    if (!viewerId || viewerId !== collection.userId) {
       await this.prisma.collection.update({
         where: { id: collectionId },
         data: { viewCount: { increment: 1 } },
@@ -223,7 +225,7 @@ export class CollectionService {
       
       if (collection) {
         // Fetch images separately for each product
-        const productIds = collection.items?.map(item => item.productId).filter(Boolean) || [];
+        const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
         if (productIds.length > 0) {
           const productImages = await this.prisma.productImage.findMany({
             where: { productId: { in: productIds } },
@@ -277,8 +279,10 @@ export class CollectionService {
       isLiked = !!like;
     }
 
-    // Increment view count if not owner
-    if (viewerId !== collection.userId) {
+    // Increment view count only if viewer is not the owner
+    // If viewerId is provided and matches owner, don't increment
+    // Otherwise increment (anonymous users or different users)
+    if (!viewerId || viewerId !== collection.userId) {
       await this.prisma.collection.update({
         where: { id: collection.id },
         data: { viewCount: { increment: 1 } },
@@ -566,6 +570,7 @@ export class CollectionService {
     collectionId: string,
     userId: string,
     dto: AddCollectionItemDto,
+    imageUrl?: string,
   ): Promise<CollectionItemResponseDto> {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
@@ -579,28 +584,64 @@ export class CollectionService {
       throw new ForbiddenException('Bu koleksiyona ekleme yetkiniz yok');
     }
 
-    // Verify product exists
-    const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
-      include: { images: { take: 1 } },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+    // Validate: either productId or customTitle must be provided
+    if (!dto.productId && !dto.customTitle) {
+      throw new BadRequestException('Ürün ID veya custom ürün bilgileri gerekli');
     }
 
-    // Check if already in collection
-    const existing = await this.prisma.collectionItem.findUnique({
-      where: {
-        collectionId_productId: {
+    // If productId is provided, use existing product logic
+    if (dto.productId) {
+      // Verify product exists
+      const product = await this.prisma.product.findUnique({
+        where: { id: dto.productId },
+        include: { images: { take: 1 } },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Ürün bulunamadı');
+      }
+
+      // Check if already in collection
+      const existing = await this.prisma.collectionItem.findUnique({
+        where: {
+          collectionId_productId: {
+            collectionId,
+            productId: dto.productId,
+          },
+        },
+      });
+
+      if (existing) {
+        throw new BadRequestException('Ürün zaten koleksiyonda');
+      }
+
+      // Get max sort order
+      const maxSort = await this.prisma.collectionItem.aggregate({
+        where: { collectionId },
+        _max: { sortOrder: true },
+      });
+
+      const item = await this.prisma.collectionItem.create({
+        data: {
           collectionId,
           productId: dto.productId,
+          sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
+          isFeatured: dto.isFeatured ?? false,
         },
-      },
-    });
+        include: {
+          product: {
+            include: { images: { take: 1 } },
+          },
+        },
+      });
 
-    if (existing) {
-      throw new BadRequestException('Ürün zaten koleksiyonda');
+      return this.mapItemToDto(item);
+    }
+
+    // Custom product logic
+    // Validate customTitle is required for custom products
+    if (!dto.customTitle || dto.customTitle.trim().length === 0) {
+      throw new BadRequestException('Custom ürün için isim zorunludur');
     }
 
     // Get max sort order
@@ -612,14 +653,16 @@ export class CollectionService {
     const item = await this.prisma.collectionItem.create({
       data: {
         collectionId,
-        productId: dto.productId,
+        productId: null,
+        customTitle: dto.customTitle,
+        customDescription: dto.customDescription,
+        customBrand: dto.customBrand,
+        customModel: dto.customModel,
+        customYear: dto.customYear,
+        customScale: dto.customScale,
+        customImageUrl: imageUrl || dto.customImageUrl,
         sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         isFeatured: dto.isFeatured ?? false,
-      },
-      include: {
-        product: {
-          include: { images: { take: 1 } },
-        },
       },
     });
 
@@ -1094,6 +1137,30 @@ export class CollectionService {
 
   private mapItemToDto(item: any): CollectionItemResponseDto {
     try {
+      // Check if this is a custom product (no productId)
+      if (!item.productId) {
+        // Custom product
+        return {
+          id: item.id || '',
+          productId: undefined,
+          productTitle: item.customTitle || 'İsimsiz Ürün',
+          productImage: item.customImageUrl || undefined,
+          productPrice: undefined,
+          sortOrder: item.sortOrder || 0,
+          isFeatured: item.isFeatured || false,
+          addedAt: item.addedAt || new Date(),
+          isCustom: true,
+          customTitle: item.customTitle,
+          customDescription: item.customDescription,
+          customBrand: item.customBrand,
+          customModel: item.customModel,
+          customYear: item.customYear,
+          customScale: item.customScale,
+          customImageUrl: item.customImageUrl,
+        };
+      }
+
+      // Regular product
       if (!item || !item.product) {
         // Product was deleted or item is invalid, return minimal data
         return {
@@ -1105,6 +1172,7 @@ export class CollectionService {
           sortOrder: item?.sortOrder || 0,
           isFeatured: item?.isFeatured || false,
           addedAt: item?.addedAt || new Date(),
+          isCustom: false,
         };
       }
       
@@ -1126,19 +1194,28 @@ export class CollectionService {
         sortOrder: item.sortOrder || 0,
         isFeatured: item.isFeatured || false,
         addedAt: item.addedAt || new Date(),
+        isCustom: false,
       };
     } catch (error) {
       console.error('Error mapping collection item to DTO:', error, item);
       // Return safe fallback
       return {
         id: item?.id || '',
-        productId: item?.productId || '',
-        productTitle: 'Hata: Ürün bilgisi yüklenemedi',
-        productImage: undefined,
-        productPrice: 0,
+        productId: item?.productId || undefined,
+        productTitle: item?.customTitle || 'Hata: Ürün bilgisi yüklenemedi',
+        productImage: item?.customImageUrl || undefined,
+        productPrice: undefined,
         sortOrder: item?.sortOrder || 0,
         isFeatured: item?.isFeatured || false,
         addedAt: item?.addedAt || new Date(),
+        isCustom: !item?.productId,
+        customTitle: item?.customTitle,
+        customDescription: item?.customDescription,
+        customBrand: item?.customBrand,
+        customModel: item?.customModel,
+        customYear: item?.customYear,
+        customScale: item?.customScale,
+        customImageUrl: item?.customImageUrl,
       };
     }
   }

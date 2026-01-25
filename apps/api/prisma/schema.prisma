@@ -961,18 +961,28 @@ model Collection {
 }
 
 model CollectionItem {
-  id           String   @id @default(uuid())
-  collectionId String   @map("collection_id")
-  productId    String   @map("product_id")
-  sortOrder    Int      @default(0) @map("sort_order")
-  isFeatured   Boolean  @default(false) @map("is_featured")
-  addedAt      DateTime @default(now()) @map("added_at")
+  id             String   @id @default(uuid())
+  collectionId   String   @map("collection_id")
+  productId      String?  @map("product_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+  isFeatured     Boolean  @default(false) @map("is_featured")
+  addedAt        DateTime @default(now()) @map("added_at")
+  
+  // Custom product fields (when productId is null)
+  customTitle       String? @map("custom_title")
+  customDescription String? @map("custom_description")
+  customBrand       String? @map("custom_brand")
+  customModel       String? @map("custom_model")
+  customYear        Int?    @map("custom_year")
+  customScale       String? @map("custom_scale")
+  customImageUrl    String? @map("custom_image_url")
 
   // Relations
   collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([collectionId, productId])
+  @@index([collectionId])
   @@map("collection_items")
 }
 

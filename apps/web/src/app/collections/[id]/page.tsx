@@ -30,13 +30,21 @@ interface UserProduct {
 
 interface CollectionItem {
   id: string;
-  productId: string;
+  productId?: string;
   productTitle: string;
   productImage?: string;
-  productPrice: number;
+  productPrice?: number;
   sortOrder: number;
   isFeatured: boolean;
   addedAt: string;
+  isCustom: boolean;
+  customTitle?: string;
+  customDescription?: string;
+  customBrand?: string;
+  customModel?: string;
+  customYear?: number;
+  customScale?: string;
+  customImageUrl?: string;
 }
 
 interface Collection {
@@ -77,6 +85,16 @@ export default function CollectionDetailPage() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  // Custom product form state
+  const [customTitle, setCustomTitle] = useState('');
+  const [customDescription, setCustomDescription] = useState('');
+  const [customBrand, setCustomBrand] = useState('');
+  const [customModel, setCustomModel] = useState('');
+  const [customYear, setCustomYear] = useState<number | ''>('');
+  const [customScale, setCustomScale] = useState('');
+  const [customImageFile, setCustomImageFile] = useState<File | null>(null);
+  const [customImagePreview, setCustomImagePreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'products' | 'custom'>('products');
 
   useEffect(() => {
     if (collectionIdOrSlug) {
@@ -203,7 +221,57 @@ export default function CollectionDetailPage() {
 
   const handleOpenAddModal = () => {
     setShowAddItemModal(true);
+    setActiveTab('products');
     fetchMyProducts();
+  };
+
+  const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCustomImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddCustomItem = async () => {
+    if (!customTitle.trim() || !collection) {
+      toast.error('Ürün ismi zorunludur');
+      return;
+    }
+
+    setAddingItem(true);
+    try {
+      await collectionsApi.addItem(collection.id, {
+        customTitle: customTitle.trim(),
+        customDescription: customDescription.trim() || undefined,
+        customBrand: customBrand.trim() || undefined,
+        customModel: customModel.trim() || undefined,
+        customYear: customYear ? Number(customYear) : undefined,
+        customScale: customScale || undefined,
+        imageFile: customImageFile || undefined,
+      });
+      toast.success(t('collection.productsAddedToCollection'));
+      setShowAddItemModal(false);
+      // Reset form
+      setCustomTitle('');
+      setCustomDescription('');
+      setCustomBrand('');
+      setCustomModel('');
+      setCustomYear('');
+      setCustomScale('');
+      setCustomImageFile(null);
+      setCustomImagePreview(null);
+      fetchCollection();
+    } catch (error: any) {
+      console.error('Failed to add custom item:', error);
+      toast.error(error.response?.data?.message || t('collection.productsAddFailed'));
+    } finally {
+      setAddingItem(false);
+    }
   };
 
   const handleAddItemToCollection = async () => {
@@ -416,10 +484,7 @@ export default function CollectionDetailPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Link
-                    href={`/listings/${item.productId}`}
-                    className="bg-white rounded-xl overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all block relative shadow-sm border border-gray-200"
-                  >
+                  <div className="bg-white rounded-xl overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all relative shadow-sm border border-gray-200">
                     {item.isFeatured && (
                       <div className="absolute top-2 left-2 z-10">
                         <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-semibold">
@@ -427,26 +492,72 @@ export default function CollectionDetailPage() {
                         </span>
                       </div>
                     )}
-                    <div className="aspect-square bg-gray-100 relative">
-                      <Image
-                        src={getItemImage(item)}
-                        alt={item.productTitle}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                        }}
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
-                        {item.productTitle}
-                      </h3>
-                      <p className="text-primary-500 font-bold text-xl">
-                        ₺{item.productPrice.toLocaleString('tr-TR')}
-                      </p>
-                    </div>
+                    {item.isCustom && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full font-semibold">
+                          Koleksiyon Ürünü
+                        </span>
+                      </div>
+                    )}
+                    {item.productId ? (
+                      <Link
+                        href={`/listings/${item.productId}`}
+                        className="block"
+                      >
+                        <div className="aspect-square bg-gray-100 relative">
+                          <Image
+                            src={getItemImage(item)}
+                            alt={item.productTitle}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
+                            }}
+                          />
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
+                            {item.productTitle}
+                          </h3>
+                          {item.productPrice !== undefined && (
+                            <p className="text-primary-500 font-bold text-xl">
+                              ₺{item.productPrice.toLocaleString('tr-TR')}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ) : (
+                      <>
+                        <div className="aspect-square bg-gray-100 relative">
+                          <Image
+                            src={item.customImageUrl || item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
+                            alt={item.productTitle}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                            }}
+                          />
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
+                            {item.productTitle}
+                          </h3>
+                          {item.customBrand && (
+                            <p className="text-gray-600 text-sm mb-1">
+                              {item.customBrand} {item.customModel && `- ${item.customModel}`}
+                            </p>
+                          )}
+                          {item.customYear && (
+                            <p className="text-gray-500 text-xs">
+                              {item.customYear}
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
                     {isOwner && (
                       <button
                         onClick={(e) => {
@@ -458,7 +569,7 @@ export default function CollectionDetailPage() {
                         <TrashIcon className="w-4 h-4 text-white" />
                       </button>
                     )}
-                  </Link>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -471,11 +582,37 @@ export default function CollectionDetailPage() {
             <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
               <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addProductToCollection')}</h2>
               
-              {loadingProducts ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
-                </div>
-              ) : myProducts.length === 0 ? (
+              {/* Tabs */}
+              <div className="flex gap-2 mb-4 border-b border-gray-200">
+                <button
+                  onClick={() => setActiveTab('products')}
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    activeTab === 'products'
+                      ? 'text-primary-600 border-b-2 border-primary-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  İlanlarım
+                </button>
+                <button
+                  onClick={() => setActiveTab('custom')}
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    activeTab === 'custom'
+                      ? 'text-primary-600 border-b-2 border-primary-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Custom Ürün Ekle
+                </button>
+              </div>
+              
+              {activeTab === 'products' && (
+                <>
+                  {loadingProducts ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+                    </div>
+                  ) : myProducts.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-700 mb-4">
                     {t('collection.noProductsToAdd')}
@@ -584,9 +721,156 @@ export default function CollectionDetailPage() {
                     </button>
                   </div>
                 </>
+                  )}
+                </>
               )}
               
-              {(myProducts.length === 0 || loadingProducts) && (
+              {activeTab === 'custom' && (
+                <div className="flex-1 overflow-y-auto">
+                  <div className="space-y-4">
+                    {/* Title - Required */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        İsim <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={customTitle}
+                        onChange={(e) => setCustomTitle(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Ürün ismi"
+                      />
+                    </div>
+
+                    {/* Image - Optional */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Resim
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCustomImageChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      {customImagePreview && (
+                        <div className="mt-2">
+                          <img
+                            src={customImagePreview}
+                            alt="Preview"
+                            className="w-32 h-32 object-cover rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Açıklama
+                      </label>
+                      <textarea
+                        value={customDescription}
+                        onChange={(e) => setCustomDescription(e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Ürün açıklaması"
+                      />
+                    </div>
+
+                    {/* Brand */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Marka
+                      </label>
+                      <input
+                        type="text"
+                        value={customBrand}
+                        onChange={(e) => setCustomBrand(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Marka"
+                      />
+                    </div>
+
+                    {/* Model */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Model
+                      </label>
+                      <input
+                        type="text"
+                        value={customModel}
+                        onChange={(e) => setCustomModel(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Model"
+                      />
+                    </div>
+
+                    {/* Year */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Yıl
+                      </label>
+                      <input
+                        type="number"
+                        value={customYear}
+                        onChange={(e) => setCustomYear(e.target.value ? parseInt(e.target.value) : '')}
+                        min="1900"
+                        max="2100"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Yıl"
+                      />
+                    </div>
+
+                    {/* Scale */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ölçek
+                      </label>
+                      <select
+                        value={customScale}
+                        onChange={(e) => setCustomScale(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="">Seçiniz</option>
+                        <option value="1:18">1:18</option>
+                        <option value="1:24">1:24</option>
+                        <option value="1:43">1:43</option>
+                        <option value="1:64">1:64</option>
+                        <option value="1:87">1:87</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setShowAddItemModal(false);
+                        setCustomTitle('');
+                        setCustomDescription('');
+                        setCustomBrand('');
+                        setCustomModel('');
+                        setCustomYear('');
+                        setCustomScale('');
+                        setCustomImageFile(null);
+                        setCustomImagePreview(null);
+                      }}
+                      className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                    <button
+                      onClick={handleAddCustomItem}
+                      disabled={!customTitle.trim() || addingItem}
+                      className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {addingItem ? t('common.adding') : t('common.add')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'products' && (myProducts.length === 0 || loadingProducts) && (
                 <button
                   onClick={() => {
                     setShowAddItemModal(false);

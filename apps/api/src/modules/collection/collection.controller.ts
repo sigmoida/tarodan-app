@@ -12,8 +12,12 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CollectionService } from './collection.service';
+import { MediaService } from '../media/media.service';
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -27,7 +31,10 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('collections')
 export class CollectionController {
-  constructor(private readonly collectionService: CollectionService) {}
+  constructor(
+    private readonly collectionService: CollectionService,
+    private readonly mediaService: MediaService,
+  ) {}
 
   /**
    * Create a new collection
@@ -247,14 +254,33 @@ export class CollectionController {
   /**
    * Add item to collection
    * POST /collections/:id/items
+   * Supports both regular products (productId) and custom products (customTitle + other fields)
+   * For custom products, image file can be uploaded
    */
   @Post(':id/items')
+  @UseInterceptors(FileInterceptor('image'))
   async addItemToCollection(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
     @Body() dto: AddCollectionItemDto,
+    @UploadedFile() imageFile?: Express.Multer.File,
   ): Promise<CollectionItemResponseDto> {
-    return this.collectionService.addItemToCollection(id, req.user.id, dto);
+    let imageUrl: string | undefined;
+
+    // If image file is provided, upload it
+    if (imageFile) {
+      try {
+        const uploadResult = await this.mediaService.upload(imageFile, {
+          folder: 'collection-items',
+          resize: { width: 800, height: 800, fit: 'cover' },
+        });
+        imageUrl = uploadResult.url;
+      } catch (error: any) {
+        throw new BadRequestException('Resim yükleme başarısız: ' + (error.message || 'Bilinmeyen hata'));
+      }
+    }
+
+    return this.collectionService.addItemToCollection(id, req.user.id, dto, imageUrl);
   }
 
   /**

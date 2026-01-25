@@ -3,9 +3,10 @@ import { CollectionController } from './collection.controller';
 import { CollectionService } from './collection.service';
 import { PrismaModule } from '../../prisma';
 import { MembershipModule } from '../membership/membership.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [PrismaModule, MembershipModule],
+  imports: [PrismaModule, MembershipModule, MediaModule],
   controllers: [CollectionController],
   providers: [CollectionService],
   exports: [CollectionService],
