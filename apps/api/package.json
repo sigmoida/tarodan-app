@@ -25,7 +25,9 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts"
+    "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
+    "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
+    "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.11.0",
