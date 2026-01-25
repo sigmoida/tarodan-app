@@ -24,26 +24,74 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
       if (typeof window !== 'undefined') {
-        // Only redirect if user HAD a token (session expired)
-        // Do NOT redirect guests - they should see public content or get auth modals
-        const hadToken = localStorage.getItem('auth_token');
-        localStorage.removeItem('auth_token');
+        const refreshToken = localStorage.getItem('refresh_token');
         
-        // Only auto-redirect for expired sessions, not for guest access attempts
-        if (hadToken) {
-          // Check if we're on a page that requires auth
-          const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-          const currentPath = window.location.pathname;
-          const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-          
-          if (isProtectedPath) {
-            window.location.href = '/login?expired=true';
+        // Try to refresh token if we have a refresh token
+        if (refreshToken && originalRequest.url !== '/auth/refresh') {
+          try {
+            // Use a new axios instance to avoid interceptor loop
+            const refreshResponse = await axios.post('/api/auth/refresh', { refreshToken }, {
+              headers: { 'Content-Type': 'application/json' },
+            });
+            const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+            
+            // Update tokens in localStorage
+            localStorage.setItem('auth_token', accessToken);
+            if (newRefreshToken) {
+              localStorage.setItem('refresh_token', newRefreshToken);
+            }
+            
+            // Update the original request with new token
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            
+            // Retry the original request
+            return api(originalRequest);
+          } catch (refreshError) {
+            // Refresh failed, logout user
+            const hadToken = localStorage.getItem('auth_token');
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            
+            // Only auto-redirect for expired sessions, not for guest access attempts
+            if (hadToken) {
+              // Check if we're on a page that requires auth
+              const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+              const currentPath = window.location.pathname;
+              const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+              
+              if (isProtectedPath) {
+                window.location.href = '/login?expired=true';
+              }
+            }
+            
+            return Promise.reject(refreshError);
           }
+        } else {
+          // No refresh token or refresh endpoint failed, handle as before
+          const hadToken = localStorage.getItem('auth_token');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          
+          // Only auto-redirect for expired sessions, not for guest access attempts
+          if (hadToken) {
+            // Check if we're on a page that requires auth
+            const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+            const currentPath = window.location.pathname;
+            const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+            
+            if (isProtectedPath) {
+              window.location.href = '/login?expired=true';
+            }
+          }
+          // For guests trying to access protected API endpoints, just reject the promise
+          // The UI will handle showing auth modals
         }
-        // For guests trying to access protected API endpoints, just reject the promise
-        // The UI will handle showing auth modals
       }
     }
     return Promise.reject(error);
@@ -58,6 +106,8 @@ export const authApi = {
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
+  refresh: (refreshToken: string) =>
+    api.post('/auth/refresh', { refreshToken }),
 };
 
 // Products (was Listings - endpoint is /products in backend)
@@ -229,6 +279,7 @@ export const userApi = {
   }) => api.patch('/users/me', data),
   getMyProducts: (params?: Record<string, any>) =>
     api.get('/products/my', { params }),
+  getMyProductById: (id: string) => api.get(`/products/my/${id}`),
   getStats: () => api.get('/users/me/stats'),
 };
 
@@ -350,6 +401,31 @@ export const searchApi = {
     api.get('/search/products', { params: { q, ...params } }),
   autocomplete: (q: string) =>
     api.get('/search/autocomplete', { params: { q } }),
+};
+
+// Media / File Upload
+export const mediaApi = {
+  uploadProductImages: (files: File[]) => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('images', file);
+    });
+    return api.post('/media/upload/product', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return api.post('/media/upload/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  deleteFile: (key: string) => api.delete(`/media/${key}`),
 };
 
 export default api;
