@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
-import { api, userApi } from '@/lib/api';
+import { api, userApi, tradesApi, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 interface MembershipTier {
@@ -109,17 +109,21 @@ export default function ProfilePage() {
   const loadProfile = async () => {
     try {
       // Use /users/me for profile data
-      const [profileResponse, statsResponse, ordersResponse, productsResponse] = await Promise.all([
+      const [profileResponse, statsResponse, ordersResponse, productsResponse, tradesResponse, collectionsResponse] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
         api.get('/orders', { params: { role: 'buyer', limit: 1 } }).catch(() => null),
         userApi.getMyProducts({ limit: 1 }).catch(() => null),
+        tradesApi.getAll({ limit: 1 }).catch(() => null),
+        collectionsApi.getMyCollections({ limit: 1 }).catch(() => null),
       ]);
       
       const profileData = profileResponse?.data?.user || profileResponse?.data || user;
       const statsData = statsResponse?.data?.data || statsResponse?.data || {};
       const ordersCount = ordersResponse?.data?.meta?.total || ordersResponse?.data?.data?.length || 0;
       const productsCount = productsResponse?.data?.meta?.total || productsResponse?.data?.data?.length || productsResponse?.data?.products?.length || 0;
+      const tradesCount = tradesResponse?.data?.meta?.total || tradesResponse?.data?.data?.length || tradesResponse?.data?.trades?.length || 0;
+      const collectionsCount = collectionsResponse?.data?.meta?.total || collectionsResponse?.data?.data?.length || collectionsResponse?.data?.collections?.length || 0;
       
       if (!profileData) {
         // If no profile data, keep using authStore data
@@ -157,10 +161,10 @@ export default function ProfilePage() {
                         profileData._count?.products ?? user?.listingCount ?? 0),
           ordersCount: ordersCount || (statsData.ordersCount ?? statsData.orders ?? 
                       profileData._count?.orders ?? user?.totalPurchases ?? 0),
-          tradesCount: statsData.tradesCount ?? statsData.trades ?? 
-                      profileData._count?.trades ?? 0,
-          collectionsCount: statsData.collectionsCount ?? statsData.collections ?? 
-                           profileData._count?.collections ?? 0,
+          tradesCount: tradesCount || (statsData.tradesCount ?? statsData.trades ?? 
+                      profileData._count?.trades ?? 0),
+          collectionsCount: collectionsCount || (statsData.collectionsCount ?? statsData.collections ?? 
+                           profileData._count?.collections ?? 0),
           rating: statsData.rating ?? profileData.rating ?? user?.rating ?? 0,
           reviewsCount: statsData.reviewsCount ?? statsData.totalRatings ?? user?.totalRatings ?? 0,
         },
