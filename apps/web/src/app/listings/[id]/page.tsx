@@ -21,6 +21,7 @@ import {
   MagnifyingGlassMinusIcon,
   FlagIcon,
   ExclamationTriangleIcon,
+  PencilIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
@@ -79,8 +80,8 @@ export default function ListingDetailPage() {
   const { addToCart, items: cartItems, removeFromCart } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
   
-  // Free üyeler takas yapamaz - Premium, Business veya Basic üyeler trade yapabilir
-  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business' || user?.membershipTier === 'basic');
+  // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
+  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
   
   const [listing, setListing] = useState<Listing | null>(null);
@@ -590,17 +591,41 @@ export default function ListingDetailPage() {
       const magnifierSize = 150;
       const halfSize = magnifierSize / 2;
       
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
+      // Check if mouse is over navigation buttons
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Button dimensions and positions
+      const buttonSize = 40; // w-10 h-10 = 40px
+      const buttonOffset = 16; // left-4/right-4 = 16px
+      const centerY = rect.height / 2;
+      
+      // Check if mouse is over left button (left-4, centered vertically)
+      const isOverLeftButton = mouseX >= buttonOffset && 
+                               mouseX <= buttonOffset + buttonSize &&
+                               mouseY >= centerY - buttonSize / 2 &&
+                               mouseY <= centerY + buttonSize / 2;
+      
+      // Check if mouse is over right button (right-4, centered vertically)
+      const isOverRightButton = mouseX >= rect.width - buttonOffset - buttonSize &&
+                                mouseX <= rect.width - buttonOffset &&
+                                mouseY >= centerY - buttonSize / 2 &&
+                                mouseY <= centerY + buttonSize / 2;
+      
+      // Don't show magnifier if over navigation buttons
+      if (isOverLeftButton || isOverRightButton) {
+        setShowMagnifier(false);
+        return;
+      }
+      
+      let x = mouseX;
+      let y = mouseY;
       
       // Büyüteci resmin kenarlarında sınırla
       x = Math.max(halfSize, Math.min(rect.width - halfSize, x));
       y = Math.max(halfSize, Math.min(rect.height - halfSize, y));
       
       // Check if mouse is within image bounds
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
       if (mouseX >= 0 && mouseX <= rect.width && mouseY >= 0 && mouseY <= rect.height) {
         setMagnifierPosition({ x, y });
         setShowMagnifier(true);
@@ -707,16 +732,24 @@ export default function ListingDetailPage() {
               {images.length > 1 && (
                 <>
                   <button
-                    onClick={() => setActiveImageIndex((i) => (i > 0 ? i - 1 : images.length - 1))}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIndex((i) => (i > 0 ? i - 1 : images.length - 1));
+                    }}
+                    onMouseEnter={() => setShowMagnifier(false)}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-white transition-colors z-10 group"
                   >
-                    <ChevronLeftIcon className="w-6 h-6" />
+                    <ChevronLeftIcon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
                   </button>
                   <button
-                    onClick={() => setActiveImageIndex((i) => (i < images.length - 1 ? i + 1 : 0))}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIndex((i) => (i < images.length - 1 ? i + 1 : 0));
+                    }}
+                    onMouseEnter={() => setShowMagnifier(false)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-white transition-colors z-10 group"
                   >
-                    <ChevronRightIcon className="w-6 h-6" />
+                    <ChevronRightIcon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
                   </button>
                 </>
               )}
@@ -1117,7 +1150,7 @@ export default function ListingDetailPage() {
                       </span>
                     </div>
                   </div>
-                  {isAuthenticated ? (
+                  {!isOwner && isAuthenticated && (
                     <Link
                       href={`/messages?user=${listing.seller.id}&listing=${listing.id}`}
                       className="btn-secondary flex items-center gap-2"
@@ -1125,7 +1158,8 @@ export default function ListingDetailPage() {
                       <ChatBubbleLeftRightIcon className="w-5 h-5" />
                       {t('product.sendMessage')}
                     </Link>
-                  ) : (
+                  )}
+                  {!isOwner && !isAuthenticated && (
                     <button
                       onClick={() => {
                         setAuthModalConfig({
@@ -1187,115 +1221,125 @@ export default function ListingDetailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {/* Primary Action: Buy Now */}
-              <button
-                onClick={handleBuyNow}
-                disabled={listing.status !== 'active'}
-                className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
-                  listing.status === 'active' 
-                    ? 'btn-primary' 
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
-                }`}
-              >
-                <BoltIcon className="w-6 h-6" />
-                {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
-              </button>
+              {!isOwner ? (
+                <>
+                  {/* Primary Action: Buy Now */}
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={listing.status !== 'active'}
+                    className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
+                      listing.status === 'active' 
+                        ? 'btn-primary' 
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                    }`}
+                  >
+                    <BoltIcon className="w-6 h-6" />
+                    {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
+                  </button>
 
-              {/* Secondary Actions */}
-              <div className="flex gap-3">
-                {isTradeAvailable && (
-                  <button
-                    onClick={() => {
-                      if (listing.status !== 'active') {
-                        toast.error(t('product.notForSale'));
-                        return;
-                      }
-                      if (!isAuthenticated) {
-                        setAuthModalConfig({
-                          title: t('auth.loginRequired'),
-                          message: t('trade.loginToTrade'),
-                          icon: <ArrowsRightLeftIcon className="w-12 h-12 text-orange-500" />,
-                        });
-                        setShowAuthModal(true);
-                        return;
-                      }
-                      if (!canTrade) {
-                        setShowTradeModal(true);
-                        return;
-                      }
-                      router.push(`/trades/new?listing=${listing.id}`);
-                    }}
-                    disabled={listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${
-                      listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
-                    }`}
-                  >
-                    <ArrowsRightLeftIcon className="w-5 h-5" />
-                    {t('product.trade')}
-                  </button>
-                )}
-                {!isOwner && (
-                  <button
-                    onClick={handleMakeOffer}
-                    disabled={listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${
-                      listing.status !== 'active'
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
-                        : 'btn-secondary'
-                    }`}
-                  >
-                    <BoltIcon className="w-5 h-5" />
-                    {t('product.makeOffer')}
-                  </button>
-                )}
-                  <button
-                    onClick={handleCartToggle}
-                    disabled={isAddingToCart || listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 ${
-                      listing.status !== 'active' 
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
-                        : isInCart 
-                          ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                  {/* Secondary Actions */}
+                  <div className="flex gap-3">
+                    {isTradeAvailable && (
+                      <button
+                        onClick={() => {
+                          if (listing.status !== 'active') {
+                            toast.error(t('product.notForSale'));
+                            return;
+                          }
+                          if (!isAuthenticated) {
+                            setAuthModalConfig({
+                              title: t('auth.loginRequired'),
+                              message: t('trade.loginToTrade'),
+                              icon: <ArrowsRightLeftIcon className="w-12 h-12 text-orange-500" />,
+                            });
+                            setShowAuthModal(true);
+                            return;
+                          }
+                          if (!canTrade) {
+                            setShowTradeModal(true);
+                            return;
+                          }
+                          router.push(`/trades/new?listing=${listing.id}`);
+                        }}
+                        disabled={listing.status !== 'active'}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 ${
+                          listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                        }`}
+                      >
+                        <ArrowsRightLeftIcon className="w-5 h-5" />
+                        {t('product.trade')}
+                      </button>
+                    )}
+                    <button
+                      onClick={handleMakeOffer}
+                      disabled={listing.status !== 'active'}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${
+                        listing.status !== 'active'
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
                           : 'btn-secondary'
-                    }`}
+                      }`}
+                    >
+                      <BoltIcon className="w-5 h-5" />
+                      {t('product.makeOffer')}
+                    </button>
+                    <button
+                      onClick={handleCartToggle}
+                      disabled={isAddingToCart || listing.status !== 'active'}
+                      className={`flex-1 flex items-center justify-center gap-2 ${
+                        listing.status !== 'active' 
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                          : isInCart 
+                            ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                            : 'btn-secondary'
+                      }`}
+                    >
+                      <ShoppingCartIcon className="w-5 h-5" />
+                      {isAddingToCart 
+                        ? (isInCart ? t('product.removing') : t('product.adding')) 
+                        : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
+                      }
+                    </button>
+                    <button
+                      onClick={handleToggleFavorite}
+                      className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                    >
+                      {isFavorite ? (
+                        <>
+                          <HeartSolidIcon className="w-5 h-5 text-red-500" />
+                          {t('product.removeFromFavorites')}
+                        </>
+                      ) : (
+                        <>
+                          <HeartIcon className="w-5 h-5" />
+                          {t('product.addToFavorites')}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Owner Actions */}
+                  <Link
+                    href={`/listings/${listing.id}/edit`}
+                    className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-lg"
                   >
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    {isAddingToCart 
-                      ? (isInCart ? t('product.removing') : t('product.adding')) 
-                      : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
-                    }
-                  </button>
-                <button
-                  onClick={handleToggleFavorite}
-                  className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
-                >
-                  {isFavorite ? (
-                    <>
-                      <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                      {t('product.removeFromFavorites')}
-                    </>
-                  ) : (
-                    <>
-                      <HeartIcon className="w-5 h-5" />
-                      {t('product.addToFavorites')}
-                    </>
+                    <PencilIcon className="w-6 h-6" />
+                    Düzenle
+                  </Link>
+                  
+                  {limits?.canCreateCollections && (
+                    <button
+                      onClick={handleOpenCollectionModal}
+                      className="w-full btn-secondary flex items-center justify-center gap-2"
+                    >
+                      <FolderPlusIcon className="w-5 h-5" />
+                      {t('collection.addToCollection')}
+                    </button>
                   )}
-                </button>
-              </div>
+                </>
+              )}
             </div>
-
-            {/* Add to Collection Button - Only for owner */}
-            {isOwner && limits?.canCreateCollections && (
-              <div className="pt-3 border-t border-gray-200">
-                <button
-                  onClick={handleOpenCollectionModal}
-                  className="w-full btn-secondary flex items-center justify-center gap-2"
-                >
-                  <FolderPlusIcon className="w-5 h-5" />
-                  {t('collection.addToCollection')}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

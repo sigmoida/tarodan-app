@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api } from '@/lib/api';
+import { listingsApi, api, userApi, mediaApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface Category {
@@ -52,7 +52,7 @@ export default function EditListingPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { isAuthenticated, user, limits } = useAuthStore();
+  const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +69,7 @@ export default function EditListingPage() {
     imageUrls: [] as string[],
     status: 'active' as string,
   });
-  const [newImageUrl, setNewImageUrl] = useState('');
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
@@ -85,7 +85,19 @@ export default function EditListingPage() {
   const fetchListing = async () => {
     setIsFetching(true);
     try {
-      const response = await listingsApi.getOne(id);
+      // Use /products/my/:id endpoint to get own product (works for all statuses including pending)
+      let response;
+      try {
+        response = await userApi.getMyProductById(id);
+      } catch (myProductError: any) {
+        // If not found or not owner, try public endpoint
+        if (myProductError.response?.status === 404 || myProductError.response?.status === 403) {
+          response = await listingsApi.getOne(id);
+        } else {
+          throw myProductError;
+        }
+      }
+      
       const listing = response.data.product || response.data;
       
       // Check if user is the owner
@@ -137,14 +149,33 @@ export default function EditListingPage() {
     return result;
   };
 
-  const addImageUrl = () => {
-    const maxImages = limits?.maxImagesPerListing || 10;
-    if (newImageUrl.trim() && formData.imageUrls.length < maxImages) {
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const maxImages = limits?.maxImagesPerListing || 5;
+    const currentCount = formData.imageUrls.length;
+
+    if (currentCount + files.length > maxImages) {
+      toast.error(`En fazla ${maxImages} resim yükleyebilirsiniz`);
+      return;
+    }
+
+    setUploadingImages(true);
+    try {
+      const fileArray = Array.from(files);
+      const response = await mediaApi.uploadProductImages(fileArray);
+      
+      const uploadedUrls = response.data.map((result: any) => result.url);
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, newImageUrl.trim()],
+        imageUrls: [...formData.imageUrls, ...uploadedUrls],
       });
-      setNewImageUrl('');
+      toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
+    } catch (error: any) {
+      console.error('Failed to upload images:', error);
+      toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -225,6 +256,10 @@ export default function EditListingPage() {
     try {
       await api.delete(`/products/${id}`);
       toast.success('İlan silindi');
+      // Refresh user data to update listing count
+      await refreshUserData();
+      // Small delay to ensure backend has processed the deletion
+      await new Promise(resolve => setTimeout(resolve, 500));
       router.push('/profile/listings');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'İlan silinemedi');
@@ -435,31 +470,21 @@ export default function EditListingPage() {
             {/* Images */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 10})
+                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 5})
               </label>
               <div className="space-y-3">
-                <div className="flex gap-2">
+                <div>
                   <input
-                    type="url"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                    placeholder="https://example.com/image.jpg"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addImageUrl();
-                      }
-                    }}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 5)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
-                  <button
-                    type="button"
-                    onClick={addImageUrl}
-                    disabled={formData.imageUrls.length >= (limits?.maxImagesPerListing || 10)}
-                    className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    Ekle
-                  </button>
+                  {uploadingImages && (
+                    <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
+                  )}
                 </div>
 
                 {formData.imageUrls.length > 0 && (
@@ -486,6 +511,9 @@ export default function EditListingPage() {
                   </div>
                 )}
               </div>
+              <p className="text-sm text-gray-500 mt-2">
+                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} resim yüklendi
+              </p>
             </div>
 
             {/* Submit */}

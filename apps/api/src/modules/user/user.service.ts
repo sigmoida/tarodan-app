@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
-import { User, Prisma } from '@prisma/client';
+import { User, Prisma, ProductStatus } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -48,17 +48,20 @@ export class UserService {
             tier: true,
           },
         },
-        _count: {
-          select: {
-            products: true,
-          },
-        },
       },
     });
 
     if (!user) {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
+
+    // Count only active listings (exclude inactive and draft)
+    const listingCount = await this.prisma.product.count({
+      where: {
+        sellerId: id,
+        status: { notIn: [ProductStatus.inactive, ProductStatus.draft] },
+      },
+    });
 
     // Format membership info for frontend
     const membershipInfo = user.membership ? {
@@ -97,11 +100,11 @@ export class UserService {
     };
 
     // Remove raw membership and add the mapped membershipInfo
-    const { membership: rawMembership, _count, ...rest } = user;
+    const { membership: rawMembership, ...rest } = user;
     return { 
       ...rest, 
       membership: membershipInfo,
-      listingCount: _count?.products || 0,
+      listingCount,
     };
   }
 
@@ -331,8 +334,14 @@ export class UserService {
     }
 
     // Get seller stats
+    // Count only active listings (exclude inactive, draft, and pending for public profile)
     const [totalListings, totalSales, totalTrades, ratings] = await Promise.all([
-      this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),
+      this.prisma.product.count({ 
+        where: { 
+          sellerId: userId, 
+          status: 'active' 
+        } 
+      }),
       this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
       this.prisma.trade.count({ 
         where: { 
@@ -550,7 +559,13 @@ export class UserService {
       recentViews,
       recentLikes,
     ] = await Promise.all([
-      this.prisma.product.count({ where: { sellerId: userId } }),
+      // Total products excluding inactive and draft
+      this.prisma.product.count({ 
+        where: { 
+          sellerId: userId,
+          status: { notIn: ['inactive', 'draft'] }
+        } 
+      }),
       this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),
       this.prisma.product.aggregate({
         where: { sellerId: userId },

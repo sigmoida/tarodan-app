@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -12,10 +12,11 @@ import {
   XCircleIcon,
   PencilIcon,
   EyeIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { userApi } from '@/lib/api';
+import { userApi, api } from '@/lib/api';
 
 interface Listing {
   id: string;
@@ -46,11 +47,14 @@ const FILTER_TABS = [
 export default function ProfileListingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading: authLoading, refreshUserData } = useAuthStore();
   
   const [listings, setListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(searchParams.get('status') || '');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -63,6 +67,38 @@ export default function ProfileListingsPage() {
     }
   }, [isAuthenticated, authLoading, activeFilter]);
 
+  // Refresh listings when pathname changes (e.g., returning from edit/delete page)
+  useEffect(() => {
+    if (prevPathnameRef.current !== null && prevPathnameRef.current !== pathname && pathname === '/profile/listings' && isAuthenticated) {
+      // Page was navigated to, refresh listings
+      fetchListings();
+    }
+    prevPathnameRef.current = pathname;
+  }, [pathname, isAuthenticated]);
+
+  // Refresh listings when page becomes visible (e.g., after returning from edit/delete)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        fetchListings();
+      }
+    };
+
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        fetchListings();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isAuthenticated]);
+
   const fetchListings = async () => {
     setIsLoading(true);
     try {
@@ -71,9 +107,23 @@ export default function ProfileListingsPage() {
         params.status = activeFilter;
       }
       
+      // Add cache busting to ensure fresh data
+      params._t = Date.now();
+      
       const response = await userApi.getMyProducts(params);
       console.log('Listings API response:', response.data);
-      const data = response.data?.data || response.data?.products || response.data || [];
+      let data = response.data?.data || response.data?.products || response.data || [];
+      
+      // Filter out deleted/inactive listings if no specific filter is active
+      if (!activeFilter || activeFilter.trim() === '') {
+        data = data.filter((listing: Listing) => {
+          // Exclude deleted, inactive, and draft listings from default view
+          return listing.status !== 'deleted' && 
+                 listing.status !== 'inactive' && 
+                 listing.status !== 'draft';
+        });
+      }
+      
       setListings(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('Failed to fetch listings:', error);
@@ -101,6 +151,27 @@ export default function ProfileListingsPage() {
     }
     const firstImage = listing.images[0];
     return typeof firstImage === 'string' ? firstImage : firstImage.url;
+  };
+
+  const handleDelete = async (listingId: string) => {
+    if (!confirm('Bu ilanı silmek istediğinize emin misiniz?')) {
+      return;
+    }
+
+    setDeletingId(listingId);
+    try {
+      await api.delete(`/products/${listingId}`);
+      toast.success('İlan silindi');
+      // Refresh user data to update listing count
+      await refreshUserData();
+      // Refresh listings
+      await fetchListings();
+    } catch (error: any) {
+      console.error('Failed to delete listing:', error);
+      toast.error(error.response?.data?.message || 'İlan silinemedi');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (authLoading) {
@@ -260,6 +331,16 @@ export default function ProfileListingsPage() {
                           <PencilIcon className="w-4 h-4" />
                           Düzenle
                         </Link>
+                      )}
+                      {listing.status === 'rejected' && (
+                        <button
+                          onClick={() => handleDelete(listing.id)}
+                          disabled={deletingId === listing.id}
+                          className="flex-1 py-2 text-center bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                          {deletingId === listing.id ? 'Siliniyor...' : 'Sil'}
+                        </button>
                       )}
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -60,6 +60,7 @@ interface ListingLimits {
 
 export default function NewListingPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const CONDITIONS = getConditions(locale);
@@ -68,6 +69,7 @@ export default function NewListingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [listingLimits, setListingLimits] = useState<ListingLimits | null>(null);
   const [limitsLoading, setLimitsLoading] = useState(true);
+  const prevPathnameRef = useRef<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -79,7 +81,7 @@ export default function NewListingPage() {
     isTradeEnabled: false,
     imageUrls: [] as string[],
   });
-  const [newImageUrl, setNewImageUrl] = useState('');
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -101,11 +103,51 @@ export default function NewListingPage() {
     }
   }, [user, limits]);
 
+  // Refresh listing limits when pathname changes (e.g., returning from edit/delete page)
+  useEffect(() => {
+    if (prevPathnameRef.current !== null && prevPathnameRef.current !== pathname && pathname === '/listings/new' && user) {
+      // Page was navigated to, refresh user data and limits
+      refreshUser().then(() => {
+        updateListingLimits();
+      });
+    }
+    prevPathnameRef.current = pathname;
+  }, [pathname, user]);
+
+  // Refresh listing limits when page becomes visible (e.g., after returning from deleting a listing)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        refreshUser().then(() => {
+          updateListingLimits();
+        });
+      }
+    };
+
+    const handleFocus = () => {
+      if (user) {
+        refreshUser().then(() => {
+          updateListingLimits();
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user]);
+
   const updateListingLimits = async () => {
     setLimitsLoading(true);
     try {
-      // Fetch real listing stats from API
-      const response = await api.get('/products/my/stats');
+      // Fetch real listing stats from API with cache busting
+      const response = await api.get('/products/my/stats', {
+        params: { _t: Date.now() }
+      });
       const stats = response.data;
       
       const tierName = stats.limits?.tierName || 'Free';
@@ -168,14 +210,33 @@ export default function NewListingPage() {
     return result;
   };
 
-  const addImageUrl = () => {
-    const maxImages = limits?.maxImagesPerListing || 10;
-    if (newImageUrl.trim() && formData.imageUrls.length < maxImages) {
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const maxImages = limits?.maxImagesPerListing || 5;
+    const currentCount = formData.imageUrls.length;
+
+    if (currentCount + files.length > maxImages) {
+      toast.error(`En fazla ${maxImages} resim yükleyebilirsiniz`);
+      return;
+    }
+
+    setUploadingImages(true);
+    try {
+      const fileArray = Array.from(files);
+      const response = await mediaApi.uploadProductImages(fileArray);
+      
+      const uploadedUrls = response.data.map((result: any) => result.url);
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, newImageUrl.trim()],
+        imageUrls: [...formData.imageUrls, ...uploadedUrls],
       });
-      setNewImageUrl('');
+      toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
+    } catch (error: any) {
+      console.error('Failed to upload images:', error);
+      toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -221,6 +282,11 @@ export default function NewListingPage() {
 
       await listingsApi.create(payload as any);
       toast.success(locale === 'en' ? 'Your listing has been created! Pending approval.' : 'İlanınız oluşturuldu! Onay bekliyor.');
+      
+      // Refresh user data and listing limits to update the count
+      await refreshUser();
+      await updateListingLimits();
+      
       router.push('/profile/listings?status=pending');
     } catch (error: any) {
       console.error('Failed to create listing:', error);
@@ -473,31 +539,21 @@ export default function NewListingPage() {
             {/* Images */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 10})
+                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 5})
               </label>
               <div className="space-y-3">
-                <div className="flex gap-2">
+                <div>
                   <input
-                    type="url"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                    placeholder="https://example.com/image.jpg"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addImageUrl();
-                      }
-                    }}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 5)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
-                  <button
-                    type="button"
-                    onClick={addImageUrl}
-                    disabled={formData.imageUrls.length >= (limits?.maxImagesPerListing || 10)}
-                    className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    Ekle
-                  </button>
+                  {uploadingImages && (
+                    <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
+                  )}
                 </div>
 
                 {formData.imageUrls.length > 0 && (
@@ -525,7 +581,7 @@ export default function NewListingPage() {
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                Görsel URL'lerini ekleyin. İleride dosya yükleme özelliği eklenecektir.
+                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} resim yüklendi
               </p>
             </div>
 

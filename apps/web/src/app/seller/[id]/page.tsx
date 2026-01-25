@@ -287,7 +287,7 @@ export default function SellerProfilePage() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-6 text-center">
               <div className="bg-white/10 rounded-xl p-4">
-                <p className="text-3xl font-bold">{products.length}</p>
+                <p className="text-3xl font-bold">{seller.stats?.totalListings || products.length}</p>
                 <p className="text-gray-400 text-sm">{t('product.listings')}</p>
               </div>
               <div className="bg-white/10 rounded-xl p-4">

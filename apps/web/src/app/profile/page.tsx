@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi } from '@/lib/api';
@@ -49,10 +49,12 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { t } = useTranslation();
   const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -66,6 +68,38 @@ export default function ProfilePage() {
     loadProfile();
   }, [isAuthenticated]);
 
+  // Refresh profile when pathname changes (e.g., returning from edit/delete page)
+  useEffect(() => {
+    if (prevPathnameRef.current !== null && prevPathnameRef.current !== pathname && pathname === '/profile' && isAuthenticated) {
+      // Page was navigated to, refresh profile
+      loadProfile();
+    }
+    prevPathnameRef.current = pathname;
+  }, [pathname, isAuthenticated]);
+
+  // Refresh profile when page becomes visible (e.g., after deleting a listing)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        loadProfile();
+      }
+    };
+
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        loadProfile();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isAuthenticated]);
+
   const setProfileFromAuthStore = () => {
     if (!user) return;
     
@@ -73,8 +107,7 @@ export default function ProfilePage() {
     const tierType = user.membershipTier || 'free';
     const tierDefaults: Record<string, MembershipTier> = {
       free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-      basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
-      premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
+      premium: { type: 'premium', name: 'Premium', maxFreeListings: -1, maxTotalListings: -1, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 3, commissionDiscount: 1, isAdFree: true },
       business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
     };
     
@@ -113,13 +146,27 @@ export default function ProfilePage() {
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
         api.get('/orders', { params: { role: 'buyer', limit: 1 } }).catch(() => null),
-        userApi.getMyProducts({ limit: 1 }).catch(() => null),
+        userApi.getMyProducts({ limit: 100, _t: Date.now() }).catch(() => null), // Get more products to filter properly
       ]);
       
       const profileData = profileResponse?.data?.user || profileResponse?.data || user;
       const statsData = statsResponse?.data?.data || statsResponse?.data || {};
       const ordersCount = ordersResponse?.data?.meta?.total || ordersResponse?.data?.data?.length || 0;
-      const productsCount = productsResponse?.data?.meta?.total || productsResponse?.data?.data?.length || productsResponse?.data?.products?.length || 0;
+      
+      // Calculate productsCount by filtering out deleted/inactive listings
+      let productsCount = 0;
+      if (productsResponse?.data) {
+        const products = productsResponse.data?.data || productsResponse.data?.products || [];
+        // Filter out deleted, inactive, and draft listings
+        productsCount = products.filter((p: any) => 
+          p.status !== 'deleted' && 
+          p.status !== 'inactive' && 
+          p.status !== 'draft'
+        ).length;
+      } else {
+        // Fallback to meta total if available
+        productsCount = productsResponse?.data?.meta?.total || 0;
+      }
       
       if (!profileData) {
         // If no profile data, keep using authStore data
@@ -133,8 +180,7 @@ export default function ProfilePage() {
       // Build membership tier object
       const tierDefaults: Record<string, MembershipTier> = {
         free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-        basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
-        premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
+        premium: { type: 'premium', name: 'Premium', maxFreeListings: -1, maxTotalListings: -1, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 3, commissionDiscount: 1, isAdFree: true },
         business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
       };
       
@@ -222,13 +268,10 @@ export default function ProfilePage() {
                           ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' 
                           : profile.membership.tier.type === 'premium'
                             ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                            : profile.membership.tier.type === 'basic'
-                              ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                              : 'bg-gray-600 text-gray-200'
+                            : 'bg-gray-600 text-gray-200'
                       }`}>
                         {profile.membership.tier.type === 'business' && '👑 '}
                         {profile.membership.tier.type === 'premium' && '⭐ '}
-                        {profile.membership.tier.type === 'basic' && '🔷 '}
                         {profile.membership.tier.name}
                       </span>
                     )}
@@ -302,15 +345,12 @@ export default function ProfilePage() {
                   ? 'bg-gradient-to-br from-orange-900/30 to-amber-900/30 border border-orange-500/30' 
                   : profile.membership.tier.type === 'premium'
                     ? 'bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30'
-                    : profile.membership.tier.type === 'basic'
-                      ? 'bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border border-blue-500/30'
-                      : 'bg-gray-800'
+                    : 'bg-gray-800'
               }`}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
                     {profile.membership.tier.type === 'business' && '👑'}
                     {profile.membership.tier.type === 'premium' && '⭐'}
-                    {profile.membership.tier.type === 'basic' && '🔷'}
                     {profile.membership.tier.name}
                   </h2>
                   {profile.membership.tier.type === 'free' && (
