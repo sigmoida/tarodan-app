@@ -210,6 +210,20 @@ export default function NewListingPage() {
     return result;
   };
 
+  // Filter out brand and scale categories since we have separate fields for those
+  const filterCategoryDuplicates = (cats: Category[]): Category[] => {
+    // Brand names to exclude from categories (these are in the Brand dropdown)
+    const brandSlugs = ['hot-wheels', 'hot-wheels-premium', 'hot-wheels-rlc', 'matchbox', 'tomica', 'tomica-limited-vintage', 'majorette', 'm2-machines', 'greenlight', 'johnny-lightning'];
+    // Scale slugs to exclude (these are in the Scale dropdown)
+    const scaleSlugs = ['scale-118', 'scale-124', 'scale-143', 'scale-164'];
+    
+    return cats.filter(cat => {
+      const slug = cat.slug.toLowerCase();
+      // Keep if not a brand or scale category
+      return !brandSlugs.includes(slug) && !scaleSlugs.includes(slug);
+    });
+  };
+
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
