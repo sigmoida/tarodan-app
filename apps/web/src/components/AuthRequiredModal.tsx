@@ -27,11 +27,13 @@ export default function AuthRequiredModal({
   if (!isOpen) return null;
 
   const handleLogin = () => {
+    onClose(); // Close modal first
     const currentPath = redirectPath || window.location.pathname + window.location.search;
     router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
   };
 
   const handleRegister = () => {
+    onClose(); // Close modal first
     const currentPath = redirectPath || window.location.pathname + window.location.search;
     router.push(`/register?redirect=${encodeURIComponent(currentPath)}`);
   };

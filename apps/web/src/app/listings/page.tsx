@@ -192,7 +192,10 @@ export default function ListingsPage() {
     });
   };
 
-  const activeFilterCount = Object.values(filters).filter(v => v).length;
+  // Count only actual filters (exclude sortBy as it's a sorting option, not a filter)
+  const activeFilterCount = Object.entries(filters)
+    .filter(([key, value]) => key !== 'sortBy' && value !== '' && value !== false)
+    .length;
 
   const getImageUrl = (image: any): string => {
     if (!image) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';

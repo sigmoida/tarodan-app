@@ -70,12 +70,17 @@ export default function Navbar() {
     }
   };
 
+  // Premium ve Business üyeler için reklam banner'ını gizle
+  const shouldShowAd = !isAuthenticated || (user?.membershipTier !== 'premium' && user?.membershipTier !== 'business');
+
   return (
     <>
       {/* Reklam Banner */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-center py-2 text-xs font-medium">
-        🎉 {t('nav.banner')}
-      </div>
+      {shouldShowAd && (
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-center py-2 text-xs font-medium">
+          🎉 {t('nav.banner')}
+        </div>
+      )}
       
       <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

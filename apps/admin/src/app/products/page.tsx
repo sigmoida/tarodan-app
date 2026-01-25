@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import Image from 'next/image';
@@ -17,7 +18,7 @@ interface Product {
   id: string;
   title: string;
   price: number;
-  status: 'pending' | 'active' | 'rejected' | 'sold';
+  status: 'pending' | 'active' | 'rejected' | 'sold' | 'inactive';
   condition: string;
   seller: {
     id: string;
@@ -132,14 +133,16 @@ export default function ProductsPage() {
       active: 'badge-success',
       rejected: 'badge-danger',
       sold: 'badge-info',
+      inactive: 'badge-gray',
     };
     const labels: Record<string, string> = {
       pending: 'Onay Bekliyor',
       active: 'Aktif',
       rejected: 'Reddedildi',
       sold: 'Satıldı',
+      inactive: 'Silindi',
     };
-    return <span className={`badge ${badges[status]}`}>{labels[status]}</span>;
+    return <span className={`badge ${badges[status] || 'badge-gray'}`}>{labels[status] || status}</span>;
   };
 
   const getConditionLabel = (condition: string) => {
@@ -199,6 +202,7 @@ export default function ProductsPage() {
             <option value="active">Aktif</option>
             <option value="rejected">Reddedilenler</option>
             <option value="sold">Satılanlar</option>
+            <option value="inactive">Silindi</option>
           </select>
         </div>
 
