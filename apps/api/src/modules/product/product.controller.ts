@@ -10,6 +10,9 @@ import {
   UseGuards,
   ParseUUIDPipe,
   BadRequestException,
+  Ip,
+  Headers,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -71,6 +74,32 @@ export class ProductController {
   }
 
   /**
+   * GET /products/my/:id
+   * Get seller's own single product (any status)
+   */
+  @Get('my/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kendi ürün detayım' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Satıcının kendi ürün detayı',
+    type: ProductResponseDto,
+  })
+  @ApiResponse({ status: 403, description: 'Bu ürün size ait değil' })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  async findMyProductById(
+    @CurrentUser('id') sellerId: string,
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+  ) {
+    return this.productService.findSellerProductById(sellerId, id);
+  }
+
+  /**
    * GET /products/my/stats
    * Get seller's listing statistics and membership limits
    */
@@ -128,7 +157,7 @@ export class ProductController {
 
   /**
    * GET /products/:id
-   * Get single product (public)
+   * Get single product (public, but only shows active products)
    */
   @Get(':id')
   @Public()
@@ -317,8 +346,17 @@ export class ProductController {
       exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
     })) id: string,
     @CurrentUser('id') userId?: string,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+    @Req() req?: any,
   ) {
-    return this.productService.incrementViewCount(id, userId);
+    // Get real IP from headers if behind proxy
+    const clientIp = 
+      req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req?.headers?.['x-real-ip'] ||
+      ip ||
+      'unknown';
+    return this.productService.incrementViewCount(id, userId, clientIp, userAgent);
   }
 
   /**

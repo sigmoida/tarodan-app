@@ -12,96 +12,97 @@ import { useAuthStore } from '@/stores/authStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
-import Footer from '@/components/layout/Footer';
+import { useTranslation } from '@/i18n';
 
-const MEMBERSHIP_TIERS = [
-  {
-    id: 'free',
-    name: 'Ücretsiz',
-    price: 0,
-    period: 'Süresiz',
-    description: 'Başlangıç için ideal',
-    features: [
-      { text: '5 aktif ilan hakkı', included: true },
-      { text: 'Temel arama ve filtreleme', included: true },
-      { text: 'Mesajlaşma', included: true },
-      { text: 'Takas yapma', included: false },
-      { text: 'Koleksiyon oluşturma', included: false },
-      { text: 'Reklamsız deneyim', included: false },
-      { text: 'Öncelikli destek', included: false },
-    ],
-    popular: false,
-    color: 'gray',
-  },
-  {
-    id: 'basic',
-    name: 'Temel',
-    price: 99,
-    period: 'Aylık',
-    description: 'Daha fazla özellik',
-    features: [
-      { text: '50 aktif ilan hakkı', included: true },
-      { text: 'Temel arama ve filtreleme', included: true },
-      { text: 'Mesajlaşma', included: true },
-      { text: 'Takas yapma', included: true },
-      { text: 'Koleksiyon oluşturma', included: true },
-      { text: 'Reklamsız deneyim', included: false },
-      { text: 'Öncelikli destek', included: false },
-    ],
-    popular: true,
-    color: 'blue',
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: 199,
-    period: 'Aylık',
-    description: 'En popüler seçenek',
-    features: [
-      { text: '200 aktif ilan hakkı', included: true },
-      { text: 'Gelişmiş arama ve filtreleme', included: true },
-      { text: 'Mesajlaşma', included: true },
-      { text: 'Takas yapma', included: true },
-      { text: 'Sınırsız koleksiyon', included: true },
-      { text: 'Reklamsız deneyim', included: true },
-      { text: 'Öncelikli destek', included: true },
-    ],
-    popular: false,
-    color: 'purple',
-  },
-  {
-    id: 'business',
-    name: 'İş',
-    price: 499,
-    period: 'Aylık',
-    description: 'Profesyonel satıcılar için',
-    features: [
-      { text: '1000 aktif ilan hakkı', included: true },
-      { text: 'Gelişmiş arama ve filtreleme', included: true },
-      { text: 'Mesajlaşma', included: true },
-      { text: 'Takas yapma', included: true },
-      { text: 'Sınırsız koleksiyon', included: true },
-      { text: 'Reklamsız deneyim', included: true },
-      { text: '7/24 öncelikli destek', included: true },
-      { text: 'Özel API erişimi', included: true },
-    ],
-    popular: false,
-    color: 'gold',
-  },
-];
 
 export default function PricingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+
+  const MEMBERSHIP_TIERS = [
+    {
+      id: 'free',
+      name: t('membership.free'),
+      price: 0,
+      period: t('membership.perMonth'),
+      description: t('membership.subtitle'),
+      features: [
+        { text: `5 ${t('membership.listingsLimit')}`, included: true },
+        { text: t('search.search'), included: true },
+        { text: t('message.messages'), included: true },
+        { text: t('nav.trades'), included: false },
+        { text: t('collection.collections'), included: false },
+        { text: t('membership.noAds'), included: false },
+        { text: t('membership.prioritySupport'), included: false },
+      ],
+      popular: false,
+      color: 'gray',
+    },
+    {
+      id: 'basic',
+      name: t('membership.basic'),
+      price: 99,
+      period: t('membership.perMonth'),
+      description: t('membership.features'),
+      features: [
+        { text: `50 ${t('membership.listingsLimit')}`, included: true },
+        { text: t('search.search'), included: true },
+        { text: t('message.messages'), included: true },
+        { text: t('nav.trades'), included: true },
+        { text: t('collection.collections'), included: true },
+        { text: t('membership.noAds'), included: false },
+        { text: t('membership.prioritySupport'), included: false },
+      ],
+      popular: true,
+      color: 'blue',
+    },
+    {
+      id: 'premium',
+      name: t('membership.premium'),
+      price: 199,
+      period: t('membership.perMonth'),
+      description: t('membership.mostPopular'),
+      features: [
+        { text: `200 ${t('membership.listingsLimit')}`, included: true },
+        { text: t('search.search'), included: true },
+        { text: t('message.messages'), included: true },
+        { text: t('nav.trades'), included: true },
+        { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
+        { text: t('membership.noAds'), included: true },
+        { text: t('membership.prioritySupport'), included: true },
+      ],
+      popular: false,
+      color: 'purple',
+    },
+    {
+      id: 'business',
+      name: t('membership.business'),
+      price: 499,
+      period: t('membership.perMonth'),
+      description: t('membership.business'),
+      features: [
+        { text: `1000 ${t('membership.listingsLimit')}`, included: true },
+        { text: t('search.search'), included: true },
+        { text: t('message.messages'), included: true },
+        { text: t('nav.trades'), included: true },
+        { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
+        { text: t('membership.noAds'), included: true },
+        { text: `24/7 ${t('membership.prioritySupport')}`, included: true },
+        { text: 'API', included: true },
+      ],
+      popular: false,
+      color: 'gold',
+    },
+  ];
 
   useEffect(() => {
     const tier = searchParams.get('tier');
     if (tier) {
       setSelectedTier(tier);
-      // Scroll to specific tier
       setTimeout(() => {
         const element = document.getElementById(`tier-${tier}`);
         element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -109,15 +110,15 @@ export default function PricingPage() {
     }
   }, [searchParams]);
 
-  const currentTier = user?.membershipTier || 'free';
+  const currentTier = isAuthenticated ? (user?.membershipTier || 'free') : null;
 
   const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
-      toast.info('Ücretsiz plan zaten mevcut');
+      toast.info(t('membership.planAlreadyActive'));
       return;
     }
     if (tierId === currentTier) {
-      toast.info('Bu plan zaten aktif');
+      toast.info(t('membership.planAlreadyActive'));
       return;
     }
     setSelectedTier(tierId);
@@ -125,35 +126,46 @@ export default function PricingPage() {
 
   const handleContinue = () => {
     if (!selectedTier || selectedTier === 'free') {
-      toast.error('Lütfen bir plan seçin');
+      toast.error(t('membership.selectPlan'));
       return;
     }
 
     if (!isAuthenticated) {
-      toast.error('Devam etmek için giriş yapmalısınız');
+      toast.error(t('membership.loginToContinue'));
       router.push(`/login?redirect=/pricing?tier=${selectedTier}`);
       return;
     }
 
-    // Redirect to membership checkout
     router.push(`/membership/checkout?tier=${selectedTier}&period=${selectedPeriod}`);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Üyelik Planları
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">{t('membership.title')}</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            İhtiyacınıza uygun planı seçin ve diecast model araba ticaretinizi büyütün
+            {t('membership.subtitle')}
           </p>
+          
+          {!isAuthenticated && (
+            <div className="mt-6 bg-orange-50 border border-orange-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-gray-700">{t('auth.noAccount')}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {t('auth.memberBenefits')}
+              </p>
+            </div>
+          )}
+          
+          {isAuthenticated && currentTier && currentTier !== 'free' && (
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-blue-800 font-medium">
+                {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Period Toggle */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
             <button
@@ -164,7 +176,7 @@ export default function PricingPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Aylık
+              {t('membership.monthly')}
             </button>
             <button
               onClick={() => setSelectedPeriod('yearly')}
@@ -174,15 +186,14 @@ export default function PricingPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Yıllık
+              {t('membership.yearly')}
               <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                %20 İndirim
+                20% {t('membership.savePercent')}
               </span>
             </button>
           </div>
         </div>
 
-        {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {MEMBERSHIP_TIERS.map((tier, index) => {
             const displayPrice = selectedPeriod === 'yearly' && tier.price > 0
@@ -199,42 +210,46 @@ export default function PricingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                onClick={() => tier.price > 0 && handleSelectTier(tier.id)}
+                onClick={() => {
+                  if (tier.price === 0 && !isAuthenticated) {
+                    router.push('/register');
+                    return;
+                  }
+                  if (tier.price > 0) {
+                    handleSelectTier(tier.id);
+                  }
+                }}
                 className={`relative bg-white rounded-xl shadow-lg border-2 overflow-hidden transition-all cursor-pointer ${
                   isSelected
                     ? 'border-primary-500 ring-2 ring-primary-500 scale-105'
                     : tier.popular
                     ? 'border-primary-300 hover:border-primary-400'
                     : 'border-gray-200 hover:border-gray-300'
-                } ${tier.price === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                } ${tier.price === 0 && isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {tier.popular && !isSelected && (
                   <div className="absolute top-0 right-0 bg-primary-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
-                    Popüler
+                    {t('membership.mostPopular')}
                   </div>
                 )}
                 {isSelected && (
                   <div className="absolute top-0 right-0 bg-green-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
                     <CheckIcon className="w-4 h-4" />
-                    Seçildi
+                    {t('common.selected')}
                   </div>
                 )}
                 {isCurrent && !isSelected && (
                   <div className="absolute top-0 left-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold rounded-br-lg">
-                    Mevcut
+                    {t('membership.currentPlan')}
                   </div>
                 )}
 
                 <div className="p-6">
-                  {/* Tier Header */}
                   <div className="mb-6">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                      {tier.name}
-                    </h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{tier.name}</h3>
                     <p className="text-gray-600 text-sm">{tier.description}</p>
                   </div>
 
-                  {/* Price */}
                   <div className="mb-6">
                     <div className="flex items-baseline">
                       <span className="text-4xl font-bold text-gray-900">
@@ -253,7 +268,6 @@ export default function PricingPage() {
                     )}
                   </div>
 
-                  {/* Features */}
                   <ul className="space-y-3 mb-6">
                     {tier.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start">
@@ -262,28 +276,25 @@ export default function PricingPage() {
                         ) : (
                           <XMarkIcon className="w-5 h-5 text-gray-300 mr-2 flex-shrink-0 mt-0.5" />
                         )}
-                        <span
-                          className={`text-sm ${
-                            feature.included ? 'text-gray-700' : 'text-gray-400'
-                          }`}
-                        >
+                        <span className={`text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
                           {feature.text}
                         </span>
                       </li>
                     ))}
                   </ul>
 
-                  {/* Selection indicator */}
                   <div className={`w-full py-3 rounded-lg font-semibold text-center transition-colors ${
                     isSelected
                       ? 'bg-primary-500 text-white'
                       : isCurrent
                       ? 'bg-blue-100 text-blue-700'
-                      : tier.price === 0
+                      : tier.price === 0 && !isAuthenticated
+                      ? 'bg-primary-500 text-white hover:bg-primary-600'
+                      : tier.price === 0 && isAuthenticated
                       ? 'bg-gray-100 text-gray-400'
                       : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200'
                   }`}>
-                    {isCurrent ? 'Mevcut Planınız' : tier.price === 0 ? 'Ücretsiz' : isSelected ? 'Seçildi' : 'Seç'}
+                    {isCurrent ? t('membership.currentPlan') : tier.price === 0 && !isAuthenticated ? t('common.freeStart') : tier.price === 0 ? t('membership.free') : isSelected ? t('common.selected') : t('common.select')}
                   </div>
                 </div>
               </motion.div>
@@ -291,7 +302,6 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* Continue Button */}
         {selectedTier && selectedTier !== 'free' && selectedTier !== currentTier && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -302,50 +312,35 @@ export default function PricingPage() {
               onClick={handleContinue}
               className="px-12 py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
             >
-              {isAuthenticated ? 'Ödemeye Devam Et' : 'Giriş Yap ve Devam Et'}
+              {isAuthenticated ? t('common.continue') : t('auth.loginToContinue')}
             </button>
           </motion.div>
         )}
 
-        {/* FAQ Section */}
         <div className="max-w-3xl mx-auto mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            Sık Sorulan Sorular
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">{t('nav.faq')}</h2>
           <div className="space-y-4">
             <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Plan değiştirebilir miyim?
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-2">{t('membership.upgrade')}?</h3>
               <p className="text-gray-600">
-                Evet, istediğiniz zaman planınızı yükseltebilir veya düşürebilirsiniz. 
-                Değişiklikler hemen geçerli olur.
+                {t('membership.subtitle')}
               </p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">
-                İlan limitim dolduğunda ne olur?
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-2">{t('membership.listingsLimit')}?</h3>
               <p className="text-gray-600">
-                İlan limitiniz dolduğunda yeni ilan ekleyemezsiniz. 
-                Mevcut ilanlarınızı kaldırarak veya planınızı yükselterek devam edebilirsiniz.
+                {t('membership.features')}
               </p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Takas özelliği nasıl çalışır?
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-2">{t('nav.trades')}?</h3>
               <p className="text-gray-600">
-                Temel, Premium ve İş planlarında takas yapabilirsiniz. 
-                Ürünlerinizi başka kullanıcıların ürünleriyle takas edebilir, 
-                isteğe bağlı olarak nakit fark ekleyebilirsiniz.
+                {t('trade.tradeRequiresLogin')}
               </p>
             </div>
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

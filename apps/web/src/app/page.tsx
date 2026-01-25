@@ -13,7 +13,8 @@ import {
 import { api, listingsApi, collectionsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
-import { RectangleStackIcon } from '@heroicons/react/24/outline';
+import { RectangleStackIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Category {
   id: string;
@@ -144,10 +145,17 @@ const SCALES = ['1:8 Diecast', '1:12 Diecast', '1:18 Diecast', '1:24 Diecast', '
 
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [featuredCollector, setFeaturedCollector] = useState<FeaturedCollector | null>(null);
   const [companyOfWeek, setCompanyOfWeek] = useState<FeaturedBusiness | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalConfig, setAuthModalConfig] = useState({
+    title: t('auth.authRequired'),
+    message: t('auth.authRequiredMessage'),
+    icon: null as React.ReactNode | null,
+    redirectPath: undefined as string | undefined,
+  });
 
   useEffect(() => {
     fetchBestSellers();
@@ -230,9 +238,10 @@ export default function Home() {
   };
 
   const getImageUrl = (image: any): string => {
-    if (!image) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    const placeholder = locale === 'en' ? 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Product' : 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    if (!image) return placeholder;
     if (typeof image === 'string') return image;
-    return image.url || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    return image.url || placeholder;
   };
 
   const getProductTag = (product: Product): string | null => {
@@ -240,9 +249,9 @@ export default function Home() {
       ? Math.floor((new Date().getTime() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24))
       : 100;
     
-    if (daysSinceCreation < 7) return 'Yeni';
-    if (product.viewCount && product.viewCount > 1000) return 'Nadir';
-    if (Math.random() > 0.7) return 'İndirim';
+    if (daysSinceCreation < 7) return locale === 'en' ? 'New' : 'Yeni';
+    if (product.viewCount && product.viewCount > 1000) return locale === 'en' ? 'Rare' : 'Nadir';
+    if (Math.random() > 0.7) return locale === 'en' ? 'Sale' : 'İndirim';
     return null;
   };
 
@@ -253,7 +262,7 @@ export default function Home() {
         return brand;
       }
     }
-    return 'Marka';
+    return locale === 'en' ? 'Brand' : 'Marka';
   };
 
   const extractScaleFromTitle = (title: string): string => {
@@ -278,12 +287,16 @@ export default function Home() {
               transition={{ duration: 0.6 }}
             >
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-orange-500">
-                Türkiye'nin en büyük
-                <br />
-                Diecast pazaryeri
+                {locale === 'en' ? (
+                  <>Turkey's Largest<br />Diecast Marketplace</>
+                ) : (
+                  <>Türkiye'nin en büyük<br />Diecast pazaryeri</>
+                )}
               </h1>
               <p className="text-lg md:text-xl text-gray-700 mb-8 max-w-xl">
-                Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.
+                {locale === 'en' 
+                  ? 'Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.'
+                  : 'Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.'}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 {isAuthenticated ? (
@@ -293,31 +306,45 @@ export default function Home() {
                       className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
                     >
                       <span className="text-xl">+</span>
-                      İlan Ver
+                      {t('nav.newListing')}
                     </Link>
                     <Link 
                       href="/collections"
                       className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
                     >
-                      Koleksiyon oluştur
+                      {t('collection.createCollection')}
                     </Link>
                   </>
                 ) : (
                   <>
                     <button
                       onClick={() => {
-                        window.location.href = '/login?redirect=/listings/new';
+                        setAuthModalConfig({
+                          title: t('nav.loginToCreateListing'),
+                          message: t('nav.loginToCreateListingMsg'),
+                          icon: <PlusCircleIcon className="w-10 h-10 text-primary-500" />,
+                          redirectPath: '/listings/new',
+                        });
+                        setShowAuthModal(true);
                       }}
                       className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
                     >
                       <span className="text-xl">+</span>
-                      İlan Ver
+                      {t('nav.newListing')}
                     </button>
                     <button
-                      onClick={() => setShowAuthModal(true)}
+                      onClick={() => {
+                        setAuthModalConfig({
+                          title: t('collection.createCollection'),
+                          message: locale === 'en' ? 'Please login to create your digital garage and showcase your collection.' : 'Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor.',
+                          icon: <RectangleStackIcon className="w-10 h-10 text-primary-500" />,
+                          redirectPath: '/collections/new',
+                        });
+                        setShowAuthModal(true);
+                      }}
                       className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
                     >
-                      Koleksiyon oluştur
+                      {t('collection.createCollection')}
                     </button>
                   </>
                 )}
@@ -352,13 +379,13 @@ export default function Home() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
-              <h2 className="text-2xl md:text-3xl font-bold">Markalar</h2>
+              <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Brands' : 'Markalar'}</h2>
             </div>
             <Link 
               href="/listings"
               className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
-              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+              {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
           
@@ -386,13 +413,13 @@ export default function Home() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
-              <h2 className="text-2xl md:text-3xl font-bold">Boyut</h2>
+              <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Scale' : 'Boyut'}</h2>
             </div>
             <Link 
               href="/listings"
               className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
-              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+              {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
           
@@ -422,20 +449,20 @@ export default function Home() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
-              <h2 className="text-2xl md:text-3xl font-bold">Çok Satanlar</h2>
+              <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Best Sellers' : 'Çok Satanlar'}</h2>
             </div>
             <Link 
               href="/listings?sortBy=viewCount"
               className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
-              Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+              {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
-                Ürünler yükleniyor...
+                {locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
               </div>
             ) : (
               bestSellers.map((product) => {
@@ -496,13 +523,13 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-8 bg-orange-500 rounded"></div>
-                <h2 className="text-2xl md:text-3xl font-bold">Haftanın Koleksiyoneri</h2>
+                <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Collector of the Week' : 'Haftanın Koleksiyoneri'}</h2>
               </div>
               <Link 
                 href="/collections"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
-                Tümünü gör <ArrowRightIcon className="w-4 h-4" />
+                {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
               </Link>
             </div>
 
@@ -526,14 +553,14 @@ export default function Home() {
                       </div>
                     )}
                     <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
-                      {featuredCollector.user?.displayName || 'Koleksiyoner'}
+                      {featuredCollector.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
                       {featuredCollector.user?.isVerified && (
                         <CheckBadgeIcon className="w-5 h-5 text-green-500" />
                       )}
                     </h3>
                     <p className="text-base text-orange-600 font-medium mb-2">{featuredCollector.name}</p>
                     <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
-                      {featuredCollector.description || `${featuredCollector.itemCount || 0} araçlık koleksiyon`}
+                      {featuredCollector.description || (locale === 'en' ? `${featuredCollector.itemCount || 0} items collection` : `${featuredCollector.itemCount || 0} araçlık koleksiyon`)}
                     </p>
                     <div className="flex items-center gap-4 mb-4">
                       <div className="flex items-center gap-1 text-blue-500">
@@ -552,7 +579,7 @@ export default function Home() {
                       href={`/collections/${featuredCollector.id}`}
                       className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
                     >
-                      Koleksiyonu incele <ArrowRightIcon className="w-4 h-4" />
+                      {locale === 'en' ? 'View Collection' : 'Koleksiyonu incele'} <ArrowRightIcon className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
@@ -570,12 +597,12 @@ export default function Home() {
                             className="object-cover"
                             unoptimized
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                              (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
                             }}
                           />
                           <div className="absolute top-3 right-3">
                             <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                              {index === 0 ? 'Yeni' : 'Nadir'}
+                              {index === 0 ? (locale === 'en' ? 'New' : 'Yeni') : (locale === 'en' ? 'Rare' : 'Nadir')}
                             </span>
                           </div>
                         </div>
@@ -610,7 +637,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-8 bg-gradient-to-b from-orange-500 to-amber-500 rounded"></div>
-                <h2 className="text-2xl md:text-3xl font-bold">Haftanın Şirketi</h2>
+                <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Company of the Week' : 'Haftanın Şirketi'}</h2>
                 <span className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
                   👑 Business
                 </span>
@@ -619,7 +646,7 @@ export default function Home() {
                 href="/listings"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
-                Tüm ilanları gör <ArrowRightIcon className="w-4 h-4" />
+                {locale === 'en' ? 'View All Listings' : 'Tüm ilanları gör'} <ArrowRightIcon className="w-4 h-4" />
               </Link>
             </div>
 
@@ -649,26 +676,26 @@ export default function Home() {
                       )}
                     </h3>
                     <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
-                      {companyOfWeek.bio || 'Premium Diecast araçların alım ve satımı'}
+                      {companyOfWeek.bio || (locale === 'en' ? 'Premium Diecast vehicle buying and selling' : 'Premium Diecast araçların alım ve satımı')}
                     </p>
                     
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-2 w-full mb-4">
                       <div className="bg-orange-50 rounded-lg p-2 text-center">
                         <p className="text-lg font-bold text-orange-600">{companyOfWeek.stats?.totalProducts || 0}</p>
-                        <p className="text-xs text-gray-500">Ürün</p>
+                        <p className="text-xs text-gray-500">{locale === 'en' ? 'Products' : 'Ürün'}</p>
                       </div>
                       <div className="bg-green-50 rounded-lg p-2 text-center">
                         <p className="text-lg font-bold text-green-600">{companyOfWeek.stats?.totalSales || 0}</p>
-                        <p className="text-xs text-gray-500">Satış</p>
+                        <p className="text-xs text-gray-500">{locale === 'en' ? 'Sales' : 'Satış'}</p>
                       </div>
                       <div className="bg-blue-50 rounded-lg p-2 text-center">
                         <p className="text-lg font-bold text-blue-600">{(companyOfWeek.stats?.totalViews || 0).toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">Görüntülenme</p>
+                        <p className="text-xs text-gray-500">{locale === 'en' ? 'Views' : 'Görüntülenme'}</p>
                       </div>
                       <div className="bg-red-50 rounded-lg p-2 text-center">
                         <p className="text-lg font-bold text-red-500">{(companyOfWeek.stats?.totalLikes || 0).toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">Beğeni</p>
+                        <p className="text-xs text-gray-500">{locale === 'en' ? 'Likes' : 'Beğeni'}</p>
                       </div>
                     </div>
 
@@ -677,7 +704,7 @@ export default function Home() {
                         <StarIcon className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                         <span className="font-semibold">{companyOfWeek.stats.averageRating.toFixed(1)}</span>
                         <span className="text-sm text-gray-500">
-                          ({companyOfWeek.stats.totalRatings || 0} yorum)
+                          ({companyOfWeek.stats.totalRatings || 0} {locale === 'en' ? 'reviews' : 'yorum'})
                         </span>
                       </div>
                     )}
@@ -686,27 +713,27 @@ export default function Home() {
                       href={`/seller/${companyOfWeek.id}`}
                       className="w-full text-center bg-gradient-to-r from-orange-500 to-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition-all"
                     >
-                      Mağazayı İncele
+                      {locale === 'en' ? 'View Store' : 'Mağazayı İncele'}
                     </Link>
                   </div>
                 </div>
 
                 {/* Featured Products */}
                 <div className="md:col-span-3">
-                  <h4 className="text-lg font-semibold mb-4 text-gray-800">Öne Çıkan Ürünler</h4>
+                  <h4 className="text-lg font-semibold mb-4 text-gray-800">{locale === 'en' ? 'Featured Products' : 'Öne Çıkan Ürünler'}</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {companyOfWeek.products?.slice(0, 6).map((product) => (
                       <Link key={product.id} href={`/listings/${product.id}`}>
                         <div className="bg-gray-50 rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
                           <div className="relative aspect-square bg-gray-100">
                             <Image
-                              src={product.image || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
+                              src={product.image || `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`}
                               alt={product.title}
                               fill
                               className="object-cover"
                               unoptimized
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                                (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
                               }}
                             />
                             <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
@@ -731,7 +758,7 @@ export default function Home() {
                   {/* Collections Preview */}
                   {companyOfWeek.collections && companyOfWeek.collections.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="text-lg font-semibold mb-4 text-gray-800">Koleksiyonları</h4>
+                      <h4 className="text-lg font-semibold mb-4 text-gray-800">{locale === 'en' ? 'Collections' : 'Koleksiyonları'}</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {companyOfWeek.collections.slice(0, 2).map((collection) => (
                           <Link key={collection.id} href={`/collections/${collection.id}`}>
@@ -752,10 +779,10 @@ export default function Home() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm truncate">{collection.name}</p>
-                                <p className="text-xs text-gray-500">{collection.itemCount} ürün</p>
+                                <p className="text-xs text-gray-500">{collection.itemCount} {locale === 'en' ? 'products' : 'ürün'}</p>
                                 <div className="flex items-center gap-3 mt-1 text-xs">
-                                  <span className="text-blue-500">{collection.viewCount} görüntülenme</span>
-                                  <span className="text-red-500">{collection.likeCount} beğeni</span>
+                                  <span className="text-blue-500">{collection.viewCount} {locale === 'en' ? 'views' : 'görüntülenme'}</span>
+                                  <span className="text-red-500">{collection.likeCount} {locale === 'en' ? 'likes' : 'beğeni'}</span>
                                 </div>
                               </div>
                             </div>
@@ -780,9 +807,10 @@ export default function Home() {
       <AuthRequiredModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        title="Koleksiyon Oluştur"
-        message="Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor."
-        icon={<RectangleStackIcon className="w-10 h-10 text-primary-500" />}
+        title={authModalConfig.title}
+        message={authModalConfig.message}
+        icon={authModalConfig.icon}
+        redirectPath={authModalConfig.redirectPath}
       />
     </div>
   );

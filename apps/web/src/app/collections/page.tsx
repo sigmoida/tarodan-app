@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
+import { useTranslation } from '@/i18n';
 
 interface Collection {
   id: string;
@@ -34,6 +35,7 @@ interface Collection {
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
 export default function CollectionsPage() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [myCollections, setMyCollections] = useState<Collection[]>([]);
@@ -164,9 +166,9 @@ export default function CollectionsPage() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Koleksiyonlar</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('collection.collections')}</h1>
             <p className="text-gray-600 mt-1">
-              Diecast model araba koleksiyonlarını keşfedin
+              {t('footer.description')}
             </p>
           </div>
           {isAuthenticated && limits?.canCreateCollections && (
@@ -174,7 +176,7 @@ export default function CollectionsPage() {
               onClick={handleCreateClick}
               className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors"
             >
-              + Yeni Koleksiyon
+              + {t('collection.createCollection')}
             </button>
           )}
           {isAuthenticated && !limits?.canCreateCollections && (
@@ -182,7 +184,7 @@ export default function CollectionsPage() {
               href="/pricing"
               className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg transition-colors"
             >
-              Koleksiyon Oluşturmak İçin Üyeliğinizi Yükseltin
+              {t('membership.upgrade')}
             </Link>
           )}
         </div>
@@ -201,7 +203,7 @@ export default function CollectionsPage() {
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              Herkese Açık
+              {t('collection.isPublic')}
             </button>
             <button
               onClick={() => {
@@ -214,7 +216,7 @@ export default function CollectionsPage() {
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              Koleksiyonlarım ({myCollections.length})
+              {t('collection.myCollections')} ({myCollections.length})
             </button>
           </div>
         )}
@@ -226,7 +228,7 @@ export default function CollectionsPage() {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Koleksiyon ara (isim, açıklama, kullanıcı)..."
+              placeholder={t('collection.searchCollections')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -259,13 +261,13 @@ export default function CollectionsPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700"
               >
                 <FunnelIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">Filtreler</span>
+                <span className="hidden sm:inline">{t('product.filters')}</span>
               </button>
             </div>
 
             {/* Sort Dropdown */}
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 font-medium">Sırala:</label>
+              <label className="text-sm text-gray-600 font-medium">{t('common.sort')}:</label>
               <select
                 value={sortBy}
                 onChange={(e) => {
@@ -276,11 +278,11 @@ export default function CollectionsPage() {
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
               >
-                <option value="popular">En Popüler</option>
-                <option value="recent">En Yeni</option>
-                <option value="name">İsme Göre (A-Z)</option>
-                <option value="items_desc">Ürün Sayısı (Çok → Az)</option>
-                <option value="items_asc">Ürün Sayısı (Az → Çok)</option>
+                <option value="popular">{t('common.popular')}</option>
+                <option value="recent">{t('common.newest')}</option>
+                <option value="name">A-Z</option>
+                <option value="items_desc">{t('common.desc')}</option>
+                <option value="items_asc">{t('common.asc')}</option>
               </select>
             </div>
           </div>
@@ -303,10 +305,10 @@ export default function CollectionsPage() {
           <div className="text-center py-12">
             <p className="text-gray-600">
               {searchQuery
-                ? `"${searchQuery}" için koleksiyon bulunamadı`
+                ? `"${searchQuery}" ${t('common.noResults')}`
                 : activeTab === 'mine'
-                ? 'Henüz koleksiyonunuz yok'
-                : 'Henüz koleksiyon bulunmuyor'}
+                ? t('collection.noCollections')
+                : t('collection.noCollections')}
             </p>
             {searchQuery && (
               <button
@@ -318,7 +320,7 @@ export default function CollectionsPage() {
                 }}
                 className="mt-4 px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
               >
-                Aramayı Temizle
+                {t('common.clear')}
               </button>
             )}
             {activeTab === 'mine' && !searchQuery && (
@@ -326,7 +328,7 @@ export default function CollectionsPage() {
                 onClick={() => setShowCreateModal(true)}
                 className="mt-4 px-6 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors"
               >
-                İlk Koleksiyonunu Oluştur
+                {t('collection.createCollection')}
               </button>
             )}
           </div>
@@ -354,11 +356,11 @@ export default function CollectionsPage() {
                   <div className="absolute top-2 right-2">
                     {collection.isPublic ? (
                       <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-full">
-                        Herkese Açık
+                        {t('collection.isPublic')}
                       </span>
                     ) : (
                       <span className="px-2 py-1 bg-gray-500/90 text-white text-xs rounded-full">
-                        Özel
+                        {t('collection.isPrivate')}
                       </span>
                     )}
                   </div>

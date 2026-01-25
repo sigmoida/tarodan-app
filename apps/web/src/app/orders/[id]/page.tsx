@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api, paymentsApi } from '@/lib/api';
 import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface OrderDetail {
   id: string;
@@ -69,22 +70,24 @@ interface OrderDetail {
   };
 }
 
-const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
-  pending_payment: { label: 'Ödeme Bekleniyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  paid: { label: 'Ödendi', color: 'text-green-600', bg: 'bg-green-100' },
-  preparing: { label: 'Hazırlanıyor', color: 'text-orange-600', bg: 'bg-orange-100' },
-  shipped: { label: 'Kargoya Verildi', color: 'text-purple-600', bg: 'bg-purple-100' },
-  delivered: { label: 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: 'İptal Edildi', color: 'text-red-600', bg: 'bg-red-100' },
-  refund_requested: { label: 'İade Talebi', color: 'text-orange-600', bg: 'bg-orange-100' },
-  refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
-};
+const getStatusLabels = (locale: string): Record<string, { label: string; color: string; bg: string }> => ({
+  pending_payment: { label: locale === 'en' ? 'Awaiting Payment' : 'Ödeme Bekleniyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+  paid: { label: locale === 'en' ? 'Paid' : 'Ödendi', color: 'text-green-600', bg: 'bg-green-100' },
+  preparing: { label: locale === 'en' ? 'Preparing' : 'Hazırlanıyor', color: 'text-orange-600', bg: 'bg-orange-100' },
+  shipped: { label: locale === 'en' ? 'Shipped' : 'Kargoya Verildi', color: 'text-purple-600', bg: 'bg-purple-100' },
+  delivered: { label: locale === 'en' ? 'Delivered' : 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
+  completed: { label: locale === 'en' ? 'Completed' : 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
+  cancelled: { label: locale === 'en' ? 'Cancelled' : 'İptal Edildi', color: 'text-red-600', bg: 'bg-red-100' },
+  refund_requested: { label: locale === 'en' ? 'Refund Requested' : 'İade Talebi', color: 'text-orange-600', bg: 'bg-orange-100' },
+  refunded: { label: locale === 'en' ? 'Refunded' : 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
+});
 
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { isAuthenticated, user } = useAuthStore();
+  const { t, locale } = useTranslation();
+  const statusLabels = getStatusLabels(locale);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -110,7 +113,7 @@ export default function OrderDetailPage() {
       setOrder(response.data);
     } catch (error: any) {
       console.error('Order load error:', error);
-      toast.error(error.response?.data?.message || 'Sipariş yüklenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to load order' : 'Sipariş yüklenemedi'));
       router.push('/orders');
     } finally {
       setLoading(false);
@@ -120,28 +123,28 @@ export default function OrderDetailPage() {
   const handleUpdateStatus = async (newStatus: string) => {
     try {
       await api.patch(`/orders/${orderId}/status`, { status: newStatus });
-      toast.success('Sipariş durumu güncellendi');
+      toast.success(locale === 'en' ? 'Order status updated' : 'Sipariş durumu güncellendi');
       loadOrder();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Durum güncellenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update status' : 'Durum güncellenemedi'));
     }
   };
 
   const handleRefund = async () => {
     if (!order?.payment) {
-      toast.error('Ödeme bilgisi bulunamadı');
+      toast.error(locale === 'en' ? 'Payment information not found' : 'Ödeme bilgisi bulunamadı');
       return;
     }
 
     setProcessingRefund(true);
     try {
       await paymentsApi.refund(order.id, refundAmount);
-      toast.success('İade işlemi başlatıldı');
+      toast.success(locale === 'en' ? 'Refund process started' : 'İade işlemi başlatıldı');
       setShowRefundModal(false);
       setRefundAmount(undefined);
       loadOrder();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'İade işlemi başlatılamadı');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to start refund' : 'İade işlemi başlatılamadı'));
     } finally {
       setProcessingRefund(false);
     }
@@ -198,13 +201,13 @@ export default function OrderDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Product Card */}
             <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Ürün Bilgileri</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Product Information' : 'Ürün Bilgileri'}</h2>
               <div className="flex gap-4">
                 <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                   {productImage ? (
                     <img
                       src={productImage}
-                      alt={productInfo?.title || 'Ürün'}
+                      alt={productInfo?.title || (locale === 'en' ? 'Product' : 'Ürün')}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -216,9 +219,9 @@ export default function OrderDetailPage() {
                     href={`/listings/${productInfo?.id}`}
                     className="text-lg font-medium text-gray-900 hover:text-primary-500 transition-colors"
                   >
-                    {productInfo?.title || 'Ürün'}
+                    {productInfo?.title || (locale === 'en' ? 'Product' : 'Ürün')}
                   </Link>
-                  <p className="text-sm text-gray-500 mt-1">Adet: 1</p>
+                  <p className="text-sm text-gray-500 mt-1">{locale === 'en' ? 'Quantity: 1' : 'Adet: 1'}</p>
                   <p className="text-xl font-bold text-primary-500 mt-2">
                     ₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </p>
@@ -231,21 +234,21 @@ export default function OrderDetailPage() {
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <TruckIcon className="w-5 h-5" />
-                  Kargo Bilgileri
+                  {locale === 'en' ? 'Shipping Information' : 'Kargo Bilgileri'}
                 </h2>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Kargo Firması:</span>
+                    <span className="text-gray-600">{locale === 'en' ? 'Carrier:' : 'Kargo Firması:'}</span>
                     <span className="font-medium">{order.shipment.provider}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Takip Numarası:</span>
+                    <span className="text-gray-600">{locale === 'en' ? 'Tracking Number:' : 'Takip Numarası:'}</span>
                     <span className="font-mono bg-gray-100 px-2 py-1 rounded">
                       {order.shipment.trackingNumber}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Kargo Durumu:</span>
+                    <span className="text-gray-600">{locale === 'en' ? 'Shipping Status:' : 'Kargo Durumu:'}</span>
                     <span className="font-medium">{order.shipment.status}</span>
                   </div>
                 </div>
@@ -274,27 +277,27 @@ export default function OrderDetailPage() {
             {/* Actions for Seller */}
             {order.isSeller && order.status === 'paid' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Satıcı İşlemleri</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Seller Actions' : 'Satıcı İşlemleri'}</h2>
                 <button
                   onClick={() => handleUpdateStatus('preparing')}
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
-                  Hazırlanıyor Olarak İşaretle
+                  {locale === 'en' ? 'Mark as Preparing' : 'Hazırlanıyor Olarak İşaretle'}
                 </button>
               </div>
             )}
 
             {order.isSeller && order.status === 'preparing' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Kargo Bilgisi Gir</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}</h2>
                 <p className="text-gray-600 mb-4">
-                  Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir.
+                  {locale === 'en' ? 'Please enter tracking number when shipped.' : 'Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir.'}
                 </p>
                 <button
-                  onClick={() => toast.info('Kargo bilgisi girme özelliği geliştiriliyor...')}
+                  onClick={() => toast.info(locale === 'en' ? 'Shipping info feature is under development...' : 'Kargo bilgisi girme özelliği geliştiriliyor...')}
                   className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
-                  Kargo Bilgisi Gir
+                  {locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}
                 </button>
               </div>
             )}
@@ -302,12 +305,12 @@ export default function OrderDetailPage() {
             {/* Actions for Buyer */}
             {order.isBuyer && order.status === 'delivered' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Teslimat Onayı</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Delivery Confirmation' : 'Teslimat Onayı'}</h2>
                 <button
                   onClick={() => handleUpdateStatus('completed')}
                   className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
-                  Teslim Aldım - Siparişi Tamamla
+                  {locale === 'en' ? 'Received - Complete Order' : 'Teslim Aldım - Siparişi Tamamla'}
                 </button>
               </div>
             )}
@@ -315,9 +318,9 @@ export default function OrderDetailPage() {
             {/* Refund Button for Completed Payments */}
             {order.payment && order.payment.status === 'completed' && (order.isBuyer || order.isSeller) && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">İade İşlemi</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
                 <p className="text-sm text-gray-600 mb-4">
-                  Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.
+                  {locale === 'en' ? 'Payment completed. You can start a refund if needed.' : 'Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.'}
                 </p>
                 <button
                   onClick={() => {
@@ -327,7 +330,7 @@ export default function OrderDetailPage() {
                   className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowUturnLeftIcon className="w-5 h-5" />
-                  İade Talebi Oluştur
+                  {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
                 </button>
               </div>
             )}
@@ -339,19 +342,19 @@ export default function OrderDetailPage() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5" />
-                Sipariş Özeti
+                {locale === 'en' ? 'Order Summary' : 'Sipariş Özeti'}
               </h2>
               <div className="space-y-3">
                 <div className="flex justify-between text-gray-600">
-                  <span>Ürün Tutarı</span>
+                  <span>{locale === 'en' ? 'Product Amount' : 'Ürün Tutarı'}</span>
                   <span>₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Kargo</span>
-                  <span>Ücretsiz</span>
+                  <span>{locale === 'en' ? 'Shipping' : 'Kargo'}</span>
+                  <span>{locale === 'en' ? 'Free' : 'Ücretsiz'}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between font-semibold text-lg">
-                  <span>Toplam</span>
+                  <span>{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="text-primary-500">
                     ₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </span>
@@ -362,7 +365,7 @@ export default function OrderDetailPage() {
             {/* Buyer/Seller Info */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {order.isBuyer ? 'Satıcı' : 'Alıcı'}
+                {order.isBuyer ? (locale === 'en' ? 'Seller' : 'Satıcı') : (locale === 'en' ? 'Buyer' : 'Alıcı')}
               </h2>
               <Link
                 href={`/seller/${order.isBuyer ? order.seller.id : order.buyer.id}`}
@@ -377,26 +380,26 @@ export default function OrderDetailPage() {
                   <p className="font-medium text-gray-900">
                     {order.isBuyer ? order.seller.displayName : order.buyer.displayName}
                   </p>
-                  <p className="text-sm text-gray-500">Profili Gör</p>
+                  <p className="text-sm text-gray-500">{locale === 'en' ? 'View Profile' : 'Profili Gör'}</p>
                 </div>
               </Link>
             </div>
 
             {/* Help */}
             <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Yardım</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Help' : 'Yardım'}</h2>
               <div className="space-y-2">
                 <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                  Sipariş Sorunu Bildir
+                  {locale === 'en' ? 'Report Order Issue' : 'Sipariş Sorunu Bildir'}
                 </button>
                 <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                  İade Talebi Oluştur
+                  {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
                 </button>
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
                 >
-                  Destek ile İletişime Geç
+                  {locale === 'en' ? 'Contact Support' : 'Destek ile İletişime Geç'}
                 </Link>
               </div>
             </div>
@@ -407,13 +410,13 @@ export default function OrderDetailPage() {
         {showRefundModal && order?.payment && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">İade İşlemi</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
               <p className="text-gray-600 mb-4">
-                Toplam ödeme tutarı: ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                {locale === 'en' ? 'Total payment amount:' : 'Toplam ödeme tutarı:'} ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  İade Tutarı (Boş bırakırsanız tam iade yapılır)
+                  {locale === 'en' ? 'Refund Amount (Leave empty for full refund)' : 'İade Tutarı (Boş bırakırsanız tam iade yapılır)'}
                 </label>
                 <input
                   type="number"
@@ -422,7 +425,7 @@ export default function OrderDetailPage() {
                   step="0.01"
                   value={refundAmount || ''}
                   onChange={(e) => setRefundAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  placeholder="İade tutarı (opsiyonel)"
+                  placeholder={locale === 'en' ? 'Refund amount (optional)' : 'İade tutarı (opsiyonel)'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
@@ -435,14 +438,14 @@ export default function OrderDetailPage() {
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                   disabled={processingRefund}
                 >
-                  İptal
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleRefund}
                   disabled={processingRefund}
                   className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {processingRefund ? 'İşleniyor...' : 'İade Et'}
+                  {processingRefund ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : (locale === 'en' ? 'Refund' : 'İade Et')}
                 </button>
               </div>
             </div>

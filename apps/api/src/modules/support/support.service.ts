@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import {
@@ -19,11 +20,19 @@ import {
   TicketResponseDto,
   TicketListResponseDto,
   TicketStatsDto,
+  GuestContactDto,
+  GuestContactResponseDto,
 } from './dto';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SupportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   // ==========================================================================
   // GENERATE TICKET NUMBER
@@ -32,6 +41,101 @@ export class SupportService {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 4).toUpperCase();
     return `TKT-${timestamp}-${random}`;
+  }
+
+  // ==========================================================================
+  // GUEST CONTACT FORM (Public - No Auth Required)
+  // ==========================================================================
+  async createGuestContact(
+    dto: GuestContactDto,
+    clientIp: string,
+  ): Promise<GuestContactResponseDto> {
+    // Rate limit check: 5 requests per hour per IP
+    const rateLimitKey = `guest_contact:${clientIp}`;
+    const rateLimit = await this.cacheService.checkRateLimit(
+      rateLimitKey,
+      5, // max 5 requests
+      3600, // per hour (3600 seconds)
+    );
+
+    if (!rateLimit.allowed) {
+      const waitMinutes = Math.ceil(
+        (rateLimit.resetAt.getTime() - Date.now()) / 60000,
+      );
+      throw new BadRequestException(
+        `Çok fazla istek gönderdiniz. Lütfen ${waitMinutes} dakika sonra tekrar deneyin.`,
+      );
+    }
+
+    try {
+      // Generate a reference number for the guest contact
+      const referenceNumber = this.generateTicketNumber().replace('TKT', 'GC');
+      
+      // Store guest contact in Redis with 30 day TTL
+      const guestContactData = {
+        referenceNumber,
+        name: dto.name,
+        email: dto.email,
+        subject: dto.subject || 'İletişim Formu',
+        message: dto.message,
+        clientIp,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      };
+
+      // Store in Redis for admin review
+      const contactKey = `guest_contact:submission:${referenceNumber}`;
+      await this.cacheService.set(contactKey, guestContactData, {
+        ttl: 30 * 24 * 3600, // 30 days
+      });
+
+      // Add to guest contacts list
+      const listKey = 'guest_contacts:list';
+      const existingList = await this.cacheService.get<string[]>(listKey) || [];
+      existingList.unshift(referenceNumber);
+      // Keep only last 1000 entries
+      const trimmedList = existingList.slice(0, 1000);
+      await this.cacheService.set(listKey, trimmedList, {
+        ttl: 30 * 24 * 3600, // 30 days
+      });
+
+      this.logger.log(
+        `Guest contact form submitted: ${referenceNumber} from ${dto.email}`,
+      );
+
+      // TODO: Send email notification to admin
+
+      return {
+        success: true,
+        message:
+          'Mesajınız başarıyla alındı. En kısa sürede size dönüş yapacağız.',
+        ticketNumber: referenceNumber,
+      };
+    } catch (error) {
+      this.logger.error('Guest contact form error:', error);
+      throw new BadRequestException(
+        'Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.',
+      );
+    }
+  }
+
+  // ==========================================================================
+  // ADMIN: GET GUEST CONTACTS
+  // ==========================================================================
+  async getGuestContacts(): Promise<any[]> {
+    const listKey = 'guest_contacts:list';
+    const referenceNumbers = await this.cacheService.get<string[]>(listKey) || [];
+    
+    const contacts = [];
+    for (const refNum of referenceNumbers.slice(0, 100)) {
+      const contactKey = `guest_contact:submission:${refNum}`;
+      const contact = await this.cacheService.get(contactKey);
+      if (contact) {
+        contacts.push(contact);
+      }
+    }
+    
+    return contacts;
   }
 
   // ==========================================================================

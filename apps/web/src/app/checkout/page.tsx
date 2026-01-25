@@ -18,9 +18,12 @@ import toast from 'react-hot-toast';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ordersApi, paymentsApi, listingsApi, addressesApi, api } from '@/lib/api';
+import CityDistrictSelector from '@/components/CityDistrictSelector';
+import { useTranslation } from '@/i18n';
 
 interface Address {
   id: string;
+  title?: string;
   fullName: string;
   phone: string;
   city: string;
@@ -47,6 +50,7 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const { items: cartItems, total: cartTotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
   
   // Direct buy mode (from URL param)
   const directProductId = searchParams.get('productId');
@@ -66,6 +70,7 @@ export default function CheckoutPage() {
   
   // New address form
   const [newAddress, setNewAddress] = useState<Omit<Address, 'id'>>({
+    title: '',
     fullName: '',
     phone: '',
     city: '',
@@ -205,12 +210,12 @@ export default function CheckoutPage() {
         imageUrl: product.images?.[0]?.url || product.images?.[0] || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
         seller: {
           id: product.sellerId || product.seller?.id,
-          displayName: product.seller?.displayName || 'Satıcı',
+          displayName: product.seller?.displayName || (locale === 'en' ? 'Seller' : 'Satıcı'),
         },
       });
     } catch (error) {
       console.error('Failed to fetch product:', error);
-      toast.error('Ürün yüklenemedi');
+      toast.error(t('product.loadFailed'));
       router.push('/listings');
     }
   };
@@ -236,12 +241,13 @@ export default function CheckoutPage() {
 
   const handleAddAddress = async () => {
     if (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
-      toast.error('Lütfen tüm alanları doldurun');
+      toast.error(t('common.fillAllFields'));
       return;
     }
 
     try {
       const response = await addressesApi.create({
+        title: newAddress.title || (locale === 'en' ? 'Home' : 'Ev'),
         fullName: newAddress.fullName,
         phone: newAddress.phone,
         city: newAddress.city,
@@ -265,19 +271,19 @@ export default function CheckoutPage() {
           address: '', 
           zipCode: '' 
         });
-        toast.success('Adres eklendi');
+        toast.success(locale === 'en' ? 'Address added' : 'Adres eklendi');
       } else {
-        toast.error('Adres eklenemedi');
+        toast.error(locale === 'en' ? 'Failed to add address' : 'Adres eklenemedi');
       }
     } catch (error: any) {
       console.error('Failed to add address:', error);
-      toast.error(error.response?.data?.message || 'Adres eklenirken bir hata oluştu');
+      toast.error(error.response?.data?.message || t('checkout.addressAddError'));
     }
   };
 
   const handleCheckout = async () => {
     if (checkoutItems.length === 0) {
-      toast.error('Sepetiniz boş');
+      toast.error(t('cart.empty'));
       return;
     }
 
@@ -299,7 +305,7 @@ export default function CheckoutPage() {
         // Use saved address
         const selectedAddress = addresses.find(a => a.id === selectedAddressId);
         if (!selectedAddress) {
-          toast.error('Seçilen adres bulunamadı');
+          toast.error(t('checkout.addressNotFound'));
           setIsLoading(false);
           return;
         }
@@ -323,29 +329,29 @@ export default function CheckoutPage() {
         // Validate required contact info for guest users
         if (!isAuthenticated) {
           if (!guestName?.trim()) {
-            toast.error('Lütfen adınızı ve soyadınızı girin');
+            toast.error(t('checkout.enterName'));
             setIsLoading(false);
             return;
           }
           if (!guestEmail?.trim()) {
-            toast.error('Lütfen e-posta adresinizi girin');
+            toast.error(t('checkout.enterEmail'));
             setIsLoading(false);
             return;
           }
           if (!guestPhone?.trim()) {
-            toast.error('Lütfen telefon numaranızı girin');
+            toast.error(t('checkout.enterPhone'));
             setIsLoading(false);
             return;
           }
         }
         
         if (!email) {
-          toast.error('Lütfen e-posta adresinizi girin');
+          toast.error(t('checkout.enterEmail'));
           setIsLoading(false);
           return;
         }
         if (!phone) {
-          toast.error('Lütfen telefon numaranızı girin');
+          toast.error(t('checkout.enterPhone'));
           setIsLoading(false);
           return;
         }
@@ -353,7 +359,7 @@ export default function CheckoutPage() {
         // Ensure address has a valid phone number
         const addressPhone = newAddress.phone?.trim() || phone;
         if (!addressPhone) {
-          toast.error('Lütfen teslimat adresi için telefon numarası girin');
+          toast.error(t('checkout.enterAddressPhone'));
           setIsLoading(false);
           return;
         }
@@ -373,25 +379,25 @@ export default function CheckoutPage() {
         // No address available - provide specific error message
         if (isAuthenticated) {
           if (addresses.length === 0) {
-            toast.error('Lütfen "Yeni Adres Ekle" butonuna tıklayarak teslimat adresinizi girin');
+            toast.error(t('checkout.clickAddNewAddress'));
           } else if (!selectedAddressId) {
-            toast.error('Lütfen teslimat adresinizi seçin');
+            toast.error(t('checkout.selectShippingAddress'));
           } else {
-            toast.error('Seçilen adres geçersiz, lütfen yeni bir adres ekleyin');
+            toast.error(t('checkout.invalidAddressAddNew'));
           }
         } else {
           // Guest user - check which fields are missing
           const missingFields = [];
-          if (!newAddress.fullName) missingFields.push('Ad Soyad');
-          if (!newAddress.phone) missingFields.push('Telefon');
-          if (!newAddress.city) missingFields.push('Şehir');
-          if (!newAddress.district) missingFields.push('İlçe');
-          if (!newAddress.address) missingFields.push('Açık Adres');
+          if (!newAddress.fullName) missingFields.push(locale === 'en' ? 'Full Name' : 'Ad Soyad');
+          if (!newAddress.phone) missingFields.push(locale === 'en' ? 'Phone' : 'Telefon');
+          if (!newAddress.city) missingFields.push(locale === 'en' ? 'City' : 'Şehir');
+          if (!newAddress.district) missingFields.push(locale === 'en' ? 'District' : 'İlçe');
+          if (!newAddress.address) missingFields.push(locale === 'en' ? 'Address' : 'Açık Adres');
           
           if (missingFields.length > 0) {
-            toast.error(`Lütfen şu alanları doldurun: ${missingFields.join(', ')}`);
+            toast.error(locale === 'en' ? `Please fill in: ${missingFields.join(', ')}` : `Lütfen şu alanları doldurun: ${missingFields.join(', ')}`);
           } else {
-            toast.error('Lütfen teslimat adresini girin');
+            toast.error(t('checkout.enterShippingAddress'));
           }
         }
         setIsLoading(false);
@@ -424,7 +430,7 @@ export default function CheckoutPage() {
             } else if (shippingAddress) {
               payload.shippingAddress = shippingAddress;
             } else {
-              throw new Error('Teslimat adresi bulunamadı');
+              throw new Error(locale === 'en' ? 'Shipping address not found' : 'Teslimat adresi bulunamadı');
             }
             
             console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
@@ -447,7 +453,7 @@ export default function CheckoutPage() {
           const errorMessage = orderError.response?.data?.message || 
                               orderError.response?.data?.error || 
                               orderError.message ||
-                              'Sipariş oluşturulamadı';
+                              (locale === 'en' ? 'Failed to create order' : 'Sipariş oluşturulamadı');
           
           // Handle array of error messages
           if (Array.isArray(errorMessage)) {
@@ -485,13 +491,13 @@ export default function CheckoutPage() {
               router.push(`/payment/${paymentData.paymentId}`);
               return;
             } else {
-              throw new Error('Ödeme başlatılamadı');
+              throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');
             }
           } catch (paymentError: any) {
             console.error('Payment initiation failed:', paymentError);
             toast.error(
               paymentError.response?.data?.message || 
-              'Ödeme başlatılamadı. Lütfen tekrar deneyin.'
+              (locale === 'en' ? 'Failed to initiate payment. Please try again.' : 'Ödeme başlatılamadı. Lütfen tekrar deneyin.')
             );
             throw paymentError;
           }
@@ -509,14 +515,14 @@ export default function CheckoutPage() {
             expiryYear: parseInt('20' + year),
             cvv: cardCvc,
           });
-          toast.success('Kart bilgileriniz kaydedildi!');
+          toast.success(locale === 'en' ? 'Card information saved!' : 'Kart bilgileriniz kaydedildi!');
         } catch (cardError) {
           console.error('Failed to save card:', cardError);
           // Don't block checkout for card save failure
         }
       }
 
-      toast.success('Sipariş tamamlandı! Fatura e-posta adresinize gönderilecek.');
+      toast.success(t('checkout.orderSuccess'));
       if (!directProductId) {
         await clearCart();
       }
@@ -529,7 +535,7 @@ export default function CheckoutPage() {
       }
     } catch (error: any) {
       console.error('Checkout failed:', error);
-      toast.error(error.response?.data?.message || 'Sipariş oluşturulamadı');
+      toast.error(error.response?.data?.message || t('checkout.orderFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -540,12 +546,12 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <TruckIcon className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sepetiniz Boş</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('cart.empty')}</h2>
           <p className="text-gray-600 mb-6">
-            Ödeme yapabilmek için sepetinize ürün ekleyin
+            {t('cart.emptyDesc')}
           </p>
           <Link href="/listings" className="btn-primary">
-            Alışverişe Başla
+            {t('cart.browseListings')}
           </Link>
         </div>
       </div>
@@ -563,15 +569,15 @@ export default function CheckoutPage() {
           >
             <ArrowLeftIcon className="w-6 h-6" />
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Ödeme</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('checkout.title')}</h1>
         </div>
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center gap-4 mb-8">
           {[
-            { step: 1, label: 'Adres' },
-            { step: 2, label: 'Ödeme' },
-            { step: 3, label: 'Onay' },
+            { step: 1, label: t('checkout.step1') },
+            { step: 2, label: t('checkout.step2') },
+            { step: 3, label: t('checkout.step3') },
           ].map((s, index) => (
             <div key={s.step} className="flex items-center">
               <div
@@ -605,7 +611,7 @@ export default function CheckoutPage() {
               >
                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                   <MapPinIcon className="w-6 h-6 text-primary-500" />
-                  Teslimat Adresi
+                  {t('checkout.shippingAddress')}
                 </h2>
 
                 {isAuthenticated ? (
@@ -647,40 +653,39 @@ export default function CheckoutPage() {
                     {/* Add New Address */}
                     {showAddressForm ? (
                       <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
+                        <input
+                          type="text"
+                          placeholder={locale === 'en' ? 'Address Title (e.g. Home, Work)' : 'Adres Başlığı (örn: Ev, İş)'}
+                          value={newAddress.title || ''}
+                          onChange={(e) => setNewAddress({ ...newAddress, title: e.target.value })}
+                          className="input"
+                        />
                         <div className="grid sm:grid-cols-2 gap-4">
                           <input
                             type="text"
-                            placeholder="Ad Soyad"
+                            placeholder={t('checkout.fullName')}
                             value={newAddress.fullName}
                             onChange={(e) => setNewAddress({ ...newAddress, fullName: e.target.value })}
                             className="input"
                           />
                           <input
                             type="tel"
-                            placeholder="Telefon"
+                            placeholder={t('checkout.phone')}
                             value={newAddress.phone}
                             onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
                             className="input"
                           />
                         </div>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <input
-                            type="text"
-                            placeholder="Şehir"
-                            value={newAddress.city}
-                            onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                            className="input"
-                          />
-                          <input
-                            type="text"
-                            placeholder="İlçe"
-                            value={newAddress.district}
-                            onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
-                            className="input"
-                          />
-                        </div>
+                        <CityDistrictSelector
+                          city={newAddress.city}
+                          district={newAddress.district}
+                          onCityChange={(city) => setNewAddress(prev => ({ ...prev, city, district: '' }))}
+                          onDistrictChange={(district) => setNewAddress(prev => ({ ...prev, district }))}
+                          cityPlaceholder={t('common.selectCity') + ' *'}
+                          districtPlaceholder={t('common.selectDistrict') + ' *'}
+                        />
                         <textarea
-                          placeholder="Açık Adres"
+                          placeholder={t('common.openAddress')}
                           rows={3}
                           value={newAddress.address}
                           onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
@@ -688,13 +693,13 @@ export default function CheckoutPage() {
                         />
                         <div className="flex gap-2">
                           <button onClick={handleAddAddress} className="btn-primary">
-                            Adresi Kaydet
+                            {t('checkout.addressSaved')}
                           </button>
                           <button
                             onClick={() => setShowAddressForm(false)}
                             className="btn-secondary"
                           >
-                            İptal
+                            {t('common.cancel')}
                           </button>
                         </div>
                       </div>
@@ -704,7 +709,7 @@ export default function CheckoutPage() {
                         className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center gap-2"
                       >
                         <PlusIcon className="w-5 h-5" />
-                        Yeni Adres Ekle
+                        {t('checkout.addNewAddress')}
                       </button>
                     )}
                   </>
@@ -713,14 +718,14 @@ export default function CheckoutPage() {
                   <div className="space-y-4">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                       <p className="text-sm text-yellow-800">
-                        Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.
+                        {locale === 'en' ? 'You are shopping without logging in. Enter your email to track your order.' : 'Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.'}
                       </p>
                     </div>
                     
                     <div className="grid sm:grid-cols-2 gap-4">
                       <input
                         type="text"
-                        placeholder="Ad Soyad *"
+                        placeholder={t('checkout.guestName') + ' *'}
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
                         className="input"
@@ -728,7 +733,7 @@ export default function CheckoutPage() {
                       />
                       <input
                         type="email"
-                        placeholder="E-posta *"
+                        placeholder={t('checkout.guestEmail') + ' *'}
                         value={guestEmail}
                         onChange={(e) => setGuestEmail(e.target.value)}
                         className="input"
@@ -737,7 +742,7 @@ export default function CheckoutPage() {
                     </div>
                     <input
                       type="tel"
-                      placeholder="Telefon *"
+                      placeholder={t('checkout.guestPhone') + ' *'}
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
                       className="input"
@@ -745,42 +750,41 @@ export default function CheckoutPage() {
                     />
                     
                     <hr className="my-4" />
-                    <h3 className="font-semibold">Teslimat Adresi</h3>
+                    <h3 className="font-semibold">{t('checkout.shippingAddress')}</h3>
                     
+                    <input
+                      type="text"
+                      placeholder={locale === 'en' ? 'Address Title (e.g. Home, Work)' : 'Adres Başlığı (örn: Ev, İş)'}
+                      value={newAddress.title || ''}
+                      onChange={(e) => setNewAddress({ ...newAddress, title: e.target.value })}
+                      className="input"
+                    />
                     <div className="grid sm:grid-cols-2 gap-4">
                       <input
                         type="text"
-                        placeholder="Ad Soyad *"
+                        placeholder={t('checkout.fullName') + ' *'}
                         value={newAddress.fullName}
                         onChange={(e) => setNewAddress({ ...newAddress, fullName: e.target.value })}
                         className="input"
                       />
                       <input
                         type="tel"
-                        placeholder="Telefon"
+                        placeholder={t('checkout.phone')}
                         value={newAddress.phone}
                         onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
                         className="input"
                       />
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <input
-                        type="text"
-                        placeholder="Şehir *"
-                        value={newAddress.city}
-                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                        className="input"
-                      />
-                      <input
-                        type="text"
-                        placeholder="İlçe *"
-                        value={newAddress.district}
-                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
-                        className="input"
-                      />
-                    </div>
+                    <CityDistrictSelector
+                      city={newAddress.city}
+                      district={newAddress.district}
+                      onCityChange={(city) => setNewAddress(prev => ({ ...prev, city, district: '' }))}
+                      onDistrictChange={(district) => setNewAddress(prev => ({ ...prev, district }))}
+                      cityPlaceholder={t('common.selectCity') + ' *'}
+                      districtPlaceholder={t('common.selectDistrict') + ' *'}
+                    />
                     <textarea
-                      placeholder="Açık Adres *"
+                      placeholder={t('common.openAddress') + ' *'}
                       rows={3}
                       value={newAddress.address}
                       onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
@@ -818,7 +822,7 @@ export default function CheckoutPage() {
               >
                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                   <CreditCardIcon className="w-6 h-6 text-primary-500" />
-                  Ödeme Yöntemi
+                  {locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}
                 </h2>
 
                 {/* Carrier Selection */}
@@ -872,7 +876,7 @@ export default function CheckoutPage() {
 
                 <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                  Ödeme Yöntemi
+                  {locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}
                 </h3>
                 <div className="space-y-3">
                   <label
@@ -891,9 +895,9 @@ export default function CheckoutPage() {
                         onChange={() => setPaymentProvider('iyzico')}
                       />
                       <div className="flex-1">
-                        <p className="font-semibold">iyzico ile Öde</p>
+                        <p className="font-semibold">{locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde'}</p>
                         <p className="text-gray-600 text-sm">
-                          Kredi kartı, banka kartı veya iyzico bakiyesi ile ödeme
+                          {locale === 'en' ? 'Pay with credit card, debit card or iyzico balance' : 'Kredi kartı, banka kartı veya iyzico bakiyesi ile ödeme'}
                         </p>
                       </div>
                       <div className="text-2xl">💳</div>
@@ -916,9 +920,9 @@ export default function CheckoutPage() {
                         onChange={() => setPaymentProvider('paytr')}
                       />
                       <div className="flex-1">
-                        <p className="font-semibold">PayTR ile Öde</p>
+                        <p className="font-semibold">{locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde'}</p>
                         <p className="text-gray-600 text-sm">
-                          Kredi kartı ile güvenli ödeme
+                          {locale === 'en' ? 'Secure payment with credit card' : 'Kredi kartı ile güvenli ödeme'}
                         </p>
                       </div>
                       <div className="text-2xl">🏦</div>
@@ -930,13 +934,13 @@ export default function CheckoutPage() {
                 <div className="mt-6 p-4 bg-white border border-gray-200 rounded-xl">
                   <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                    Kart Bilgileri
+                    {locale === 'en' ? 'Card Information' : 'Kart Bilgileri'}
                   </h3>
                   
                   {/* Saved Cards Section */}
                   {isAuthenticated && savedCards.length > 0 && (
                     <div className="mb-6">
-                      <p className="text-sm font-medium text-gray-700 mb-3">Kayıtlı Kartlarım</p>
+                      <p className="text-sm font-medium text-gray-700 mb-3">{locale === 'en' ? 'My Saved Cards' : 'Kayıtlı Kartlarım'}</p>
                       <div className="space-y-2">
                         {savedCards.map((card) => (
                           <label
@@ -1002,7 +1006,7 @@ export default function CheckoutPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Kart Üzerindeki İsim
+                          {locale === 'en' ? 'Name on Card' : 'Kart Üzerindeki İsim'}
                         </label>
                         <input
                           type="text"
@@ -1015,7 +1019,7 @@ export default function CheckoutPage() {
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Kart Numarası
+                          {locale === 'en' ? 'Card Number' : 'Kart Numarası'}
                         </label>
                         <input
                           type="text"
@@ -1033,7 +1037,7 @@ export default function CheckoutPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Son Kullanma Tarihi
+                            {locale === 'en' ? 'Expiry Date' : 'Son Kullanma Tarihi'}
                           </label>
                           <input
                             type="text"
@@ -1132,7 +1136,7 @@ export default function CheckoutPage() {
               >
                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                   <CheckCircleIcon className="w-6 h-6 text-primary-500" />
-                  Sipariş Özeti
+                  {locale === 'en' ? 'Order Summary' : 'Sipariş Özeti'}
                 </h2>
 
                 {/* Order Items */}
@@ -1162,7 +1166,7 @@ export default function CheckoutPage() {
                 {/* Delivery Address */}
                 {isAuthenticated && selectedAddressId && (
                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500 mb-1">Teslimat Adresi</p>
+                    <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Delivery Address' : 'Teslimat Adresi'}</p>
                     {(() => {
                       const addr = addresses.find((a) => a.id === selectedAddressId);
                       return addr ? (
@@ -1176,9 +1180,11 @@ export default function CheckoutPage() {
 
                 {/* Payment Method */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Ödeme Yöntemi</p>
+                  <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}</p>
                   <p className="font-medium">
-                    {paymentProvider === 'iyzico' ? 'iyzico ile Öde' : 'PayTR ile Öde'}
+                    {paymentProvider === 'iyzico' 
+                      ? (locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde') 
+                      : (locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde')}
                   </p>
                 </div>
 
@@ -1222,7 +1228,7 @@ export default function CheckoutPage() {
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
-              <h2 className="text-lg font-semibold mb-4">Sipariş Özeti</h2>
+              <h2 className="text-lg font-semibold mb-4">{locale === 'en' ? 'Order Summary' : 'Sipariş Özeti'}</h2>
 
               {/* Items Preview */}
               <div className="space-y-3 mb-4">
@@ -1256,7 +1262,7 @@ export default function CheckoutPage() {
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ara Toplam</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
                   <span className="font-medium">₺{subtotal.toLocaleString('tr-TR')}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1273,7 +1279,7 @@ export default function CheckoutPage() {
                 </div>
                 <hr />
                 <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Toplam</span>
+                  <span className="font-semibold">{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="font-bold text-primary-500">
                     {shippingLoading ? (
                       <span className="text-gray-400">...</span>

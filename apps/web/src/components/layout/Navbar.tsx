@@ -20,21 +20,27 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { messagesApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
-
-const NAV_LINKS = [
-  { href: '/listings', label: 'İlanlar' },
-  { href: '/trades', label: 'Takaslar' },
-  { href: '/collections', label: 'Koleksiyonlar' },
-  { href: '/pricing', label: 'Üyelik' },
-];
+import AuthRequiredModal from '@/components/AuthRequiredModal';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function Navbar() {
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { itemCount: cartCount } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showTradesAuthModal, setShowTradesAuthModal] = useState(false);
+
+  const NAV_LINKS = [
+    { href: '/listings', label: t('nav.listings') },
+    { href: '/trades', label: t('nav.trades') },
+    { href: '/collections', label: t('nav.collections') },
+    { href: '/pricing', label: t('nav.pricing') },
+  ];
 
   useEffect(() => {
     checkAuth();
@@ -68,7 +74,7 @@ export default function Navbar() {
     <>
       {/* Reklam Banner */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-center py-2 text-xs font-medium">
-        🎉 Yeni üyelere özel %10 indirim! Hemen üye olun
+        🎉 {t('nav.banner')}
       </div>
       
       <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
@@ -100,7 +106,7 @@ export default function Navbar() {
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
               <input
                 type="text"
-                placeholder="Kategori, ürün, marka, koleksiyon ara"
+                placeholder={t('nav.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-2.5 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white focus:ring-2 focus:ring-white/30 transition-all placeholder:text-gray-500"
@@ -110,19 +116,38 @@ export default function Navbar() {
 
           {/* Nav Links - Desktop */}
           <div className="hidden lg:flex items-center gap-6 mr-12">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {NAV_LINKS.map((link) => {
+              // Takaslar link requires auth for guests
+              if (link.href === '/trades' && !isAuthenticated) {
+                return (
+                  <button
+                    key={link.href}
+                    onClick={() => setShowTradesAuthModal(true)}
+                    className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
+                  >
+                    {link.label}
+                  </button>
+                );
+              }
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-6 ml-8">
+          <div className="flex items-center gap-4 ml-8">
+            {/* Language Switcher - Desktop */}
+            <div className="hidden md:block">
+              <LanguageSwitcher variant="minimal" />
+            </div>
+            
             {isAuthenticated ? (
               <>
                 {/* Yeni İlan Ekle Butonu - Desktop */}
@@ -131,7 +156,7 @@ export default function Navbar() {
                   className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
                 >
                   <PlusIcon className="w-4 h-4" />
-                  <span>İlan Ver</span>
+                  <span>{t('nav.newListing')}</span>
                 </Link>
                 <Link
                   href="/messages"
@@ -181,14 +206,14 @@ export default function Navbar() {
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setIsOpen(false)}
                     >
-                      Profilim
+                      {t('profile.myProfile')}
                     </Link>
                     <Link
                       href="/orders"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setIsOpen(false)}
                     >
-                      Siparişlerim
+                      {t('order.myOrders')}
                     </Link>
                     <button
                       onClick={() => {
@@ -198,7 +223,7 @@ export default function Navbar() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
                     >
-                      Çıkış Yap
+                      {t('common.logout')}
                     </button>
                   </div>
                 </div>
@@ -206,24 +231,32 @@ export default function Navbar() {
             ) : (
               <>
               <div className="flex items-center gap-4">
+                {/* İlan Ver butonu - Guest Desktop */}
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  <span>{t('nav.newListing')}</span>
+                </button>
                 <Link
                   href="/login"
                     className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
                 >
-                  Giriş yap
+                  {t('common.login')}
                 </Link>
                 <Link
                   href="/register"
                     className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
                 >
-                  Üye Ol
+                  {t('common.register')}
                 </Link>
                 <Link
                   href="/cart"
                     className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
                 >
                   <ShoppingCartIcon className="w-5 h-5" />
-                  Sepetim
+                  {t('nav.cart')}
                 </Link>
               </div>
               </>
@@ -268,7 +301,7 @@ export default function Navbar() {
                 <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
                 <input
                   type="text"
-                  placeholder="Model, marka ara..."
+                  placeholder={t('nav.searchPlaceholderMobile')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white placeholder:text-gray-500"
@@ -276,16 +309,33 @@ export default function Navbar() {
               </form>
 
               {/* Mobile Nav Links */}
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="block py-2 text-white hover:text-orange-100 font-medium"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {NAV_LINKS.map((link) => {
+                // Takaslar link requires auth for guests
+                if (link.href === '/trades' && !isAuthenticated) {
+                  return (
+                    <button
+                      key={link.href}
+                      onClick={() => {
+                        setIsOpen(false);
+                        setShowTradesAuthModal(true);
+                      }}
+                      className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
+                    >
+                      {link.label}
+                    </button>
+                  );
+                }
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="block py-2 text-white hover:text-orange-100 font-medium"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
               
               {/* Mobile Auth Links */}
               <div className="border-t border-orange-600 pt-4 mt-4">
@@ -298,29 +348,33 @@ export default function Navbar() {
                       onClick={() => setIsOpen(false)}
                     >
                       <PlusIcon className="w-4 h-4" />
-                      <span>İlan Ver</span>
+                      <span>{t('nav.newListing')}</span>
                     </Link>
                     <Link
                       href="/profile"
                       className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
-                      Profilim
+                      {t('profile.myProfile')}
                     </Link>
                     <Link
                       href="/profile/listings"
                       className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
-                      İlanlarım
+                      {t('nav.myListings')}
                     </Link>
                     <Link
                       href="/orders"
                       className="block py-2 text-white hover:text-orange-100 font-medium"
                       onClick={() => setIsOpen(false)}
                     >
-                      Siparişlerim
+                      {t('order.myOrders')}
                     </Link>
+                    {/* Language Switcher - Mobile */}
+                    <div className="py-2">
+                      <LanguageSwitcher variant="buttons" />
+                    </div>
                     <button
                       onClick={() => {
                         logout();
@@ -328,17 +382,32 @@ export default function Navbar() {
                       }}
                       className="block w-full text-left py-2 text-red-500 hover:text-red-600 font-medium"
                     >
-                      Çıkış Yap
+                      {t('common.logout')}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
+                    {/* İlan Ver butonu - Guest Mobile */}
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        setShowAuthModal(true);
+                      }}
+                      className="flex items-center justify-center gap-2 w-full bg-white text-orange-500 px-4 py-2.5 rounded-lg font-medium hover:bg-orange-50 transition-colors mb-4"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      <span>{t('nav.newListing')}</span>
+                    </button>
+                    {/* Language Switcher - Mobile Guest */}
+                    <div className="py-2">
+                      <LanguageSwitcher variant="buttons" />
+                    </div>
                     <Link
                       href="/login"
                       className="block py-2.5 text-center text-white hover:text-orange-100 font-medium rounded-lg hover:bg-white/10 transition-colors"
                       onClick={() => setIsOpen(false)}
                     >
-                      Giriş Yap
+                      {t('common.login')}
                     </Link>
                   </div>
                 )}
@@ -347,6 +416,26 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Auth Required Modal for İlan Ver */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={t('nav.loginToCreateListing')}
+        message={t('nav.loginToCreateListingMsg')}
+        icon={<PlusIcon className="w-10 h-10 text-primary-500" />}
+        redirectPath="/listings/new"
+      />
+
+      {/* Auth Required Modal for Takaslar */}
+      <AuthRequiredModal
+        isOpen={showTradesAuthModal}
+        onClose={() => setShowTradesAuthModal(false)}
+        title={t('nav.loginForTrades')}
+        message={t('trade.tradeRequiresLogin')}
+        icon={<ArrowsRightLeftIcon className="w-10 h-10 text-primary-500" />}
+        redirectPath="/trades"
+      />
       </nav>
     </>
   );

@@ -7,11 +7,13 @@ import { motion } from 'framer-motion';
 import { LockClosedIcon, EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const { t } = useTranslation();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,31 +23,31 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
-      toast.error('Geçersiz şifre sıfırlama linki');
+      toast.error(t('auth.invalidResetLink'));
       router.push('/forgot-password');
     }
-  }, [token, router]);
+  }, [token, router, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!password || !confirmPassword) {
-      toast.error('Lütfen tüm alanları doldurun');
+      toast.error(t('common.fillAllFields'));
       return;
     }
 
     if (password.length < 8) {
-      toast.error('Şifre en az 8 karakter olmalıdır');
+      toast.error(t('validation.passwordMin8'));
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error('Şifreler eşleşmiyor');
+      toast.error(t('validation.passwordMatch'));
       return;
     }
 
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error('Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir');
+      toast.error(t('auth.passwordRequirements'));
       return;
     }
 
@@ -56,13 +58,13 @@ export default function ResetPasswordPage() {
         newPassword: password,
       });
       setIsSuccess(true);
-      toast.success('Şifreniz başarıyla sıfırlandı');
+      toast.success(t('auth.passwordResetSuccess'));
       setTimeout(() => {
         router.push('/login');
       }, 2000);
     } catch (error: any) {
       console.error('Failed to reset password:', error);
-      toast.error(error.response?.data?.message || 'Şifre sıfırlanamadı');
+      toast.error(error.response?.data?.message || t('common.operationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -86,15 +88,15 @@ export default function ResetPasswordPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Şifre Sıfırlandı</h2>
+            <h2 className="text-2xl font-bold mb-2">{t('auth.resetPassword')}</h2>
             <p className="text-gray-600 mb-6">
-              Şifreniz başarıyla sıfırlandı. Giriş sayfasına yönlendiriliyorsunuz...
+              {t('auth.passwordResetSuccess')}
             </p>
             <Link
               href="/login"
               className="inline-block px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
             >
-              Giriş Yap
+              {t('common.login')}
             </Link>
           </motion.div>
         </main>
@@ -110,7 +112,7 @@ export default function ResetPasswordPage() {
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8"
         >
           <ArrowLeftIcon className="w-5 h-5" />
-          Giriş Sayfasına Dön
+          {t('auth.backToLogin')}
         </Link>
 
         <motion.div
@@ -118,15 +120,15 @@ export default function ResetPasswordPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-2xl shadow-sm p-8"
         >
-          <h1 className="text-3xl font-bold mb-2">Yeni Şifre Belirle</h1>
+          <h1 className="text-3xl font-bold mb-2">{t('auth.resetPassword')}</h1>
           <p className="text-gray-600 mb-8">
-            Yeni şifrenizi belirleyin
+            {t('auth.newPassword')}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Yeni Şifre
+                {t('auth.newPassword')}
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -152,13 +154,13 @@ export default function ResetPasswordPage() {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                En az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam
+                {t('auth.passwordRequirements')}
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Şifre Tekrar
+                {t('auth.confirmPassword')}
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -190,7 +192,7 @@ export default function ResetPasswordPage() {
               disabled={isLoading}
               className="w-full py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Sıfırlanıyor...' : 'Şifreyi Sıfırla'}
+              {isLoading ? t('common.loading') : t('auth.resetPassword')}
             </button>
           </form>
         </motion.div>

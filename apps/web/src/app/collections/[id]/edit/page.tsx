@@ -6,6 +6,7 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Collection {
   id: string;
@@ -30,6 +31,7 @@ export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
   const [collection, setCollection] = useState<Collection | null>(null);
@@ -58,7 +60,7 @@ export default function EditCollectionPage() {
 
   const fetchCollection = async () => {
     if (!collectionIdOrSlug) {
-      setError('Geçersiz koleksiyon bağlantısı');
+      setError(t('collection.invalidLink'));
       setIsLoading(false);
       return;
     }
@@ -78,7 +80,7 @@ export default function EditCollectionPage() {
 
       // Check if user is the owner
       if (data.userId !== user?.id) {
-        setError('Bu koleksiyonu düzenleme yetkiniz yok');
+        setError(t('collection.noEditPermission'));
         setIsLoading(false);
         return;
       }
@@ -90,8 +92,8 @@ export default function EditCollectionPage() {
       setIsPublic(data.isPublic ?? true);
     } catch (error: any) {
       console.error('Fetch collection error:', error);
-      setError(error.response?.data?.message || 'Koleksiyon yüklenemedi');
-      toast.error('Koleksiyon yüklenemedi');
+      setError(error.response?.data?.message || t('collection.loadFailed'));
+      toast.error(t('collection.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -101,12 +103,12 @@ export default function EditCollectionPage() {
     e.preventDefault();
     
     if (!name.trim()) {
-      toast.error('Koleksiyon adı gereklidir');
+      toast.error(t('collection.collectionNameRequired'));
       return;
     }
 
     if (!collection) {
-      toast.error('Koleksiyon bulunamadı');
+      toast.error(t('collection.collectionNotFound'));
       return;
     }
 
@@ -119,13 +121,13 @@ export default function EditCollectionPage() {
         isPublic,
       });
       
-      toast.success('Koleksiyon güncellendi');
+      toast.success(t('collection.collectionUpdated'));
       // Use slug if available, otherwise use ID
       const redirectPath = collection.slug || collection.id;
       router.push(`/collections/${redirectPath}`);
     } catch (error: any) {
       console.error('Update collection error:', error);
-      toast.error(error.response?.data?.message || 'Koleksiyon güncellenemedi');
+      toast.error(error.response?.data?.message || t('collection.loadFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -133,18 +135,18 @@ export default function EditCollectionPage() {
 
   const handleDelete = async () => {
     if (!collection) {
-      toast.error('Koleksiyon bulunamadı');
+      toast.error(t('collection.collectionNotFound'));
       return;
     }
 
     setIsDeleting(true);
     try {
       await collectionsApi.delete(collection.id);
-      toast.success('Koleksiyon silindi');
+      toast.success(t('collection.collectionDeleted'));
       router.push('/collections');
     } catch (error: any) {
       console.error('Delete collection error:', error);
-      toast.error(error.response?.data?.message || 'Koleksiyon silinemedi');
+      toast.error(error.response?.data?.message || t('collection.loadFailed'));
       setIsDeleting(false);
     }
   };
@@ -154,7 +156,7 @@ export default function EditCollectionPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Yükleniyor...</p>
+          <p className="text-gray-600">{t('collection.loading')}</p>
         </div>
       </div>
     );
@@ -164,12 +166,12 @@ export default function EditCollectionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'Koleksiyon bulunamadı'}</p>
+          <p className="text-red-600 mb-4">{error || t('collection.collectionNotFound')}</p>
           <button
             onClick={() => router.push('/collections')}
             className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
           >
-            Koleksiyonlara Dön
+            {t('collection.backToCollections')}
           </button>
         </div>
       </div>
@@ -186,9 +188,9 @@ export default function EditCollectionPage() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
           >
             <ArrowLeftIcon className="w-5 h-5" />
-            <span>Geri</span>
+            <span>{t('common.back')}</span>
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Koleksiyonu Düzenle</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('collection.editCollectionTitle')}</h1>
         </div>
 
         {/* Form */}
@@ -197,55 +199,55 @@ export default function EditCollectionPage() {
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Koleksiyon Adı *
+                {t('collection.collectionNameLabel')}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Örn: Hot Wheels Koleksiyonum"
+                placeholder={t('collection.namePlaceholder')}
                 required
                 minLength={3}
                 maxLength={100}
               />
               <p className="mt-1 text-sm text-gray-500">
-                {name.length}/100 karakter
+                {name.length}/100 {t('collection.characters')}
               </p>
             </div>
 
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Açıklama
+                {t('collection.descriptionLabel')}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Koleksiyonunuz hakkında bilgi verin..."
+                placeholder={t('collection.descriptionPlaceholder')}
                 rows={5}
                 maxLength={500}
               />
               <p className="mt-1 text-sm text-gray-500">
-                {description.length}/500 karakter
+                {description.length}/500 {t('collection.characters')}
               </p>
             </div>
 
             {/* Cover Image URL */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kapak Görseli URL
+                {t('collection.coverImageUrl')}
               </label>
               <input
                 type="url"
                 value={coverImageUrl}
                 onChange={(e) => setCoverImageUrl(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="https://example.com/image.jpg"
+                placeholder={t('collection.coverImagePlaceholder')}
               />
               <p className="mt-1 text-sm text-gray-500">
-                Koleksiyonunuz için bir kapak görseli ekleyebilirsiniz
+                {t('collection.coverImageHelp')}
               </p>
               {coverImageUrl && (
                 <div className="mt-3">
@@ -271,13 +273,13 @@ export default function EditCollectionPage() {
                 className="w-5 h-5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
               />
               <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 cursor-pointer">
-                Herkese açık koleksiyon
+                {t('collection.publicCollection')}
               </label>
             </div>
             <p className="text-sm text-gray-500 -mt-4">
               {isPublic
-                ? 'Koleksiyonunuz herkes tarafından görüntülenebilir'
-                : 'Koleksiyonunuz sadece siz tarafından görüntülenebilir'}
+                ? t('collection.publicCollectionDesc')
+                : t('collection.privateCollectionDesc')}
             </p>
 
             {/* Actions */}
@@ -288,14 +290,14 @@ export default function EditCollectionPage() {
                   onClick={() => router.back()}
                   className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium"
                 >
-                  İptal
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || !name.trim()}
                   className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
-                  {isSaving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+                  {isSaving ? t('collection.saving') : t('collection.saveChanges')}
                 </button>
               </div>
               
@@ -306,7 +308,7 @@ export default function EditCollectionPage() {
                 className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium"
               >
                 <TrashIcon className="w-5 h-5" />
-                Koleksiyonu Sil
+                {t('collection.deleteCollection')}
               </button>
             </div>
           </form>
@@ -318,10 +320,10 @@ export default function EditCollectionPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
             <h2 className="text-xl font-semibold mb-4 text-gray-900">
-              Koleksiyonu Sil
+              {t('collection.deleteCollection')}
             </h2>
             <p className="text-gray-700 mb-6">
-              Bu koleksiyonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve koleksiyonunuzdaki tüm ürünler koleksiyondan kaldırılacaktır.
+              {t('collection.deleteCollectionConfirm')}
             </p>
             <div className="flex gap-3">
               <button
@@ -330,7 +332,7 @@ export default function EditCollectionPage() {
                 disabled={isDeleting}
                 className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                İptal
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -338,7 +340,7 @@ export default function EditCollectionPage() {
                 disabled={isDeleting}
                 className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isDeleting ? 'Siliniyor...' : 'Evet, Sil'}
+                {isDeleting ? t('collection.deleting') : t('collection.yesDelete')}
               </button>
             </div>
           </div>

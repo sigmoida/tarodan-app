@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { api, listingsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Seller {
   id: string;
@@ -51,6 +52,7 @@ export default function SellerProfilePage() {
   const params = useParams();
   const sellerId = params.id as string;
   const { isAuthenticated, user } = useAuthStore();
+  const { t, locale } = useTranslation();
   
   const [seller, setSeller] = useState<Seller | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -137,14 +139,14 @@ export default function SellerProfilePage() {
       if (isFollowing) {
         await api.delete(`/users/${sellerId}/follow`);
         setIsFollowing(false);
-        toast.success('Takipten çıkıldı');
+        toast.success(t('seller.unfollowed'));
       } else {
         await api.post(`/users/${sellerId}/follow`);
         setIsFollowing(true);
-        toast.success('Takip edilmeye başlandı');
+        toast.success(t('seller.followed'));
       }
     } catch (error) {
-      toast.error('İşlem başarısız');
+      toast.error(t('common.operationFailed'));
     }
   };
 
@@ -161,12 +163,13 @@ export default function SellerProfilePage() {
       setShowAuthModal(true);
       return;
     }
-    toast('Kullanıcı raporlama özelliği yakında eklenecek');
+    toast(t('common.comingSoon'));
   };
 
   const getImageUrl = (images: any[]): string => {
-    if (!images || images.length === 0) return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
-    return images[0]?.url || images[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    const placeholder = locale === 'en' ? 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Product' : 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    if (!images || images.length === 0) return placeholder;
+    return images[0]?.url || images[0] || placeholder;
   };
 
   if (isLoading) {
@@ -182,9 +185,9 @@ export default function SellerProfilePage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <UserIcon className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Satıcı Bulunamadı</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('seller.notFound')}</h2>
           <Link href="/listings" className="btn-primary">
-            İlanlara Dön
+            {t('seller.backToListings')}
           </Link>
         </div>
       </div>
@@ -226,7 +229,7 @@ export default function SellerProfilePage() {
               <h1 className="text-3xl font-bold flex items-center justify-center md:justify-start gap-2">
                 {seller.displayName}
                 {seller.isVerified && (
-                  <span className="text-green-400 text-sm">(Doğrulanmış)</span>
+                  <span className="text-green-400 text-sm">({t('seller.verified')})</span>
                 )}
               </h1>
               
@@ -237,13 +240,15 @@ export default function SellerProfilePage() {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-4 text-sm text-gray-300">
                 <span className="flex items-center gap-1">
                   <CalendarIcon className="w-4 h-4" />
-                  {new Date(seller.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })} tarihinden beri üye
+                  {locale === 'en' 
+                    ? `Member since ${new Date(seller.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`
+                    : `${new Date(seller.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })} tarihinden beri üye`}
                 </span>
                 
                 {seller.stats && seller.stats.averageRating > 0 && (
                   <span className="flex items-center gap-1">
                     <StarSolidIcon className="w-4 h-4 text-yellow-400" />
-                    {seller.stats.averageRating.toFixed(1)} ({seller.stats.totalRatings} değerlendirme)
+                    {seller.stats.averageRating.toFixed(1)} ({seller.stats.totalRatings} {t('review.reviews')})
                   </span>
                 )}
               </div>
@@ -256,7 +261,7 @@ export default function SellerProfilePage() {
                     className="btn-primary flex items-center gap-2"
                   >
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                    Mesaj Gönder
+                    {t('product.sendMessage')}
                   </button>
                   <button
                     onClick={handleFollow}
@@ -266,12 +271,12 @@ export default function SellerProfilePage() {
                         : 'bg-white text-gray-900 hover:bg-gray-100'
                     }`}
                   >
-                    {isFollowing ? 'Takip Ediliyor' : 'Takip Et'}
+                    {isFollowing ? t('seller.following') : t('seller.follow')}
                   </button>
                   <button
                     onClick={handleReport}
                     className="p-2.5 rounded-xl bg-gray-700/50 text-gray-300 hover:bg-gray-700 transition-colors"
-                    title="Raporla"
+                    title={t('seller.report')}
                   >
                     <FlagIcon className="w-5 h-5" />
                   </button>
@@ -283,15 +288,15 @@ export default function SellerProfilePage() {
             <div className="grid grid-cols-3 gap-6 text-center">
               <div className="bg-white/10 rounded-xl p-4">
                 <p className="text-3xl font-bold">{products.length}</p>
-                <p className="text-gray-400 text-sm">İlan</p>
+                <p className="text-gray-400 text-sm">{t('product.listings')}</p>
               </div>
               <div className="bg-white/10 rounded-xl p-4">
                 <p className="text-3xl font-bold">{seller.stats?.totalSales || 0}</p>
-                <p className="text-gray-400 text-sm">Satış</p>
+                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Sales' : 'Satış'}</p>
               </div>
               <div className="bg-white/10 rounded-xl p-4">
                 <p className="text-3xl font-bold">{seller.stats?.totalTrades || 0}</p>
-                <p className="text-gray-400 text-sm">Takas</p>
+                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Trade' : 'Takas'}</p>
               </div>
             </div>
           </div>
@@ -310,7 +315,7 @@ export default function SellerProfilePage() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            İlanlar ({products.length})
+            {t('nav.listings')} ({products.length})
           </button>
           <button
             onClick={() => setTab('reviews')}
@@ -320,7 +325,7 @@ export default function SellerProfilePage() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Değerlendirmeler ({seller.stats?.totalRatings || 0})
+            {t('review.reviews')} ({seller.stats?.totalRatings || 0})
           </button>
         </div>
 
@@ -329,7 +334,7 @@ export default function SellerProfilePage() {
           <div>
             {products.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500">Bu satıcının henüz aktif ilanı yok.</p>
+                <p className="text-gray-500">{t('seller.noActiveListings')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -351,7 +356,7 @@ export default function SellerProfilePage() {
                         {product.isTradeEnabled && (
                           <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                             <ArrowsRightLeftIcon className="w-3 h-3" />
-                            Takas
+                            {locale === 'en' ? 'Trade' : 'Takas'}
                           </div>
                         )}
                       </div>
@@ -375,7 +380,7 @@ export default function SellerProfilePage() {
         {tab === 'reviews' && (
           <div className="text-center py-12">
             <StarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">Değerlendirme sistemi yakında eklenecek.</p>
+            <p className="text-gray-500">{t('common.comingSoon')}</p>
           </div>
         )}
       </div>
@@ -384,7 +389,7 @@ export default function SellerProfilePage() {
       <AuthRequiredModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        message="Bu işlem için giriş yapmanız gerekiyor."
+        message={t('auth.authRequiredMessage')}
       />
     </div>
   );

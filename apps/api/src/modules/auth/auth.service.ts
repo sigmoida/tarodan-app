@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,14 +15,18 @@ import { RegisterDto, LoginDto, AuthResponseDto, TokensDto } from './dto';
 import { JwtPayload } from './interfaces';
 import { SellerType } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -115,6 +120,9 @@ export class AuthService {
 
       // Generate tokens
       const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+
+      // Cache invalidation: Clear any guest session cache and set up user cache
+      await this.invalidateGuestCacheOnLogin(user.id);
 
       // Format membership data safely
       let membershipData = undefined;
@@ -371,6 +379,33 @@ export class AuthService {
     ]);
 
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Invalidate guest cache when user logs in
+   * This ensures clean state transition from guest to authenticated
+   */
+  private async invalidateGuestCacheOnLogin(userId: string): Promise<void> {
+    try {
+      // Clear any guest-related cache that might exist
+      // Clear user-specific caches - NOT global guest caches
+      // Note: We only clear the logged-in user's cache, not all guest sessions
+      await Promise.all([
+        // Clear any stale user cache and refresh
+        this.cacheService.del(this.cacheService.userKey(userId)),
+        // Clear user's membership limits cache to refresh on login
+        this.cacheService.del(this.cacheService.membershipLimitsKey(userId)),
+        // Clear user's cart cache if exists
+        this.cacheService.del(`cart:${userId}`),
+        // Clear user's recently viewed cache if exists
+        this.cacheService.del(`recently_viewed:${userId}`),
+      ]);
+
+      this.logger.debug(`Cache invalidated for user login: ${userId}`);
+    } catch (error) {
+      // Log but don't fail login if cache invalidation fails
+      this.logger.warn(`Cache invalidation error on login: ${error}`);
+    }
   }
 
   /**

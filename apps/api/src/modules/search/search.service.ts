@@ -79,63 +79,130 @@ export class SearchService implements OnModuleInit {
       });
 
       if (!indexExists) {
-        // 7.x API: settings and mappings go inside body
-        await (this.client.indices as any).create({
+        // ES 8.x API: settings and mappings go directly (no body wrapper)
+        await this.client.indices.create({
           index: this.PRODUCTS_INDEX,
-          body: {
-            settings: {
-              number_of_shards: 1,
-              number_of_replicas: 0,
-              analysis: {
-                analyzer: {
-                  turkish: {
-                    type: 'custom',
-                    tokenizer: 'standard',
-                    filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
-                  },
+          settings: {
+            number_of_shards: 1,
+            number_of_replicas: 0,
+            // Allow larger ngram difference for better partial matching
+            max_ngram_diff: 13,
+            analysis: {
+              analyzer: {
+                turkish: {
+                  type: 'custom',
+                  tokenizer: 'standard',
+                  filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
                 },
-                filter: {
-                  turkish_stop: {
-                    type: 'stop',
-                    stopwords: '_turkish_',
-                  },
-                  turkish_stemmer: {
-                    type: 'stemmer',
-                    language: 'turkish',
-                  },
+                // Edge ngram analyzer for autocomplete (matches from beginning of words)
+                turkish_edge_ngram: {
+                  type: 'custom',
+                  tokenizer: 'edge_ngram_tokenizer',
+                  filter: ['lowercase', 'asciifolding'],
+                },
+                // Ngram analyzer for partial matching (matches anywhere in word)
+                turkish_ngram: {
+                  type: 'custom',
+                  tokenizer: 'ngram_tokenizer',
+                  filter: ['lowercase', 'asciifolding'],
+                },
+                // Search analyzer (for query time)
+                turkish_search: {
+                  type: 'custom',
+                  tokenizer: 'standard',
+                  filter: ['lowercase', 'asciifolding'],
                 },
               },
-            },
-            mappings: {
-              properties: {
-                id: { type: 'keyword' },
-                title: {
-                  type: 'text',
-                  analyzer: 'turkish',
-                  fields: {
-                    keyword: { type: 'keyword' },
-                  },
+              tokenizer: {
+                edge_ngram_tokenizer: {
+                  type: 'edge_ngram',
+                  min_gram: 2,
+                  max_gram: 15,
+                  token_chars: ['letter', 'digit'],
                 },
-                description: {
-                  type: 'text',
-                  analyzer: 'turkish',
+                ngram_tokenizer: {
+                  type: 'ngram',
+                  min_gram: 2,
+                  max_gram: 4,
+                  token_chars: ['letter', 'digit'],
                 },
-                price: { type: 'float' },
-                condition: { type: 'keyword' },
-                status: { type: 'keyword' },
-                categoryId: { type: 'keyword' },
-                categoryName: { type: 'keyword' },
-                sellerId: { type: 'keyword' },
-                sellerName: { type: 'keyword' },
-                imageUrl: { type: 'keyword' },
-                isTradeEnabled: { type: 'boolean' },
-                createdAt: { type: 'date' },
-                updatedAt: { type: 'date' },
+              },
+              filter: {
+                turkish_stop: {
+                  type: 'stop',
+                  stopwords: '_turkish_',
+                },
+                turkish_stemmer: {
+                  type: 'stemmer',
+                  language: 'turkish',
+                },
+                asciifolding: {
+                  type: 'asciifolding',
+                  preserve_original: true,
+                },
               },
             },
           },
+          mappings: {
+            properties: {
+              id: { type: 'keyword' },
+              title: {
+                type: 'text',
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  // Edge ngram field for autocomplete/prefix matching
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                  // Ngram field for partial matching anywhere in word
+                  ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              description: {
+                type: 'text',
+                analyzer: 'turkish',
+                fields: {
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              price: { type: 'float' },
+              condition: { type: 'keyword' },
+              status: { type: 'keyword' },
+              categoryId: { type: 'keyword' },
+              categoryName: {
+                type: 'text',
+                analyzer: 'turkish',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              sellerId: { type: 'keyword' },
+              sellerName: { type: 'keyword' },
+              imageUrl: { type: 'keyword' },
+              isTradeEnabled: { type: 'boolean' },
+              createdAt: { type: 'date' },
+              updatedAt: { type: 'date' },
+            },
+          },
         });
-        console.log('✅ Created Elasticsearch index: products');
+        console.log('✅ Created Elasticsearch index: products with ngram analyzers');
       }
 
       // Update index tracking in DB
@@ -172,13 +239,95 @@ export class SearchService implements OnModuleInit {
     const must: any[] = [];
     const filter: any[] = [];
 
-    // Text search
+    // Text search with ngram support for partial matching
     if (query) {
       must.push({
-        multi_match: {
-          query,
-          fields: ['title^3', 'description', 'categoryName'],
-          fuzziness: 'AUTO',
+        bool: {
+          should: [
+            // Exact match on title gets highest boost
+            {
+              match: {
+                title: {
+                  query,
+                  boost: 5,
+                },
+              },
+            },
+            // Edge ngram for prefix matching (e.g., "hot" -> "Hot Wheels")
+            {
+              match: {
+                'title.edge_ngram': {
+                  query,
+                  boost: 3,
+                },
+              },
+            },
+            // Ngram for partial matching (e.g., "wheel" in "Hotwheels")
+            {
+              match: {
+                'title.ngram': {
+                  query,
+                  boost: 2,
+                },
+              },
+            },
+            // Description matching
+            {
+              match: {
+                description: {
+                  query,
+                  boost: 1,
+                },
+              },
+            },
+            {
+              match: {
+                'description.edge_ngram': {
+                  query,
+                  boost: 0.5,
+                },
+              },
+            },
+            // Category name matching
+            {
+              match: {
+                categoryName: {
+                  query,
+                  boost: 2,
+                },
+              },
+            },
+            {
+              match: {
+                'categoryName.edge_ngram': {
+                  query,
+                  boost: 1,
+                },
+              },
+            },
+            // Fuzzy match for typos (e.g., "hxt wheels" → "hot wheels")
+            {
+              multi_match: {
+                query,
+                fields: ['title^3', 'description', 'categoryName^2'],
+                fuzziness: 2, // Allow up to 2 character edits
+                prefix_length: 1, // First character must match
+                boost: 1.5,
+              },
+            },
+            // More aggressive fuzzy for very short queries
+            {
+              fuzzy: {
+                title: {
+                  value: query.toLowerCase(),
+                  fuzziness: 'AUTO',
+                  prefix_length: 1,
+                  boost: 1,
+                },
+              },
+            },
+          ],
+          minimum_should_match: 1,
         },
       });
     }
@@ -221,27 +370,25 @@ export class SearchService implements OnModuleInit {
     }
 
     try {
-      // 7.x API: query/sort/from/size go inside body
-      const response = await (this.client as any).search({
+      // ES 8.x API: no body wrapper, response is direct
+      const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
-        body: {
-          query: {
-            bool: {
-              must: must.length > 0 ? must : [{ match_all: {} }],
-              filter,
-            },
+        query: {
+          bool: {
+            must: must.length > 0 ? must : [{ match_all: {} }],
+            filter,
           },
-          sort,
-          from: (page - 1) * pageSize,
-          size: pageSize,
         },
+        sort,
+        from: (page - 1) * pageSize,
+        size: pageSize,
       });
 
-      const hits = response.body.hits.hits;
+      const hits = response.hits.hits;
       const total =
-        typeof response.body.hits.total === 'number'
-          ? response.body.hits.total
-          : response.body.hits.total?.value || 0;
+        typeof response.hits.total === 'number'
+          ? response.hits.total
+          : (response.hits.total as any)?.value || 0;
 
       return {
         results: hits.map((hit: any) => ({
@@ -259,7 +406,7 @@ export class SearchService implements OnModuleInit {
         total,
         page,
         pageSize,
-        took: response.body.took,
+        took: response.took || 0,
       };
     } catch (error) {
       console.error('Elasticsearch search error:', error);
@@ -284,13 +431,11 @@ export class SearchService implements OnModuleInit {
     if (!product) return;
 
     try {
-      // 7.x API: document goes inside body
-      // @ts-ignore - ES client v9 compatibility (body parameter)
-      // @ts-ignore - ES client v9 compatibility (id parameter)
-      await (this.client as any).index({
+      // ES 8.x API: document goes in `document` parameter
+      await this.client.index({
         index: this.PRODUCTS_INDEX,
         id: product.id,
-        body: {
+        document: {
           id: product.id,
           title: product.title,
           description: product.description,
@@ -331,13 +476,38 @@ export class SearchService implements OnModuleInit {
   }
 
   /**
+   * Force recreate index with updated settings
+   * Use this when analyzer settings change
+   */
+  async forceRecreateIndex(): Promise<void> {
+    console.log('🔄 Force recreating Elasticsearch index...');
+    
+    try {
+      // Delete existing index
+      const exists = await this.client.indices.exists({ index: this.PRODUCTS_INDEX });
+      if (exists) {
+        await this.client.indices.delete({ index: this.PRODUCTS_INDEX });
+        console.log('🗑️ Deleted old index');
+      }
+      
+      // Create new index with updated settings
+      await this.ensureIndexExists();
+      console.log('✅ Index recreated with updated settings');
+    } catch (error) {
+      console.error('Failed to recreate index:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Reindex all products
    */
   async reindexAll(): Promise<number> {
     // Update index status
-    await this.prisma.searchIndex.update({
+    await this.prisma.searchIndex.upsert({
       where: { indexName: this.PRODUCTS_INDEX },
-      data: { status: 'rebuilding' },
+      update: { status: 'rebuilding' },
+      create: { indexName: this.PRODUCTS_INDEX, status: 'rebuilding', settings: {} },
     });
 
     try {
@@ -351,9 +521,8 @@ export class SearchService implements OnModuleInit {
         },
       });
 
-      // Delete existing index
-      await this.client.indices.delete({ index: this.PRODUCTS_INDEX }).catch(() => {});
-      await this.ensureIndexExists();
+      // Force recreate index with new settings
+      await this.forceRecreateIndex();
 
       // Bulk index
       if (products.length > 0) {
@@ -377,8 +546,8 @@ export class SearchService implements OnModuleInit {
           },
         ]);
 
-        // 7.x API: use body instead of operations
-        await this.client.bulk({ refresh: true, body });
+        // ES 8.x API: use operations instead of body
+        await this.client.bulk({ refresh: true, operations: body });
       }
 
       // Update index status
@@ -403,38 +572,100 @@ export class SearchService implements OnModuleInit {
   }
 
   /**
-   * Get autocomplete suggestions
+   * Get autocomplete suggestions with fuzzy matching
    */
   async autocomplete(query: string, limit = 10): Promise<string[]> {
     try {
-      // 7.x API: query/_source/size go inside body
-      const response = await (this.client as any).search({
+      // ES 8.x API: no body wrapper
+      const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
-        body: {
-          query: {
-            bool: {
-              must: [
-                {
-                  multi_match: {
+        query: {
+          bool: {
+            should: [
+              // Edge ngram for partial matching (e.g., "hotw" → "hot wheels")
+              {
+                match: {
+                  'title.edge_ngram': {
                     query,
-                    type: 'phrase_prefix',
-                    fields: ['title', 'categoryName'],
+                    boost: 4,
                   },
                 },
-              ],
-              filter: [{ term: { status: ProductStatus.active } }],
-            },
+              },
+              // Ngram for middle-of-word matching
+              {
+                match: {
+                  'title.ngram': {
+                    query,
+                    boost: 2,
+                  },
+                },
+              },
+              // Standard phrase prefix
+              {
+                multi_match: {
+                  query,
+                  type: 'phrase_prefix',
+                  fields: ['title^2', 'categoryName'],
+                  boost: 3,
+                },
+              },
+              // Fuzzy match for typos (e.g., "hxt" → "hot")
+              {
+                fuzzy: {
+                  title: {
+                    value: query.toLowerCase(),
+                    fuzziness: 'AUTO',
+                    prefix_length: 1,
+                    boost: 1.5,
+                  },
+                },
+              },
+              // Multi-match fuzzy for complete phrases with typos
+              {
+                multi_match: {
+                  query,
+                  fields: ['title^2', 'categoryName'],
+                  fuzziness: 2,
+                  prefix_length: 1,
+                  boost: 1,
+                },
+              },
+            ],
+            minimum_should_match: 1,
+            filter: [{ term: { status: ProductStatus.active } }],
           },
-          _source: ['title'],
-          size: limit,
+        },
+        _source: ['title'],
+        size: limit * 2, // Get more results then dedupe
+        // Remove duplicates
+        collapse: {
+          field: 'title.keyword',
         },
       });
 
-      return response.body.hits.hits.map((hit: any) => hit._source.title);
+      return response.hits.hits
+        .map((hit: any) => hit._source.title)
+        .slice(0, limit);
     } catch (error) {
       console.error('Elasticsearch autocomplete error:', error);
-      return [];
+      return this.fallbackAutocomplete(query, limit);
     }
+  }
+
+  /**
+   * Fallback autocomplete using database
+   */
+  private async fallbackAutocomplete(query: string, limit: number): Promise<string[]> {
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: ProductStatus.active,
+        title: { contains: query, mode: 'insensitive' },
+      },
+      select: { title: true },
+      take: limit,
+      distinct: ['title'],
+    });
+    return products.map(p => p.title);
   }
 
   /**

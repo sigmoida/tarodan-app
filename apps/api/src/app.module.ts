@@ -108,7 +108,7 @@ import { EventModule } from './modules/events';
 
     // PHASE 4 - Infrastructure Modules
     StorageModule,      // GAP-007: MinIO File Storage (HIGH)
-    // SearchModule,       // GAP-008: Elasticsearch Search (HIGH) - Temporarily disabled
+    SearchModule,       // GAP-008: Elasticsearch Search (HIGH) - Enabled for improved search
     PaymentProvidersModule, // GAP-015 & GAP-016: iyzico & Aras Kargo
 
     // PHASE 5 - Operations Modules

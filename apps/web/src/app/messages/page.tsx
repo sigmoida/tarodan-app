@@ -6,6 +6,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { messagesApi, listingsApi } from '@/lib/api';
+import { useTranslation } from '@/i18n';
 
 interface MessageThread {
   id: string;
@@ -45,14 +46,16 @@ const PROHIBITED_PATTERNS = [
   /\b(whatsapp|wp|telegram)\b/gi,
 ];
 
-const checkContentFilter = (text: string): { passed: boolean; warning?: string } => {
+const checkContentFilter = (text: string, locale: string): { passed: boolean; warning?: string } => {
   const lowerText = text.toLowerCase();
   
   for (const pattern of PROHIBITED_PATTERNS) {
     if (pattern.test(lowerText)) {
       return {
         passed: false,
-        warning: 'Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez.',
+        warning: locale === 'en' 
+          ? 'Personal contact information detected in your message. Communication outside the platform is not recommended for your safety.'
+          : 'Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez.',
       };
     }
     pattern.lastIndex = 0; // Reset regex
@@ -64,6 +67,7 @@ const checkContentFilter = (text: string): { passed: boolean; warning?: string }
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, locale } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -103,7 +107,7 @@ export default function MessagesPage() {
       try {
         const productResponse = await listingsApi.getOne(productId);
         const product = productResponse.data.product || productResponse.data;
-        productTitle = product.title || 'Ürün';
+        productTitle = product.title || (locale === 'en' ? 'Product' : 'Ürün');
       } catch (error) {
         console.error('Failed to fetch product:', error);
       }
@@ -119,7 +123,9 @@ export default function MessagesPage() {
       setSelectedThread(existingThread);
       // Pre-fill message with product reference
       if (productTitle && !newMessage) {
-        setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+        setNewMessage(locale === 'en' 
+          ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
+          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
       }
       // Clear URL params without triggering a reload
       window.history.replaceState({}, '', '/messages');
@@ -141,13 +147,13 @@ export default function MessagesPage() {
         id: newThread.id,
         otherUser: {
           id: sellerId,
-          displayName: newThread.otherUser?.displayName || 'Satıcı',
+          displayName: newThread.otherUser?.displayName || (locale === 'en' ? 'Seller' : 'Satıcı'),
           avatarUrl: newThread.otherUser?.avatarUrl,
         },
         unreadCount: 0,
         product: productId ? {
           id: productId,
-          title: productTitle || 'Ürün',
+          title: productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
         } : undefined,
       };
 
@@ -156,7 +162,9 @@ export default function MessagesPage() {
       
       // Pre-fill message with product reference
       if (productTitle) {
-        setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+        setNewMessage(locale === 'en'
+          ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
+          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
       }
       
       // Clear URL params
@@ -174,7 +182,7 @@ export default function MessagesPage() {
           }
         }
       } else {
-        toast.error('Sohbet başlatılamadı');
+        toast.error(t('common.operationFailed'));
       }
     } finally {
       setCreatingThread(false);
@@ -206,7 +214,7 @@ export default function MessagesPage() {
           ...t,
           otherUser: {
             id: isParticipant1 ? t.participant2Id : t.participant1Id,
-            displayName: isParticipant1 ? (t.participant2Name || 'Kullanıcı') : (t.participant1Name || 'Kullanıcı'),
+            displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
             avatarUrl: null, // Backend doesn't provide avatarUrl in threads
           },
           lastMessage: t.lastMessage ? {
@@ -215,7 +223,7 @@ export default function MessagesPage() {
           } : undefined,
           product: t.productId ? {
             id: t.productId,
-            title: t.productTitle || 'Ürün',
+            title: t.productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
             imageUrl: t.productImage,
           } : undefined,
         };
@@ -254,7 +262,7 @@ export default function MessagesPage() {
     
     // Check content filter on input
     if (text.length > 5) {
-      const filterResult = checkContentFilter(text);
+      const filterResult = checkContentFilter(text, locale);
       setContentWarning(filterResult.warning || null);
     } else {
       setContentWarning(null);
@@ -265,10 +273,12 @@ export default function MessagesPage() {
     if (!selectedThread || !newMessage.trim() || sending) return;
 
     // Final content filter check
-    const filterResult = checkContentFilter(newMessage);
+    const filterResult = checkContentFilter(newMessage, locale);
     if (!filterResult.passed) {
       const confirm = window.confirm(
-        `${filterResult.warning}\n\nYine de göndermek istiyor musunuz?`
+        locale === 'en'
+          ? `${filterResult.warning}\n\nDo you still want to send it?`
+          : `${filterResult.warning}\n\nYine de göndermek istiyor musunuz?`
       );
       if (!confirm) return;
     }
@@ -280,7 +290,7 @@ export default function MessagesPage() {
       
       // Check if message was filtered by backend
       if (sentMessage.isFiltered || sentMessage.status === 'pending') {
-        toast('Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
+        toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
       }
 
       setMessages((prev) => [...prev, sentMessage]);
@@ -294,11 +304,11 @@ export default function MessagesPage() {
       }, 100);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
-        toast('Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
+        toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
       } else if (error.response?.data?.filtered) {
-        toast.error('Mesajınız uygunsuz içerik nedeniyle engellenmiştir');
+        toast.error(locale === 'en' ? 'Your message has been blocked due to inappropriate content' : 'Mesajınız uygunsuz içerik nedeniyle engellenmiştir');
       } else {
-        toast.error(error.response?.data?.message || 'Mesaj gönderilemedi');
+        toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to send message' : 'Mesaj gönderilemedi'));
       }
     } finally {
       setSending(false);
@@ -316,7 +326,7 @@ export default function MessagesPage() {
         {/* Thread List */}
         <div className="w-80 border-r border-gray-700 flex flex-col">
           <div className="p-4 border-b border-gray-700">
-            <h1 className="text-xl font-semibold">Mesajlar</h1>
+            <h1 className="text-xl font-semibold">{t('message.messages')}</h1>
           </div>
 
           {loading ? (
@@ -325,7 +335,7 @@ export default function MessagesPage() {
             </div>
           ) : threads.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-gray-400 p-4 text-center">
-              Henüz mesajınız yok
+              {t('message.noMessages')}
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
@@ -455,7 +465,7 @@ export default function MessagesPage() {
                     value={newMessage}
                     onChange={(e) => handleMessageChange(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder="Mesajınızı yazın..."
+                    placeholder={t('message.typeMessage')}
                     className={`flex-1 px-4 py-2 bg-gray-700 rounded-lg text-white placeholder-gray-400 ${
                       contentWarning ? 'border border-yellow-500' : ''
                     }`}
@@ -465,17 +475,17 @@ export default function MessagesPage() {
                     disabled={!newMessage.trim() || sending}
                     className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    {sending ? '...' : 'Gönder'}
+                    {sending ? '...' : t('common.send')}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  ℹ️ Mesajlar içerik filtresinden geçirilir. Kişisel bilgi paylaşımı engellenir.
+                  ℹ️ {t('message.blockedContent')}
                 </p>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
-              Bir sohbet seçin
+              {t('message.selectConversation')}
             </div>
           )}
         </div>

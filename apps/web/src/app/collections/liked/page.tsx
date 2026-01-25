@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Collection {
   id: string;
@@ -34,6 +35,7 @@ interface Collection {
 export default function LikedCollectionsPage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
+  const { t } = useTranslation();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function LikedCollectionsPage() {
       setCollections(response.data?.data || response.data?.collections || response.data || []);
     } catch (err: any) {
       console.error('Liked collections load error:', err);
-      setError('Beğenilen koleksiyonlar yüklenirken bir hata oluştu');
+      setError(t('collection.loadFailed'));
       setCollections([]);
     } finally {
       setLoading(false);
@@ -66,7 +68,7 @@ export default function LikedCollectionsPage() {
       await collectionsApi.unlike(collectionId);
       setCollections(collections.filter(c => c.id !== collectionId));
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Beğeni kaldırılırken hata oluştu');
+      alert(err.response?.data?.message || t('collection.unlikeFailed'));
     }
   };
 
@@ -79,14 +81,14 @@ export default function LikedCollectionsPage() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Beğenilen Koleksiyonlar</h1>
-            <p className="text-gray-400 mt-1">Beğendiğiniz koleksiyonları buradan görüntüleyin</p>
+            <h1 className="text-3xl font-bold">{t('collection.likedCollections')}</h1>
+            <p className="text-gray-400 mt-1">{t('collection.likedCollectionsDesc')}</p>
           </div>
           <Link
             href="/profile"
             className="text-gray-400 hover:text-white transition-colors"
           >
-            ← Profile Dön
+            ← {t('collection.backToProfile')}
           </Link>
         </div>
 
@@ -101,19 +103,19 @@ export default function LikedCollectionsPage() {
               onClick={loadLikedCollections}
               className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
             >
-              Tekrar Dene
+              {t('collection.tryAgain')}
             </button>
           </div>
         ) : collections.length === 0 ? (
           <div className="text-center py-12 bg-gray-800 rounded-xl">
             <div className="text-6xl mb-4">📚</div>
-            <p className="text-gray-400 text-lg">Henüz beğendiğiniz koleksiyon yok</p>
-            <p className="text-gray-500 mt-2">Koleksiyonları keşfedin ve beğenin!</p>
+            <p className="text-gray-400 text-lg">{t('collection.noLikedCollections')}</p>
+            <p className="text-gray-500 mt-2">{t('collection.exploreTip')}</p>
             <Link
               href="/collections"
               className="inline-block mt-6 px-6 py-3 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors font-medium"
             >
-              Koleksiyonları Keşfet
+              {t('collection.exploreCollections')}
             </Link>
           </div>
         ) : (
@@ -158,7 +160,7 @@ export default function LikedCollectionsPage() {
 
                     {/* Item count badge */}
                     <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs">
-                      {collection.itemCount || 0} ürün
+                      {collection.itemCount || 0} {t('collection.items')}
                     </div>
                   </div>
                 </Link>
@@ -191,7 +193,7 @@ export default function LikedCollectionsPage() {
                       )}
                     </div>
                     <span className="text-gray-400 text-sm">
-                      {collection.user?.displayName || 'Anonim'}
+                      {collection.user?.displayName || t('collection.anonymous')}
                     </span>
                   </div>
 
@@ -210,7 +212,7 @@ export default function LikedCollectionsPage() {
                       onClick={() => handleUnlike(collection.id)}
                       className="px-3 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition-colors"
                     >
-                      Beğeniyi Kaldır
+                      {t('collection.unlike')}
                     </button>
                   </div>
                 </div>

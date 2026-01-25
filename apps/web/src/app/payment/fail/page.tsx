@@ -13,11 +13,13 @@ import {
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function PaymentFailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
 
   const [payment, setPayment] = useState<any>(null);
@@ -59,7 +61,7 @@ export default function PaymentFailPage() {
 
     try {
       const response = await paymentsApi.retry(paymentId);
-      toast.success('Ödeme tekrar denendi');
+      toast.success(locale === 'en' ? 'Payment retry initiated' : 'Ödeme tekrar denendi');
       if (response.data.paymentUrl) {
         window.location.href = response.data.paymentUrl;
       } else if (response.data.paymentHtml) {
@@ -69,7 +71,7 @@ export default function PaymentFailPage() {
         router.push('/orders');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Ödeme tekrar denenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to retry payment' : 'Ödeme tekrar denenemedi'));
     }
   };
 
@@ -103,10 +105,10 @@ export default function PaymentFailPage() {
 
           {/* Error Message */}
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Ödeme Başarısız Oldu
+            {locale === 'en' ? 'Payment Failed' : 'Ödeme Başarısız Oldu'}
           </h1>
           <p className="text-gray-600 mb-6">
-            Ödeme işleminiz tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi seçin.
+            {locale === 'en' ? 'Your payment could not be completed. Please try again or choose a different payment method.' : 'Ödeme işleminiz tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi seçin.'}
           </p>
 
           {/* Payment Details */}
@@ -114,31 +116,31 @@ export default function PaymentFailPage() {
             <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                Ödeme Detayları
+                {locale === 'en' ? 'Payment Details' : 'Ödeme Detayları'}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme Tutarı:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Payment Amount:' : 'Ödeme Tutarı:'}</span>
                   <span className="font-semibold">
                     ₺{payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme Yöntemi:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
                   <span className="font-semibold">
                     {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Durum:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Status:' : 'Durum:'}</span>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    Başarısız
+                    {locale === 'en' ? 'Failed' : 'Başarısız'}
                   </span>
                 </div>
                 {payment.failureReason && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-gray-600 text-xs">
-                      <strong>Hata:</strong> {payment.failureReason}
+                      <strong>{locale === 'en' ? 'Error:' : 'Hata:'}</strong> {payment.failureReason}
                     </p>
                   </div>
                 )}
@@ -151,13 +153,13 @@ export default function PaymentFailPage() {
             <div className="flex items-start gap-3">
               <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-yellow-800">
-                <p className="font-semibold mb-2">Ödeme başarısız olmasının olası nedenleri:</p>
+                <p className="font-semibold mb-2">{locale === 'en' ? 'Possible reasons for payment failure:' : 'Ödeme başarısız olmasının olası nedenleri:'}</p>
                 <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>Yetersiz bakiye</li>
-                  <li>Kart bilgilerinde hata</li>
-                  <li>3D Secure doğrulaması başarısız</li>
-                  <li>Banka tarafından işlem reddedildi</li>
-                  <li>İnternet bağlantı problemi</li>
+                  <li>{locale === 'en' ? 'Insufficient balance' : 'Yetersiz bakiye'}</li>
+                  <li>{locale === 'en' ? 'Card information error' : 'Kart bilgilerinde hata'}</li>
+                  <li>{locale === 'en' ? '3D Secure verification failed' : '3D Secure doğrulaması başarısız'}</li>
+                  <li>{locale === 'en' ? 'Transaction rejected by bank' : 'Banka tarafından işlem reddedildi'}</li>
+                  <li>{locale === 'en' ? 'Internet connection problem' : 'İnternet bağlantı problemi'}</li>
                 </ul>
               </div>
             </div>
@@ -166,12 +168,11 @@ export default function PaymentFailPage() {
           {/* Help Text */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-blue-800">
-              <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sorununuz devam ederse, 
-              lütfen{' '}
+              <strong>{locale === 'en' ? 'Need help?' : 'Yardıma mı ihtiyacınız var?'}</strong> {locale === 'en' ? 'If your payment issue persists, please contact ' : 'Ödeme sorununuz devam ederse, lütfen '}
               <Link href="/support" className="underline font-medium">
-                destek ekibimiz
+                {locale === 'en' ? 'our support team' : 'destek ekibimiz'}
               </Link>
-              {' '}ile iletişime geçin.
+              {locale === 'en' ? '.' : ' ile iletişime geçin.'}
             </p>
           </div>
 
@@ -181,14 +182,14 @@ export default function PaymentFailPage() {
               onClick={handleRetryPayment}
               className="btn-primary flex items-center justify-center gap-2"
             >
-              Tekrar Dene
+              {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
             </button>
             <Link
               href="/orders"
               className="btn-secondary flex items-center justify-center gap-2"
             >
               <ArrowLeftIcon className="w-5 h-5" />
-              Siparişlerime Dön
+              {locale === 'en' ? 'Back to My Orders' : 'Siparişlerime Dön'}
             </Link>
           </div>
         </motion.div>

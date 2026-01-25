@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi } from '@/lib/api';
+import { useTranslation } from '@/i18n';
 
 interface MembershipTier {
   type: string;
@@ -48,6 +49,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,7 +213,7 @@ export default function ProfilePage() {
                     <h1 className="text-2xl font-bold">{profile.displayName}</h1>
                     {profile.isVerified && (
                       <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
-                        ✓ Doğrulanmış
+                        ✓ {t('common.approved')}
                       </span>
                     )}
                     {profile.membership && (
@@ -234,14 +236,14 @@ export default function ProfilePage() {
                   <p className="text-gray-400 mt-1">{profile.email}</p>
                   {profile.bio && <p className="text-gray-300 mt-2">{profile.bio}</p>}
                   <p className="text-gray-500 text-sm mt-2">
-                    Üye olma: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
+                    {t('profile.memberSince')}: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
                   </p>
                 </div>
                 <Link
                   href="/profile/edit"
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
                 >
-                  Profili Düzenle
+                  {t('profile.editProfile')}
                 </Link>
               </div>
             </div>
@@ -249,10 +251,10 @@ export default function ProfilePage() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'İlanlarım', value: profile.stats?.productsCount ?? 0, href: '/profile/listings' },
-                { label: 'Siparişlerim', value: profile.stats?.ordersCount ?? 0, href: '/orders' },
-                { label: 'Takaslarım', value: profile.stats?.tradesCount ?? 0, href: '/trades' },
-                { label: 'Koleksiyonlarım', value: profile.stats?.collectionsCount ?? 0, href: '/collections' },
+                { label: t('nav.myListings'), value: profile.stats?.productsCount ?? 0, href: '/profile/listings' },
+                { label: t('order.myOrders'), value: profile.stats?.ordersCount ?? 0, href: '/orders' },
+                { label: t('trade.myTrades'), value: profile.stats?.tradesCount ?? 0, href: '/trades' },
+                { label: t('collection.myCollections'), value: profile.stats?.collectionsCount ?? 0, href: '/collections' },
               ].map((stat) => (
                 <Link
                   key={stat.label}
@@ -268,7 +270,7 @@ export default function ProfilePage() {
             {/* Rating */}
             {profile.stats && profile.stats.rating > 0 && (
               <div className="bg-gray-800 rounded-xl p-6">
-                <h2 className="text-xl font-semibold mb-4">Değerlendirmelerim</h2>
+                <h2 className="text-xl font-semibold mb-4">{t('profile.reviews')}</h2>
                 <div className="flex items-center gap-4">
                   <div className="text-4xl font-bold text-yellow-400">
                     {profile.stats.rating.toFixed(1)}
@@ -287,7 +289,7 @@ export default function ProfilePage() {
                         </svg>
                       ))}
                     </div>
-                    <p className="text-gray-400 text-sm">{profile.stats?.reviewsCount ?? 0} değerlendirme</p>
+                    <p className="text-gray-400 text-sm">{profile.stats?.reviewsCount ?? 0} {t('review.reviews').toLowerCase()}</p>
                   </div>
                 </div>
               </div>
@@ -316,7 +318,7 @@ export default function ProfilePage() {
                       href="/pricing"
                       className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg text-sm font-medium transition-colors"
                     >
-                      Yükselt
+                      {t('membership.upgrade')}
                     </Link>
                   )}
                 </div>
@@ -326,21 +328,21 @@ export default function ProfilePage() {
                     <p className="text-2xl font-bold text-primary-400">
                       {profile.membership.tier.maxTotalListings === -1 ? '∞' : profile.membership.tier.maxTotalListings}
                     </p>
-                    <p className="text-xs text-gray-400">Maks İlan</p>
+                    <p className="text-xs text-gray-400">{t('membership.listingsLimit')}</p>
                   </div>
                   <div className="text-center p-3 bg-black/20 rounded-lg">
                     <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.maxImagesPerListing}</p>
-                    <p className="text-xs text-gray-400">İlan Başı Resim</p>
+                    <p className="text-xs text-gray-400">{t('product.images')}</p>
                   </div>
                   <div className="text-center p-3 bg-black/20 rounded-lg">
                     <p className="text-2xl font-bold text-primary-400">{profile.membership.tier.featuredListingSlots}</p>
-                    <p className="text-xs text-gray-400">Öne Çıkan Slot</p>
+                    <p className="text-xs text-gray-400">{t('membership.featuredListings')}</p>
                   </div>
                   <div className="text-center p-3 bg-black/20 rounded-lg">
                     <p className="text-2xl font-bold text-green-400">
                       %{(profile.membership.tier.commissionDiscount * 100).toFixed(1).replace('.0', '')}
                     </p>
-                    <p className="text-xs text-gray-400">Komisyon İndirimi</p>
+                    <p className="text-xs text-gray-400">{t('membership.savePercent')}</p>
                   </div>
                 </div>
                 
@@ -350,21 +352,21 @@ export default function ProfilePage() {
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-red-500/20 text-red-400'
                   }`}>
-                    {profile.membership.tier.canTrade ? '✓' : '✗'} Takas
+                    {profile.membership.tier.canTrade ? '✓' : '✗'} {t('nav.trades')}
                   </span>
                   <span className={`px-3 py-1 rounded-full text-xs ${
                     profile.membership.tier.canCreateCollections 
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-red-500/20 text-red-400'
                   }`}>
-                    {profile.membership.tier.canCreateCollections ? '✓' : '✗'} Koleksiyon
+                    {profile.membership.tier.canCreateCollections ? '✓' : '✗'} {t('nav.collections')}
                   </span>
                   <span className={`px-3 py-1 rounded-full text-xs ${
                     profile.membership.tier.isAdFree 
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-gray-500/20 text-gray-400'
                   }`}>
-                    {profile.membership.tier.isAdFree ? '✓ Reklamsız' : 'Reklamlı'}
+                    {profile.membership.tier.isAdFree ? `✓ ${t('membership.noAds')}` : t('membership.noAds')}
                   </span>
                 </div>
               </div>
@@ -376,17 +378,17 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-semibold flex items-center gap-2">
-                      📊 İşletme Paneli
+                      📊 {t('analytics.analytics')}
                     </h2>
                     <p className="text-gray-400 text-sm mt-1">
-                      Ürün ve koleksiyon istatistiklerinizi görüntüleyin
+                      {t('analytics.overview')}
                     </p>
                   </div>
                   <Link
                     href="/profile/business"
                     className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl"
                   >
-                    Paneli Aç →
+                    {t('common.view')} →
                   </Link>
                 </div>
               </div>
@@ -394,26 +396,26 @@ export default function ProfilePage() {
 
             {/* Quick Links */}
             <div className="bg-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">Hızlı Erişim</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('common.more')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: 'Mesajlarım', href: '/messages', icon: '💬' },
-                  { label: 'Favorilerim', href: '/wishlist', icon: '❤️' },
-                  { label: 'Tekliflerim', href: '/offers', icon: '🏷️' },
-                  { label: 'Takaslarım', href: '/trades', icon: '🔄' },
-                  { label: 'Takip Ettiklerim', href: '/profile/following', icon: '👥' },
-                  { label: 'Beğenilen Koleksiyonlar', href: '/collections/liked', icon: '📚' },
-                  { label: 'Kayıtlı Aramalar', href: '/saved-searches', icon: '🔍' },
-                  { label: 'Ödeme Yöntemleri', href: '/payment-methods', icon: '💳' },
-                  { label: 'Adreslerim', href: '/profile/addresses', icon: '📍' },
-                  { label: 'Üyelik Yönetimi', href: '/membership/manage', icon: '👑' },
-                  { label: 'Üyelik', href: '/pricing', icon: '⭐' },
-                  { label: 'Destek', href: '/support', icon: '🎫' },
-                  { label: 'Ödeme Geçmişi', href: '/profile/payments', icon: '💳' },
-                  { label: 'İstatistikler', href: '/profile/statistics', icon: '📈' },
-                  { label: 'Ayarlar', href: '/profile/settings', icon: '⚙️' },
+                  { label: t('nav.messages'), href: '/messages', icon: '💬' },
+                  { label: t('nav.favorites'), href: '/wishlist', icon: '❤️' },
+                  { label: t('offer.myOffers'), href: '/offers', icon: '🏷️' },
+                  { label: t('trade.myTrades'), href: '/trades', icon: '🔄' },
+                  { label: t('profile.following'), href: '/profile/following', icon: '👥' },
+                  { label: t('collection.collections'), href: '/collections/liked', icon: '📚' },
+                  { label: t('search.recentSearches'), href: '/saved-searches', icon: '🔍' },
+                  { label: t('payment.paymentMethods'), href: '/payment-methods', icon: '💳' },
+                  { label: t('address.myAddresses'), href: '/profile/addresses', icon: '📍' },
+                  { label: t('membership.manageMembership'), href: '/membership/manage', icon: '👑' },
+                  { label: t('nav.membership'), href: '/pricing', icon: '⭐' },
+                  { label: t('footer.support'), href: '/support', icon: '🎫' },
+                  { label: t('nav.payments'), href: '/profile/payments', icon: '💳' },
+                  { label: t('analytics.analytics'), href: '/profile/statistics', icon: '📈' },
+                  { label: t('nav.settings'), href: '/profile/settings', icon: '⚙️' },
                   ...(profile.membership?.tier.type === 'business' ? [
-                    { label: 'İşletme Paneli', href: '/profile/business', icon: '📊' }
+                    { label: t('analytics.analytics'), href: '/profile/business', icon: '📊' }
                   ] : []),
                 ].map((link) => (
                   <Link
@@ -433,12 +435,12 @@ export default function ProfilePage() {
               onClick={handleLogout}
               className="w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
             >
-              Çıkış Yap
+              {t('common.logout')}
             </button>
           </div>
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-400">Profil yüklenemedi</p>
+            <p className="text-gray-400">{t('error.somethingWrong')}</p>
           </div>
         )}
       </main>

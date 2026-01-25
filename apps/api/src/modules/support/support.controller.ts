@@ -9,6 +9,8 @@ import {
   Request,
   ParseUUIDPipe,
   UseGuards,
+  Ip,
+  Req,
 } from '@nestjs/common';
 import { SupportService } from './support.service';
 import {
@@ -19,16 +21,48 @@ import {
   TicketResponseDto,
   TicketListResponseDto,
   TicketStatsDto,
+  GuestContactDto,
+  GuestContactResponseDto,
 } from './dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole, TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('support')
 export class SupportController {
   constructor(private readonly supportService: SupportService) {}
+
+  // ==========================================================================
+  // PUBLIC ENDPOINTS (No Auth Required)
+  // ==========================================================================
+
+  /**
+   * Guest contact form submission (Public)
+   * POST /support/contact
+   * Rate limited: 5 requests per hour per IP
+   */
+  @Post('contact')
+  @Public()
+  async guestContact(
+    @Body() dto: GuestContactDto,
+    @Ip() ip: string,
+    @Req() req: any,
+  ): Promise<GuestContactResponseDto> {
+    // Get real IP from headers if behind proxy
+    const clientIp =
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req.headers['x-real-ip'] ||
+      ip ||
+      'unknown';
+    return this.supportService.createGuestContact(dto, clientIp);
+  }
+
+  // ==========================================================================
+  // AUTHENTICATED ENDPOINTS
+  // ==========================================================================
 
   /**
    * Create a support ticket
@@ -188,5 +222,17 @@ export class SupportController {
   @Roles(AdminRole.admin, AdminRole.super_admin)
   async getStats(): Promise<TicketStatsDto> {
     return this.supportService.getTicketStats();
+  }
+
+  /**
+   * Get guest contact submissions (Admin)
+   * GET /support/admin/guest-contacts
+   */
+  @Get('admin/guest-contacts')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.admin, AdminRole.super_admin, AdminRole.moderator)
+  async getGuestContacts(): Promise<any[]> {
+    return this.supportService.getGuestContacts();
   }
 }

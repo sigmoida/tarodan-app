@@ -29,6 +29,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
 import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from '@/i18n';
 
 interface ProductImage {
   id?: string;
@@ -65,12 +66,15 @@ interface Listing {
   };
   created_at?: string;
   createdAt?: string;
+  viewCount?: number;
+  likeCount?: number;
 }
 
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { t, locale } = useTranslation();
   
   const { addToCart, items: cartItems, removeFromCart } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
@@ -91,7 +95,7 @@ export default function ListingDetailPage() {
   const [addingToCollection, setAddingToCollection] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalConfig, setAuthModalConfig] = useState({
-    title: 'Giriş Yapmanız Gerekiyor',
+    title: '',
     message: '',
     icon: null as React.ReactNode,
   });
@@ -110,10 +114,11 @@ export default function ListingDetailPage() {
   const [imageContainerRef, setImageContainerRef] = useState<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const zoomPreviewRef = useRef<HTMLDivElement | null>(null);
+  const viewCountedRef = useRef<boolean>(false); // Track if view has been counted
   
   // Product reviews state
   const [reviews, setReviews] = useState<any[]>([]);
-  const [reviewStats, setReviewStats] = useState<{ averageRating: number; totalRatings: number } | null>(null);
+  const [reviewStats, setReviewStats] = useState<{ averageRating: number; totalRatings: number; scoreDistribution?: Record<number, number> } | null>(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   
   // Check if product is in cart
@@ -186,7 +191,24 @@ export default function ListingDetailPage() {
   const fetchListing = async () => {
     try {
       const response = await listingsApi.getOne(id);
-      setListing(response.data.product || response.data);
+      const productData = response.data.product || response.data;
+      setListing(productData);
+      
+      // Increment view count ONLY ONCE per page load
+      // Use ref to prevent double counting when auth state changes
+      if (!viewCountedRef.current) {
+        viewCountedRef.current = true;
+        try {
+          const viewResponse = await api.post(`/products/${id}/view`);
+          if (viewResponse.data?.viewCount !== undefined) {
+            // Update the listing with the new view count
+            setListing((prev: any) => prev ? { ...prev, viewCount: viewResponse.data.viewCount } : prev);
+          }
+        } catch (viewError) {
+          // Silent fail - view tracking is not critical
+          console.debug('View tracking skipped or failed');
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch listing:', error);
     } finally {
@@ -213,7 +235,13 @@ export default function ListingDetailPage() {
         api.get(`/ratings/products/${id}/stats`),
       ]);
       setReviews(reviewsRes.data?.ratings || reviewsRes.data?.data || []);
-      setReviewStats(statsRes.data || null);
+      // Map API response to frontend expected format
+      const stats = statsRes.data;
+      setReviewStats(stats ? {
+        averageRating: stats.averageScore || 0,
+        totalRatings: stats.totalRatings || 0,
+        scoreDistribution: stats.scoreDistribution,
+      } : null);
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
     } finally {
@@ -226,7 +254,7 @@ export default function ListingDetailPage() {
     
     // Check if product is available
     if (listing.status && listing.status !== 'active') {
-      toast.error('Bu ürün şu anda satışta değil');
+      toast.error(t('product.productNotForSale'));
       return;
     }
     
@@ -236,15 +264,15 @@ export default function ListingDetailPage() {
         productId: listing.id,
         title: listing.title,
         price: Number(listing.price),
-        imageUrl: listing.images?.length ? getImageUrl(listing.images[0]) : 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        imageUrl: listing.images?.length ? getImageUrl(listing.images[0]) : 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Product',
         seller: {
           id: listing.sellerId || listing.seller?.id || '',
-          displayName: listing.seller?.displayName || listing.seller?.username || 'Satıcı',
+          displayName: listing.seller?.displayName || listing.seller?.username || t('product.seller'),
         },
       });
-      toast.success('Ürün sepete eklendi');
+      toast.success(t('product.addedToCart'));
     } catch (error) {
-      toast.error('Sepete eklenemedi');
+      toast.error(t('common.operationFailed'));
     } finally {
       setIsAddingToCart(false);
     }
@@ -256,9 +284,9 @@ export default function ListingDetailPage() {
     setIsAddingToCart(true);
     try {
       await removeFromCart(cartItem.id);
-      toast.success('Ürün sepetten çıkarıldı');
+      toast.success(t('product.removedFromCart'));
     } catch (error) {
-      toast.error('Sepetten çıkarılamadı');
+      toast.error(t('product.removeFromCartFailed'));
     } finally {
       setIsAddingToCart(false);
     }
@@ -278,11 +306,11 @@ export default function ListingDetailPage() {
     // Check if product is available for purchase
     if (listing.status && listing.status !== 'active') {
       if (listing.status === 'reserved') {
-        toast.error('Bu ürün şu anda başka bir alıcı tarafından satın alınıyor');
+        toast.error(t('product.productReserved'));
       } else if (listing.status === 'sold') {
-        toast.error('Bu ürün satılmıştır');
+        toast.error(t('product.productSold'));
       } else {
-        toast.error('Bu ürün şu anda satışta değil');
+        toast.error(t('product.productNotForSale'));
       }
       return;
     }
@@ -293,8 +321,8 @@ export default function ListingDetailPage() {
   const handleMakeOffer = () => {
     if (!isAuthenticated) {
       setAuthModalConfig({
-        title: 'Giriş Yapmanız Gerekiyor',
-        message: 'Teklif vermek için giriş yapmalısınız.',
+        title: t('auth.authRequired'),
+        message: t('product.loginToOffer'),
         icon: <BoltIcon className="w-12 h-12 text-orange-500" />,
       });
       setShowAuthModal(true);
@@ -302,12 +330,12 @@ export default function ListingDetailPage() {
     }
     
     if (!listing || listing.status !== 'active') {
-      toast.error('Bu ürün şu anda satışta değil');
+      toast.error(t('product.productNotForSale'));
       return;
     }
     
     if (isOwner) {
-      toast.error('Kendi ürününüze teklif veremezsiniz');
+      toast.error(t('product.cannotOfferOwn'));
       return;
     }
     
@@ -321,18 +349,18 @@ export default function ListingDetailPage() {
     
     const amount = parseFloat(offerAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Geçerli bir tutar giriniz');
+      toast.error(t('product.enterValidAmount'));
       return;
     }
     
     const minOffer = Number(listing.price) * 0.5; // Minimum %50
     if (amount < minOffer) {
-      toast.error(`Minimum teklif tutarı: ${minOffer.toFixed(2)} TL (Ürün fiyatının %50'si)`);
+      toast.error(`Min: ${minOffer.toFixed(2)} TL (50%)`);
       return;
     }
     
     if (amount >= Number(listing.price)) {
-      toast.error('Teklif tutarı ürün fiyatından düşük olmalıdır');
+      toast.error(t('product.offerMustBeLower'));
       return;
     }
     
@@ -343,12 +371,12 @@ export default function ListingDetailPage() {
         amount: amount,
         message: offerMessage.trim() || undefined,
       });
-      toast.success('Teklifiniz başarıyla gönderildi');
+      toast.success(t('product.offerSentSuccess'));
       setShowOfferModal(false);
       setOfferAmount('');
       setOfferMessage('');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Teklif gönderilemedi';
+      const errorMessage = error.response?.data?.message || t('product.offerFailed');
       toast.error(errorMessage);
     } finally {
       setIsSubmittingOffer(false);
@@ -359,12 +387,12 @@ export default function ListingDetailPage() {
 
   const handleOpenCollectionModal = async () => {
     if (!isAuthenticated || !user) {
-      toast.error('Koleksiyona eklemek için giriş yapmalısınız');
+      toast.error(t('product.loginToAddCollection'));
       return;
     }
     
     if (!limits?.canCreateCollections) {
-      toast.error('Koleksiyon oluşturma özelliği üyeliğinizde mevcut değil');
+      toast.error(t('product.collectionFeatureNotAvailable'));
       router.push('/pricing');
       return;
     }
@@ -377,7 +405,7 @@ export default function ListingDetailPage() {
       setCollections(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch collections:', error);
-      toast.error('Koleksiyonlar yüklenemedi');
+      toast.error(t('product.collectionsLoadFailed'));
     } finally {
       setLoadingCollections(false);
     }
@@ -389,11 +417,11 @@ export default function ListingDetailPage() {
     setAddingToCollection(true);
     try {
       await collectionsApi.addItem(collectionId, { productId: listing.id });
-      toast.success('Ürün koleksiyona eklendi');
+      toast.success(t('product.addedToCollection'));
       setShowCollectionModal(false);
     } catch (error: any) {
       console.error('Failed to add to collection:', error);
-      toast.error(error.response?.data?.message || 'Koleksiyona eklenemedi');
+      toast.error(error.response?.data?.message || t('common.operationFailed'));
     } finally {
       setAddingToCollection(false);
     }
@@ -402,11 +430,17 @@ export default function ListingDetailPage() {
   const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
       setAuthModalConfig({
-        title: 'Favorilere Ekle',
-        message: 'Bu ürünü favorilerinize eklemek için giriş yapmanız gerekiyor.',
+        title: t('product.addToFavorites'),
+        message: t('auth.memberBenefits'),
         icon: <HeartOutlineIcon className="w-10 h-10 text-red-500" />,
       });
       setShowAuthModal(true);
+      return;
+    }
+    
+    // Cannot favorite own product
+    if (isOwner) {
+      toast.error(t('product.cannotFavoriteOwn'));
       return;
     }
     
@@ -414,14 +448,15 @@ export default function ListingDetailPage() {
       if (isFavorite) {
         await wishlistApi.remove(id);
         setIsFavorite(false);
-        toast.success('Favorilerden çıkarıldı');
+        toast.success(t('product.removedFromFavorites'));
       } else {
         await wishlistApi.add(id);
         setIsFavorite(true);
-        toast.success('Favorilere eklendi');
+        toast.success(t('product.addToFavorites'));
       }
-    } catch (error) {
-      toast.error('İşlem başarısız');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || t('common.operationFailed');
+      toast.error(message);
     }
   };
 
@@ -431,7 +466,7 @@ export default function ListingDetailPage() {
 
   const shareToSocial = async (platform: string) => {
     const url = encodeURIComponent(window.location.href);
-    const title = encodeURIComponent(listing?.title || 'Taro\'da bu ürüne göz at!');
+    const title = encodeURIComponent(listing?.title || 'Check this out on Tarodan!');
     const text = encodeURIComponent(`${listing?.title} - ₺${listing?.price?.toLocaleString('tr-TR')}`);
     
     let shareUrl = '';
@@ -452,9 +487,9 @@ export default function ListingDetailPage() {
       case 'copy':
         try {
           await navigator.clipboard.writeText(window.location.href);
-          toast.success('Link kopyalandı!');
+          toast.success(t('common.copied'));
         } catch (e) {
-          toast.error('Link kopyalanamadı');
+          toast.error(t('common.copyFailed'));
         }
         setShowShareMenu(false);
         return;
@@ -613,7 +648,7 @@ export default function ListingDetailPage() {
   if (!listing) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">İlan bulunamadı</p>
+        <p className="text-gray-500">{t('product.listingNotFound')}</p>
       </div>
     );
   }
@@ -665,7 +700,7 @@ export default function ListingDetailPage() {
               {isTradeAvailable && (
                 <div className="absolute top-4 left-4 badge badge-trade text-base z-10">
                   <ArrowsRightLeftIcon className="w-5 h-5 mr-1" />
-                  Takas Kabul Edilir
+                  {t('product.tradeAccepted')}
                 </div>
               )}
 
@@ -946,44 +981,59 @@ export default function ListingDetailPage() {
                   onClick={() => {
                     if (!isAuthenticated) {
                       setAuthModalConfig({
-                        title: 'İlanı Raporla',
-                        message: 'İlanı raporlamak için giriş yapmanız gerekiyor.',
+                        title: t('product.reportListing'),
+                        message: t('product.reportListingMsg'),
                         icon: <FlagIcon className="w-10 h-10 text-red-500" />,
                       });
                       setShowAuthModal(true);
                     } else {
-                      toast('İlan raporlama özelliği yakında eklenecek');
+                      toast(t('common.comingSoon'));
                     }
                   }}
                   className="p-2 rounded-full hover:bg-red-50 transition-colors"
-                  title="İlanı Raporla"
+                  title={t('product.reportListing')}
                 >
                   <FlagIcon className="w-6 h-6 text-gray-400 hover:text-red-500" />
                 </button>
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-orange-500 mb-6">
+            <p className="text-4xl font-bold text-orange-500 mb-4">
               ₺{Number(listing.price).toLocaleString('tr-TR')}
             </p>
+
+            {/* View & Like Stats */}
+            <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>{listing.viewCount || 0} {t('product.views')}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <HeartIcon className="w-4 h-4" />
+                <span>{listing.likeCount || 0} {t('product.likes')}</span>
+              </div>
+            </div>
 
             {/* Quick Info */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-white rounded-xl mb-6">
               {listing.brand && (
                 <div className="text-center">
-                  <p className="text-sm text-gray-500">Marka</p>
+                  <p className="text-sm text-gray-500">{t('product.brand')}</p>
                   <p className="font-semibold">{listing.brand}</p>
                 </div>
               )}
               {listing.scale && (
                 <div className="text-center">
-                  <p className="text-sm text-gray-500">Ölçek</p>
+                  <p className="text-sm text-gray-500">{t('product.scale')}</p>
                   <p className="font-semibold">{listing.scale}</p>
                 </div>
               )}
               {listing.category && (
                 <div className="text-center">
-                  <p className="text-sm text-gray-500">Kategori</p>
+                  <p className="text-sm text-gray-500">{t('product.category')}</p>
                   <p className="font-semibold">{listing.category.name}</p>
                 </div>
               )}
@@ -1003,9 +1053,9 @@ export default function ListingDetailPage() {
 
             {/* Description */}
             <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-2">Açıklama</h2>
+              <h2 className="text-lg font-semibold mb-2">{t('product.description')}</h2>
               <p className="text-gray-600 whitespace-pre-line">
-                {listing.description || 'Açıklama bulunmuyor.'}
+                {listing.description || t('product.noDescription')}
               </p>
             </div>
 
@@ -1013,15 +1063,49 @@ export default function ListingDetailPage() {
             {listing.seller && (
               <div className="bg-white rounded-xl p-4 mb-6">
                 <div className="flex items-center gap-4">
-                  <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
-                      <span className="text-xl">👤</span>
-                    </div>
-                  </Link>
-                  <div className="flex-1">
-                    <Link href={`/seller/${listing.seller.id}`} className="font-semibold hover:text-orange-500 transition-colors">
-                      {listing.seller.displayName || listing.seller.username || 'Satıcı'}
+                  {isAuthenticated ? (
+                    <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
+                        <span className="text-xl">👤</span>
+                      </div>
                     </Link>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAuthModalConfig({
+                          title: t('product.viewSellerProfile'),
+                          message: t('product.viewSellerProfileMsg'),
+                          icon: <span className="text-4xl">👤</span>,
+                        });
+                        setShowAuthModal(true);
+                      }}
+                      className="flex-shrink-0"
+                    >
+                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
+                        <span className="text-xl">👤</span>
+                      </div>
+                    </button>
+                  )}
+                  <div className="flex-1">
+                    {isAuthenticated ? (
+                      <Link href={`/seller/${listing.seller.id}`} className="font-semibold hover:text-orange-500 transition-colors">
+                        {listing.seller.displayName || listing.seller.username || t('product.seller')}
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAuthModalConfig({
+                            title: t('product.viewSellerProfile'),
+                            message: t('product.viewSellerProfileMsg'),
+                            icon: <span className="text-4xl">👤</span>,
+                          });
+                          setShowAuthModal(true);
+                        }}
+                        className="font-semibold hover:text-orange-500 transition-colors text-left cursor-pointer"
+                      >
+                        {listing.seller.displayName || listing.seller.username || t('product.seller')}
+                      </button>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <div className="flex items-center">
                         <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
@@ -1029,7 +1113,7 @@ export default function ListingDetailPage() {
                       </div>
                       <span>•</span>
                       <span>
-                        {listing.seller.listings_count || listing.seller.productsCount || 0} ilan
+                        {listing.seller.listings_count || listing.seller.productsCount || 0} {t('product.listings')}
                       </span>
                     </div>
                   </div>
@@ -1039,14 +1123,14 @@ export default function ListingDetailPage() {
                       className="btn-secondary flex items-center gap-2"
                     >
                       <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                      Mesaj Gönder
+                      {t('product.sendMessage')}
                     </Link>
                   ) : (
                     <button
                       onClick={() => {
                         setAuthModalConfig({
-                          title: 'Satıcıya Mesaj Gönder',
-                          message: 'Satıcıyla iletişime geçmek için giriş yapmanız gerekiyor.',
+                          title: t('product.sendMessageToSeller'),
+                          message: t('product.sendMessageToSellerMsg'),
                           icon: <ChatBubbleLeftRightIcon className="w-10 h-10 text-orange-500" />,
                         });
                         setShowAuthModal(true);
@@ -1054,7 +1138,7 @@ export default function ListingDetailPage() {
                       className="btn-secondary flex items-center gap-2"
                     >
                       <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                      Mesaj Gönder
+                      {t('product.sendMessage')}
                     </button>
                   )}
                 </div>
@@ -1086,15 +1170,15 @@ export default function ListingDetailPage() {
                           ? 'text-red-800'
                           : 'text-gray-800'
                     }`}>
-                      {listing.status === 'reserved' && 'Bu ürün şu anda rezerve edilmiş'}
-                      {listing.status === 'sold' && 'Bu ürün satılmıştır'}
-                      {listing.status === 'pending' && 'Bu ürün onay bekliyor'}
-                      {listing.status === 'inactive' && 'Bu ürün aktif değil'}
-                      {listing.status === 'rejected' && 'Bu ürün reddedilmiş'}
+                      {listing.status === 'reserved' && t('product.statusReserved')}
+                      {listing.status === 'sold' && t('product.statusSold')}
+                      {listing.status === 'pending' && t('product.statusPending')}
+                      {listing.status === 'inactive' && t('product.statusInactive')}
+                      {listing.status === 'rejected' && t('product.statusRejected')}
                     </p>
                     <p className="text-sm text-gray-600">
-                      {listing.status === 'reserved' && 'Başka bir alıcı tarafından satın alma işlemi devam ediyor.'}
-                      {listing.status === 'sold' && 'Bu ürün artık satışta değil.'}
+                      {listing.status === 'reserved' && t('product.statusReservedDesc')}
+                      {listing.status === 'sold' && t('product.statusSoldDesc')}
                     </p>
                   </div>
                 </div>
@@ -1114,7 +1198,7 @@ export default function ListingDetailPage() {
                 }`}
               >
                 <BoltIcon className="w-6 h-6" />
-                {listing.status === 'sold' ? 'Satıldı' : listing.status === 'reserved' ? 'Rezerve Edildi' : 'Hemen Al'}
+                {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
               </button>
 
               {/* Secondary Actions */}
@@ -1123,13 +1207,13 @@ export default function ListingDetailPage() {
                   <button
                     onClick={() => {
                       if (listing.status !== 'active') {
-                        toast.error('Bu ürün şu anda satışta değil');
+                        toast.error(t('product.notForSale'));
                         return;
                       }
                       if (!isAuthenticated) {
                         setAuthModalConfig({
-                          title: 'Giriş Yapmanız Gerekiyor',
-                          message: 'Takas teklifi göndermek için giriş yapmalısınız.',
+                          title: t('auth.loginRequired'),
+                          message: t('trade.loginToTrade'),
                           icon: <ArrowsRightLeftIcon className="w-12 h-12 text-orange-500" />,
                         });
                         setShowAuthModal(true);
@@ -1147,7 +1231,7 @@ export default function ListingDetailPage() {
                     }`}
                   >
                     <ArrowsRightLeftIcon className="w-5 h-5" />
-                    Takas Teklifi
+                    {t('product.trade')}
                   </button>
                 )}
                 {!isOwner && (
@@ -1161,26 +1245,26 @@ export default function ListingDetailPage() {
                     }`}
                   >
                     <BoltIcon className="w-5 h-5" />
-                    Teklif Ver
+                    {t('product.makeOffer')}
                   </button>
                 )}
-                <button
-                  onClick={handleCartToggle}
-                  disabled={isAddingToCart || listing.status !== 'active'}
-                  className={`flex-1 flex items-center justify-center gap-2 ${
-                    listing.status !== 'active' 
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
-                      : isInCart 
-                        ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
-                        : 'btn-secondary'
-                  }`}
-                >
-                  <ShoppingCartIcon className="w-5 h-5" />
-                  {isAddingToCart 
-                    ? (isInCart ? 'Çıkarılıyor...' : 'Ekleniyor...') 
-                    : (isInCart ? 'Sepetten Çıkar' : 'Sepete Ekle')
-                  }
-                </button>
+                  <button
+                    onClick={handleCartToggle}
+                    disabled={isAddingToCart || listing.status !== 'active'}
+                    className={`flex-1 flex items-center justify-center gap-2 ${
+                      listing.status !== 'active' 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                        : isInCart 
+                          ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                          : 'btn-secondary'
+                    }`}
+                  >
+                    <ShoppingCartIcon className="w-5 h-5" />
+                    {isAddingToCart 
+                      ? (isInCart ? t('product.removing') : t('product.adding')) 
+                      : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
+                    }
+                  </button>
                 <button
                   onClick={handleToggleFavorite}
                   className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
@@ -1188,12 +1272,12 @@ export default function ListingDetailPage() {
                   {isFavorite ? (
                     <>
                       <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                      Favorilerden Çıkar
+                      {t('product.removeFromFavorites')}
                     </>
                   ) : (
                     <>
                       <HeartIcon className="w-5 h-5" />
-                      Favorilere Ekle
+                      {t('product.addToFavorites')}
                     </>
                   )}
                 </button>
@@ -1208,7 +1292,7 @@ export default function ListingDetailPage() {
                   className="w-full btn-secondary flex items-center justify-center gap-2"
                 >
                   <FolderPlusIcon className="w-5 h-5" />
-                  Koleksiyona Ekle
+                  {t('collection.addToCollection')}
                 </button>
               </div>
             )}
@@ -1221,7 +1305,7 @@ export default function ListingDetailPage() {
         <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
-              Ürün Değerlendirmeleri
+              {t('product.productReviews')}
             </h2>
             {reviewStats && (
               <div className="flex items-center gap-2">
@@ -1241,7 +1325,7 @@ export default function ListingDetailPage() {
                   {(reviewStats.averageRating || 0).toFixed(1)}
                 </span>
                 <span className="text-gray-500">
-                  ({reviewStats.totalRatings || 0} değerlendirme)
+                  ({reviewStats.totalRatings || 0} {t('review.reviews')})
                 </span>
               </div>
             )}
@@ -1255,10 +1339,10 @@ export default function ListingDetailPage() {
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-medium text-gray-900 mb-2">
-                Henüz değerlendirme yapılmamış
+                {t('product.noReviews')}
               </p>
               <p className="text-gray-600">
-                Bu ürünü satın alan ilk kişi olun ve deneyiminizi paylaşın!
+                {t('product.beFirstToReview')}
               </p>
             </div>
           ) : (
@@ -1277,7 +1361,7 @@ export default function ListingDetailPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">
-                          {review.user?.displayName || 'Anonim'}
+                          {review.user?.displayName || (locale === 'en' ? 'Anonymous' : 'Anonim')}
                         </span>
                         <div className="flex">
                           {[1, 2, 3, 4, 5].map((star) => (
@@ -1316,7 +1400,7 @@ export default function ListingDetailPage() {
       {showCollectionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Koleksiyona Ekle</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addToCollection')}</h2>
             
             {loadingCollections ? (
               <div className="flex justify-center py-8">
@@ -1338,12 +1422,12 @@ export default function ListingDetailPage() {
                           <p className="text-sm text-gray-600 mt-1 line-clamp-2">{collection.description}</p>
                         )}
                         <p className="text-xs text-gray-500 mt-2">
-                          {collection.itemCount || 0} ürün
+                          {collection.itemCount || 0} {locale === 'en' ? 'products' : 'ürün'}
                         </p>
                       </button>
                     ))
                   ) : (
-                    <p className="text-gray-600 text-center py-8">Henüz koleksiyonunuz yok</p>
+                    <p className="text-gray-600 text-center py-8">{t('collection.noCollections')}</p>
                   )}
                   
                   {/* New Collection Button */}
@@ -1354,7 +1438,7 @@ export default function ListingDetailPage() {
                     }}
                     className="w-full p-4 bg-orange-50 hover:bg-orange-100 border-2 border-dashed border-orange-300 rounded-lg transition-colors text-orange-700 font-medium"
                   >
-                    + Yeni Koleksiyon Oluştur
+                    + {t('collection.createNewCollection')}
                   </button>
                 </div>
               </div>
@@ -1365,7 +1449,7 @@ export default function ListingDetailPage() {
                 onClick={() => setShowCollectionModal(false)}
                 className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
               >
-                İptal
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -1386,7 +1470,7 @@ export default function ListingDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Teklif Ver</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t('product.makeOffer')}</h2>
               <button
                 onClick={() => setShowOfferModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -1398,25 +1482,25 @@ export default function ListingDetailPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ürün Fiyatı
+                  {t('product.productPrice')}
                 </label>
                 <div className="text-lg font-semibold text-gray-900">
                   {Number(listing.price).toLocaleString('tr-TR')} TL
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Minimum teklif: {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
+                  {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
                 </p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Teklif Tutarınız (TL)
+                  {locale === 'en' ? 'Your Offer Amount (TL)' : 'Teklif Tutarınız (TL)'}
                 </label>
                 <input
                   type="number"
                   value={offerAmount}
                   onChange={(e) => setOfferAmount(e.target.value)}
-                  placeholder="Teklif tutarını giriniz"
+                  placeholder={locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'}
                   min={Math.round(Number(listing.price) * 0.5)}
                   max={Number(listing.price) - 1}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -1425,18 +1509,18 @@ export default function ListingDetailPage() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mesaj (Opsiyonel)
+                  {locale === 'en' ? 'Message (Optional)' : 'Mesaj (Opsiyonel)'}
                 </label>
                 <textarea
                   value={offerMessage}
                   onChange={(e) => setOfferMessage(e.target.value)}
-                  placeholder="Satıcıya iletmek istediğiniz mesaj..."
+                  placeholder={locale === 'en' ? 'Message you want to send to seller...' : 'Satıcıya iletmek istediğiniz mesaj...'}
                   rows={4}
                   maxLength={500}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  {offerMessage.length}/500 karakter
+                  {offerMessage.length}/500 {locale === 'en' ? 'characters' : 'karakter'}
                 </p>
               </div>
               
@@ -1445,14 +1529,14 @@ export default function ListingDetailPage() {
                   onClick={() => setShowOfferModal(false)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 >
-                  İptal
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleSubmitOffer}
                   disabled={isSubmittingOffer || !offerAmount}
                   className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {isSubmittingOffer ? 'Gönderiliyor...' : 'Teklif Gönder'}
+                  {isSubmittingOffer ? t('common.sending') : t('product.sendOffer')}
                 </button>
               </div>
             </div>
@@ -1472,24 +1556,23 @@ export default function ListingDetailPage() {
               <ArrowsRightLeftIcon className="w-8 h-8 text-amber-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">
-              Premium Üyelik Gerekli
+              {t('trade.premiumRequired')}
             </h2>
             <p className="text-gray-600 mb-6">
-              Takas özelliği sadece Premium ve üzeri üyelikler için aktiftir. 
-              Üyeliğinizi yükselterek takas teklifleri gönderebilir ve alabilirsiniz.
+              {t('trade.premiumRequiredDesc')}
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowTradeModal(false)}
                 className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
               >
-                Vazgeç
+                {t('common.cancel')}
               </button>
               <Link
                 href="/membership"
                 className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors text-center"
               >
-                Üyeliği Yükselt
+                {t('membership.upgrade')}
               </Link>
             </div>
           </motion.div>

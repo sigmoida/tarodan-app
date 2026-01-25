@@ -282,20 +282,24 @@ model Category {
 }
 
 model Product {
-  id                String           @id @default(uuid())
-  sellerId          String           @map("seller_id")
-  categoryId        String           @map("category_id")
-  title             String
-  description       String?
-  price             Decimal          @db.Decimal(10, 2)
-  condition         ProductCondition
-  status            ProductStatus    @default(pending)
-  isTradeEnabled    Boolean          @default(false) @map("is_trade_enabled")
-  viewCount         Int              @default(0) @map("view_count")
-  likeCount         Int              @default(0) @map("like_count")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-  version           Int              @default(1)
+  id                   String           @id @default(uuid())
+  sellerId             String           @map("seller_id")
+  categoryId           String           @map("category_id")
+  title                String
+  description          String?
+  price                Decimal          @db.Decimal(10, 2)
+  condition            ProductCondition
+  status               ProductStatus    @default(pending)
+  isTradeEnabled       Boolean          @default(false) @map("is_trade_enabled")
+  quantity             Int              @default(1)
+  maxQuantityPerOrder  Int              @default(5) @map("max_quantity_per_order")
+  viewCount            Int              @default(0) @map("view_count")
+  likeCount            Int              @default(0) @map("like_count")
+  popularityScore      Int              @default(0) @map("popularity_score")
+  popularityUpdatedAt  DateTime?        @map("popularity_updated_at")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  version              Int              @default(1)
   collectionItems   CollectionItem[]
   likes             ProductLike[]
   offers            Offer[]

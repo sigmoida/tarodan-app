@@ -17,6 +17,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { tradesApi } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface TradeItem {
   id: string;
@@ -62,80 +63,82 @@ interface Trade {
   cancelReason?: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any; description: string }> = {
+const getStatusConfig = (locale: string): Record<string, { label: string; color: string; icon: any; description: string }> => ({
   pending: { 
-    label: 'Bekliyor', 
+    label: locale === 'en' ? 'Pending' : 'Bekliyor', 
     color: 'bg-yellow-100 text-yellow-700 border-yellow-300', 
     icon: ClockIcon,
-    description: 'Teklif alıcı tarafından değerlendiriliyor'
+    description: locale === 'en' ? 'Offer is being evaluated by the recipient' : 'Teklif alıcı tarafından değerlendiriliyor'
   },
   accepted: { 
-    label: 'Kabul Edildi', 
+    label: locale === 'en' ? 'Accepted' : 'Kabul Edildi', 
     color: 'bg-orange-100 text-orange-700 border-orange-300', 
     icon: CheckCircleIcon,
-    description: 'Takas kabul edildi, gönderim bekleniyor'
+    description: locale === 'en' ? 'Trade accepted, awaiting shipment' : 'Takas kabul edildi, gönderim bekleniyor'
   },
   rejected: { 
-    label: 'Reddedildi', 
+    label: locale === 'en' ? 'Rejected' : 'Reddedildi', 
     color: 'bg-red-100 text-red-700 border-red-300', 
     icon: XCircleIcon,
-    description: 'Teklif reddedildi'
+    description: locale === 'en' ? 'Offer rejected' : 'Teklif reddedildi'
   },
   initiator_shipped: { 
-    label: 'Gönderildi', 
+    label: locale === 'en' ? 'Shipped' : 'Gönderildi', 
     color: 'bg-purple-100 text-purple-700 border-purple-300', 
     icon: TruckIcon,
-    description: 'Başlatıcı ürünlerini gönderdi'
+    description: locale === 'en' ? 'Initiator shipped their items' : 'Başlatıcı ürünlerini gönderdi'
   },
   receiver_shipped: { 
-    label: 'Gönderildi', 
+    label: locale === 'en' ? 'Shipped' : 'Gönderildi', 
     color: 'bg-purple-100 text-purple-700 border-purple-300', 
     icon: TruckIcon,
-    description: 'Alıcı ürünlerini gönderdi'
+    description: locale === 'en' ? 'Receiver shipped their items' : 'Alıcı ürünlerini gönderdi'
   },
   both_shipped: { 
-    label: 'Her İki Taraf Gönderdi', 
+    label: locale === 'en' ? 'Both Parties Shipped' : 'Her İki Taraf Gönderdi', 
     color: 'bg-indigo-100 text-indigo-700 border-indigo-300', 
     icon: TruckIcon,
-    description: 'Her iki taraf da ürünlerini gönderdi'
+    description: locale === 'en' ? 'Both parties shipped their items' : 'Her iki taraf da ürünlerini gönderdi'
   },
   initiator_received: { 
-    label: 'Teslim Alındı', 
+    label: locale === 'en' ? 'Received' : 'Teslim Alındı', 
     color: 'bg-green-100 text-green-700 border-green-300', 
     icon: CheckCircleIcon,
-    description: 'Başlatıcı ürünleri teslim aldı'
+    description: locale === 'en' ? 'Initiator received the items' : 'Başlatıcı ürünleri teslim aldı'
   },
   receiver_received: { 
-    label: 'Teslim Alındı', 
+    label: locale === 'en' ? 'Received' : 'Teslim Alındı', 
     color: 'bg-green-100 text-green-700 border-green-300', 
     icon: CheckCircleIcon,
-    description: 'Alıcı ürünleri teslim aldı'
+    description: locale === 'en' ? 'Receiver received the items' : 'Alıcı ürünleri teslim aldı'
   },
   completed: { 
-    label: 'Tamamlandı', 
+    label: locale === 'en' ? 'Completed' : 'Tamamlandı', 
     color: 'bg-green-100 text-green-700 border-green-300', 
     icon: CheckCircleIcon,
-    description: 'Takas başarıyla tamamlandı'
+    description: locale === 'en' ? 'Trade successfully completed' : 'Takas başarıyla tamamlandı'
   },
   cancelled: { 
-    label: 'İptal Edildi', 
+    label: locale === 'en' ? 'Cancelled' : 'İptal Edildi', 
     color: 'bg-gray-100 text-gray-700 border-gray-300', 
     icon: XCircleIcon,
-    description: 'Takas iptal edildi'
+    description: locale === 'en' ? 'Trade cancelled' : 'Takas iptal edildi'
   },
   disputed: { 
-    label: 'İtiraz Açıldı', 
+    label: locale === 'en' ? 'Disputed' : 'İtiraz Açıldı', 
     color: 'bg-orange-100 text-orange-700 border-orange-300', 
     icon: ExclamationTriangleIcon,
-    description: 'Takas için itiraz açıldı'
+    description: locale === 'en' ? 'Dispute opened for trade' : 'Takas için itiraz açıldı'
   },
-};
+});
 
 export default function TradeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
   const tradeId = params.id as string;
+  const STATUS_CONFIG = getStatusConfig(locale);
 
   const [trade, setTrade] = useState<Trade | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -146,7 +149,7 @@ export default function TradeDetailPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('Takas detaylarını görmek için giriş yapmalısınız');
+      toast.error(locale === 'en' ? 'Please login to view trade details' : 'Takas detaylarını görmek için giriş yapmalısınız');
       router.push(`/login?redirect=/trades/${tradeId}`);
       return;
     }
@@ -164,13 +167,13 @@ export default function TradeDetailPage() {
 
     if (trade.status === 'pending' && trade.responseDeadline) {
       deadline = trade.responseDeadline;
-      deadlineLabel = 'Yanıt Süresi';
+      deadlineLabel = locale === 'en' ? 'Response Time' : 'Yanıt Süresi';
     } else if (trade.status === 'accepted' && trade.paymentDeadline) {
       deadline = trade.paymentDeadline;
-      deadlineLabel = 'Ödeme Süresi';
+      deadlineLabel = locale === 'en' ? 'Payment Time' : 'Ödeme Süresi';
     } else if (['initiator_shipped', 'receiver_shipped', 'accepted'].includes(trade.status) && trade.shippingDeadline) {
       deadline = trade.shippingDeadline;
-      deadlineLabel = 'Kargo Süresi';
+      deadlineLabel = locale === 'en' ? 'Shipping Time' : 'Kargo Süresi';
     }
 
     if (!deadline) {
@@ -184,7 +187,7 @@ export default function TradeDetailPage() {
       const diff = deadlineTime - now;
 
       if (diff <= 0) {
-        setCountdown(`${deadlineLabel}: Süre Doldu!`);
+        setCountdown(`${deadlineLabel}: ${locale === 'en' ? 'Time Expired!' : 'Süre Doldu!'}`);
         return;
       }
 
@@ -194,7 +197,7 @@ export default function TradeDetailPage() {
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       let timeStr = '';
-      if (days > 0) timeStr += `${days}g `;
+      if (days > 0) timeStr += `${days}${locale === 'en' ? 'd ' : 'g '}`;
       timeStr += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
       setCountdown(`${deadlineLabel}: ${timeStr}`);
@@ -213,7 +216,7 @@ export default function TradeDetailPage() {
       setTrade(response.data.trade || response.data);
     } catch (error: any) {
       console.error('Failed to fetch trade:', error);
-      toast.error(error.response?.data?.message || 'Takas yüklenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to load trade' : 'Takas yüklenemedi'));
       router.push('/trades');
     } finally {
       setIsLoading(false);
@@ -225,12 +228,12 @@ export default function TradeDetailPage() {
     
     setIsActionLoading(true);
     try {
-      await tradesApi.accept(trade.id, 'Takas teklifini kabul ediyorum');
-      toast.success('Takas kabul edildi!');
+      await tradesApi.accept(trade.id, locale === 'en' ? 'I accept the trade offer' : 'Takas teklifini kabul ediyorum');
+      toast.success(locale === 'en' ? 'Trade accepted!' : 'Takas kabul edildi!');
       fetchTrade();
     } catch (error: any) {
       console.error('Failed to accept trade:', error);
-      toast.error(error.response?.data?.message || 'Takas kabul edilemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to accept trade' : 'Takas kabul edilemedi'));
     } finally {
       setIsActionLoading(false);
     }
@@ -238,20 +241,20 @@ export default function TradeDetailPage() {
 
   const handleReject = async () => {
     if (!trade || !rejectReason.trim()) {
-      toast.error('Lütfen red nedeni belirtin');
+      toast.error(locale === 'en' ? 'Please specify rejection reason' : 'Lütfen red nedeni belirtin');
       return;
     }
 
     setIsActionLoading(true);
     try {
       await tradesApi.reject(trade.id, rejectReason);
-      toast.success('Takas reddedildi');
+      toast.success(locale === 'en' ? 'Trade rejected' : 'Takas reddedildi');
       setShowRejectModal(false);
       setRejectReason('');
       fetchTrade();
     } catch (error: any) {
       console.error('Failed to reject trade:', error);
-      toast.error(error.response?.data?.message || 'Takas reddedilemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to reject trade' : 'Takas reddedilemedi'));
     } finally {
       setIsActionLoading(false);
     }
@@ -260,18 +263,18 @@ export default function TradeDetailPage() {
   const handleCancel = async () => {
     if (!trade) return;
 
-    if (!confirm('Bu takası iptal etmek istediğinizden emin misiniz?')) {
+    if (!confirm(locale === 'en' ? 'Are you sure you want to cancel this trade?' : 'Bu takası iptal etmek istediğinizden emin misiniz?')) {
       return;
     }
 
     setIsActionLoading(true);
     try {
-      await tradesApi.cancel(trade.id, 'Kullanıcı tarafından iptal edildi');
-      toast.success('Takas iptal edildi');
+      await tradesApi.cancel(trade.id, locale === 'en' ? 'Cancelled by user' : 'Kullanıcı tarafından iptal edildi');
+      toast.success(locale === 'en' ? 'Trade cancelled' : 'Takas iptal edildi');
       fetchTrade();
     } catch (error: any) {
       console.error('Failed to cancel trade:', error);
-      toast.error(error.response?.data?.message || 'Takas iptal edilemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to cancel trade' : 'Takas iptal edilemedi'));
     } finally {
       setIsActionLoading(false);
     }
@@ -550,7 +553,7 @@ export default function TradeDetailPage() {
                   disabled={isActionLoading}
                   className="btn-primary flex-1 min-w-[120px]"
                 >
-                  {isActionLoading ? 'İşleniyor...' : 'Kabul Et'}
+                  {isActionLoading ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : (locale === 'en' ? 'Accept' : 'Kabul Et')}
                 </button>
               )}
               {canReject && (
@@ -559,7 +562,7 @@ export default function TradeDetailPage() {
                   disabled={isActionLoading}
                   className="btn-secondary flex-1 min-w-[120px]"
                 >
-                  Reddet
+                  {locale === 'en' ? 'Reject' : 'Reddet'}
                 </button>
               )}
               {canCancel && (
@@ -579,11 +582,11 @@ export default function TradeDetailPage() {
         {showRejectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4">Takası Reddet</h2>
+              <h2 className="text-xl font-semibold mb-4">{locale === 'en' ? 'Reject Trade' : 'Takası Reddet'}</h2>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Red nedeni (opsiyonel)"
+                placeholder={locale === 'en' ? 'Rejection reason (optional)' : 'Red nedeni (opsiyonel)'}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
               />
@@ -595,14 +598,14 @@ export default function TradeDetailPage() {
                   }}
                   className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
-                  İptal
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={isActionLoading}
                   className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {isActionLoading ? 'Reddediliyor...' : 'Reddet'}
+                  {isActionLoading ? (locale === 'en' ? 'Rejecting...' : 'Reddediliyor...') : (locale === 'en' ? 'Reject' : 'Reddet')}
                 </button>
               </div>
             </div>

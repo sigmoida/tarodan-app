@@ -8,10 +8,12 @@ import { ArrowLeftIcon, CameraIcon, UserCircleIcon } from '@heroicons/react/24/o
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function EditProfilePage() {
   const router = useRouter();
   const { isAuthenticated, user, setUser } = useAuthStore();
+  const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,13 +62,13 @@ export default function EditProfilePage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Lütfen bir resim dosyası seçin');
+      toast.error(locale === 'en' ? 'Please select an image file' : 'Lütfen bir resim dosyası seçin');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Dosya boyutu 5MB\'dan küçük olmalıdır');
+      toast.error(locale === 'en' ? 'File size must be less than 5MB' : 'Dosya boyutu 5MB\'dan küçük olmalıdır');
       return;
     }
 
@@ -88,10 +90,10 @@ export default function EditProfilePage() {
       
       setProfilePhoto(uploadedUrl);
       setUser(updatedUser);
-      toast.success('Profil fotoğrafı güncellendi');
+      toast.success(locale === 'en' ? 'Profile photo updated' : 'Profil fotoğrafı güncellendi');
     } catch (error: any) {
       console.error('Photo upload error:', error);
-      toast.error(error.response?.data?.message || 'Fotoğraf yüklenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to upload photo' : 'Fotoğraf yüklenemedi'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -104,11 +106,11 @@ export default function EditProfilePage() {
       const response = await api.patch('/users/me', formData);
       const updatedUser = response.data.user || response.data;
       setUser(updatedUser);
-      toast.success('Profil güncellendi');
+      toast.success(locale === 'en' ? 'Profile updated' : 'Profil güncellendi');
       router.push('/profile');
     } catch (error: any) {
       console.error('Profile update error:', error);
-      toast.error(error.response?.data?.message || 'Profil güncellenemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update profile' : 'Profil güncellenemedi'));
     } finally {
       setLoading(false);
     }
@@ -351,7 +353,7 @@ export default function EditProfilePage() {
                 disabled={loading}
                 className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
-                {loading ? 'Kaydediliyor...' : 'Kaydet'}
+                {loading ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...') : (locale === 'en' ? 'Save' : 'Kaydet')}
               </button>
             </div>
           </form>

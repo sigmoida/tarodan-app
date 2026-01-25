@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Offer {
   id: string;
@@ -34,6 +35,7 @@ interface Offer {
 export default function OffersPage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
+  const { t, locale } = useTranslation();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
@@ -57,7 +59,7 @@ export default function OffersPage() {
       setOffers(response.data?.data || response.data?.offers || []);
     } catch (err: any) {
       console.error('Offers load error:', err);
-      setError('Teklifler yüklenirken bir hata oluştu');
+      setError(locale === 'en' ? 'Failed to load offers' : 'Teklifler yüklenirken bir hata oluştu');
       setOffers([]);
     } finally {
       setLoading(false);
@@ -69,7 +71,7 @@ export default function OffersPage() {
       await api.post(`/offers/${offerId}/accept`);
       loadOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Teklif kabul edilirken hata oluştu');
+      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to accept offer' : 'Teklif kabul edilirken hata oluştu'));
     }
   };
 
@@ -78,7 +80,7 @@ export default function OffersPage() {
       await api.post(`/offers/${offerId}/reject`);
       loadOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Teklif reddedilirken hata oluştu');
+      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to reject offer' : 'Teklif reddedilirken hata oluştu'));
     }
   };
 
@@ -87,7 +89,7 @@ export default function OffersPage() {
       await api.post(`/offers/${offerId}/cancel`);
       loadOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Teklif iptal edilirken hata oluştu');
+      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to cancel offer' : 'Teklif iptal edilirken hata oluştu'));
     }
   };
 
@@ -100,7 +102,14 @@ export default function OffersPage() {
       cancelled: 'bg-gray-500/20 text-gray-400',
       expired: 'bg-orange-500/20 text-orange-400',
     };
-    const labels: Record<string, string> = {
+    const labels: Record<string, string> = locale === 'en' ? {
+      pending: 'Pending',
+      accepted: 'Accepted',
+      rejected: 'Rejected',
+      countered: 'Counter Offer',
+      cancelled: 'Cancelled',
+      expired: 'Expired',
+    } : {
       pending: 'Bekliyor',
       accepted: 'Kabul Edildi',
       rejected: 'Reddedildi',
@@ -123,12 +132,12 @@ export default function OffersPage() {
     <div className="min-h-screen bg-gray-900 text-white">
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Tekliflerim</h1>
+          <h1 className="text-3xl font-bold">{locale === 'en' ? 'My Offers' : 'Tekliflerim'}</h1>
           <Link
             href="/profile"
             className="text-gray-400 hover:text-white transition-colors"
           >
-            ← Profile Dön
+            ← {locale === 'en' ? 'Back to Profile' : 'Profile Dön'}
           </Link>
         </div>
 
@@ -142,7 +151,7 @@ export default function OffersPage() {
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
-            Gelen Teklifler
+            {locale === 'en' ? 'Received Offers' : 'Gelen Teklifler'}
           </button>
           <button
             onClick={() => setActiveTab('sent')}
@@ -152,7 +161,7 @@ export default function OffersPage() {
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
-            Gönderdiğim Teklifler
+            {locale === 'en' ? 'Sent Offers' : 'Gönderdiğim Teklifler'}
           </button>
         </div>
 
@@ -167,7 +176,7 @@ export default function OffersPage() {
               onClick={loadOffers}
               className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
             >
-              Tekrar Dene
+              {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
             </button>
           </div>
         ) : offers.length === 0 ? (

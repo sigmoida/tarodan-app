@@ -8,6 +8,7 @@ import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 interface Notification {
   id: string;
@@ -21,6 +22,7 @@ interface Notification {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ export default function NotificationsPage() {
       setNotifications(data);
     } catch (error) {
       console.error('Notifications load error:', error);
-      toast.error('Bildirimler yüklenemedi');
+      toast.error(t('common.operationFailed'));
     } finally {
       setLoading(false);
     }
@@ -64,10 +66,10 @@ export default function NotificationsPage() {
     try {
       await api.patch('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      toast.success('Tüm bildirimler okundu olarak işaretlendi');
+      toast.success(t('notification.allRead'));
     } catch (error) {
       console.error('Failed to mark all as read:', error);
-      toast.error('İşlem başarısız');
+      toast.error(t('common.operationFailed'));
     }
   };
 
@@ -82,9 +84,9 @@ export default function NotificationsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Bildirimlerim</h1>
+            <h1 className="text-3xl font-bold mb-2">{t('notification.notifications')}</h1>
             <p className="text-gray-600">
-              {unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : 'Tüm bildirimler okundu'}
+              {unreadCount > 0 ? `${unreadCount} ${t('notification.notifications').toLowerCase()}` : t('notification.allRead')}
             </p>
           </div>
           {unreadCount > 0 && (
@@ -92,7 +94,7 @@ export default function NotificationsPage() {
               onClick={markAllAsRead}
               className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
             >
-              Tümünü Okundu İşaretle
+              {t('notification.markAllRead')}
             </button>
           )}
         </div>
@@ -104,7 +106,7 @@ export default function NotificationsPage() {
         ) : notifications.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl">
             <BellIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg">Henüz bildiriminiz yok</p>
+            <p className="text-gray-600 text-lg">{t('notification.noNotifications')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -136,7 +138,7 @@ export default function NotificationsPage() {
                         className="text-primary-500 hover:text-primary-600 text-sm mt-2 inline-block"
                         onClick={() => markAsRead(notification.id)}
                       >
-                        Detayları Gör →
+                        {t('common.viewDetails')} →
                       </Link>
                     )}
                   </div>
@@ -144,7 +146,7 @@ export default function NotificationsPage() {
                     <button
                       onClick={() => markAsRead(notification.id)}
                       className="p-2 text-gray-400 hover:text-primary-500 transition-colors"
-                      title="Okundu işaretle"
+                      title={t('notification.markRead')}
                     >
                       <CheckIcon className="w-5 h-5" />
                     </button>

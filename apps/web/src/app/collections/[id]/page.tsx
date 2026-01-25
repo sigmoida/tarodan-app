@@ -18,6 +18,8 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi } from '@/lib/api';
+import AuthRequiredModal from '@/components/AuthRequiredModal';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface UserProduct {
   id: string;
@@ -62,6 +64,7 @@ export default function CollectionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
   const [collection, setCollection] = useState<Collection | null>(null);
@@ -73,6 +76,7 @@ export default function CollectionDetailPage() {
   const [myProducts, setMyProducts] = useState<UserProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     if (collectionIdOrSlug) {
@@ -82,7 +86,7 @@ export default function CollectionDetailPage() {
 
   const fetchCollection = async () => {
     if (!collectionIdOrSlug) {
-      setError('Geçersiz koleksiyon bağlantısı');
+      setError(t('collection.invalidLink'));
       setIsLoading(false);
       return;
     }
@@ -113,13 +117,13 @@ export default function CollectionDetailPage() {
       console.error('Failed to fetch collection:', error);
       const status = error.response?.status;
       if (status === 400) {
-        setError('Geçersiz koleksiyon bağlantısı');
+        setError(t('collection.invalidLink'));
       } else if (status === 403) {
-        setError('Bu koleksiyon özel');
+        setError(t('collection.privateCollection'));
       } else if (status === 404) {
-        setError('Koleksiyon bulunamadı');
+        setError(t('collection.collectionNotFound'));
       } else {
-        setError('Koleksiyon yüklenemedi');
+        setError(t('collection.loadFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -128,13 +132,12 @@ export default function CollectionDetailPage() {
 
   const handleLike = async () => {
     if (!isAuthenticated) {
-      toast.error('Beğenmek için giriş yapmalısınız');
-      router.push(`/login?redirect=/collections/${collectionIdOrSlug}`);
+      setShowAuthModal(true);
       return;
     }
 
     if (!collection || !collection.id) {
-      toast.error('Koleksiyon bilgisi bulunamadı');
+      toast.error(t('collection.collectionInfoNotFound'));
       return;
     }
 
@@ -155,12 +158,12 @@ export default function CollectionDetailPage() {
         likeCount: likeCount !== undefined ? likeCount : collection.likeCount,
         isLiked: liked !== undefined ? liked : !isLiked,
       });
-      toast.success(liked ? 'Beğenildi' : 'Beğeni kaldırıldı');
+      toast.success(liked ? t('collection.liked') : t('collection.unliked'));
     } catch (error: any) {
       console.error('Failed to like collection:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Beğeni işlemi başarısız';
+      const errorMessage = error?.response?.data?.message || error?.message || t('collection.likeFailed');
       if (error?.response?.status === 404) {
-        toast.error('Koleksiyon bulunamadı');
+        toast.error(t('collection.collectionNotFound'));
       } else {
         toast.error(errorMessage);
       }
@@ -170,17 +173,17 @@ export default function CollectionDetailPage() {
   const handleRemoveItem = async (itemId: string) => {
     if (!collection) return;
 
-    if (!confirm('Bu ürünü koleksiyondan kaldırmak istediğinizden emin misiniz?')) {
+    if (!confirm(t('collection.removeProductConfirm'))) {
       return;
     }
 
     try {
       await collectionsApi.removeItem(collection.id, itemId);
-      toast.success('Ürün koleksiyondan kaldırıldı');
+      toast.success(t('collection.productRemoved'));
       fetchCollection();
     } catch (error: any) {
       console.error('Failed to remove item:', error);
-      toast.error('Ürün kaldırılamadı');
+      toast.error(t('collection.productRemoveFailed'));
     }
   };
 
@@ -195,7 +198,7 @@ export default function CollectionDetailPage() {
       setMyProducts(availableProducts);
     } catch (error) {
       console.error('Failed to fetch my products:', error);
-      toast.error('Ürünler yüklenemedi');
+      toast.error(t('collection.productsLoadFailed'));
     } finally {
       setLoadingProducts(false);
     }
@@ -208,7 +211,7 @@ export default function CollectionDetailPage() {
 
   const handleAddItemToCollection = async () => {
     if (selectedProductIds.length === 0 || !collection) {
-      toast.error('Lütfen en az bir ürün seçin');
+      toast.error(t('collection.selectItems'));
       return;
     }
 
@@ -219,13 +222,13 @@ export default function CollectionDetailPage() {
         collectionsApi.addItem(collection.id, { productId })
       );
       await Promise.all(addPromises);
-      toast.success(`${selectedProductIds.length} ürün koleksiyona eklendi`);
+      toast.success(`${selectedProductIds.length} ${t('collection.productsAddedToCollection')}`);
       setShowAddItemModal(false);
       setSelectedProductIds([]);
       fetchCollection();
     } catch (error: any) {
       console.error('Failed to add items:', error);
-      toast.error(error.response?.data?.message || 'Ürünler eklenemedi');
+      toast.error(error.response?.data?.message || t('collection.productsAddFailed'));
     } finally {
       setAddingItem(false);
     }
@@ -266,9 +269,9 @@ export default function CollectionDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="text-center py-16">
-            <p className="text-gray-600 mb-4">{error || 'Koleksiyon bulunamadı'}</p>
+            <p className="text-gray-600 mb-4">{error || t('collection.collectionNotFound')}</p>
             <Link href="/collections" className="text-primary-500 hover:text-primary-600">
-              Koleksiyonlara Dön
+              {t('collection.backToCollections')}
             </Link>
           </div>
         </div>
@@ -298,7 +301,7 @@ export default function CollectionDetailPage() {
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeftIcon className="w-5 h-5" />
-          Koleksiyonlara Dön
+          {t('collection.backToCollections')}
         </Link>
 
         {/* Collection Header */}
@@ -320,11 +323,11 @@ export default function CollectionDetailPage() {
             <div className="absolute top-4 right-4">
               {collection.isPublic ? (
                 <span className="px-3 py-1 bg-green-500/80 text-white text-sm rounded-full">
-                  Herkese Açık
+                  {t('collection.isPublic')}
                 </span>
               ) : (
                 <span className="px-3 py-1 bg-gray-600/80 text-white text-sm rounded-full">
-                  Özel
+                  {t('collection.isPrivate')}
                 </span>
               )}
             </div>
@@ -341,13 +344,13 @@ export default function CollectionDetailPage() {
                 <span>@{collection.userName}</span>
                 <span className="flex items-center gap-1">
                   <EyeIcon className="w-4 h-4" />
-                  {collection.viewCount} görüntüleme
+                  {collection.viewCount} {t('collection.views')}
                 </span>
                 <span className="flex items-center gap-1">
                   <HeartIcon className="w-4 h-4" />
-                  {collection.likeCount} beğeni
+                  {collection.likeCount} {t('collection.likes')}
                 </span>
-                <span>{collection.itemCount} ürün</span>
+                <span>{collection.itemCount} {t('collection.products')}</span>
               </div>
             </div>
 
@@ -358,7 +361,7 @@ export default function CollectionDetailPage() {
                   href={`/collections/${collectionIdOrSlug}/edit`}
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
                 >
-                  Düzenle
+                  {t('collection.edit')}
                 </Link>
               )}
               <button
@@ -382,13 +385,13 @@ export default function CollectionDetailPage() {
         {/* Collection Items */}
         {sortedItems.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-            <p className="text-gray-700 mb-4 text-lg">Bu koleksiyonda henüz ürün yok</p>
+            <p className="text-gray-700 mb-4 text-lg">{t('collection.noProductsYet')}</p>
             {isOwner && (
               <button
                 onClick={handleOpenAddModal}
                 className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors font-medium"
               >
-                Ürün Ekle
+                {t('collection.addProduct')}
               </button>
             )}
           </div>
@@ -401,7 +404,7 @@ export default function CollectionDetailPage() {
                   className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors flex items-center gap-2"
                 >
                   <PlusIcon className="w-5 h-5" />
-                  Ürün Ekle
+                  {t('collection.addProduct')}
                 </button>
               </div>
             )}
@@ -421,7 +424,7 @@ export default function CollectionDetailPage() {
                     {item.isFeatured && (
                       <div className="absolute top-2 left-2 z-10">
                         <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-semibold">
-                          Öne Çıkan
+                          {t('collection.featured')}
                         </span>
                       </div>
                     )}
@@ -467,7 +470,7 @@ export default function CollectionDetailPage() {
         {showAddItemModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900">Koleksiyona Ürün Ekle</h2>
+              <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addProductToCollection')}</h2>
               
               {loadingProducts ? (
                 <div className="flex justify-center py-8">
@@ -476,14 +479,14 @@ export default function CollectionDetailPage() {
               ) : myProducts.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-700 mb-4">
-                    Eklenebilecek ürününüz yok. Önce ilan oluşturun veya tüm ürünleriniz zaten bu koleksiyonda.
+                    {t('collection.noProductsToAdd')}
                   </p>
                   <Link
                     href="/listings/new"
                     className="text-primary-500 hover:text-primary-600 font-medium"
                     onClick={() => setShowAddItemModal(false)}
                   >
-                    Yeni İlan Oluştur →
+                    {t('collection.createNewListing')} →
                   </Link>
                 </div>
               ) : (
@@ -491,15 +494,15 @@ export default function CollectionDetailPage() {
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-sm text-gray-600">
                       {selectedProductIds.length > 0 
-                        ? `${selectedProductIds.length} ürün seçildi`
-                        : 'Ürün seçin'}
+                        ? `${selectedProductIds.length} ${t('collection.productsSelected')}`
+                        : t('collection.selectProducts')}
                     </p>
                     {selectedProductIds.length > 0 && (
                       <button
                         onClick={() => setSelectedProductIds([])}
                         className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                       >
-                        Seçimi Temizle
+                        {t('collection.clearSelection')}
                       </button>
                     )}
                   </div>
@@ -567,7 +570,7 @@ export default function CollectionDetailPage() {
                       }}
                       className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
                     >
-                      İptal
+                      {t('common.cancel')}
                     </button>
                     <button
                       onClick={handleAddItemToCollection}
@@ -575,10 +578,10 @@ export default function CollectionDetailPage() {
                       className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       {addingItem 
-                        ? `Ekleniyor... (${selectedProductIds.length})` 
+                        ? `${t('common.adding')} (${selectedProductIds.length})` 
                         : selectedProductIds.length > 0 
-                          ? `${selectedProductIds.length} Ürün Ekle`
-                          : 'Ekle'}
+                          ? `${selectedProductIds.length} ${t('collection.addProduct')}`
+                          : t('common.add')}
                     </button>
                   </div>
                 </>
@@ -592,12 +595,22 @@ export default function CollectionDetailPage() {
                   }}
                   className="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors mt-4 font-medium"
                 >
-                  Kapat
+                  {t('common.close')}
                 </button>
               )}
             </div>
           </div>
         )}
+
+        {/* Auth Required Modal for Like */}
+        <AuthRequiredModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          title={t('collection.loginToLike')}
+          message={t('collection.loginToLikeMsg')}
+          icon={<HeartIcon className="w-10 h-10 text-primary-500" />}
+          redirectPath={`/collections/${collectionIdOrSlug}`}
+        />
       </div>
     </div>
   );

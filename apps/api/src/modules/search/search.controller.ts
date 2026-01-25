@@ -5,6 +5,7 @@ import {
   Query,
   Param,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SearchService, SearchOptions, SearchResponse } from './search.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -12,7 +13,10 @@ import { AdminRole } from '@prisma/client';
 
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    private readonly searchService: SearchService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Search products (public)
@@ -83,5 +87,64 @@ export class SearchController {
   ): Promise<{ success: boolean }> {
     await this.searchService.indexProduct(productId);
     return { success: true };
+  }
+
+  /**
+   * Reindex all products (Development only)
+   * GET /search/dev/reindex
+   * Only works in development mode for easy testing
+   */
+  @Public()
+  @Get('dev/reindex')
+  async devReindex(): Promise<{ indexed: number; message: string }> {
+    const isDev = this.configService.get('NODE_ENV') === 'development';
+    
+    if (!isDev) {
+      return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
+    }
+    
+    const indexed = await this.searchService.reindexAll();
+    return { 
+      indexed, 
+      message: `${indexed} ürün Elasticsearch'e index'lendi. Artık "hotw" veya "hxt wheels" gibi aramalar çalışacak.` 
+    };
+  }
+
+  /**
+   * Get search index status
+   * GET /search/status
+   */
+  @Public()
+  @Get('status')
+  async getStatus(): Promise<{ 
+    elasticsearch: boolean; 
+    indexExists: boolean;
+    documentCount: number;
+    message: string;
+  }> {
+    try {
+      // This will test if ES is reachable and index exists
+      const result = await this.searchService.searchProducts({ 
+        query: '', 
+        page: 1, 
+        pageSize: 1 
+      });
+      
+      return {
+        elasticsearch: true,
+        indexExists: true,
+        documentCount: result.total,
+        message: result.total > 0 
+          ? `Elasticsearch çalışıyor, ${result.total} ürün index'li` 
+          : 'Elasticsearch çalışıyor ama index boş. /search/dev/reindex çağırın.',
+      };
+    } catch (error) {
+      return {
+        elasticsearch: false,
+        indexExists: false,
+        documentCount: 0,
+        message: `Elasticsearch bağlantı hatası: ${error.message}`,
+      };
+    }
   }
 }

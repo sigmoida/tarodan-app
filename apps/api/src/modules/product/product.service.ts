@@ -178,8 +178,9 @@ export class ProductService {
       async () => {
         // Build where clause
         const where: Prisma.ProductWhereInput = {
-          // By default, only show active products to public
-          status: status || ProductStatus.active,
+          // IMPORTANT: Public listings MUST only show active products
+          // Ignore any status parameter from query - only active products are visible publicly
+          status: ProductStatus.active,
         };
 
         if (search) {
@@ -332,6 +333,13 @@ export class ProductService {
         });
 
         if (!product) {
+          throw new NotFoundException('Ürün bulunamadı');
+        }
+
+        // IMPORTANT: Only show active products to public
+        // Pending, rejected, sold, inactive products are NOT visible publicly
+        // Sellers can see their own products via /products/my endpoint
+        if (product.status !== ProductStatus.active) {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
@@ -513,6 +521,44 @@ export class ProductService {
   }
 
   /**
+   * Get seller's own single product (any status)
+   */
+  async findSellerProductById(sellerId: string, productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            sellerType: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // Only the owner can see their own non-active products
+    if (product.sellerId !== sellerId) {
+      throw new ForbiddenException('Bu ürünü görüntüleme yetkiniz yok');
+    }
+
+    return this.formatProductResponse(product);
+  }
+
+  /**
    * Get seller's own products (all statuses)
    */
   async findSellerProducts(sellerId: string, query: ProductQueryDto) {
@@ -634,6 +680,11 @@ export class ProductService {
       throw new NotFoundException('Ürün bulunamadı');
     }
 
+    // Cannot like own product
+    if (product.sellerId === userId) {
+      throw new BadRequestException('Kendi ürününüzü beğenemezsiniz');
+    }
+
     // Check if already liked
     const existingLike = await this.prisma.productLike.findUnique({
       where: {
@@ -737,13 +788,61 @@ export class ProductService {
    * POST /products/:id/view
    * Uses Redis to prevent same user incrementing multiple times per day
    */
-  async incrementViewCount(productId: string, userId?: string): Promise<{ viewCount: number }> {
+  /**
+   * Check if user agent indicates a bot
+   */
+  private isBot(userAgent?: string): boolean {
+    if (!userAgent) return true; // No user agent is suspicious
+    
+    const botPatterns = [
+      'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget',
+      'python-requests', 'java/', 'go-http-client', 'libwww',
+      'httpunit', 'nutch', 'linkwalker', 'archiver', 'fetch',
+      'slurp', 'yandex', 'bingbot', 'googlebot', 'baiduspider'
+    ];
+    
+    const ua = userAgent.toLowerCase();
+    return botPatterns.some(pattern => ua.includes(pattern));
+  }
+
+  async incrementViewCount(
+    productId: string, 
+    userId?: string,
+    clientIp?: string,
+    userAgent?: string
+  ): Promise<{ viewCount: number }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
     if (!product) {
       throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    // Skip counting views from product owner
+    if (userId && product.sellerId === userId) {
+      return { viewCount: product.viewCount };
+    }
+
+    // Bot protection: Skip counting for bots
+    if (this.isBot(userAgent)) {
+      return { viewCount: product.viewCount };
+    }
+
+    // IP-based rate limiting for anonymous users
+    if (!userId && clientIp) {
+      const ipViewKey = `view:ip:${clientIp}:${productId}`;
+      const ipViewCount = await this.cache.incr(ipViewKey);
+      
+      // First increment, set TTL for 24 hours
+      if (ipViewCount === 1) {
+        await this.cache.expire(ipViewKey, 86400);
+      }
+      
+      // Max 10 views per day per IP per product for anonymous users
+      if (ipViewCount > 10) {
+        return { viewCount: product.viewCount };
+      }
     }
 
     // If user is logged in, check if they've already viewed today

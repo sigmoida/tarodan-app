@@ -8,6 +8,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 
 export interface ServiceHealth {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -45,6 +46,7 @@ export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -149,56 +151,40 @@ export class HealthService {
   }
 
   /**
-   * Check Redis connectivity
+   * Check Redis connectivity using CacheService
    */
   private async checkRedis(): Promise<ServiceHealth> {
     const start = Date.now();
     try {
-      const redisHost = this.configService.get('REDIS_HOST', 'localhost');
-      const redisPort = this.configService.get('REDIS_PORT', 6379);
-      const redisPassword = this.configService.get('REDIS_PASSWORD');
-
-      // Simple TCP connection check
-      const net = require('net');
-      const connected = await new Promise<boolean>((resolve) => {
-        const socket = new net.Socket();
-        socket.setTimeout(3000);
-        
-        socket.on('connect', () => {
-          socket.destroy();
-          resolve(true);
-        });
-        
-        socket.on('error', () => {
-          socket.destroy();
-          resolve(false);
-        });
-        
-        socket.on('timeout', () => {
-          socket.destroy();
-          resolve(false);
-        });
-        
-        socket.connect(redisPort, redisHost);
-      });
+      // Use actual CacheService to test Redis connection
+      const testKey = 'health:check:ping';
+      const testValue = Date.now().toString();
+      
+      // Try to set and get a value
+      await this.cacheService.set(testKey, testValue, { ttl: 60 });
+      const retrieved = await this.cacheService.get<string>(testKey);
+      await this.cacheService.del(testKey);
 
       const latency = Date.now() - start;
 
-      if (connected) {
+      if (retrieved === testValue) {
+        // Get Redis memory info for additional details
+        const memoryInfo = await this.cacheService.getMemoryUsage();
+        
         return {
           status: 'healthy',
           latency,
           message: 'Redis connection successful',
           details: {
-            host: redisHost,
-            port: redisPort,
+            memoryUsedMB: Math.round(memoryInfo.used / 1024 / 1024),
+            memoryPeakMB: Math.round(memoryInfo.peak / 1024 / 1024),
           },
         };
       } else {
         return {
           status: 'unhealthy',
           latency,
-          message: 'Redis connection failed',
+          message: 'Redis set/get test failed',
         };
       }
     } catch (error) {

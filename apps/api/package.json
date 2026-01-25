@@ -28,7 +28,7 @@
     "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts"
   },
   "dependencies": {
-    "@elastic/elasticsearch": "^9.2.0",
+    "@elastic/elasticsearch": "^8.11.0",
     "@nestjs/apollo": "^13.2.3",
     "@nestjs/bull": "^10.0.1",
     "@nestjs/common": "^10.3.0",

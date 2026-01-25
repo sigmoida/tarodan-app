@@ -4,8 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   MagnifyingGlassIcon,
@@ -16,6 +14,7 @@ import {
   ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
+import { useTranslation } from '@/i18n';
 
 interface Product {
   id: string;
@@ -45,6 +44,7 @@ interface Category {
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useTranslation();
   const query = searchParams.get('q') || '';
   
   const [searchTerm, setSearchTerm] = useState(query);
@@ -146,19 +146,17 @@ function SearchContent() {
 
   const getConditionLabel = (condition: string) => {
     const labels: Record<string, string> = {
-      new: 'Sıfır',
-      like_new: 'Sıfır Gibi',
-      very_good: 'Çok İyi',
-      good: 'İyi',
-      fair: 'Orta',
+      new: t('product.conditionNew'),
+      like_new: t('product.conditionLikeNew'),
+      very_good: t('product.conditionVeryGood'),
+      good: t('product.conditionGood'),
+      fair: t('product.conditionFair'),
     };
     return labels[condition] || condition;
   };
 
   return (
     <div className="min-h-screen bg-dark-900">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-8">
         {/* Search Header */}
         <div className="mb-8">
@@ -169,14 +167,14 @@ function SearchContent() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Ürün, marka veya kategori ara..."
+                placeholder={t('search.searchPlaceholder')}
                 className="w-full bg-dark-800 border border-dark-700 rounded-full pl-12 pr-32 py-4 text-white focus:outline-none focus:border-primary-500 text-lg"
               />
               <button
                 type="submit"
                 className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-full transition-colors"
               >
-                Ara
+                {t('common.search')}
               </button>
             </div>
           </form>
@@ -187,11 +185,11 @@ function SearchContent() {
           <div>
             {query && (
               <h1 className="text-2xl font-bold text-white">
-                "{query}" için arama sonuçları
+                "{query}" {t('search.searchFor')}
               </h1>
             )}
             <p className="text-gray-400 mt-1">
-              {totalItems} ürün bulundu
+              {totalItems} {t('search.resultsFound')}
             </p>
           </div>
 
@@ -205,10 +203,10 @@ function SearchContent() {
               }}
               className="bg-dark-800 border border-dark-700 rounded-lg px-4 py-2 text-white"
             >
-              <option value="createdAt-desc">En Yeni</option>
-              <option value="createdAt-asc">En Eski</option>
-              <option value="price-asc">Fiyat (Düşükten)</option>
-              <option value="price-desc">Fiyat (Yüksekten)</option>
+              <option value="createdAt-desc">{t('product.sortNewest')}</option>
+              <option value="createdAt-asc">{t('product.sortOldest')}</option>
+              <option value="price-asc">{t('product.sortPriceLow')}</option>
+              <option value="price-desc">{t('product.sortPriceHigh')}</option>
               <option value="title-asc">A-Z</option>
             </select>
 
@@ -222,7 +220,7 @@ function SearchContent() {
               }`}
             >
               <FunnelIcon className="h-5 w-5" />
-              Filtrele
+              {t('common.filter')}
             </button>
           </div>
         </div>
@@ -233,26 +231,26 @@ function SearchContent() {
             <div className="w-72 flex-shrink-0">
               <div className="bg-dark-800 rounded-lg p-6 sticky top-24">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-white">Filtreler</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('product.filters')}</h3>
                   <button
                     onClick={clearFilters}
                     className="text-sm text-primary-400 hover:text-primary-300"
                   >
-                    Temizle
+                    {t('common.clear')}
                   </button>
                 </div>
 
                 {/* Category Filter */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Kategori
+                    {t('product.category')}
                   </label>
                   <select
                     value={filters.categoryId}
                     onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
                     className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white"
                   >
-                    <option value="">Tümü</option>
+                    <option value="">{t('common.all')}</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
@@ -264,7 +262,7 @@ function SearchContent() {
                 {/* Price Range */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Fiyat Aralığı
+                    {t('product.priceRange')}
                   </label>
                   <div className="flex gap-2 items-center">
                     <input
@@ -288,19 +286,19 @@ function SearchContent() {
                 {/* Condition Filter */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Durum
+                    {t('product.condition')}
                   </label>
                   <select
                     value={filters.condition}
                     onChange={(e) => setFilters({ ...filters, condition: e.target.value })}
                     className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white"
                   >
-                    <option value="">Tümü</option>
-                    <option value="new">Sıfır</option>
-                    <option value="like_new">Sıfır Gibi</option>
-                    <option value="very_good">Çok İyi</option>
-                    <option value="good">İyi</option>
-                    <option value="fair">Orta</option>
+                    <option value="">{t('common.all')}</option>
+                    <option value="new">{t('product.conditionNew')}</option>
+                    <option value="like_new">{t('product.conditionLikeNew')}</option>
+                    <option value="very_good">{t('product.conditionVeryGood')}</option>
+                    <option value="good">{t('product.conditionGood')}</option>
+                    <option value="fair">{t('product.conditionFair')}</option>
                   </select>
                 </div>
 
@@ -313,7 +311,7 @@ function SearchContent() {
                       onChange={(e) => setFilters({ ...filters, isTradeEnabled: e.target.checked })}
                       className="rounded border-dark-600 text-primary-500 focus:ring-primary-500 bg-dark-700"
                     />
-                    <span className="text-gray-300">Sadece takas kabul edenler</span>
+                    <span className="text-gray-300">{t('product.tradeAvailable')}</span>
                   </label>
                 </div>
 
@@ -322,7 +320,7 @@ function SearchContent() {
                   onClick={handleSearch}
                   className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg transition-colors"
                 >
-                  Filtreleri Uygula
+                  {t('product.applyFilters')}
                 </button>
               </div>
             </div>
@@ -337,9 +335,9 @@ function SearchContent() {
             ) : products.length === 0 ? (
               <div className="text-center py-16">
                 <MagnifyingGlassIcon className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-white mb-2">Sonuç bulunamadı</h2>
+                <h2 className="text-xl font-semibold text-white mb-2">{t('search.noResults')}</h2>
                 <p className="text-gray-400">
-                  Arama kriterlerinize uygun ürün bulunamadı. Farklı anahtar kelimeler deneyin.
+                  {t('search.tryDifferent')}
                 </p>
               </div>
             ) : (
@@ -362,7 +360,7 @@ function SearchContent() {
                         {product.isTradeEnabled && (
                           <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                             <ArrowsRightLeftIcon className="h-3 w-3" />
-                            Takas
+                            {t('nav.trades')}
                           </span>
                         )}
                         <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm">
@@ -399,17 +397,17 @@ function SearchContent() {
                       disabled={page === 1}
                       className="px-4 py-2 bg-dark-800 text-white rounded-lg disabled:opacity-50"
                     >
-                      Önceki
+                      {t('common.previous')}
                     </button>
                     <span className="px-4 py-2 text-gray-400">
-                      Sayfa {page} / {totalPages}
+                      {page} / {totalPages}
                     </span>
                     <button
                       onClick={() => setPage(Math.min(totalPages, page + 1))}
                       disabled={page === totalPages}
                       className="px-4 py-2 bg-dark-800 text-white rounded-lg disabled:opacity-50"
                     >
-                      Sonraki
+                      {t('common.next')}
                     </button>
                   </div>
                 )}
@@ -418,8 +416,6 @@ function SearchContent() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

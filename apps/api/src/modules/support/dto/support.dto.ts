@@ -5,10 +5,38 @@ import {
   IsUUID,
   IsArray,
   IsBoolean,
+  IsEmail,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+
+// DTO for guest contact form (public, no auth required)
+export class GuestContactDto {
+  @IsEmail({}, { message: 'Geçerli bir e-posta adresi giriniz' })
+  email: string;
+
+  @IsString()
+  @MinLength(2, { message: 'İsim en az 2 karakter olmalıdır' })
+  @MaxLength(100)
+  name: string;
+
+  @IsString()
+  @MinLength(10, { message: 'Mesaj en az 10 karakter olmalıdır' })
+  @MaxLength(2000)
+  message: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  subject?: string;
+}
+
+export class GuestContactResponseDto {
+  success: boolean;
+  message: string;
+  ticketNumber?: string;
+}
 
 export class CreateTicketDto {
   @IsString()

@@ -7,9 +7,11 @@ import { motion } from 'framer-motion';
 import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const { login, isAuthenticated } = useAuthStore();
   
   const [email, setEmail] = useState('');
@@ -28,7 +30,7 @@ export default function LoginPage() {
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
-      toast.error('E-posta ve şifre gerekli');
+      toast.error(locale === 'en' ? 'Email and password are required' : 'E-posta ve şifre gerekli');
       return;
     }
 
@@ -38,12 +40,12 @@ export default function LoginPage() {
     try {
       await login(email, password);
       console.log('[Login] Login successful!');
-      toast.success('Giriş başarılı!');
+      toast.success(t('auth.loginSuccess'));
       // Use window.location for reliable redirect
       window.location.href = '/';
     } catch (error: any) {
       console.error('[Login] Login error:', error);
-      const message = error.response?.data?.message || error.message || 'Giriş başarısız';
+      const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -65,11 +67,15 @@ export default function LoginPage() {
                 <span className="text-white text-2xl">🚗</span>
               </div>
               <span className="font-display font-bold text-2xl">
-                Diecast <span className="text-primary-500">Market</span>
+                TARODAN
               </span>
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Hoş Geldiniz</h1>
-            <p className="text-gray-600">Hesabınıza giriş yapın</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {t('auth.welcomeBack')}
+            </h1>
+            <p className="text-gray-600">
+              {locale === 'en' ? 'Sign in to your account' : 'Hesabınıza giriş yapın'}
+            </p>
           </div>
 
           <form
@@ -81,7 +87,7 @@ export default function LoginPage() {
           >
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                E-posta
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -89,7 +95,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ornek@email.com"
+                  placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
                   className="input pl-12"
                   autoComplete="email"
                 />
@@ -98,7 +104,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Şifre
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -136,10 +142,10 @@ export default function LoginPage() {
                   type="checkbox"
                   className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                 />
-                <span className="text-sm text-gray-600">Beni hatırla</span>
+                <span className="text-sm text-gray-600">{t('auth.rememberMe')}</span>
               </label>
               <Link href="/forgot-password" className="text-sm text-primary-500 hover:text-primary-600">
-                Şifremi Unuttum
+                {t('auth.forgotPassword')}
               </Link>
             </div>
 
@@ -148,14 +154,16 @@ export default function LoginPage() {
               disabled={isLoading}
               className="btn-primary w-full"
             >
-              {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+              {isLoading 
+                ? (locale === 'en' ? 'Signing in...' : 'Giriş yapılıyor...') 
+                : t('common.login')}
             </button>
           </form>
 
           <p className="text-center mt-8 text-gray-600">
-            Hesabınız yok mu?{' '}
+            {t('auth.noAccount')}{' '}
             <Link href="/register" className="text-primary-500 font-semibold hover:text-primary-600">
-              Üye Olun
+              {t('common.register')}
             </Link>
           </p>
         </motion.div>
@@ -171,11 +179,14 @@ export default function LoginPage() {
           >
             <div className="text-8xl mb-8">🏎️</div>
             <h2 className="text-3xl font-bold mb-4">
-              Koleksiyonerlerin Buluşma Noktası
+              {locale === 'en' 
+                ? 'The Meeting Point for Collectors'
+                : 'Koleksiyonerlerin Buluşma Noktası'}
             </h2>
             <p className="text-gray-300 text-lg">
-              Binlerce diecast model arasından aradığınızı bulun. 
-              Güvenle alın, satın veya takas yapın.
+              {locale === 'en'
+                ? 'Find what you\'re looking for among thousands of diecast models. Buy, sell, or trade with confidence.'
+                : 'Binlerce diecast model arasından aradığınızı bulun. Güvenle alın, satın veya takas yapın.'}
             </p>
           </motion.div>
         </div>
@@ -183,5 +194,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-

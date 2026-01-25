@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { XMarkIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -15,12 +16,13 @@ interface AuthRequiredModalProps {
 export default function AuthRequiredModal({
   isOpen,
   onClose,
-  title = 'Giriş Yapmanız Gerekiyor',
+  title,
   message,
   icon,
   redirectPath,
 }: AuthRequiredModalProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   if (!isOpen) return null;
 
@@ -63,7 +65,7 @@ export default function AuthRequiredModal({
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-gray-900 mb-3">
-            {title}
+            {title || t('auth.authRequired')}
           </h2>
 
           {/* Message */}
@@ -78,7 +80,7 @@ export default function AuthRequiredModal({
               className="w-full py-3 px-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
             >
               <UserIcon className="w-5 h-5" />
-              Giriş Yap
+              {t('common.login')}
             </button>
             
             <button
@@ -86,13 +88,13 @@ export default function AuthRequiredModal({
               className="w-full py-3 px-4 bg-gray-100 text-gray-800 font-semibold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
             >
               <UserPlusIcon className="w-5 h-5" />
-              Ücretsiz Üye Ol
+              {t('auth.freeSignUp')}
             </button>
           </div>
 
           {/* Benefits hint */}
           <p className="mt-6 text-sm text-gray-500">
-            Üye olarak favorilerinizi kaydedin, satıcılarla mesajlaşın ve daha fazlası!
+            {t('auth.memberBenefits')}
           </p>
         </div>
       </div>

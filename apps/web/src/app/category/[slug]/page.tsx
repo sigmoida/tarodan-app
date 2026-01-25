@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   FunnelIcon,
@@ -130,8 +128,6 @@ export default function CategoryPage() {
 
   return (
     <div className="min-h-screen bg-dark-900">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-8">
         {/* Category Header */}
         <div className="mb-8">
@@ -433,8 +429,6 @@ export default function CategoryPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

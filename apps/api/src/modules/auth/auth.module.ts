@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AdminAuthController } from './admin-auth.controller';
 import { JwtStrategy, JwtRefreshStrategy, AdminJwtStrategy } from './strategies';
 import { NotificationModule } from '../notification/notification.module';
+import { CacheModule } from '../cache/cache.module';
 import { BannedUserGuard } from './guards/banned-user.guard';
 
 @Module({
@@ -23,6 +24,7 @@ import { BannedUserGuard } from './guards/banned-user.guard';
       inject: [ConfigService],
     }),
     NotificationModule,
+    CacheModule,
   ],
   controllers: [AuthController, AdminAuthController],
   providers: [

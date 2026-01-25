@@ -364,7 +364,14 @@ export class PaymentService {
    * Requirement: iyzico signature verification (3.1)
    */
   async handleIyzicoCallback(dto: IyzicoCallbackDto, rawBody?: string, signature?: string) {
-    this.logger.log(`Iyzico callback received: ${dto.token}`);
+    // Enhanced logging for debugging
+    this.logger.log(`=== Iyzico Callback Received ===`);
+    this.logger.log(`Token: ${dto.token}`);
+    this.logger.log(`Status: ${dto.status || 'not provided'}`);
+    this.logger.log(`Payment ID: ${dto.paymentId || 'not provided'}`);
+    this.logger.log(`Conversation ID: ${dto.conversationId || 'not provided'}`);
+    this.logger.log(`Raw Body Present: ${!!rawBody}`);
+    this.logger.log(`Signature Present: ${!!signature}`);
 
     // Verify signature if provided (webhook verification)
     if (rawBody && signature) {
@@ -397,8 +404,11 @@ export class PaymentService {
 
     if (!payment) {
       this.logger.warn(`Payment not found for token: ${dto.token}`);
+      this.logger.warn(`Searched with token/conversationId: ${dto.token}, ${dto.conversationId}`);
       throw new NotFoundException('Payment not found');
     }
+
+    this.logger.log(`Payment found: ${payment.id}, Order: ${payment.orderId}, Status: ${payment.status}`);
 
     // Retrieve checkout form result from Iyzico
     try {

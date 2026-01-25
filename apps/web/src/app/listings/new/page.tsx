@@ -8,6 +8,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { listingsApi, api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Category {
   id: string;
@@ -16,12 +17,12 @@ interface Category {
   children?: Category[];
 }
 
-const CONDITIONS = [
-  { value: 'new', label: 'Yeni' },
-  { value: 'like_new', label: 'Sıfır Gibi' },
-  { value: 'very_good', label: 'Mükemmel' },
-  { value: 'good', label: 'İyi' },
-  { value: 'fair', label: 'Orta' },
+const getConditions = (locale: string) => [
+  { value: 'new', label: locale === 'en' ? 'New' : 'Yeni' },
+  { value: 'like_new', label: locale === 'en' ? 'Like New' : 'Sıfır Gibi' },
+  { value: 'very_good', label: locale === 'en' ? 'Very Good' : 'Mükemmel' },
+  { value: 'good', label: locale === 'en' ? 'Good' : 'İyi' },
+  { value: 'fair', label: locale === 'en' ? 'Fair' : 'Orta' },
 ];
 
 const BRANDS = [
@@ -34,8 +35,9 @@ const BRANDS = [
   'Maisto',
   'Bburago',
   'Welly',
-  'Diğer',
 ];
+
+const getOtherLabel = (locale: string) => locale === 'en' ? 'Other' : 'Diğer';
 
 const SCALES = [
   '1:18',
@@ -45,7 +47,6 @@ const SCALES = [
   '1:64',
   '1:72',
   '1:87',
-  'Diğer',
 ];
 
 interface ListingLimits {
@@ -60,6 +61,9 @@ interface ListingLimits {
 export default function NewListingPage() {
   const router = useRouter();
   const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
+  const { t, locale } = useTranslation();
+  const CONDITIONS = getConditions(locale);
+  const OTHER_LABEL = getOtherLabel(locale);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [listingLimits, setListingLimits] = useState<ListingLimits | null>(null);
@@ -79,7 +83,7 @@ export default function NewListingPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('İlan oluşturmak için giriş yapmalısınız');
+      toast.error(locale === 'en' ? 'Please login to create a listing' : 'İlan oluşturmak için giriş yapmalısınız');
       router.push('/login?redirect=/listings/new');
       return;
     }
@@ -149,7 +153,7 @@ export default function NewListingPage() {
       setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      toast.error('Kategoriler yüklenemedi');
+      toast.error(locale === 'en' ? 'Failed to load categories' : 'Kategoriler yüklenemedi');
     }
   };
 
@@ -186,12 +190,12 @@ export default function NewListingPage() {
     e.preventDefault();
     
     if (!formData.title || !formData.price || !formData.categoryId) {
-      toast.error('Lütfen tüm zorunlu alanları doldurun');
+      toast.error(locale === 'en' ? 'Please fill in all required fields' : 'Lütfen tüm zorunlu alanları doldurun');
       return;
     }
 
     if (isNaN(Number(formData.price)) || Number(formData.price) < 1) {
-      toast.error('Geçerli bir fiyat giriniz');
+      toast.error(locale === 'en' ? 'Please enter a valid price' : 'Geçerli bir fiyat giriniz');
       return;
     }
 
@@ -216,11 +220,11 @@ export default function NewListingPage() {
       };
 
       await listingsApi.create(payload as any);
-      toast.success('İlanınız oluşturuldu! Onay bekliyor.');
+      toast.success(locale === 'en' ? 'Your listing has been created! Pending approval.' : 'İlanınız oluşturuldu! Onay bekliyor.');
       router.push('/profile/listings?status=pending');
     } catch (error: any) {
       console.error('Failed to create listing:', error);
-      toast.error(error.response?.data?.message || 'İlan oluşturulamadı');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to create listing' : 'İlan oluşturulamadı'));
     } finally {
       setIsLoading(false);
     }
@@ -423,8 +427,8 @@ export default function NewListingPage() {
                 <label className="font-medium text-gray-900">Takas Aktif</label>
                 <p className="text-sm text-gray-600">
                   {limits?.canTrade 
-                    ? 'Bu ürünü takas için de açık tutar' 
-                    : 'Takas özelliği Premium üyelik gerektirir'}
+                    ? (locale === 'en' ? 'Also makes this product available for trade' : 'Bu ürünü takas için de açık tutar')
+                    : (locale === 'en' ? 'Trade feature requires Premium membership' : 'Takas özelliği Premium üyelik gerektirir')}
                 </p>
               </div>
               {limits?.canTrade ? (
@@ -539,7 +543,7 @@ export default function NewListingPage() {
                 disabled={isLoading}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Oluşturuluyor...' : 'İlanı Oluştur'}
+                {isLoading ? (locale === 'en' ? 'Creating...' : 'Oluşturuluyor...') : (locale === 'en' ? 'Create Listing' : 'İlanı Oluştur')}
               </button>
             </div>
           </form>

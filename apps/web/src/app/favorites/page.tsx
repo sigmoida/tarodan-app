@@ -6,10 +6,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { HeartIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { wishlistApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 interface WishlistItem {
   id: string;
@@ -27,12 +27,13 @@ interface WishlistItem {
 export default function FavoritesPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { t } = useTranslation();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('Favorileri görmek için giriş yapmalısınız');
+      toast.error(t('favorites.loginRequired'));
       router.push('/login?redirect=/favorites');
       return;
     }
@@ -43,20 +44,15 @@ export default function FavoritesPage() {
     setIsLoading(true);
     try {
       const response = await wishlistApi.get();
-      // Backend returns { items: WishlistItem[] }
       const wishlistItems = response.data?.items || response.data?.data || response.data || [];
-      
-      // Filter out invalid items (those without productId or productTitle)
       const validItems = (Array.isArray(wishlistItems) ? wishlistItems : []).filter(
         (item: any) => item && item.productId && item.productTitle
       );
-      
       setItems(validItems);
     } catch (error: any) {
       console.error('Failed to fetch favorites:', error);
-      // Don't show error toast for 404 (empty wishlist is valid)
       if (error.response?.status !== 404) {
-        toast.error('Favoriler yüklenemedi');
+        toast.error(t('favorites.loadFailed'));
       }
       setItems([]);
     } finally {
@@ -67,17 +63,17 @@ export default function FavoritesPage() {
   const handleRemove = async (productId: string) => {
     try {
       await wishlistApi.remove(productId);
-      toast.success('Favorilerden çıkarıldı');
+      toast.success(t('product.removedFromFavorites'));
       fetchFavorites();
     } catch (error: any) {
       console.error('Failed to remove from favorites:', error);
-      toast.error('Kaldırılamadı');
+      toast.error(t('common.operationFailed'));
     }
   };
 
   const getImageUrl = (productImage?: string): string => {
     if (!productImage) {
-      return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+      return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Product';
     }
     return productImage;
   };
@@ -101,13 +97,12 @@ export default function FavoritesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Favorilerim</h1>
+            <h1 className="text-3xl font-bold mb-2">{t('favorites.myFavorites')}</h1>
             <p className="text-gray-600">
-              {items.length} {items.length === 1 ? 'ürün' : 'ürün'} favorilerinizde
+              {items.length} {t('favorites.itemsInFavorites')}
             </p>
           </div>
         </div>
@@ -115,12 +110,12 @@ export default function FavoritesPage() {
         {items.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl">
             <HeartIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg mb-4">Henüz favori ürününüz yok</p>
+            <p className="text-gray-600 text-lg mb-4">{t('favorites.empty')}</p>
             <Link
               href="/listings"
               className="inline-block px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
             >
-              Ürünlere Göz At
+              {t('favorites.browseProducts')}
             </Link>
           </div>
         ) : (
@@ -138,12 +133,12 @@ export default function FavoritesPage() {
                     <div className="relative aspect-square bg-gray-100">
                       <Image
                         src={getImageUrl(item.productImage)}
-                        alt={item.productTitle || 'Ürün'}
+                        alt={item.productTitle || 'Product'}
                         fill
                         className="object-cover"
                         unoptimized
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Product';
                         }}
                       />
                       <button
@@ -152,6 +147,7 @@ export default function FavoritesPage() {
                           handleRemove(item.productId);
                         }}
                         className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
+                        title={t('favorites.removeFromFavorites')}
                       >
                         <TrashIcon className="w-5 h-5 text-red-500" />
                       </button>
@@ -160,7 +156,7 @@ export default function FavoritesPage() {
                   <div className="p-4">
                     <Link href={`/listings/${item.productId}`}>
                       <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 hover:text-primary-500">
-                        {item.productTitle || 'Ürün'}
+                        {item.productTitle || 'Product'}
                       </h3>
                     </Link>
                     <div className="flex items-center justify-between">

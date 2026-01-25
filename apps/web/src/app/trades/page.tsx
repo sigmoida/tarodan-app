@@ -8,6 +8,7 @@ import { ArrowsRightLeftIcon, ClockIcon, CheckCircleIcon, XCircleIcon, TruckIcon
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
+import { useTranslation } from '@/i18n';
 
 interface TradeProduct {
   id: string;
@@ -31,21 +32,22 @@ interface Trade {
   responseDeadline: string;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Bekliyor', color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
-  accepted: { label: 'Kabul Edildi', color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-  rejected: { label: 'Reddedildi', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
-  initiator_shipped: { label: 'Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-  receiver_shipped: { label: 'Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-  both_shipped: { label: 'Karşılıklı Gönderildi', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-  completed: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-  cancelled: { label: 'İptal Edildi', color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
-  disputed: { label: 'Anlaşmazlık', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
-};
-
 export default function TradesPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
+  
+  const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+    pending: { label: t('trade.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
+    accepted: { label: t('trade.statusAccepted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
+    rejected: { label: t('trade.statusRejected'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+    initiator_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    receiver_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    both_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    completed: { label: t('trade.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
+    cancelled: { label: t('trade.statusCancelled'), color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
+    disputed: { label: t('common.error'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+  };
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
@@ -66,7 +68,7 @@ export default function TradesPage() {
       setTrades(response.data.data || response.data.trades || []);
     } catch (error) {
       console.error('Failed to fetch trades:', error);
-      toast.error('Takaslar yüklenemedi');
+      toast.error(t('trade.tradesLoadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -105,16 +107,16 @@ export default function TradesPage() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
             <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
-            Takaslarım
+            {t('trade.myTrades')}
           </h1>
         </div>
 
         {/* Filters */}
         <div className="flex gap-2 mb-6">
           {[
-            { value: 'all', label: 'Tümü' },
-            { value: 'sent', label: 'Gönderilen' },
-            { value: 'received', label: 'Gelen' },
+            { value: 'all', label: t('common.all') },
+            { value: 'sent', label: t('trade.sentTrades') },
+            { value: 'received', label: t('trade.receivedTrades') },
           ].map((f) => (
             <button
               key={f.value}
@@ -135,16 +137,16 @@ export default function TradesPage() {
           <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
             <ArrowsRightLeftIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Henüz Takas Yok
+              {t('trade.noTrades')}
             </h2>
             <p className="text-gray-600 mb-6">
-              Takas teklifleri burada görünecek.
+              {t('trade.tradeRequiresLogin')}
             </p>
             <Link
               href="/listings"
               className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors"
             >
-              İlanları Keşfet
+              {t('cart.browseListings')}
             </Link>
           </div>
         ) : (
@@ -167,7 +169,7 @@ export default function TradesPage() {
                         #{trade.tradeNumber}
                       </p>
                       <p className="font-medium text-gray-900">
-                        {isSent ? 'Gönderilen' : 'Gelen'} • {otherUser?.displayName || 'Kullanıcı'}
+                        {isSent ? t('trade.sentTrades') : t('trade.receivedTrades')} • {otherUser?.displayName || t('common.name')}
                       </p>
                     </div>
                     {getStatusBadge(trade.status)}
@@ -177,7 +179,7 @@ export default function TradesPage() {
                     {/* My Items */}
                     <div className="flex-1">
                       <p className="text-xs text-gray-500 mb-2">
-                        {isSent ? 'Verdiğiniz' : 'Aldığınız'}
+                        {t('trade.yourItems')}
                       </p>
                       <div className="flex gap-2">
                         {myItems.slice(0, 3).map((item, idx) => (
@@ -207,7 +209,7 @@ export default function TradesPage() {
                     {/* Their Items */}
                     <div className="flex-1">
                       <p className="text-xs text-gray-500 mb-2">
-                        {isSent ? 'Aldığınız' : 'Verdiğiniz'}
+                        {t('trade.theirItems')}
                       </p>
                       <div className="flex gap-2">
                         {theirItems.slice(0, 3).map((item, idx) => (
@@ -235,7 +237,7 @@ export default function TradesPage() {
                   {trade.cashAmount && trade.cashAmount > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <p className="text-sm text-gray-600">
-                        Nakit Fark: <span className="font-semibold text-orange-600">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
+                        {t('trade.cashDifference')}: <span className="font-semibold text-orange-600">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
                       </p>
                     </div>
                   )}

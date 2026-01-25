@@ -11,11 +11,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
 
   const [payment, setPayment] = useState<any>(null);
@@ -75,10 +77,10 @@ export default function PaymentSuccessPage() {
 
           {/* Success Message */}
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Ödeme Başarıyla Tamamlandı!
+            {locale === 'en' ? 'Payment Completed Successfully!' : 'Ödeme Başarıyla Tamamlandı!'}
           </h1>
           <p className="text-gray-600 mb-6">
-            Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı.
+            {locale === 'en' ? 'Your payment has been received and your order is being prepared.' : 'Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı.'}
           </p>
 
           {/* Payment Details */}
@@ -86,33 +88,33 @@ export default function PaymentSuccessPage() {
             <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                Ödeme Detayları
+                {locale === 'en' ? 'Payment Details' : 'Ödeme Detayları'}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme Tutarı:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Payment Amount:' : 'Ödeme Tutarı:'}</span>
                   <span className="font-semibold">
                     ₺{payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme Yöntemi:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
                   <span className="font-semibold">
                     {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'}
                   </span>
                 </div>
                 {payment.providerTransactionId && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">İşlem No:</span>
+                    <span className="text-gray-600">{locale === 'en' ? 'Transaction ID:' : 'İşlem No:'}</span>
                     <span className="font-mono text-xs">
                       {payment.providerTransactionId}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Durum:</span>
+                  <span className="text-gray-600">{locale === 'en' ? 'Status:' : 'Durum:'}</span>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Tamamlandı
+                    {locale === 'en' ? 'Completed' : 'Tamamlandı'}
                   </span>
                 </div>
               </div>
@@ -122,12 +124,11 @@ export default function PaymentSuccessPage() {
           {/* Info Message */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-blue-800">
-              <strong>Bilgilendirme:</strong> Sipariş onay e-postası e-posta adresinize gönderildi. 
-              Sipariş durumunuzu{' '}
+              <strong>{locale === 'en' ? 'Information:' : 'Bilgilendirme:'}</strong> {locale === 'en' ? 'Order confirmation email has been sent to your email address. You can track your order status from the ' : 'Sipariş onay e-postası e-posta adresinize gönderildi. Sipariş durumunuzu '}
               <Link href="/orders" className="underline font-medium">
-                Siparişlerim
+                {locale === 'en' ? 'My Orders' : 'Siparişlerim'}
               </Link>
-              {' '}sayfasından takip edebilirsiniz.
+              {locale === 'en' ? ' page.' : ' sayfasından takip edebilirsiniz.'}
             </p>
           </div>
 
@@ -137,14 +138,14 @@ export default function PaymentSuccessPage() {
               href="/orders"
               className="btn-primary flex items-center justify-center gap-2"
             >
-              Siparişlerime Git
+              {locale === 'en' ? 'Go to My Orders' : 'Siparişlerime Git'}
               <ArrowRightIcon className="w-5 h-5" />
             </Link>
             <Link
               href="/listings"
               className="btn-secondary flex items-center justify-center gap-2"
             >
-              Alışverişe Devam Et
+              {locale === 'en' ? 'Continue Shopping' : 'Alışverişe Devam Et'}
             </Link>
           </div>
         </motion.div>

@@ -26,8 +26,24 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
+        // Only redirect if user HAD a token (session expired)
+        // Do NOT redirect guests - they should see public content or get auth modals
+        const hadToken = localStorage.getItem('auth_token');
         localStorage.removeItem('auth_token');
-        window.location.href = '/login';
+        
+        // Only auto-redirect for expired sessions, not for guest access attempts
+        if (hadToken) {
+          // Check if we're on a page that requires auth
+          const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+          const currentPath = window.location.pathname;
+          const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+          
+          if (isProtectedPath) {
+            window.location.href = '/login?expired=true';
+          }
+        }
+        // For guests trying to access protected API endpoints, just reject the promise
+        // The UI will handle showing auth modals
       }
     }
     return Promise.reject(error);
@@ -306,6 +322,30 @@ export const ratingsApi = {
     api.post('/ratings/products', data),
   markHelpful: (ratingId: string) => 
     api.post(`/ratings/products/${ratingId}/helpful`),
+};
+
+// Support / Contact
+export const supportApi = {
+  // Guest contact form (public, no auth required)
+  guestContact: (data: { name: string; email: string; message: string; subject?: string }) =>
+    api.post('/support/contact', data),
+  // Authenticated user tickets
+  createTicket: (data: { subject: string; category: string; message: string; orderId?: string; tradeId?: string; attachments?: string[] }) =>
+    api.post('/support/tickets', data),
+  getMyTickets: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    api.get('/support/tickets/me', { params }),
+  getTicket: (id: string) =>
+    api.get(`/support/tickets/${id}`),
+  addMessage: (id: string, data: { content: string; attachments?: string[] }) =>
+    api.post(`/support/tickets/${id}/messages`, data),
+};
+
+// Search (ElasticSearch)
+export const searchApi = {
+  products: (q: string, params?: Record<string, any>) =>
+    api.get('/search/products', { params: { q, ...params } }),
+  autocomplete: (q: string) =>
+    api.get('/search/autocomplete', { params: { q } }),
 };
 
 export default api;

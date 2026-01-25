@@ -7,9 +7,11 @@ import Link from 'next/link';
 import { TrashIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useCartStore } from '@/stores/cartStore';
+import { useTranslation } from '@/i18n';
 
 export default function CartPage() {
   const { items, total, isLoading, fetchCart, removeFromCart } = useCartStore();
+  const { t } = useTranslation();
 
   useEffect(() => {
     fetchCart();
@@ -18,9 +20,9 @@ export default function CartPage() {
   const handleRemove = async (itemId: string) => {
     try {
       await removeFromCart(itemId);
-      toast.success('Ürün sepetten kaldırıldı');
+      toast.success(t('product.removedFromCart'));
     } catch (error) {
-      toast.error('Ürün kaldırılamadı');
+      toast.error(t('product.removeFromCartFailed'));
     }
   };
 
@@ -50,12 +52,10 @@ export default function CartPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <ShoppingCartIcon className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sepetiniz Boş</h2>
-          <p className="text-gray-600 mb-6">
-            İlanlara göz atın ve beğendiklerinizi sepete ekleyin
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('cart.empty')}</h2>
+          <p className="text-gray-600 mb-6">{t('cart.emptyDesc')}</p>
           <Link href="/listings" className="btn-primary">
-            İlanlara Göz At
+            {t('cart.browseListings')}
           </Link>
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Sepetim</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('cart.myCart')}</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
@@ -99,7 +99,7 @@ export default function CartPage() {
                     </h3>
                   </Link>
                   <p className="text-sm text-gray-500 mt-1">
-                    Satıcı: @{item.seller.displayName}
+                    {t('product.seller')}: @{item.seller.displayName}
                   </p>
                   <p className="text-lg font-bold text-primary-500 mt-2">
                     ₺{item.price.toLocaleString('tr-TR')}
@@ -118,20 +118,20 @@ export default function CartPage() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
-              <h2 className="text-lg font-semibold mb-4">Sipariş Özeti</h2>
+              <h2 className="text-lg font-semibold mb-4">{t('checkout.orderSummary')}</h2>
               
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ürün Toplam</span>
+                  <span className="text-gray-600">{t('checkout.subtotal')}</span>
                   <span className="font-medium">₺{total.toLocaleString('tr-TR')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Kargo</span>
+                  <span className="text-gray-600">{t('checkout.shipping')}</span>
                   <span className="font-medium">₺{shippingCost.toFixed(2)}</span>
                 </div>
                 <hr className="my-4" />
                 <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Toplam</span>
+                  <span className="font-semibold">{t('checkout.total')}</span>
                   <span className="font-bold text-primary-500">
                     ₺{grandTotal.toFixed(2)}
                   </span>
@@ -142,14 +142,14 @@ export default function CartPage() {
                 href="/checkout" 
                 className="btn-primary w-full mt-6 flex items-center justify-center gap-2"
               >
-                Ödemeye Geç
+                {t('cart.proceedToCheckout')}
               </Link>
 
               <Link 
                 href="/listings" 
                 className="block text-center text-sm text-gray-500 hover:text-primary-500 mt-4"
               >
-                Alışverişe Devam Et
+                {t('cart.continueShopping')}
               </Link>
             </div>
           </div>
@@ -158,5 +158,3 @@ export default function CartPage() {
     </div>
   );
 }
-
-

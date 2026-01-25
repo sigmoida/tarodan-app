@@ -15,6 +15,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface NotificationSettings {
   emailNotifications: boolean;
@@ -30,6 +31,7 @@ interface NotificationSettings {
 export default function SettingsPage() {
   const router = useRouter();
   const { isAuthenticated, user, logout } = useAuthStore();
+  const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
@@ -70,11 +72,11 @@ export default function SettingsPage() {
     
     try {
       await api.patch('/users/me/settings', { [key]: newValue }).catch(() => null);
-      toast.success('Ayar güncellendi');
+      toast.success(locale === 'en' ? 'Setting updated' : 'Ayar güncellendi');
     } catch (error) {
       // Revert on error
       setSettings(prev => ({ ...prev, [key]: !newValue }));
-      toast.error('Ayar güncellenemedi');
+      toast.error(locale === 'en' ? 'Failed to update setting' : 'Ayar güncellenemedi');
     }
   };
 
@@ -82,11 +84,11 @@ export default function SettingsPage() {
     setLoading(true);
     try {
       await api.delete('/users/me');
-      toast.success('Hesabınız silindi');
+      toast.success(locale === 'en' ? 'Your account has been deleted' : 'Hesabınız silindi');
       logout();
       router.push('/');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Hesap silinemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to delete account' : 'Hesap silinemedi'));
     } finally {
       setLoading(false);
       setShowDeleteConfirm(false);
@@ -327,7 +329,7 @@ export default function SettingsPage() {
                   disabled={loading}
                   className="flex-1 py-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Siliniyor...' : 'Evet, Sil'}
+                  {loading ? (locale === 'en' ? 'Deleting...' : 'Siliniyor...') : (locale === 'en' ? 'Yes, Delete' : 'Evet, Sil')}
                 </button>
               </div>
             </div>

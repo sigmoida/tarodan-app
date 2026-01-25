@@ -35,6 +35,39 @@ export class OrderService {
     private readonly cache: CacheService,
   ) {}
 
+  // Shipping cost settings
+  private readonly BASE_SHIPPING_COST = 29.99; // Base shipping cost in TL
+  private readonly FREE_SHIPPING_THRESHOLD = 500; // Free shipping threshold in TL
+
+  /**
+   * Calculate shipping cost based on order amount
+   * Free shipping for orders >= 500 TL
+   */
+  calculateShippingCost(orderAmount: number): number {
+    if (orderAmount >= this.FREE_SHIPPING_THRESHOLD) {
+      return 0;
+    }
+    return this.BASE_SHIPPING_COST;
+  }
+
+  /**
+   * Get free shipping info for frontend display
+   */
+  getFreeShippingInfo(orderAmount: number): {
+    isFreeShipping: boolean;
+    shippingCost: number;
+    threshold: number;
+    amountToFreeShipping: number;
+  } {
+    const shippingCost = this.calculateShippingCost(orderAmount);
+    return {
+      isFreeShipping: shippingCost === 0,
+      shippingCost,
+      threshold: this.FREE_SHIPPING_THRESHOLD,
+      amountToFreeShipping: Math.max(0, this.FREE_SHIPPING_THRESHOLD - orderAmount),
+    };
+  }
+
   /**
    * Invalidate product caches when product status changes
    */
@@ -377,11 +410,16 @@ export class OrderService {
       }
 
       // Get product price
-      const totalAmount = Number(product.price);
+      const productPrice = Number(product.price);
+      
+      // Calculate shipping cost (free shipping for orders >= 500 TL)
+      const shippingCost = this.calculateShippingCost(productPrice);
+      const totalAmount = productPrice + shippingCost;
 
       // Calculate commission with category-based matching (3.3)
+      // Commission is calculated on product price, not including shipping
       const commissionResult = await this.calculateCommission(
-        totalAmount,
+        productPrice,
         product.sellerId,
         product.categoryId, // Pass categoryId for priority-based matching
       );
@@ -403,6 +441,7 @@ export class OrderService {
           buyerId,
           sellerId: product.sellerId,
           totalAmount,
+          shippingCost,
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: shippingAddressId,
@@ -715,7 +754,12 @@ export class OrderService {
         throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
       }
 
+      // Calculate shipping cost (free shipping for orders >= 500 TL)
+      const shippingCost = this.calculateShippingCost(finalPrice);
+      const totalAmount = finalPrice + shippingCost;
+
       // Calculate commission with category-based matching (3.3)
+      // Commission is calculated on product price, not including shipping
       const commissionResult = await this.calculateCommission(
         finalPrice,
         product.sellerId,
@@ -733,7 +777,8 @@ export class OrderService {
           buyerId: guestUser.id,
           sellerId: product.sellerId,
           offerId: dto.offerId,
-          totalAmount: finalPrice,
+          totalAmount,
+          shippingCost,
           commissionAmount: commissionResult.commissionAmount,
           status: OrderStatus.pending_payment,
           shippingAddress: {

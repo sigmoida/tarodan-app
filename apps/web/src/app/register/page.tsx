@@ -15,9 +15,11 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const { register, isAuthenticated, isLoading: authLoading } = useAuthStore();
   
   // All useState hooks must be declared before any early returns
@@ -51,8 +53,12 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Zaten giriş yapmışsınız.</p>
-          <Link href="/" className="btn-primary">Ana Sayfaya Dön</Link>
+          <p className="text-gray-600 mb-4">
+            {locale === 'en' ? 'You are already logged in.' : 'Zaten giriş yapmışsınız.'}
+          </p>
+          <Link href="/" className="btn-primary">
+            {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
+          </Link>
         </div>
       </div>
     );
@@ -62,37 +68,39 @@ export default function RegisterPage() {
     e.preventDefault();
     
     if (!displayName.trim() || !email.trim() || !password.trim()) {
-      toast.error('Tüm alanları doldurun');
+      toast.error(locale === 'en' ? 'Please fill in all fields' : 'Tüm alanları doldurun');
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error('Şifreler eşleşmiyor');
+      toast.error(t('validation.passwordMatch'));
       return;
     }
 
     if (password.length < 8) {
-      toast.error('Şifre en az 8 karakter olmalıdır');
+      toast.error(locale === 'en' ? 'Password must be at least 8 characters' : 'Şifre en az 8 karakter olmalıdır');
       return;
     }
 
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error('Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir');
+      toast.error(locale === 'en' 
+        ? 'Password must contain at least one uppercase, one lowercase, and one number'
+        : 'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir');
       return;
     }
 
     if (!agreeTerms) {
-      toast.error('Kullanım şartlarını kabul etmelisiniz');
+      toast.error(locale === 'en' ? 'You must accept the terms of service' : 'Kullanım şartlarını kabul etmelisiniz');
       return;
     }
 
     setIsLoading(true);
     try {
       await register(displayName, email, password, phone || undefined, birthDate || undefined);
-      toast.success('Kayıt başarılı! Hoş geldiniz.');
+      toast.success(locale === 'en' ? 'Registration successful! Welcome.' : 'Kayıt başarılı! Hoş geldiniz.');
       window.location.href = '/';
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Kayıt başarısız');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Registration failed' : 'Kayıt başarısız'));
     } finally {
       setIsLoading(false);
     }
@@ -110,25 +118,26 @@ export default function RegisterPage() {
           >
             <div className="text-8xl mb-8">🚗</div>
             <h2 className="text-3xl font-bold mb-4">
-              Koleksiyonunuzu Büyütün
+              {locale === 'en' ? 'Grow Your Collection' : 'Koleksiyonunuzu Büyütün'}
             </h2>
             <p className="text-gray-300 text-lg">
-              Ücretsiz üye olun, ilk 5 ilanınızı ücretsiz yayınlayın. 
-              Takas özelliğiyle koleksiyonunuzu zenginleştirin.
+              {locale === 'en' 
+                ? 'Sign up for free, publish your first 5 listings for free. Enrich your collection with the trade feature.'
+                : 'Ücretsiz üye olun, ilk 5 ilanınızı ücretsiz yayınlayın. Takas özelliğiyle koleksiyonunuzu zenginleştirin.'}
             </p>
             
             <div className="mt-12 grid grid-cols-3 gap-6 text-center">
               <div>
                 <p className="text-4xl font-bold">10K+</p>
-                <p className="text-gray-400 text-sm">İlan</p>
+                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Listings' : 'İlan'}</p>
               </div>
               <div>
                 <p className="text-4xl font-bold">5K+</p>
-                <p className="text-gray-400 text-sm">Üye</p>
+                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Members' : 'Üye'}</p>
               </div>
               <div>
                 <p className="text-4xl font-bold">2K+</p>
-                <p className="text-gray-400 text-sm">Takas</p>
+                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Trades' : 'Takas'}</p>
               </div>
             </div>
           </motion.div>
@@ -148,17 +157,21 @@ export default function RegisterPage() {
                 <span className="text-white text-2xl">🚗</span>
               </div>
               <span className="font-display font-bold text-2xl">
-                Diecast <span className="text-primary-500">Market</span>
+                TARODAN
               </span>
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Hesap Oluştur</h1>
-            <p className="text-gray-600">Koleksiyonerlere katılın</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {t('auth.createAccount')}
+            </h1>
+            <p className="text-gray-600">
+              {locale === 'en' ? 'Join the collectors' : 'Koleksiyonerlere katılın'}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ad Soyad
+                {locale === 'en' ? 'Full Name' : 'Ad Soyad'}
               </label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -166,7 +179,7 @@ export default function RegisterPage() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Adınız Soyadınız"
+                  placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
                   className="input pl-12"
                 />
               </div>
@@ -174,7 +187,7 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                E-posta
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -182,7 +195,7 @@ export default function RegisterPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ornek@email.com"
+                  placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
                   className="input pl-12"
                 />
               </div>
@@ -191,7 +204,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Telefon
+                  {t('auth.phone')}
                 </label>
                 <div className="relative">
                   <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -207,7 +220,7 @@ export default function RegisterPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Doğum Tarihi
+                  {t('auth.birthDate')}
                 </label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -224,7 +237,7 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Şifre
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -251,7 +264,7 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Şifre Tekrar
+                {t('auth.confirmPassword')}
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -273,14 +286,30 @@ export default function RegisterPage() {
                 className="w-5 h-5 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-600">
-                <Link href="/terms" className="text-primary-500 hover:text-primary-600">
-                  Kullanım Şartları
-                </Link>
-                {' '}ve{' '}
-                <Link href="/privacy" className="text-primary-500 hover:text-primary-600">
-                  Gizlilik Politikası
-                </Link>
-                'nı okudum ve kabul ediyorum.
+                {locale === 'en' ? (
+                  <>
+                    I have read and accept the{' '}
+                    <Link href="/terms" className="text-primary-500 hover:text-primary-600">
+                      Terms of Service
+                    </Link>
+                    {' '}and{' '}
+                    <Link href="/privacy" className="text-primary-500 hover:text-primary-600">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  <>
+                    <Link href="/terms" className="text-primary-500 hover:text-primary-600">
+                      Kullanım Şartları
+                    </Link>
+                    {' '}ve{' '}
+                    <Link href="/privacy" className="text-primary-500 hover:text-primary-600">
+                      Gizlilik Politikası
+                    </Link>
+                    'nı okudum ve kabul ediyorum.
+                  </>
+                )}
               </span>
             </label>
 
@@ -289,14 +318,16 @@ export default function RegisterPage() {
               disabled={isLoading}
               className="btn-primary w-full"
             >
-              {isLoading ? 'Kayıt yapılıyor...' : 'Üye Ol'}
+              {isLoading 
+                ? (locale === 'en' ? 'Signing up...' : 'Kayıt yapılıyor...') 
+                : t('common.register')}
             </button>
           </form>
 
           <p className="text-center mt-8 text-gray-600">
-            Zaten hesabınız var mı?{' '}
+            {t('auth.hasAccount')}{' '}
             <Link href="/login" className="text-primary-500 font-semibold hover:text-primary-600">
-              Giriş Yapın
+              {t('common.login')}
             </Link>
           </p>
         </motion.div>
@@ -304,5 +335,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-

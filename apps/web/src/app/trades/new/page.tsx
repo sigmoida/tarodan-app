@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { productsApi, userApi } from '@/lib/api';
 import api from '@/lib/api';
+import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Product {
   id: string;
@@ -22,6 +23,7 @@ export default function NewTradePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const listingId = searchParams.get('listing');
+  const { t, locale } = useTranslation();
   
   const { user, isAuthenticated, limits } = useAuthStore();
   const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business' || user?.membershipTier === 'basic');
@@ -41,7 +43,7 @@ export default function NewTradePage() {
     }
     
     if (!canTrade) {
-      toast.error('Takas özelliği için Premium üyelik gereklidir');
+      toast.error(t('trade.requiresPremium'));
       router.push('/pricing');
       return;
     }
@@ -67,15 +69,16 @@ export default function NewTradePage() {
       setMyProducts(tradeableProducts);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error('Veriler yüklenemedi');
+      toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const getProductImage = (product: Product): string => {
+    const placeholder = locale === 'en' ? 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Product' : 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
     if (!product.images || product.images.length === 0) {
-      return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+      return placeholder;
     }
     const img = product.images[0];
     return typeof img === 'string' ? img : img.url;
@@ -100,19 +103,19 @@ export default function NewTradePage() {
 
   const handleSubmit = async () => {
     if (selectedProducts.length === 0 && !cashAmount) {
-      toast.error('En az bir ürün seçin veya nakit fark girin');
+      toast.error(t('trade.selectAtLeastOne'));
       return;
     }
 
     if (!targetProduct) {
-      toast.error('Hedef ürün bulunamadı');
+      toast.error(t('trade.targetNotFound'));
       return;
     }
 
     // Get sellerId from targetProduct
     const sellerId = (targetProduct as any).sellerId || (targetProduct as any).seller?.id;
     if (!sellerId) {
-      toast.error('Satıcı bilgisi bulunamadı');
+      toast.error(t('trade.sellerNotFound'));
       return;
     }
 
@@ -127,11 +130,11 @@ export default function NewTradePage() {
       };
 
       await api.post('/trades', payload);
-      toast.success('Takas teklifi gönderildi!');
+      toast.success(t('trade.tradeSent'));
       router.push('/trades');
     } catch (error: any) {
       console.error('Failed to create trade:', error);
-      toast.error(error.response?.data?.message || 'Takas teklifi gönderilemedi');
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to send trade offer' : 'Takas teklifi gönderilemedi'));
     } finally {
       setIsSubmitting(false);
     }
@@ -155,9 +158,9 @@ export default function NewTradePage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <p className="text-gray-600 mb-4">Ürün bulunamadı</p>
+          <p className="text-gray-600 mb-4">{t('trade.targetNotFound')}</p>
           <Link href="/listings" className="text-primary-500 hover:text-primary-600">
-            İlanlara Dön
+            {t('seller.backToListings')}
           </Link>
         </div>
       </div>
@@ -174,21 +177,21 @@ export default function NewTradePage() {
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeftIcon className="w-5 h-5" />
-            Geri Dön
+            {t('common.back')}
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
             <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
-            Takas Teklifi Oluştur
+            {t('trade.createTrade')}
           </h1>
           <p className="text-gray-600 mt-2">
-            Takas etmek istediğiniz ürünleri seçin
+            {locale === 'en' ? 'Select the products you want to trade' : 'Takas etmek istediğiniz ürünleri seçin'}
           </p>
         </div>
 
         {/* Target Product */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            İstediğiniz Ürün
+            {locale === 'en' ? 'Product You Want' : 'İstediğiniz Ürün'}
           </h2>
           <div className="flex items-center gap-4">
             <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
@@ -214,19 +217,19 @@ export default function NewTradePage() {
         {/* My Products */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Teklif Edeceğiniz Ürünler
+            {locale === 'en' ? 'Products You Offer' : 'Teklif Edeceğiniz Ürünler'}
           </h2>
           
           {myProducts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
-                Takasa açık ürününüz bulunmuyor. Önce ilanlarınızdan birini takasa açık hale getirin.
+                {t('trade.noListingsForTrade')}
               </p>
               <Link
                 href="/profile/listings"
                 className="text-primary-500 hover:text-primary-600 font-medium"
               >
-                İlanlarıma Git →
+                {locale === 'en' ? 'Go to My Listings →' : 'İlanlarıma Git →'}
               </Link>
             </div>
           ) : (
@@ -275,10 +278,10 @@ export default function NewTradePage() {
         {/* Cash Addition */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Nakit Fark (Opsiyonel)
+            {t('trade.cashDifference')} ({t('common.optional')})
           </h2>
           <p className="text-gray-600 text-sm mb-4">
-            Takas değerini dengelemek için nakit fark ekleyebilirsiniz.
+            {locale === 'en' ? 'You can add cash to balance the trade value.' : 'Takas değerini dengelemek için nakit fark ekleyebilirsiniz.'}
           </p>
           <div className="relative max-w-xs">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
@@ -297,12 +300,12 @@ export default function NewTradePage() {
         {/* Message */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Mesaj (Opsiyonel)
+            {t('trade.message')} ({t('common.optional')})
           </h2>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Satıcıya bir mesaj bırakın..."
+            placeholder={t('trade.messagePlaceholder')}
             rows={4}
             maxLength={500}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
@@ -315,15 +318,15 @@ export default function NewTradePage() {
         {/* Summary */}
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Teklif Özeti
+            {locale === 'en' ? 'Offer Summary' : 'Teklif Özeti'}
           </h2>
           <div className="space-y-2 text-gray-700">
             <div className="flex justify-between">
-              <span>Seçilen Ürünler:</span>
-              <span className="font-medium">{selectedProducts.length} adet</span>
+              <span>{locale === 'en' ? 'Selected Products:' : 'Seçilen Ürünler:'}</span>
+              <span className="font-medium">{selectedProducts.length} {locale === 'en' ? 'items' : 'adet'}</span>
             </div>
             <div className="flex justify-between">
-              <span>Ürün Toplam Değeri:</span>
+              <span>{locale === 'en' ? 'Product Total Value:' : 'Ürün Toplam Değeri:'}</span>
               <span className="font-medium">
                 ₺{myProducts
                   .filter(p => selectedProducts.includes(p.id))
@@ -333,18 +336,18 @@ export default function NewTradePage() {
             </div>
             {parseFloat(cashAmount) > 0 && (
               <div className="flex justify-between">
-                <span>Nakit Fark:</span>
+                <span>{t('trade.cashDifference')}:</span>
                 <span className="font-medium">₺{parseFloat(cashAmount).toLocaleString('tr-TR')}</span>
               </div>
             )}
             <div className="border-t border-orange-200 pt-2 mt-2">
               <div className="flex justify-between text-lg font-bold">
-                <span>Toplam Teklif:</span>
+                <span>{locale === 'en' ? 'Total Offer:' : 'Toplam Teklif:'}</span>
                 <span className="text-orange-600">₺{calculateTotal().toLocaleString('tr-TR')}</span>
               </div>
             </div>
             <div className="flex justify-between text-gray-600">
-              <span>İstenen Ürün:</span>
+              <span>{locale === 'en' ? 'Requested Product:' : 'İstenen Ürün:'}</span>
               <span className="font-medium">₺{Number(targetProduct.price).toLocaleString('tr-TR')}</span>
             </div>
           </div>
@@ -356,7 +359,7 @@ export default function NewTradePage() {
             onClick={() => router.back()}
             className="flex-1 px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
           >
-            Vazgeç
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -366,12 +369,12 @@ export default function NewTradePage() {
             {isSubmitting ? (
               <>
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Gönderiliyor...
+                {t('common.sending')}
               </>
             ) : (
               <>
                 <ArrowsRightLeftIcon className="w-5 h-5" />
-                Takas Teklifi Gönder
+                {t('trade.sendTrade')}
               </>
             )}
           </button>
