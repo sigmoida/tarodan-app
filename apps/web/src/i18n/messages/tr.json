@@ -453,7 +453,12 @@
     "enterRejectReason": "Lütfen red nedenini yazın",
     "loginToTrade": "Takas teklifi göndermek için giriş yapmalısınız.",
     "premiumRequired": "Premium Üyelik Gerekli",
-    "premiumRequiredDesc": "Takas özelliği sadece Premium ve üzeri üyelikler için aktiftir. Üyeliğinizi yükselterek takas teklifleri gönderebilir ve alabilirsiniz."
+    "premiumRequiredDesc": "Takas özelliği sadece Premium ve üzeri üyelikler için aktiftir. Üyeliğinizi yükselterek takas teklifleri gönderebilir ve alabilirsiniz.",
+    "counterOffer": "Karşı Teklif",
+    "counterOfferSent": "Karşı teklif gönderildi!",
+    "waitingForCounterResponse": "Karşı teklif yanıtı bekleniyor",
+    "counterOfferHistory": "Takas Geçmişi",
+    "sendCounterOffer": "Karşı Teklif Gönder"
   },
   "offer": {
     "makeOffer": "Teklif Ver",

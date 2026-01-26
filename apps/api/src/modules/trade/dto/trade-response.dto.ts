@@ -79,6 +79,8 @@ export class TradeResponseDto {
   cancelledAt?: Date;
   cancelReason?: string;
   
+  version?: number;
+  
   createdAt: Date;
   updatedAt: Date;
 }

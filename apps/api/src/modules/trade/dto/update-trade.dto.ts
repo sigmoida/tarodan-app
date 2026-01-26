@@ -6,6 +6,7 @@ import {
   IsEnum,
   ValidateNested,
   MaxLength,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TradeItemDto } from './create-trade.dto';
@@ -36,6 +37,7 @@ export class CounterTradeDto {
    * Products the counter-offerer (original receiver) is offering
    */
   @IsArray()
+  @ArrayMinSize(1, { message: 'En az 1 ürün teklif etmelisiniz' })
   @ValidateNested({ each: true })
   @Type(() => TradeItemDto)
   initiatorItems: TradeItemDto[];
@@ -44,6 +46,7 @@ export class CounterTradeDto {
    * Products the counter-offerer wants from original initiator
    */
   @IsArray()
+  @ArrayMinSize(1, { message: 'En az 1 ürün talep etmelisiniz' })
   @ValidateNested({ each: true })
   @Type(() => TradeItemDto)
   receiverItems: TradeItemDto[];

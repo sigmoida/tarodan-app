@@ -17,6 +17,7 @@ interface Product {
   price: number;
   images?: Array<{ url: string } | string>;
   isTradeEnabled?: boolean;
+  status?: string;
 }
 
 export default function NewTradePage() {
@@ -55,6 +56,7 @@ export default function NewTradePage() {
   const [myProducts, setMyProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [cashAmount, setCashAmount] = useState<string>('');
+  const [cashPayer, setCashPayer] = useState<'me' | 'them'>('me');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,8 +89,12 @@ export default function NewTradePage() {
       // Fetch my trade-enabled products
       const myProductsRes = await userApi.getMyProducts();
       const products = myProductsRes.data.data || myProductsRes.data.products || [];
-      // Filter only trade-enabled products
-      const tradeableProducts = products.filter((p: Product) => p.isTradeEnabled && p.id !== listingId);
+      // Filter only active and trade-enabled products
+      const tradeableProducts = products.filter((p: Product) => 
+        p.status === 'active' && 
+        p.isTradeEnabled && 
+        p.id !== listingId
+      );
       setMyProducts(tradeableProducts);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -144,11 +150,17 @@ export default function NewTradePage() {
 
     setIsSubmitting(true);
     try {
+      // Calculate cash amount: positive = initiator pays, negative = receiver pays
+      let finalCashAmount: number | undefined = undefined;
+      if (cashAmount && parseFloat(cashAmount) > 0) {
+        finalCashAmount = cashPayer === 'me' ? parseFloat(cashAmount) : -parseFloat(cashAmount);
+      }
+
       const payload = {
         receiverId: sellerId,
         initiatorItems: selectedProducts.map(id => ({ productId: id, quantity: 1 })),
         receiverItems: [{ productId: targetProduct.id, quantity: 1 }],
-        cashAmount: parseFloat(cashAmount) || undefined,
+        cashAmount: finalCashAmount,
         message: message || undefined,
       };
 
@@ -221,91 +233,101 @@ export default function NewTradePage() {
           </p>
         </div>
 
-        {/* Target Product */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            {locale === 'en' ? 'Product You Want' : 'İstediğiniz Ürün'}
-          </h2>
-          <div className="flex items-center gap-4">
-            <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-              <Image
-                src={getProductImage(targetProduct)}
-                alt={targetProduct.title}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900 line-clamp-2">
-                {targetProduct.title}
-              </h3>
-              <p className="text-xl font-bold text-primary-500 mt-1">
-                ₺{Number(targetProduct.price).toLocaleString('tr-TR')}
-              </p>
+        {/* Products Comparison - Side by Side */}
+        <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+          {/* SOL - İstenilen Ürün */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              {locale === 'en' ? 'Product You Want' : 'İstediğiniz Ürün'}
+            </h2>
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative w-full aspect-square max-w-[200px] rounded-lg overflow-hidden bg-gray-100">
+                <Image
+                  src={getProductImage(targetProduct)}
+                  alt={targetProduct.title}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              <div className="text-center w-full">
+                <h3 className="font-medium text-gray-900 line-clamp-2 mb-2">
+                  {targetProduct.title}
+                </h3>
+                <p className="text-xl font-bold text-primary-500">
+                  ₺{Number(targetProduct.price).toLocaleString('tr-TR')}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* My Products */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            {locale === 'en' ? 'Products You Offer' : 'Teklif Edeceğiniz Ürünler'}
-          </h2>
-          
-          {myProducts.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">
-                {t('trade.noListingsForTrade')}
-              </p>
-              <Link
-                href="/profile/listings"
-                className="text-primary-500 hover:text-primary-600 font-medium"
-              >
-                {locale === 'en' ? 'Go to My Listings →' : 'İlanlarıma Git →'}
-              </Link>
+          {/* ORTA - Takas İkonu */}
+          <div className="flex items-center justify-center py-4 lg:py-0">
+            <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center">
+              <ArrowsRightLeftIcon className="w-8 h-8 text-orange-600" />
             </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {myProducts.map((product) => {
-                const isSelected = selectedProducts.includes(product.id);
-                return (
-                  <button
-                    key={product.id}
-                    onClick={() => toggleProduct(product.id)}
-                    className={`relative rounded-xl overflow-hidden border-2 transition-all ${
-                      isSelected
-                        ? 'border-orange-500 ring-2 ring-orange-200'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
-                        <CheckIcon className="w-4 h-4 text-white" />
+          </div>
+
+          {/* SAĞ - Benim Ürünlerim */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              {locale === 'en' ? 'Products You Offer' : 'Teklif Edeceğiniz Ürünler'}
+            </h2>
+            
+            {myProducts.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600 mb-4">
+                  {t('trade.noListingsForTrade')}
+                </p>
+                <Link
+                  href="/profile/listings"
+                  className="text-primary-500 hover:text-primary-600 font-medium"
+                >
+                  {locale === 'en' ? 'Go to My Listings →' : 'İlanlarıma Git →'}
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                {myProducts.map((product) => {
+                  const isSelected = selectedProducts.includes(product.id);
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => toggleProduct(product.id)}
+                      className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                        isSelected
+                          ? 'border-orange-500 ring-2 ring-orange-200'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                          <CheckIcon className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <div className="aspect-square relative bg-gray-100">
+                        <Image
+                          src={getProductImage(product)}
+                          alt={product.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
                       </div>
-                    )}
-                    <div className="aspect-square relative bg-gray-100">
-                      <Image
-                        src={getProductImage(product)}
-                        alt={product.title}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                    <div className="p-3 text-left">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-1">
-                        {product.title}
-                      </p>
-                      <p className="text-sm font-bold text-primary-500">
-                        ₺{Number(product.price).toLocaleString('tr-TR')}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                      <div className="p-2 text-left">
+                        <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                          {product.title}
+                        </p>
+                        <p className="text-xs font-bold text-primary-500">
+                          ₺{Number(product.price).toLocaleString('tr-TR')}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Cash Addition */}
@@ -316,17 +338,54 @@ export default function NewTradePage() {
           <p className="text-gray-600 text-sm mb-4">
             {locale === 'en' ? 'You can add cash to balance the trade value.' : 'Takas değerini dengelemek için nakit fark ekleyebilirsiniz.'}
           </p>
-          <div className="relative max-w-xs">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
-            <input
-              type="number"
-              value={cashAmount}
-              onChange={(e) => setCashAmount(e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+          <div className="space-y-4">
+            <div className="relative max-w-xs">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
+              <input
+                type="number"
+                value={cashAmount}
+                onChange={(e) => setCashAmount(e.target.value)}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
+            {parseFloat(cashAmount) > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  {locale === 'en' ? 'Who will pay the cash difference?' : 'Nakit farkı kim ödeyecek?'}
+                </p>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="cashPayer"
+                      value="me"
+                      checked={cashPayer === 'me'}
+                      onChange={(e) => setCashPayer(e.target.value as 'me' | 'them')}
+                      className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {locale === 'en' ? 'I will pay' : 'Ben ödeyeceğim'}
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="cashPayer"
+                      value="them"
+                      checked={cashPayer === 'them'}
+                      onChange={(e) => setCashPayer(e.target.value as 'me' | 'them')}
+                      className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {locale === 'en' ? 'They will pay' : 'Karşı taraf ödeyecek'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

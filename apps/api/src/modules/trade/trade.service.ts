@@ -500,6 +500,212 @@ export class TradeService {
   }
 
   // ==========================================================================
+  // COUNTER TRADE OFFER
+  // ==========================================================================
+  async counterTrade(
+    tradeId: string,
+    userId: string,
+    dto: CounterTradeDto,
+  ): Promise<TradeResponseDto> {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      include: {
+        initiatorItems: true,
+        receiverItems: true,
+      },
+    });
+
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+    
+    // Store version for optimistic locking
+    const tradeVersion = trade.version;
+
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+
+    // Only receiver can send counter-offer
+    if (trade.receiverId !== userId) {
+      throw new ForbiddenException('Sadece takas alıcısı karşı teklif gönderebilir');
+    }
+
+    // Trade must be in pending status
+    if (trade.status !== TradeStatus.pending) {
+      throw new BadRequestException(
+        `Takas durumu '${trade.status}' karşı teklif gönderilemez`,
+      );
+    }
+
+    // Check response deadline hasn't expired
+    if (new Date() > trade.responseDeadline) {
+      throw new BadRequestException('Yanıt süresi dolmuş');
+    }
+
+    // Validate user has premium membership
+    const userCanTrade = await this.membershipService.canCreateTrade(userId);
+    if (!userCanTrade.allowed) {
+      throw new BadRequestException(
+        'Karşı teklif göndermek için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+      );
+    }
+
+    // Get original initiator (who will become the receiver)
+    const originalInitiatorId = trade.initiatorId;
+    const originalReceiverId = trade.receiverId; // current user (counter-offerer)
+
+    // Get current trade item IDs for comparison
+    const currentInitiatorItemIds = trade.initiatorItems.map(item => item.productId).sort();
+    const currentReceiverItemIds = trade.receiverItems.map(item => item.productId).sort();
+
+    // Check for identical counter-offer
+    const newInitiatorItemIds = dto.initiatorItems.map(i => i.productId).sort();
+    const newReceiverItemIds = dto.receiverItems.map(i => i.productId).sort();
+    const newCashAmount = Math.abs(dto.cashAmount || 0);
+    const currentCashAmount = Math.abs(trade.cashAmount?.toNumber() || 0);
+
+    const isIdentical = 
+      JSON.stringify(newInitiatorItemIds) === JSON.stringify(currentReceiverItemIds) &&
+      JSON.stringify(newReceiverItemIds) === JSON.stringify(currentInitiatorItemIds) &&
+      newCashAmount === currentCashAmount;
+
+    if (isIdentical) {
+      throw new BadRequestException('Önceki teklif ile aynı. Lütfen değişiklik yapın.');
+    }
+
+    // Validate counter-offerer owns the products they're offering
+    // Allow active OR reserved (if in current trade)
+    const counterOffererProducts = await this.prisma.product.findMany({
+      where: {
+        id: { in: dto.initiatorItems.map((i) => i.productId) },
+        sellerId: originalReceiverId, // current receiver is offering these
+        OR: [
+          { status: ProductStatus.active },
+          { 
+            status: ProductStatus.reserved,
+            id: { in: currentReceiverItemIds } // Only allow if in current trade
+          }
+        ],
+      },
+    });
+
+    if (counterOffererProducts.length !== dto.initiatorItems.length) {
+      throw new BadRequestException(
+        'Bazı ürünler size ait değil veya aktif değil',
+      );
+    }
+
+    // Validate original initiator's products (what counter-offerer wants)
+    // Allow active AND trade-enabled OR reserved (if in current trade)
+    const originalInitiatorProducts = await this.prisma.product.findMany({
+      where: {
+        id: { in: dto.receiverItems.map((i) => i.productId) },
+        sellerId: originalInitiatorId, // original initiator owns these
+        OR: [
+          { 
+            status: ProductStatus.active,
+            isTradeEnabled: true 
+          },
+          { 
+            status: ProductStatus.reserved,
+            id: { in: currentInitiatorItemIds } // Only allow if in current trade
+          }
+        ],
+      },
+    });
+
+    if (originalInitiatorProducts.length !== dto.receiverItems.length) {
+      throw new BadRequestException(
+        'Talep edilen bazı ürünler takasa uygun değil',
+      );
+    }
+
+    // Get trade deadlines from platform settings
+    const responseHoursSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'trade_response_deadline_hours' },
+    });
+    const responseHours = parseInt(responseHoursSetting?.settingValue ?? '72');
+
+    const responseDeadline = new Date();
+    responseDeadline.setHours(responseDeadline.getHours() + responseHours);
+
+    // Calculate cash payer if there's a cash component
+    // After swap: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
+    let cashPayerId: string | null = null;
+    if (dto.cashAmount && dto.cashAmount !== 0) {
+      // Positive = new initiator (originalReceiverId) pays, negative = new receiver (originalInitiatorId) pays
+      cashPayerId = dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId;
+    }
+
+    // Update trade in transaction
+    await this.prisma.$transaction(async (tx) => {
+      // Release old reserved products (both sides)
+      const oldItems = await tx.tradeItem.findMany({
+        where: { tradeId },
+      });
+
+      await tx.product.updateMany({
+        where: { id: { in: oldItems.map((i) => i.productId) } },
+        data: { status: ProductStatus.active },
+      });
+
+      // Delete old trade items
+      await tx.tradeItem.deleteMany({
+        where: { tradeId },
+      });
+
+      // Reserve new products (counter-offerer's products)
+      await tx.product.updateMany({
+        where: { id: { in: dto.initiatorItems.map((i) => i.productId) } },
+        data: { status: ProductStatus.reserved },
+      });
+
+      // Swap roles: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
+      // Update trade with swapped roles
+      await tx.trade.update({
+        where: { id: tradeId, version: tradeVersion },
+        data: {
+          initiatorId: originalReceiverId, // Swapped
+          receiverId: originalInitiatorId, // Swapped
+          cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
+          cashPayerId,
+          initiatorMessage: dto.message, // New initiator's message
+          receiverMessage: null, // Clear old receiver message
+          responseDeadline,
+          version: { increment: 1 },
+        },
+      });
+
+      // Create new trade items for new initiator (originalReceiverId)
+      await tx.tradeItem.createMany({
+        data: dto.initiatorItems.map((item) => ({
+          tradeId,
+          productId: item.productId,
+          side: 'initiator',
+          quantity: item.quantity,
+          valueAtTrade:
+            counterOffererProducts.find((p) => p.id === item.productId)?.price ?? 0,
+        })),
+      });
+
+      // Create new trade items for new receiver (originalInitiatorId) - what counter-offerer wants
+      await tx.tradeItem.createMany({
+        data: dto.receiverItems.map((item) => ({
+          tradeId,
+          productId: item.productId,
+          side: 'receiver',
+          quantity: item.quantity,
+          valueAtTrade:
+            originalInitiatorProducts.find((p) => p.id === item.productId)?.price ?? 0,
+        })),
+      });
+    });
+
+    return this.getTradeById(tradeId, userId);
+  }
+
+  // ==========================================================================
   // CANCEL TRADE
   // ==========================================================================
   async cancelTrade(
@@ -1105,6 +1311,7 @@ export class TradeService {
       completedAt: trade.completedAt || undefined,
       cancelledAt: trade.cancelledAt || undefined,
       cancelReason: trade.cancelReason || undefined,
+      version: trade.version || undefined,
       createdAt: trade.createdAt,
       updatedAt: trade.updatedAt,
     };
