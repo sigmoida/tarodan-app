@@ -292,7 +292,8 @@ export default function Home() {
   };
 
   const extractScaleFromTitle = (title: string): string => {
-    const scaleMatch = title.match(/\d+:\d+/);
+    const scalePattern = /\d+:\d+/;
+    const scaleMatch = title.match(scalePattern);
     if (scaleMatch) return scaleMatch[0];
     return '1:18';
   };
