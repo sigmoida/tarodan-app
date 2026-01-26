@@ -13,10 +13,13 @@ import {
   TruckIcon,
   ExclamationTriangleIcon,
   ChatBubbleLeftRightIcon,
+  PlusIcon,
+  TrashIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { tradesApi } from '@/lib/api';
+import { tradesApi, listingsApi, userApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface TradeItem {
@@ -61,6 +64,7 @@ interface Trade {
   completedAt?: string;
   cancelledAt?: string;
   cancelReason?: string;
+  version?: number;
 }
 
 const getStatusConfig = (locale: string): Record<string, { label: string; color: string; icon: any; description: string }> => ({
@@ -146,6 +150,15 @@ export default function TradeDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [isCounterMode, setIsCounterMode] = useState(false);
+  const [counterProducts, setCounterProducts] = useState<any[]>([]);
+  const [counterTargetProducts, setCounterTargetProducts] = useState<any[]>([]);
+  const [selectedCounterProducts, setSelectedCounterProducts] = useState<string[]>([]);
+  const [selectedCounterTargetProducts, setSelectedCounterTargetProducts] = useState<string[]>([]);
+  const [counterCashAmount, setCounterCashAmount] = useState<string>('');
+  const [counterCashPayer, setCounterCashPayer] = useState<'me' | 'them'>('me');
+  const [counterMessage, setCounterMessage] = useState('');
+  const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -240,14 +253,13 @@ export default function TradeDetailPage() {
   };
 
   const handleReject = async () => {
-    if (!trade || !rejectReason.trim()) {
-      toast.error(locale === 'en' ? 'Please specify rejection reason' : 'Lütfen red nedeni belirtin');
+    if (!trade) {
       return;
     }
 
     setIsActionLoading(true);
     try {
-      await tradesApi.reject(trade.id, rejectReason);
+      await tradesApi.reject(trade.id, rejectReason.trim() || undefined);
       toast.success(locale === 'en' ? 'Trade rejected' : 'Takas reddedildi');
       setShowRejectModal(false);
       setRejectReason('');
@@ -278,6 +290,211 @@ export default function TradeDetailPage() {
     } finally {
       setIsActionLoading(false);
     }
+  };
+
+  const handleOpenCounterModal = async () => {
+    if (!trade) return;
+    setIsCounterMode(true);
+    setIsLoadingCounterData(true);
+
+    try {
+      // Fetch my products (for counter-offer initiator items)
+      const myProductsRes = await userApi.getMyProducts();
+      const myProducts = myProductsRes.data.data || myProductsRes.data.products || [];
+      const tradeableProducts = myProducts.filter((p: any) => 
+        p.status === 'active' && 
+        p.isTradeEnabled && 
+        p.id !== trade.initiatorItems[0]?.productId
+      );
+      setCounterProducts(tradeableProducts);
+
+      // Fetch original initiator's products (for counter-offer receiver items)
+      const originalInitiatorId = trade.initiatorId;
+      
+      // Get products that are currently in the trade (these should be shown and pre-selected)
+      const currentTradeProductIds = trade.initiatorItems.map((item: TradeItem) => item.productId);
+      
+      // Create product objects from trade items (they already have id, title, image)
+      const currentTradeProducts = trade.initiatorItems.map((item: TradeItem) => ({
+        id: item.productId,
+        title: item.productTitle,
+        price: item.valueAtTrade, // Use value at trade time
+        images: item.productImage ? (typeof item.productImage === 'string' ? [item.productImage] : [{ url: item.productImage }]) : [],
+        status: 'reserved', // These are in a trade, so they're reserved
+        isTradeEnabled: true, // They're already in a trade, so they must be trade-enabled
+      }));
+
+      // Get active and trade-enabled products (excluding ones already in current trade to avoid duplicates)
+      const activeListingsRes = await listingsApi.getAll({ 
+        sellerId: originalInitiatorId,
+        status: 'active',
+        tradeOnly: true,
+        limit: 100 
+      });
+      const activeProducts = activeListingsRes.data.products || activeListingsRes.data.data || [];
+      
+      // Filter out products already in current trade
+      const otherActiveProducts = activeProducts.filter((p: any) => 
+        !currentTradeProductIds.includes(p.id)
+      );
+      
+      // Combine: current trade products + other active trade-enabled products
+      const allInitiatorProducts = [...currentTradeProducts, ...otherActiveProducts];
+      
+      // All products should be trade-enabled (current trade products are already in a trade, so include them)
+      const tradeableInitiatorProducts = allInitiatorProducts.filter((p: any) => {
+        const isInCurrentTrade = currentTradeProductIds.includes(p.id);
+        return isInCurrentTrade || (p.isTradeEnabled && p.status === 'active');
+      });
+      
+      setCounterTargetProducts(tradeableInitiatorProducts);
+
+      // Pre-fill form with current trade data (swapped)
+      // What receiver currently wants (initiatorItems) -> what receiver will want in counter (selectedCounterTargetProducts)
+      setSelectedCounterTargetProducts(trade.initiatorItems.map((item: TradeItem) => item.productId));
+      
+      // What receiver currently offers (receiverItems) -> what receiver will offer in counter (selectedCounterProducts)
+      // Create product objects from receiver items for the list
+      const currentReceiverProducts = trade.receiverItems.map((item: TradeItem) => ({
+        id: item.productId,
+        title: item.productTitle,
+        price: item.valueAtTrade,
+        images: item.productImage ? (typeof item.productImage === 'string' ? [item.productImage] : [{ url: item.productImage }]) : [],
+        status: 'reserved',
+        isTradeEnabled: true,
+      }));
+      
+      // Combine current receiver products with other available products
+      const allReceiverProducts = [...currentReceiverProducts, ...tradeableProducts.filter(p => 
+        !trade.receiverItems.some((item: TradeItem) => item.productId === p.id)
+      )];
+      setCounterProducts(allReceiverProducts);
+      
+      // Pre-select current receiver products
+      const currentReceiverProductIds = trade.receiverItems.map((item: TradeItem) => item.productId);
+      setSelectedCounterProducts(currentReceiverProductIds);
+
+      // Pre-fill cash amount
+      if (trade.cashAmount && trade.cashAmount > 0) {
+        setCounterCashAmount(trade.cashAmount.toString());
+        // Determine cash payer: if current cashPayerId is receiver, then receiver was paying
+        // In counter, if receiver was paying, they might want to change it
+        setCounterCashPayer(trade.cashPayerId === trade.receiverId ? 'me' : 'them');
+      } else {
+        setCounterCashAmount('');
+        setCounterCashPayer('me');
+      }
+
+      setCounterMessage('');
+    } catch (error: any) {
+      console.error('Failed to load counter-offer data:', error);
+      toast.error(locale === 'en' ? 'Failed to load products' : 'Ürünler yüklenemedi');
+      setIsCounterMode(false);
+    } finally {
+      setIsLoadingCounterData(false);
+    }
+  };
+
+  const handleExitCounterMode = () => {
+    setIsCounterMode(false);
+    setSelectedCounterProducts([]);
+    setSelectedCounterTargetProducts([]);
+    setCounterCashAmount('');
+    setCounterCashPayer('me');
+    setCounterMessage('');
+  };
+
+  const toggleCounterProduct = (productId: string) => {
+    setSelectedCounterProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const toggleCounterTargetProduct = (productId: string) => {
+    setSelectedCounterTargetProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const handleCounterSubmit = async () => {
+    if (!trade) return;
+
+    if (selectedCounterProducts.length === 0) {
+      toast.error(locale === 'en' ? 'Please select at least one product to offer' : 'Lütfen en az bir ürün seçin');
+      return;
+    }
+
+    if (selectedCounterTargetProducts.length === 0) {
+      toast.error(locale === 'en' ? 'Please select at least one product you want' : 'Lütfen en az bir istediğiniz ürünü seçin');
+      return;
+    }
+
+    // Check if counter-offer is identical to current trade
+    const currentInitiatorItemIds = trade.initiatorItems.map(item => item.productId).sort();
+    const currentReceiverItemIds = trade.receiverItems.map(item => item.productId).sort();
+    const newInitiatorItemIds = selectedCounterProducts.sort();
+    const newReceiverItemIds = selectedCounterTargetProducts.sort();
+    const newCashAmount = Math.abs(parseFloat(counterCashAmount) || 0);
+    const currentCashAmount = Math.abs(trade.cashAmount || 0);
+
+    const isIdentical = 
+      JSON.stringify(newInitiatorItemIds) === JSON.stringify(currentReceiverItemIds) &&
+      JSON.stringify(newReceiverItemIds) === JSON.stringify(currentInitiatorItemIds) &&
+      newCashAmount === currentCashAmount;
+
+    if (isIdentical) {
+      toast.error(locale === 'en' 
+        ? 'This counter-offer is identical to the current trade. Please make changes before submitting.' 
+        : 'Önceki teklif ile aynı. Değişiklik yapmadan karşı teklif gönderemezsiniz.');
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      // Calculate cash amount: positive = initiator (receiver in counter) pays, negative = receiver (original initiator) pays
+      let finalCashAmount: number | undefined = undefined;
+      if (counterCashAmount && parseFloat(counterCashAmount) > 0) {
+        finalCashAmount = counterCashPayer === 'me' ? parseFloat(counterCashAmount) : -parseFloat(counterCashAmount);
+      }
+
+      await tradesApi.counter(trade.id, {
+        initiatorItems: selectedCounterProducts.map(id => ({ productId: id, quantity: 1 })),
+        receiverItems: selectedCounterTargetProducts.map(id => ({ productId: id, quantity: 1 })),
+        cashAmount: finalCashAmount,
+        message: counterMessage || undefined,
+      });
+      toast.success(locale === 'en' ? 'Counter offer sent!' : 'Karşı teklif gönderildi!');
+      setIsCounterMode(false);
+      fetchTrade();
+    } catch (error: any) {
+      console.error('Failed to send counter offer:', error);
+      const errorMessage = error.response?.data?.message || (locale === 'en' ? 'Failed to send counter offer' : 'Karşı teklif gönderilemedi');
+      
+      // Handle specific error for identical counter-offer
+      if (errorMessage.includes('Önceki teklif ile aynı') || errorMessage.includes('identical')) {
+        toast.error(locale === 'en' 
+          ? 'This counter-offer is identical to the current trade. Please make changes before submitting.' 
+          : 'Önceki teklif ile aynı. Değişiklik yapmadan karşı teklif gönderemezsiniz.');
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const getProductImage = (product: any): string => {
+    if (!product.images || product.images.length === 0) {
+      return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    }
+    const img = product.images[0];
+    return typeof img === 'string' ? img : img.url;
   };
 
   if (isLoading) {
@@ -316,8 +533,8 @@ export default function TradeDetailPage() {
   const isReceiver = user?.id === trade.receiverId;
   const canAccept = isReceiver && trade.status === 'pending';
   const canReject = isReceiver && trade.status === 'pending';
-  const canCancel = (isInitiator || isReceiver) && 
-    ['pending', 'accepted', 'initiator_shipped', 'receiver_shipped'].includes(trade.status);
+  const canCounter = isReceiver && trade.status === 'pending' && 
+    (!trade.responseDeadline || new Date(trade.responseDeadline) > new Date());
 
   const getItemImage = (item: TradeItem) => {
     return item.productImage || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
@@ -338,6 +555,262 @@ export default function TradeDetailPage() {
   const myTotal = isInitiator ? initiatorTotal : receiverTotal;
   const theirTotal = isInitiator ? receiverTotal : initiatorTotal;
 
+  // Counter-offer edit mode
+  if (isCounterMode) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-6">
+            <button
+              onClick={handleExitCounterMode}
+              className="text-primary-500 hover:text-primary-600 mb-4 inline-block"
+            >
+              ← {locale === 'en' ? 'Back to Trade' : 'Takasa Dön'}
+            </button>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
+              {locale === 'en' ? 'Counter Offer' : 'Karşı Teklif'}
+            </h1>
+            <p className="text-gray-600 mt-2">
+              {locale === 'en' ? 'Modify the trade offer' : 'Takas teklifini değiştirin'}
+            </p>
+          </div>
+
+          {isLoadingCounterData ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">{locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}</p>
+            </div>
+          ) : (
+            <>
+              {/* Products Comparison - Side by Side */}
+              <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+                {/* SOL - İstenilen Ürünler */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    {locale === 'en' ? 'Products You Want' : 'İstediğiniz Ürünler'}
+                  </h2>
+                  {counterTargetProducts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600">{locale === 'en' ? 'No products available from this seller' : 'Bu satıcıdan kullanılabilir ürün yok'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                      {counterTargetProducts.map((product) => {
+                        const isSelected = selectedCounterTargetProducts.includes(product.id);
+                        return (
+                          <button
+                            key={product.id}
+                            onClick={() => toggleCounterTargetProduct(product.id)}
+                            className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                              isSelected
+                                ? 'border-orange-500 ring-2 ring-orange-200'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                                <CheckIcon className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                            <div className="aspect-square relative bg-gray-100">
+                              <Image
+                                src={getProductImage(product)}
+                                alt={product.title}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                            <div className="p-2 text-left">
+                              <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                                {product.title}
+                              </p>
+                              <p className="text-xs font-bold text-orange-500">
+                                ₺{Number(product.price || 0).toLocaleString('tr-TR')}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ORTA - Takas İkonu */}
+                <div className="flex items-center justify-center py-4 lg:py-0">
+                  <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center">
+                    <ArrowsRightLeftIcon className="w-8 h-8 text-orange-600" />
+                  </div>
+                </div>
+
+                {/* SAĞ - Benim Ürünlerim */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    {locale === 'en' ? 'Products You Offer' : 'Teklif Edeceğiniz Ürünler'}
+                  </h2>
+                  {counterProducts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600 mb-4">{locale === 'en' ? 'No products available' : 'Kullanılabilir ürün yok'}</p>
+                      <Link href="/profile/listings" className="text-orange-500 hover:text-orange-600 font-medium">
+                        {locale === 'en' ? 'Go to My Listings →' : 'İlanlarıma Git →'}
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                      {counterProducts.map((product) => {
+                        const isSelected = selectedCounterProducts.includes(product.id);
+                        return (
+                          <button
+                            key={product.id}
+                            onClick={() => toggleCounterProduct(product.id)}
+                            className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                              isSelected
+                                ? 'border-orange-500 ring-2 ring-orange-200'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                                <CheckIcon className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                            <div className="aspect-square relative bg-gray-100">
+                              <Image
+                                src={getProductImage(product)}
+                                alt={product.title}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                            <div className="p-2 text-left">
+                              <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                                {product.title}
+                              </p>
+                              <p className="text-xs font-bold text-orange-500">
+                                ₺{Number(product.price || 0).toLocaleString('tr-TR')}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cash Amount */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  {t('trade.cashDifference')} ({t('common.optional')})
+                </h2>
+                <p className="text-gray-600 text-sm mb-4">
+                  {locale === 'en' ? 'You can add cash to balance the trade value.' : 'Takas değerini dengelemek için nakit fark ekleyebilirsiniz.'}
+                </p>
+                <div className="space-y-4">
+                  <div className="relative max-w-xs">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
+                    <input
+                      type="number"
+                      value={counterCashAmount}
+                      onChange={(e) => setCounterCashAmount(e.target.value)}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                  {parseFloat(counterCashAmount) > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">
+                        {locale === 'en' ? 'Who will pay the cash difference?' : 'Nakit farkı kim ödeyecek?'}
+                      </p>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="counterCashPayer"
+                            value="me"
+                            checked={counterCashPayer === 'me'}
+                            onChange={(e) => setCounterCashPayer(e.target.value as 'me' | 'them')}
+                            className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {locale === 'en' ? 'I will pay' : 'Ben ödeyeceğim'}
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="counterCashPayer"
+                            value="them"
+                            checked={counterCashPayer === 'them'}
+                            onChange={(e) => setCounterCashPayer(e.target.value as 'me' | 'them')}
+                            className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {locale === 'en' ? 'They will pay' : 'Karşı taraf ödeyecek'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  {t('trade.message')} ({t('common.optional')})
+                </h2>
+                <textarea
+                  value={counterMessage}
+                  onChange={(e) => setCounterMessage(e.target.value)}
+                  placeholder={locale === 'en' ? 'Leave a message...' : 'Mesaj bırakın...'}
+                  rows={4}
+                  maxLength={500}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                />
+                <p className="text-sm text-gray-500 mt-2 text-right">
+                  {counterMessage.length}/500
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4">
+                <button
+                  onClick={handleExitCounterMode}
+                  className="flex-1 px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={handleCounterSubmit}
+                  disabled={isActionLoading || selectedCounterProducts.length === 0 || selectedCounterTargetProducts.length === 0}
+                  className="flex-1 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isActionLoading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {locale === 'en' ? 'Sending...' : 'Gönderiliyor...'}
+                    </>
+                  ) : (
+                    <>
+                      <ArrowsRightLeftIcon className="w-5 h-5" />
+                      {locale === 'en' ? 'Send Counter Offer' : 'Karşı Teklif Gönder'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -349,7 +822,14 @@ export default function TradeDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Takas Detayı</h1>
-              <p className="text-gray-600 mt-1">Takas No: {trade.tradeNumber}</p>
+              <div className="flex items-center gap-4 mt-1">
+                <p className="text-gray-600">Takas No: {trade.tradeNumber}</p>
+                {trade.version && trade.version > 1 && (
+                  <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded">
+                    {locale === 'en' ? `Counter-offer #${trade.version - 1}` : `Karşı Teklif #${trade.version - 1}`}
+                  </span>
+                )}
+              </div>
             </div>
             <div className={`px-4 py-2 rounded-lg border-2 flex items-center gap-2 ${statusConfig.color}`}>
               <StatusIcon className="w-5 h-5" />
@@ -544,7 +1024,7 @@ export default function TradeDetailPage() {
         )}
 
         {/* Action Buttons */}
-        {(canAccept || canReject || canCancel) && (
+        {(canAccept || canReject || canCounter) && (
           <div className="card p-6">
             <div className="flex flex-wrap gap-3">
               {canAccept && (
@@ -556,6 +1036,15 @@ export default function TradeDetailPage() {
                   {isActionLoading ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : (locale === 'en' ? 'Accept' : 'Kabul Et')}
                 </button>
               )}
+              {canCounter && (
+                <button
+                  onClick={handleOpenCounterModal}
+                  disabled={isActionLoading}
+                  className="btn-primary flex-1 min-w-[120px] bg-orange-500 hover:bg-orange-600"
+                >
+                  {locale === 'en' ? 'Counter Offer' : 'Karşı Teklif'}
+                </button>
+              )}
               {canReject && (
                 <button
                   onClick={() => setShowRejectModal(true)}
@@ -563,15 +1052,6 @@ export default function TradeDetailPage() {
                   className="btn-secondary flex-1 min-w-[120px]"
                 >
                   {locale === 'en' ? 'Reject' : 'Reddet'}
-                </button>
-              )}
-              {canCancel && (
-                <button
-                  onClick={handleCancel}
-                  disabled={isActionLoading}
-                  className="btn-secondary flex-1 min-w-[120px]"
-                >
-                  İptal Et
                 </button>
               )}
             </div>
@@ -611,6 +1091,7 @@ export default function TradeDetailPage() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

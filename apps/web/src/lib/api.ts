@@ -139,6 +139,12 @@ export const tradesApi = {
     api.post(`/trades/${id}/accept`, { message }),
   reject: (id: string | number, reason?: string) =>
     api.post(`/trades/${id}/reject`, { reason }),
+  counter: (id: string | number, data: {
+    initiatorItems: Array<{ productId: string; quantity: number }>;
+    receiverItems: Array<{ productId: string; quantity: number }>;
+    cashAmount?: number;
+    message?: string;
+  }) => api.post(`/trades/${id}/counter`, data),
   cancel: (id: string | number, reason?: string) =>
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>

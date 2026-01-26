@@ -10,11 +10,14 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
-interface TradeProduct {
+interface TradeItem {
   id: string;
-  title: string;
-  price: number;
-  imageUrl?: string;
+  productId: string;
+  productTitle: string;
+  productImage?: string;
+  side: string;
+  quantity: number;
+  valueAtTrade: number;
 }
 
 interface Trade {
@@ -23,10 +26,12 @@ interface Trade {
   status: string;
   initiatorId: string;
   receiverId: string;
-  initiator: { id: string; displayName?: string };
-  receiver: { id: string; displayName?: string };
-  initiatorItems: Array<{ product: TradeProduct }>;
-  receiverItems: Array<{ product: TradeProduct }>;
+  initiatorName?: string;
+  receiverName?: string;
+  initiator?: { id: string; displayName?: string };
+  receiver?: { id: string; displayName?: string };
+  initiatorItems: TradeItem[];
+  receiverItems: TradeItem[];
   cashAmount?: number;
   createdAt: string;
   responseDeadline: string;
@@ -34,7 +39,7 @@ interface Trade {
 
 export default function TradesPage() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
   
   const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -50,7 +55,7 @@ export default function TradesPage() {
   };
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -58,14 +63,29 @@ export default function TradesPage() {
       return;
     }
     fetchTrades();
-  }, [isAuthenticated, filter]);
+  }, [isAuthenticated, statusFilter]);
 
   const fetchTrades = async () => {
     setIsLoading(true);
     try {
-      const params = filter !== 'all' ? { type: filter } : {};
-      const response = await api.get('/trades', { params });
-      setTrades(response.data.data || response.data.trades || []);
+      const response = await api.get('/trades');
+      let allTrades = response.data.data || response.data.trades || [];
+      
+      // Frontend'de status bazlı filtreleme
+      if (statusFilter) {
+        if (statusFilter === 'shipped') {
+          // Kargoda: initiator_shipped, receiver_shipped, both_shipped
+          allTrades = allTrades.filter((trade: Trade) => 
+            trade.status === 'initiator_shipped' || 
+            trade.status === 'receiver_shipped' || 
+            trade.status === 'both_shipped'
+          );
+        } else {
+          allTrades = allTrades.filter((trade: Trade) => trade.status === statusFilter);
+        }
+      }
+      
+      setTrades(allTrades);
     } catch (error) {
       console.error('Failed to fetch trades:', error);
       toast.error(t('trade.tradesLoadFailed'));
@@ -111,25 +131,32 @@ export default function TradesPage() {
           </h1>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-6">
+        {/* Status Filters */}
+        <div className="flex gap-2 mb-6 flex-wrap">
           {[
-            { value: 'all', label: t('common.all') },
-            { value: 'sent', label: t('trade.sentTrades') },
-            { value: 'received', label: t('trade.receivedTrades') },
-          ].map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value as any)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === f.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+            { value: null, label: t('common.all'), icon: null },
+            { value: 'pending', label: t('trade.statusPending'), icon: ClockIcon },
+            { value: 'shipped', label: locale === 'en' ? 'In Transit' : 'Kargoda', icon: TruckIcon },
+            { value: 'completed', label: t('trade.statusCompleted'), icon: CheckCircleIcon },
+            { value: 'cancelled', label: t('trade.statusCancelled'), icon: XCircleIcon },
+            { value: 'rejected', label: t('trade.statusRejected'), icon: XCircleIcon },
+          ].map((f) => {
+            const Icon = f.icon;
+            return (
+              <button
+                key={f.value || 'all'}
+                onClick={() => setStatusFilter(f.value)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  statusFilter === f.value
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {Icon && <Icon className="w-4 h-4" />}
+                {f.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Trades List */}
@@ -153,101 +180,152 @@ export default function TradesPage() {
           <div className="space-y-4">
             {trades.map((trade) => {
               const isSent = trade.initiatorId === user?.id;
-              const otherUser = isSent ? trade.receiver : trade.initiator;
+              const otherUserName = isSent 
+                ? (trade.receiverName || trade.receiver?.displayName || t('common.name'))
+                : (trade.initiatorName || trade.initiator?.displayName || t('common.name'));
               const myItems = isSent ? trade.initiatorItems : trade.receiverItems;
               const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
+              
+              const getItemImage = (item: TradeItem): string => {
+                return item.productImage || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
+              };
+
+              const calculateTotalValue = (items: TradeItem[]): number => {
+                return items.reduce((sum, item) => sum + item.valueAtTrade * item.quantity, 0);
+              };
+
+              const myTotal = calculateTotalValue(myItems);
+              const theirTotal = calculateTotalValue(theirItems);
               
               return (
                 <Link
                   key={trade.id}
                   href={`/trades/${trade.id}`}
-                  className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all"
+                  className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 mb-1 font-mono">
                         #{trade.tradeNumber}
                       </p>
-                      <p className="font-medium text-gray-900">
-                        {isSent ? t('trade.sentTrades') : t('trade.receivedTrades')} • {otherUser?.displayName || t('common.name')}
+                      <p className="font-semibold text-gray-900 text-lg">
+                        {isSent ? t('trade.sentTrades') : t('trade.receivedTrades')} • {otherUserName}
                       </p>
                     </div>
                     {getStatusBadge(trade.status)}
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     {/* My Items */}
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 mb-2">
+                    <div className="md:col-span-1">
+                      <p className="text-xs font-medium text-gray-600 mb-3 uppercase tracking-wide">
                         {t('trade.yourItems')}
                       </p>
-                      <div className="flex gap-2">
-                        {myItems.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden relative">
-                            {item.product?.imageUrl && (
+                      <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
+                        {myItems.map((item, idx) => (
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
                               <Image
-                                src={item.product.imageUrl}
-                                alt={item.product.title}
+                                src={getItemImage(item)}
+                                alt={item.productTitle}
                                 fill
                                 className="object-cover"
                                 unoptimized
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün';
+                                }}
                               />
-                            )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
+                              <p className="text-xs text-gray-500">
+                                {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                              </p>
+                            </div>
                           </div>
                         ))}
-                        {myItems.length > 3 && (
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 text-sm font-medium">
-                            +{myItems.length - 3}
-                          </div>
-                        )}
                       </div>
+                      {myItems.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <p className="text-xs text-gray-500">Toplam</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            ₺{myTotal.toLocaleString('tr-TR')}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Arrow */}
-                    <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500 flex-shrink-0" />
+                    <div className="hidden md:flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                        <ArrowsRightLeftIcon className="w-6 h-6 text-orange-600" />
+                      </div>
+                    </div>
 
                     {/* Their Items */}
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 mb-2">
+                    <div className="md:col-span-1">
+                      <p className="text-xs font-medium text-gray-600 mb-3 uppercase tracking-wide">
                         {t('trade.theirItems')}
                       </p>
-                      <div className="flex gap-2">
-                        {theirItems.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden relative">
-                            {item.product?.imageUrl && (
+                      <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
+                        {theirItems.map((item, idx) => (
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
                               <Image
-                                src={item.product.imageUrl}
-                                alt={item.product.title}
+                                src={getItemImage(item)}
+                                alt={item.productTitle}
                                 fill
                                 className="object-cover"
                                 unoptimized
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün';
+                                }}
                               />
-                            )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
+                              <p className="text-xs text-gray-500">
+                                {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                              </p>
+                            </div>
                           </div>
                         ))}
-                        {theirItems.length > 3 && (
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 text-sm font-medium">
-                            +{theirItems.length - 3}
-                          </div>
-                        )}
                       </div>
+                      {theirItems.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <p className="text-xs text-gray-500">Toplam</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            ₺{theirTotal.toLocaleString('tr-TR')}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {trade.cashAmount && trade.cashAmount > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <p className="text-sm text-gray-600">
-                        {t('trade.cashDifference')}: <span className="font-semibold text-orange-600">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
+                  {/* Mobile Arrow */}
+                  <div className="md:hidden flex items-center justify-center my-4">
+                    <ArrowsRightLeftIcon className="w-6 h-6 text-orange-500" />
+                  </div>
+
+                  {(trade.cashAmount && trade.cashAmount > 0) && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded-lg p-3">
+                      <p className="text-sm text-gray-700">
+                        {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
                       </p>
                     </div>
                   )}
 
-                  <div className="mt-4 text-sm text-gray-500">
-                    {new Date(trade.createdAt).toLocaleDateString('tr-TR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      {new Date(trade.createdAt).toLocaleDateString('tr-TR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {locale === 'en' ? 'Click to view details' : 'Detayları görmek için tıklayın'}
+                    </div>
                   </div>
                 </Link>
               );

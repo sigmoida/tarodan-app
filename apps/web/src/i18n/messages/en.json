@@ -453,7 +453,12 @@
     "enterRejectReason": "Please enter a rejection reason",
     "loginToTrade": "Please login to send a trade offer.",
     "premiumRequired": "Premium Membership Required",
-    "premiumRequiredDesc": "Trade feature is only available for Premium and higher memberships. Upgrade your membership to send and receive trade offers."
+    "premiumRequiredDesc": "Trade feature is only available for Premium and higher memberships. Upgrade your membership to send and receive trade offers.",
+    "counterOffer": "Counter Offer",
+    "counterOfferSent": "Counter offer sent!",
+    "waitingForCounterResponse": "Waiting for response to counter-offer",
+    "counterOfferHistory": "Trade History",
+    "sendCounterOffer": "Send Counter Offer"
   },
   "offer": {
     "makeOffer": "Make Offer",

@@ -15,6 +15,7 @@ import {
   TradeQueryDto,
   AcceptTradeDto,
   RejectTradeDto,
+  CounterTradeDto,
   CancelTradeDto,
   ShipTradeDto,
   ConfirmTradeReceiptDto,
@@ -90,6 +91,19 @@ export class TradeController {
     @Body() dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
     return this.tradeService.rejectTrade(id, req.user.id, dto);
+  }
+
+  /**
+   * Send a counter-offer on a trade
+   * POST /trades/:id/counter
+   */
+  @Post(':id/counter')
+  async counterTrade(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CounterTradeDto,
+  ): Promise<TradeResponseDto> {
+    return this.tradeService.counterTrade(id, req.user.id, dto);
   }
 
   /**
