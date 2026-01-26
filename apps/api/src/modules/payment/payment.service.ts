@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus } from '@prisma/client';
+import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
@@ -781,11 +781,130 @@ export class PaymentService {
         },
       });
 
-      // Update product status to SOLD
-      await tx.product.update({
-        where: { id: payment.order.productId },
-        data: { status: ProductStatus.sold },
-      });
+      // Check if this is a membership order (productId starts with "membership-")
+      const isMembershipOrder = payment.order.productId.startsWith('membership-');
+      
+      if (isMembershipOrder) {
+        // Activate membership for the buyer
+        const membership = await tx.userMembership.findUnique({
+          where: { userId: payment.order.buyerId },
+          include: { tier: true },
+        });
+
+        if (membership) {
+          await tx.userMembership.update({
+            where: { userId: payment.order.buyerId },
+            data: {
+              status: SubscriptionStatus.active,
+              cancelledAt: null,
+            },
+          });
+
+          // Update membership payment record
+          await tx.membershipPayment.updateMany({
+            where: {
+              membershipId: membership.id,
+              status: 'pending',
+            },
+            data: {
+              status: 'completed',
+              providerPaymentId: transactionId || payment.providerPaymentId,
+            },
+          });
+
+          this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
+        }
+      } else {
+        // Regular product order - update product status to SOLD
+        // Note: quantity was already decremented when order was created
+        const product = await tx.product.findUnique({
+          where: { id: payment.order.productId },
+        });
+
+        if (!product) {
+          throw new Error('Product not found');
+        }
+
+        // Update product status to SOLD
+        // If stock is 0, set product to inactive instead
+        const updateData: any = { 
+          status: product.quantity !== null && product.quantity === 0 
+            ? ProductStatus.inactive 
+            : ProductStatus.sold 
+        };
+
+        await tx.product.update({
+          where: { id: payment.order.productId },
+          data: updateData,
+        });
+
+        // CRITICAL: Cancel all pending/accepted trades that include this product
+        // When a product is sold, any pending or accepted trades involving it should be cancelled
+        const tradesWithThisProduct = await tx.tradeItem.findMany({
+          where: { productId: payment.order.productId },
+          select: { tradeId: true },
+          distinct: ['tradeId'],
+        });
+
+        const tradeIds = tradesWithThisProduct.map((item) => item.tradeId);
+
+        if (tradeIds.length > 0) {
+          // Find trades that are still pending or accepted (can be cancelled)
+          const activeTrades = await tx.trade.findMany({
+            where: {
+              id: { in: tradeIds },
+              status: {
+                in: [TradeStatus.pending, TradeStatus.accepted],
+              },
+            },
+          });
+
+          if (activeTrades.length > 0) {
+            // Cancel these trades
+            await tx.trade.updateMany({
+              where: {
+                id: { in: activeTrades.map((t) => t.id) },
+              },
+              data: {
+                status: TradeStatus.cancelled,
+                cancelledAt: new Date(),
+                cancelReason: 'Ürün satın alındığı için takas iptal edildi',
+                version: { increment: 1 },
+              },
+            });
+
+            // Get all products involved in these cancelled trades
+            const allTradeItems = await tx.tradeItem.findMany({
+              where: {
+                tradeId: { in: activeTrades.map((t) => t.id) },
+              },
+              select: { productId: true },
+              distinct: ['productId'],
+            });
+
+            const productIdsToRestore = allTradeItems
+              .map((item) => item.productId)
+              .filter((id) => id !== payment.order.productId); // Don't restore the sold product
+
+            // Restore products from cancelled trades to active status
+            // (except the one that was just sold)
+            // Only restore products that were reserved (from accepted trades)
+            if (productIdsToRestore.length > 0) {
+              await tx.product.updateMany({
+                where: {
+                  id: { in: productIdsToRestore },
+                  status: ProductStatus.reserved, // Only restore if they were reserved
+                },
+                data: { status: ProductStatus.active },
+              });
+            }
+
+            this.logger.log(
+              `Cancelled ${activeTrades.length} trade(s) due to product ${payment.order.productId} being sold`,
+            );
+          }
+        }
+      }
 
       // Get full order details for event emission
       const order = await tx.order.findUnique({
@@ -801,84 +920,94 @@ export class PaymentService {
         throw new Error('Order not found after payment');
       }
 
-      // Calculate seller payout (amount - commission)
-      const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
+      // Only create payment hold for regular product orders (not membership orders)
+      if (!isMembershipOrder) {
+        // Calculate seller payout (amount - commission)
+        const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
 
-      // Create payment hold for seller (escrow)
-      const releaseAt = new Date();
-      releaseAt.setDate(releaseAt.getDate() + this.holdDays);
+        // Create payment hold for seller (escrow)
+        const releaseAt = new Date();
+        releaseAt.setDate(releaseAt.getDate() + this.holdDays);
 
-      await tx.paymentHold.create({
-        data: {
-          paymentId: payment.id,
-          orderId: payment.orderId,
-          sellerId: order.sellerId,
-          amount: sellerAmount,
-          status: PaymentHoldStatus.held,
-          releaseAt,
-        },
-      });
+        await tx.paymentHold.create({
+          data: {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            sellerId: order.sellerId,
+            amount: sellerAmount,
+            status: PaymentHoldStatus.held,
+            releaseAt,
+          },
+        });
 
-      this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
+        this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
+      } else {
+        this.logger.log(`Membership payment ${payment.id} completed, no hold needed`);
+      }
 
       return order;
     });
 
-    // Emit order.paid event AFTER transaction commits
+    // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
     // This publishes jobs to email, push, and shipping queues
-    try {
-      const shippingAddressData = result.shippingAddress as any;
-      
-      // Check if this is a guest order and get actual buyer info
-      const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
-      const actualBuyerEmail = isGuestOrder
-        ? (shippingAddressData?.guestEmail || shippingAddressData?.email || result.buyer.email)
-        : result.buyer.email;
-      const actualBuyerName = isGuestOrder
-        ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
-        : (result.buyer.displayName || result.buyer.email);
-      
-      this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
-      
-      await this.eventService.emitOrderPaid({
-        orderId: result.id,
-        orderNumber: result.orderNumber,
-        buyerId: result.buyerId,
-        sellerId: result.sellerId,
-        productId: result.productId,
-        productTitle: result.product.title,
-        totalAmount: Number(result.totalAmount),
-        commissionAmount: Number(result.commissionAmount),
-        buyerEmail: actualBuyerEmail,
-        buyerName: actualBuyerName,
-        sellerEmail: result.seller.email,
-        sellerName: result.seller.displayName || result.seller.email,
-        paymentMethod: payment.provider,
-        transactionId: transactionId || payment.providerPaymentId || payment.id,
-        shippingAddress: {
-          fullName: shippingAddressData?.fullName || '',
-          phone: shippingAddressData?.phone || '',
-          address: shippingAddressData?.address || '',
-          city: shippingAddressData?.city || '',
-          district: shippingAddressData?.district || '',
-          zipCode: shippingAddressData?.zipCode || '',
-        },
-      });
+    const isMembershipOrder = result.productId.startsWith('membership-');
+    
+    if (!isMembershipOrder) {
+      try {
+        const shippingAddressData = result.shippingAddress as any;
+        
+        // Check if this is a guest order and get actual buyer info
+        const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+        const actualBuyerEmail = isGuestOrder
+          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || result.buyer.email)
+          : result.buyer.email;
+        const actualBuyerName = isGuestOrder
+          ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
+          : (result.buyer.displayName || result.buyer.email);
+        
+        this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
+        
+        await this.eventService.emitOrderPaid({
+          orderId: result.id,
+          orderNumber: result.orderNumber,
+          buyerId: result.buyerId,
+          sellerId: result.sellerId,
+          productId: result.productId,
+          productTitle: result.product.title,
+          totalAmount: Number(result.totalAmount),
+          commissionAmount: Number(result.commissionAmount),
+          buyerEmail: actualBuyerEmail,
+          buyerName: actualBuyerName,
+          sellerEmail: result.seller.email,
+          sellerName: result.seller.displayName || result.seller.email,
+          paymentMethod: payment.provider,
+          transactionId: transactionId || payment.providerPaymentId || payment.id,
+          shippingAddress: {
+            fullName: shippingAddressData?.fullName || '',
+            phone: shippingAddressData?.phone || '',
+            address: shippingAddressData?.address || '',
+            city: shippingAddressData?.city || '',
+            district: shippingAddressData?.district || '',
+            zipCode: shippingAddressData?.zipCode || '',
+          },
+        });
 
-      this.logger.log(`order.paid event emitted for order ${result.orderNumber}`);
-    } catch (error) {
-      // Log but don't fail - payment was already successful
-      this.logger.error(`Failed to emit order.paid event: ${error}`);
+        this.logger.log(`order.paid event emitted for order ${result.orderNumber}`);
+      } catch (error) {
+        // Log but don't fail - payment was already successful
+        this.logger.error(`Failed to emit order.paid event: ${error}`);
+      }
     }
 
-    // Generate and send invoice to buyer
-    // Requirement: "After payment, invoices will be sent to users automatically"
-    try {
-      await this.invoiceService.generateAndSendInvoice(result.id);
-      this.logger.log(`Invoice generated and sent for order ${result.orderNumber}`);
-    } catch (error) {
-      // Log but don't fail - payment was already successful
-      this.logger.error(`Failed to generate invoice for order ${result.orderNumber}: ${error}`);
+    // Generate and send invoice to buyer (only for regular product orders, not membership)
+    if (!isMembershipOrder) {
+      try {
+        await this.invoiceService.generateAndSendInvoice(result.id);
+        this.logger.log(`Invoice generated and sent for order ${result.orderNumber}`);
+      } catch (error) {
+        // Log but don't fail - payment was already successful
+        this.logger.error(`Failed to generate invoice for order ${result.orderNumber}: ${error}`);
+      }
     }
   }
 

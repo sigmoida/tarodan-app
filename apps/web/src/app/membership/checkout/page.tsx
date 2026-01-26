@@ -116,19 +116,37 @@ export default function MembershipCheckoutPage() {
     setIsProcessing(true);
     
     try {
-      // Call the actual membership subscription API
-      await membershipApi.subscribe({
+      // Call the membership subscription API - this will create membership and initiate payment
+      const response = await membershipApi.subscribe({
         tierType: tier,
         billingPeriod: period,
       });
       
-      toast.success('Üyeliğiniz başarıyla yükseltildi!');
+      const paymentUrl = response.data.paymentUrl || (response.data as any).paymentUrl;
+      const paymentId = response.data.paymentId || (response.data as any).paymentId;
       
-      // Refresh user data to update membership info
-      await refreshUserData();
-      
-      // Redirect to success page
-      router.push('/membership/success?tier=' + tier);
+      if (paymentUrl) {
+        // Redirect to Iyzico payment page
+        if (paymentUrl.startsWith('http')) {
+          window.location.href = paymentUrl;
+          return;
+        }
+        // If payment HTML is provided, show it
+        if ((response.data as any).paymentHtml) {
+          // For Iyzico, paymentUrl should be a redirect URL
+          window.location.href = paymentUrl;
+          return;
+        }
+      } else if (paymentId) {
+        // Redirect to payment page
+        router.push(`/payment/${paymentId}`);
+        return;
+      } else {
+        // No payment needed (free tier)
+        toast.success('Üyeliğiniz başarıyla yükseltildi!');
+        await refreshUserData();
+        router.push('/membership/success?tier=' + tier);
+      }
     } catch (error: any) {
       console.error('Payment error:', error);
       toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu');

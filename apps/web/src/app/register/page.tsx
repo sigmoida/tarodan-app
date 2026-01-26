@@ -147,8 +147,13 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await register(displayName, email, password, formattedPhone, birthDate, acceptMarketing);
-      toast.success(locale === 'en' ? 'Registration successful! Welcome.' : 'Kayıt başarılı! Hoş geldiniz.');
-      window.location.href = '/';
+      toast.success(
+        locale === 'en' 
+          ? 'Registration successful! Please check your email to verify your account.' 
+          : 'Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.'
+      );
+      // Redirect to login page with message about email verification
+      window.location.href = '/login?verified=false';
     } catch (error: any) {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Registration failed' : 'Kayıt başarısız'));
     } finally {

@@ -87,11 +87,81 @@ export class AuthService {
         sellerType: dto.isSeller ? SellerType.individual : null,
         isVerified: false, // Email verification required
         isEmailVerified: false, // Will be true after email verification
+        // acceptsMarketingEmails: dto.marketingConsent ?? dto.acceptsMarketingEmails ?? false, // Will be available after migration
       },
     });
 
+    // Update acceptsMarketingEmails after user creation (until migration is done)
+    if (dto.marketingConsent || dto.acceptsMarketingEmails) {
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { acceptsMarketingEmails: true } as any, // Type assertion until migration
+        });
+      } catch (error) {
+        // Ignore if field doesn't exist yet
+        this.logger.warn('acceptsMarketingEmails field not available yet, migration needed');
+      }
+    }
+
+    // Check if there are guest orders with this email and link them to the new user
+    try {
+      // Get system guest user
+      const systemGuestUser = await this.prisma.user.findUnique({
+        where: { email: 'guest@tarodan.system' },
+      });
+
+      if (systemGuestUser) {
+        // Get all orders from system guest user
+        const guestOrders = await this.prisma.order.findMany({
+          where: {
+            buyerId: systemGuestUser.id,
+          },
+        });
+
+        // Filter orders where guestEmail in shippingAddress matches the new user's email
+        const matchingOrders = guestOrders.filter((order: any) => {
+          try {
+            const shippingAddress = order.shippingAddress as any;
+            const guestEmail = shippingAddress?.guestEmail?.toLowerCase()?.trim();
+            const userEmail = dto.email.toLowerCase().trim();
+            return guestEmail === userEmail;
+          } catch {
+            return false;
+          }
+        });
+
+        if (matchingOrders.length > 0) {
+          // Link guest orders to the new user
+          await this.prisma.order.updateMany({
+            where: {
+              id: { in: matchingOrders.map((o: any) => o.id) },
+            },
+            data: {
+              buyerId: user.id,
+            },
+          });
+
+          this.logger.log(`Linked ${matchingOrders.length} guest order(s) to new user ${user.id} (${user.email})`);
+        }
+      }
+    } catch (error) {
+      // Don't fail registration if linking guest orders fails
+      this.logger.error(`Failed to link guest orders for ${user.email}: ${error.message}`);
+    }
+
     // Send email verification
     await this.sendEmailVerification(user.id, user.email);
+
+    // Send welcome email if user accepted marketing emails
+    if (dto.marketingConsent || dto.acceptsMarketingEmails) {
+      try {
+        await this.notificationService.sendWelcomeEmail(user.id);
+      } catch (error) {
+        // Don't fail registration if welcome email fails
+        this.logger.error(`Failed to send welcome email to ${user.email}: ${error.message}`);
+      }
+    }
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
@@ -228,6 +298,14 @@ export class AuthService {
 
       if (!isPasswordValid) {
         throw new UnauthorizedException('Email veya şifre hatalı');
+      }
+
+      // Check if email is verified - require email verification before login
+      if (!user.isEmailVerified) {
+        throw new UnauthorizedException(
+          'Email adresiniz henüz doğrulanmamış. Lütfen email adresinize gönderilen doğrulama linkine tıklayın. ' +
+          'Doğrulama emaili gelmediyse, tekrar gönderebilirsiniz.'
+        );
       }
 
       // Generate tokens

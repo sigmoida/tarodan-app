@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
         }
       } catch (verifyError) {
         console.error('[IYZICO CALLBACK] Verify error:', verifyError);
-        return NextResponse.redirect(new URL(`/payment/success?paymentId=${paymentId}&guest=true`, origin), 303);
+        // On verification error, redirect to fail page
+        return NextResponse.redirect(new URL(`/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent('Ödeme doğrulanamadı')}&guest=true`, origin), 303);
       }
     }
 

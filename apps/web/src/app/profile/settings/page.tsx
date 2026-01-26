@@ -88,7 +88,18 @@ export default function SettingsPage() {
       logout();
       router.push('/');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to delete account' : 'Hesap silinemedi'));
+      // Show detailed error messages if available
+      const errorData = error.response?.data;
+      if (errorData?.errors && Array.isArray(errorData.errors)) {
+        // Show main message
+        toast.error(errorData.message || (locale === 'en' ? 'Cannot delete account' : 'Hesap silinemez'));
+        // Show each error detail
+        errorData.errors.forEach((err: string) => {
+          toast.error(err, { duration: 5000 });
+        });
+      } else {
+        toast.error(errorData?.message || (locale === 'en' ? 'Failed to delete account' : 'Hesap silinemedi'));
+      }
     } finally {
       setLoading(false);
       setShowDeleteConfirm(false);

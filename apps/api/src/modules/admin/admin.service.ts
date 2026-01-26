@@ -2602,9 +2602,11 @@ export class AdminService {
         // Complete trade
         newStatus = TradeStatus.completed;
 
+        // CRITICAL: When trade is completed, products should be marked as inactive
+        // (not sold) so they disappear from listings
         await tx.product.updateMany({
           where: { id: { in: productIds } },
-          data: { status: ProductStatus.sold },
+          data: { status: ProductStatus.inactive },
         });
 
         updatedTrade = await tx.trade.update({

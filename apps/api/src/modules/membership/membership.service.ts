@@ -198,52 +198,56 @@ export class MembershipService {
       return this.getUserMembership(userId);
     }
 
-    // For paid tiers, create payment record and wait for payment
-    // In real implementation, this would integrate with iyzico/PayTR
-    // For now, we'll create membership in pending state
-
+    // For paid tiers, create membership in pending state and initiate payment
+    let membership;
     if (existingMembership) {
-      await this.prisma.userMembership.update({
+      membership = await this.prisma.userMembership.update({
         where: { userId },
         data: {
           tierId: tier.id,
-          status: SubscriptionStatus.active, // In real app, this would be 'pending' until payment
+          status: SubscriptionStatus.past_due, // Will be activated after payment
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
           cancelledAt: null,
         },
       });
     } else {
-      await this.prisma.userMembership.create({
+      membership = await this.prisma.userMembership.create({
         data: {
           userId,
           tierId: tier.id,
-          status: SubscriptionStatus.active,
+          status: SubscriptionStatus.past_due, // Will be activated after payment
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
         },
       });
     }
 
-    // Create payment record
-    const membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-    });
+    // Initiate payment with Iyzico (default provider)
+    // This will create an order and payment, then return payment URL
+    try {
+      const paymentResult = await this.initiateMembershipPayment(
+        userId,
+        PaymentProvider.iyzico, // Default to Iyzico
+        undefined, // No request object needed here
+      );
 
-    if (membership) {
-      await this.prisma.membershipPayment.create({
-        data: {
-          membershipId: membership.id,
-          amount: price,
-          provider: 'pending',
-          status: 'pending',
-          periodStart: now,
-          periodEnd: periodEnd,
-        },
+      // Return membership info with payment URL
+      return {
+        ...(await this.getUserMembership(userId)),
+        paymentUrl: paymentResult.paymentUrl,
+        paymentId: paymentResult.paymentId,
+        provider: paymentResult.provider,
+      } as any;
+    } catch (error) {
+      // If payment initiation fails, rollback membership
+      await this.prisma.userMembership.delete({
+        where: { userId },
+      }).catch(() => {
+        // Ignore if already deleted or doesn't exist
       });
+      throw error;
     }
-
-    return this.getUserMembership(userId);
   }
 
   // ==========================================================================
@@ -267,7 +271,15 @@ export class MembershipService {
       throw new BadRequestException('Ücretsiz üyelik için ödeme gerekmez');
     }
 
-    const price = membership.tier.monthlyPrice.toNumber() || membership.tier.yearlyPrice.toNumber();
+    // Determine billing period from membership period (monthly or yearly)
+    const periodDays = Math.round(
+      (membership.currentPeriodEnd.getTime() - membership.currentPeriodStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const isYearly = periodDays > 180; // More than 6 months = yearly
+    
+    const price = isYearly 
+      ? membership.tier.yearlyPrice.toNumber() 
+      : membership.tier.monthlyPrice.toNumber();
 
     if (price === 0) {
       throw new BadRequestException('Bu üyelik seviyesi için ödeme gerekmez');

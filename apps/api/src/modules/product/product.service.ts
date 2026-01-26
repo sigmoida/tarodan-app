@@ -11,6 +11,8 @@ import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { SearchService } from '../search/search.service';
+import { WishlistService } from '../wishlist/wishlist.service';
+import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma } from '@prisma/client';
 
@@ -22,6 +24,8 @@ export class ProductService {
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
+    private readonly wishlistService: WishlistService,
+    private readonly smtpProvider: SmtpProvider,
   ) {}
 
   /**
@@ -101,6 +105,8 @@ export class ProductService {
         price: dto.price,
         condition: dto.condition,
         status: ProductStatus.pending, // Needs admin approval
+        quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
+        isTradeEnabled: dto.isTradeEnabled || false,
         images: dto.imageUrls?.length
           ? {
               create: dto.imageUrls.map((url, index) => ({
@@ -193,6 +199,11 @@ export class ProductService {
           // IMPORTANT: Public listings MUST only show active products
           // Ignore any status parameter from query - only active products are visible publicly
           status: ProductStatus.active,
+          // Only show products with available stock (quantity > 0 or quantity is null for unlimited)
+          OR: [
+            { quantity: { gt: 0 } },
+            { quantity: null },
+          ],
         };
 
         if (search) {
@@ -521,6 +532,11 @@ export class ProductService {
       condition: dto.condition,
       status: dto.status,
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
+      // CRITICAL: Handle quantity properly
+      // - If dto.quantity is explicitly null, set to null (unlimited stock)
+      // - If dto.quantity is a number, set to that number
+      // - If dto.quantity is undefined, don't update (preserve existing value)
+      quantity: dto.quantity !== undefined ? (dto.quantity === null ? null : Number(dto.quantity)) : undefined,
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       version: { increment: 1 }, // Optimistic locking
     };
@@ -542,6 +558,11 @@ export class ProductService {
         });
       }
     }
+
+    // Check if price changed (for wishlist notifications)
+    const oldPrice = Number(product.price);
+    const newPrice = dto.price ? Number(dto.price) : oldPrice;
+    const priceChanged = dto.price !== undefined && oldPrice !== newPrice;
 
     // Update with optimistic locking
     try {
@@ -575,6 +596,16 @@ export class ProductService {
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
 
+      // If price changed, notify users who have this product in their wishlist
+      if (priceChanged && updated.status === ProductStatus.active) {
+        try {
+          await this.notifyWishlistUsersOfPriceChange(id, oldPrice, newPrice, updated.title);
+        } catch (error) {
+          // Don't fail the update if notification fails
+          console.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
+        }
+      }
+
       // Update Elasticsearch index (only if status is active)
       if (updated.status === ProductStatus.active) {
         try {
@@ -600,6 +631,190 @@ export class ProductService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Notify users who have this product in their wishlist about price change
+   */
+  private async notifyWishlistUsersOfPriceChange(
+    productId: string,
+    oldPrice: number,
+    newPrice: number,
+    productTitle: string,
+  ): Promise<void> {
+    // Get all wishlist items for this product with user info
+    const wishlistItems = await this.prisma.wishlistItem.findMany({
+      where: { productId },
+      include: {
+        wishlist: {
+          include: {
+            user: true, // Get full user object to check acceptsMarketingEmails
+          },
+        },
+      },
+    });
+
+    // Filter users who accept marketing emails
+    // After migration, acceptsMarketingEmails will be available in the select
+    const usersToNotify = wishlistItems
+      .map((item) => (item as any).wishlist?.user)
+      .filter((user: any) => {
+        if (!user) return false;
+        try {
+          return user.acceptsMarketingEmails === true;
+        } catch {
+          return false; // Field doesn't exist yet, skip
+        }
+      });
+
+    if (usersToNotify.length === 0) {
+      return;
+    }
+
+    // Determine if price increased or decreased
+    const priceChange = newPrice - oldPrice;
+    const isPriceDrop = priceChange < 0;
+    const priceChangePercent = ((priceChange / oldPrice) * 100).toFixed(1);
+
+    // Send email to each user using SmtpProvider (same as invoice system)
+    for (const user of usersToNotify) {
+      try {
+        const htmlContent = this.generatePriceChangeEmailHtml(
+          user.displayName,
+          productTitle,
+          oldPrice,
+          newPrice,
+          priceChange,
+          priceChangePercent,
+          isPriceDrop,
+          productId,
+        );
+        const textContent = this.generatePriceChangeEmailText(
+          user.displayName,
+          productTitle,
+          oldPrice,
+          newPrice,
+          priceChange,
+          priceChangePercent,
+          isPriceDrop,
+          productId,
+        );
+
+        await this.smtpProvider.sendEmail({
+          to: user.email,
+          subject: isPriceDrop
+            ? `🎉 Fiyat Düştü: ${productTitle}`
+            : `📈 Fiyat Değişti: ${productTitle}`,
+          html: htmlContent,
+          text: textContent,
+        });
+      } catch (error: any) {
+        console.error(`Failed to send price change email for user ${user.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Generate HTML content for price change email
+   */
+  private generatePriceChangeEmailHtml(
+    userName: string,
+    productTitle: string,
+    oldPrice: number,
+    newPrice: number,
+    priceChange: number,
+    priceChangePercent: string,
+    isPriceDrop: boolean,
+    productId: string,
+  ): string {
+    const baseStyle = `
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 32px;
+    `;
+    const headerStyle = `color: #1a1a2e; margin-bottom: 24px;`;
+    const buttonStyle = `
+      display: inline-block;
+      padding: 14px 28px;
+      background-color: #4f46e5;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    `;
+    const boxStyle = `
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 20px 0;
+      border: 1px solid #e2e8f0;
+    `;
+
+    return `
+      <div style="${baseStyle}">
+        <h1 style="${headerStyle}">${isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}</h1>
+        <p>Merhaba ${userName},</p>
+        <p>İstek listenizdeki bir ürünün fiyatı değişti:</p>
+        <div style="${boxStyle}">
+          <p style="margin: 8px 0; font-size: 18px; font-weight: 600;"><strong>${productTitle}</strong></p>
+          <p style="margin: 8px 0;"><strong>Eski Fiyat:</strong> <span style="text-decoration: line-through; color: #64748b;">${oldPrice.toFixed(2)} TL</span></p>
+          <p style="margin: 8px 0; font-size: 20px; color: ${isPriceDrop ? '#059669' : '#dc2626'}; font-weight: 600;">
+            <strong>Yeni Fiyat:</strong> ${newPrice.toFixed(2)} TL
+          </p>
+          <p style="margin: 8px 0; color: ${isPriceDrop ? '#059669' : '#dc2626'};">
+            <strong>${isPriceDrop ? 'İndirim:' : 'Artış:'}</strong> ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
+          </p>
+        </div>
+        ${isPriceDrop ? `
+        <p style="color: #059669; font-weight: 500; margin: 20px 0;">
+          🎉 Bu ürünün fiyatı düştü! Hemen almak için aşağıdaki butona tıklayın.
+        </p>
+        ` : `
+        <p style="color: #dc2626; font-weight: 500; margin: 20px 0;">
+          ⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.
+        </p>
+        `}
+        <a href="${process.env.FRONTEND_URL || 'https://tarodan.com'}/products/${productId}" style="${buttonStyle}">Ürünü Görüntüle</a>
+        <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
+          Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
+        </p>
+      </div>
+    `;
+  }
+
+  /**
+   * Generate text content for price change email
+   */
+  private generatePriceChangeEmailText(
+    userName: string,
+    productTitle: string,
+    oldPrice: number,
+    newPrice: number,
+    priceChange: number,
+    priceChangePercent: string,
+    isPriceDrop: boolean,
+    productId: string,
+  ): string {
+    return `
+${isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}
+
+Merhaba ${userName},
+
+İstek listenizdeki bir ürünün fiyatı değişti:
+
+Ürün: ${productTitle}
+Eski Fiyat: ${oldPrice.toFixed(2)} TL
+Yeni Fiyat: ${newPrice.toFixed(2)} TL
+${isPriceDrop ? 'İndirim' : 'Artış'}: ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
+
+${isPriceDrop ? '🎉 Bu ürünün fiyatı düştü! Hemen almak için linke tıklayın.' : '⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.'}
+
+Ürünü görüntüle: ${process.env.FRONTEND_URL || 'https://tarodan.com'}/products/${productId}
+
+Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
+    `.trim();
   }
 
   /**
@@ -780,6 +995,7 @@ export class ProductService {
       isTradeEnabled: product.isTradeEnabled || false,
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
+      quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null, // null = unlimited stock
       images: product.images?.map((img: any) => ({
         id: img.id,
         url: img.url,

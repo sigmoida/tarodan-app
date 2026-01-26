@@ -39,6 +39,9 @@ import { ReportsModule } from './modules/reports';
 // Invoice System - requirements.txt: "invoices will be sent to users automatically"
 import { InvoiceModule } from './modules/invoice';
 
+// Marketing Email System
+import { MarketingModule } from './modules/marketing/marketing.module';
+
 // GAP-L02 & GAP-L03 - GraphQL & i18n Support
 import { GraphQLAppModule } from './modules/graphql';
 import { I18nModule } from './modules/i18n';
@@ -116,6 +119,7 @@ import { EventModule } from './modules/events';
     // PHASE 5 - Operations Modules
     ReportsModule,      // GAP-019: Report Export (MEDIUM)
     InvoiceModule,      // Invoice Generation & Delivery
+    MarketingModule,    // Marketing Email Scheduler (weekly newsletter, monthly promotions)
 
     // GAP-L02 & GAP-L03 - GraphQL & i18n
     // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled

@@ -51,6 +51,7 @@ interface Listing {
   condition?: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
+  quantity?: number | null;
   status?: 'pending' | 'active' | 'reserved' | 'sold' | 'inactive' | 'rejected';
   sellerId?: string;
   seller?: {
@@ -1093,6 +1094,14 @@ export default function ListingDetailPage() {
                 <div className="text-center">
                   <p className="text-sm text-gray-500">Yıl</p>
                   <p className="font-semibold">{listing.year}</p>
+                </div>
+              )}
+              {listing.quantity !== undefined && listing.quantity !== null && (
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">{locale === 'en' ? 'Stock' : 'Stok'}</p>
+                  <p className="font-semibold">
+                    {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : (locale === 'en' ? 'Out of stock' : 'Stokta yok')}
+                  </p>
                 </div>
               )}
             </div>

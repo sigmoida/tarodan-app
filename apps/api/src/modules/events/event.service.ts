@@ -619,4 +619,25 @@ export class EventService {
 
     this.logger.log(`payment.refunded event emitted for order ${payload.orderNumber}`);
   }
+
+  /**
+   * Queue email for sending (public helper method)
+   */
+  async queueEmail(data: {
+    to: string;
+    template: string;
+    subject: string;
+    templateData?: Record<string, any>;
+  }): Promise<void> {
+    await this.emailQueue.add('send-template', {
+      to: data.to,
+      template: data.template,
+      subject: data.subject,
+      templateData: data.templateData || {},
+    }, {
+      priority: 2,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+  }
 }

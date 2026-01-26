@@ -100,6 +100,14 @@ export class RegisterDto {
 
   @ApiPropertyOptional({
     example: true,
+    description: 'Consent for marketing emails (alternative field name)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptsMarketingEmails?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
     description: 'Consent for push notifications',
   })
   @IsOptional()

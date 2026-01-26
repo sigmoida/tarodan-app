@@ -144,6 +144,11 @@ export class EmailWorker {
       'offer-accepted': 'Teklifiniz Kabul Edildi',
       'payment-received': 'Ödeme Alındı',
       'product-approved': 'Ürününüz Onaylandı',
+      'wishlist-price-change': data?.isPriceDrop
+        ? `🎉 Fiyat Düştü: ${data?.productTitle || ''}`
+        : `📈 Fiyat Değişti: ${data?.productTitle || ''}`,
+      'marketing-newsletter': '📰 Tarodan Haftalık Bülteni',
+      'marketing-monthly': '🎁 Tarodan Aylık Özel Fırsatlar',
     };
     return data?.subject || subjects[template] || 'Tarodan Bildirim';
   }
@@ -362,6 +367,80 @@ export class EmailWorker {
           </div>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Not: Ödeme işlemi 30 dakika içinde tamamlanmazsa sipariş iptal edilebilir ve ürün tekrar satışa çıkarılabilir.
+          </p>
+        </div>
+      `,
+      'wishlist-price-change': `
+        <div style="${baseStyle}">
+          <h1 style="${headerStyle}">${data?.isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}</h1>
+          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
+          <p>İstek listenizdeki bir ürünün fiyatı değişti:</p>
+          <div style="${boxStyle}">
+            <p style="margin: 8px 0; font-size: 18px; font-weight: 600;"><strong>${data?.productTitle || ''}</strong></p>
+            <p style="margin: 8px 0;"><strong>Eski Fiyat:</strong> <span style="text-decoration: line-through; color: #64748b;">${this.formatPrice(data?.oldPrice || 0)} TL</span></p>
+            <p style="margin: 8px 0; font-size: 20px; color: ${data?.isPriceDrop ? '#059669' : '#dc2626'}; font-weight: 600;">
+              <strong>Yeni Fiyat:</strong> ${this.formatPrice(data?.newPrice || 0)} TL
+            </p>
+            <p style="margin: 8px 0; color: ${data?.isPriceDrop ? '#059669' : '#dc2626'};">
+              <strong>${data?.isPriceDrop ? 'İndirim:' : 'Artış:'}</strong> ${data?.priceChange || 0} TL (${data?.priceChangePercent || 0}%)
+            </p>
+          </div>
+          ${data?.isPriceDrop ? `
+          <p style="color: #059669; font-weight: 500; margin: 20px 0;">
+            🎉 Bu ürünün fiyatı düştü! Hemen almak için aşağıdaki butona tıklayın.
+          </p>
+          ` : `
+          <p style="color: #dc2626; font-weight: 500; margin: 20px 0;">
+            ⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.
+          </p>
+          `}
+          <a href="${data?.productUrl || 'https://tarodan.com'}" style="${buttonStyle}">Ürünü Görüntüle</a>
+          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
+            Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
+          </p>
+        </div>
+      `,
+      'marketing-newsletter': `
+        <div style="${baseStyle}">
+          <h1 style="${headerStyle}">📰 Tarodan Haftalık Bülteni</h1>
+          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
+          <p>Bu hafta en çok ilgi gören ürünler:</p>
+          ${data?.trendingProducts?.length > 0 ? `
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
+            ${data.trendingProducts.map((product: any) => `
+              <div style="${boxStyle}">
+                ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ''}
+                <p style="font-weight: 600; margin: 8px 0;">${product.title}</p>
+                <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${this.formatPrice(product.price)} TL</p>
+                <a href="${product.productUrl}" style="${buttonStyle}">İncele</a>
+              </div>
+            `).join('')}
+          </div>
+          ` : '<p>Bu hafta öne çıkan ürün bulunmamaktadır.</p>'}
+          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
+            <a href="${data?.unsubscribeUrl || 'https://tarodan.com/profile/settings'}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
+          </p>
+        </div>
+      `,
+      'marketing-monthly': `
+        <div style="${baseStyle}">
+          <h1 style="${headerStyle}">🎁 Tarodan Aylık Özel Fırsatlar</h1>
+          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
+          <p>Bu ay sizin için özel olarak seçtiğimiz ürünler:</p>
+          ${data?.featuredProducts?.length > 0 ? `
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
+            ${data.featuredProducts.map((product: any) => `
+              <div style="${boxStyle}">
+                ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ''}
+                <p style="font-weight: 600; margin: 8px 0;">${product.title}</p>
+                <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${this.formatPrice(product.price)} TL</p>
+                <a href="${product.productUrl}" style="${buttonStyle}">İncele</a>
+              </div>
+            `).join('')}
+          </div>
+          ` : '<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>'}
+          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
+            <a href="${data?.unsubscribeUrl || 'https://tarodan.com/profile/settings'}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
           </p>
         </div>
       `,

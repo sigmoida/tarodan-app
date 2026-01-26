@@ -55,6 +55,13 @@ export class ProductResponseDto {
   @ApiProperty({ example: 'active' })
   status: string;
 
+  @ApiPropertyOptional({ 
+    example: 5, 
+    description: 'Stock quantity (null for unlimited stock)',
+    nullable: true,
+  })
+  quantity?: number | null;
+
   @ApiProperty({ type: [ProductImageDto] })
   images: ProductImageDto[];
 

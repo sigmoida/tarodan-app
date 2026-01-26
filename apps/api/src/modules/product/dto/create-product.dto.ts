@@ -77,4 +77,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean({ message: 'Takas durumu boolean olmalıdır' })
   isTradeEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Stock quantity (null for unlimited stock)',
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'Stok miktarı sayı olmalıdır' })
+  @Type(() => Number)
+  @Min(1, { message: 'Stok miktarı en az 1 olmalıdır' })
+  quantity?: number | null;
 }

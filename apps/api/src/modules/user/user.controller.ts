@@ -55,6 +55,50 @@ export class UserController {
   }
 
   /**
+   * DELETE /users/me
+   * Delete current user account
+   */
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Hesabı sil',
+    description: 'Hesabı silmek için tüm ilanlar kaldırılmış, aktif takas teklifi ve bekleyen sipariş olmamalıdır.',
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Hesap silindi',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Hesap silinemez - aktif ilan, takas veya sipariş var',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        errors: { type: 'array', items: { type: 'string' } },
+        details: {
+          type: 'object',
+          properties: {
+            activeProducts: { type: 'number' },
+            activeTrades: { type: 'number' },
+            pendingOrders: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async deleteAccount(@CurrentUser('id') userId: string) {
+    return this.userService.deleteAccount(userId);
+  }
+
+  /**
    * GET /users/me/analytics
    * Get user analytics data
    */

@@ -347,6 +347,11 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
 
+      // Check stock availability (quantity > 0 or null for unlimited)
+      if (product.quantity !== null && product.quantity <= 0) {
+        throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
+      }
+
       // Cannot buy own product
       if (product.sellerId === buyerId) {
         throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
@@ -436,10 +441,20 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Reserve product immediately (status = RESERVED)
+      // Reserve product immediately (status = RESERVED) and decrease quantity
+      const updateData: any = { status: ProductStatus.reserved };
+      
+      // Decrease quantity if it's not null (null means unlimited stock)
+      if (product.quantity !== null) {
+        if (product.quantity <= 0) {
+          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
+        }
+        updateData.quantity = { decrement: 1 };
+      }
+      
       await tx.product.update({
         where: { id: dto.productId },
-        data: { status: ProductStatus.reserved },
+        data: updateData,
       });
 
       // Create order
@@ -663,10 +678,10 @@ export class OrderService {
         commissionResult,
       );
 
-      // Update product status to sold
+      // Reserve product (status = RESERVED) - will be set to SOLD after payment is completed
       await tx.product.update({
         where: { id: offer.productId },
-        data: { status: ProductStatus.sold },
+        data: { status: ProductStatus.reserved },
       });
 
       // Store productId for cache invalidation
@@ -704,6 +719,11 @@ export class OrderService {
 
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException('Bu ürün satışta değil');
+      }
+
+      // Check stock availability (quantity > 0 or null for unlimited)
+      if (product.quantity !== null && product.quantity <= 0) {
+        throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
       }
 
       // Get price (from offer or direct buy price)
@@ -830,10 +850,20 @@ export class OrderService {
         commissionResult,
       );
 
-      // Update product status to reserved
+      // Update product status to reserved and decrease quantity
+      const updateData: any = { status: ProductStatus.reserved };
+      
+      // Decrease quantity if it's not null (null means unlimited stock)
+      if (product.quantity !== null) {
+        if (product.quantity <= 0) {
+          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
+        }
+        updateData.quantity = { decrement: 1 };
+      }
+      
       await tx.product.update({
         where: { id: dto.productId },
-        data: { status: ProductStatus.reserved },
+        data: updateData,
       });
 
       return {

@@ -191,11 +191,10 @@ export class TradeService {
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
-      // Reserve products
-      await tx.product.updateMany({
-        where: { id: { in: dto.initiatorItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.reserved },
-      });
+      // CRITICAL: Don't reserve products when trade is pending
+      // Products should remain active and available for purchase
+      // Only reserve when trade is accepted
+      // Products will be marked as inactive/sold when trade is completed or product is purchased
 
       // Create trade
       const newTrade = await tx.trade.create({
@@ -957,14 +956,33 @@ export class TradeService {
         },
       });
 
-      // If trade completed, mark products as sold
+      // If trade completed, mark products as sold and decrease stock
       if (newStatus === TradeStatus.completed) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+        const productIds = allItems.map((i) => i.productId);
 
-        await tx.product.updateMany({
-          where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.sold },
+        // Get all products to check stock
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds } },
         });
+
+        // Update each product individually to handle stock properly
+        // CRITICAL: When trade is completed, products should be marked as inactive
+        // (not sold) so they disappear from listings
+        for (const product of products) {
+          const updateData: any = { status: ProductStatus.inactive };
+          
+          // Decrease quantity if it's not null (null means unlimited stock)
+          if (product.quantity !== null && product.quantity > 0) {
+            const newQuantity = product.quantity - 1;
+            updateData.quantity = newQuantity;
+          }
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: updateData,
+          });
+        }
 
         // Release cash payment to recipient if any
         const cashPayment = await tx.tradeCashPayment.findUnique({
@@ -1110,9 +1128,11 @@ export class TradeService {
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
 
       if (newStatus === TradeStatus.completed) {
+        // CRITICAL: When trade is completed, products should be marked as inactive
+        // (not sold) so they disappear from listings
         await tx.product.updateMany({
           where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.sold },
+          data: { status: ProductStatus.inactive },
         });
       } else if (newStatus === TradeStatus.cancelled) {
         await tx.product.updateMany({

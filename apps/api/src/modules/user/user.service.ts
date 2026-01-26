@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
-import { User, Prisma, ProductStatus } from '@prisma/client';
+import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/client';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -1566,6 +1566,145 @@ export class UserService {
         (b.blockerId === userId1 && b.blockedId === userId2) ||
         (b.blockerId === userId2 && b.blockedId === userId1)
     );
+  }
+
+  /**
+   * Delete user account
+   * Only allowed if:
+   * - All products are removed (inactive, sold, rejected, draft)
+   * - No active trades (pending, accepted, shipped, etc.)
+   * - No pending orders (pending_payment, paid, preparing, shipped, delivered)
+   */
+  async deleteAccount(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    // Check 1: Active products (active, pending, reserved)
+    const activeProducts = await this.prisma.product.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved],
+        },
+      },
+      select: { id: true, title: true, status: true },
+    });
+
+    // Check 2: Active trades (pending, accepted, shipped, received - not completed/cancelled/rejected/disputed)
+    const activeTrades = await this.prisma.trade.findMany({
+      where: {
+        OR: [
+          { initiatorId: userId },
+          { receiverId: userId },
+        ],
+        status: {
+          in: [
+            TradeStatus.pending,
+            TradeStatus.accepted,
+            TradeStatus.initiator_shipped,
+            TradeStatus.receiver_shipped,
+            TradeStatus.both_shipped,
+            TradeStatus.initiator_received,
+            TradeStatus.receiver_received,
+          ],
+        },
+      },
+      select: { id: true, tradeNumber: true, status: true },
+    });
+
+    // Check 3: Pending orders (as buyer or seller)
+    const pendingOrders = await this.prisma.order.findMany({
+      where: {
+        OR: [
+          { buyerId: userId },
+          { sellerId: userId },
+        ],
+        status: {
+          in: [
+            OrderStatus.pending_payment,
+            OrderStatus.paid,
+            OrderStatus.preparing,
+            OrderStatus.shipped,
+            OrderStatus.delivered,
+          ],
+        },
+      },
+      select: { id: true, orderNumber: true, status: true },
+    });
+
+    // Build error messages
+    const errors: string[] = [];
+
+    if (activeProducts.length > 0) {
+      errors.push(
+        `${activeProducts.length} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.`,
+      );
+    }
+
+    if (activeTrades.length > 0) {
+      errors.push(
+        `${activeTrades.length} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.`,
+      );
+    }
+
+    if (pendingOrders.length > 0) {
+      errors.push(
+        `${pendingOrders.length} bekleyen satın alım/satış işleminiz bulunmaktadır. Lütfen siparişlerinizi tamamlayın veya iptal edin.`,
+      );
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException({
+        message: 'Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:',
+        errors,
+        details: {
+          activeProducts: activeProducts.length,
+          activeTrades: activeTrades.length,
+          pendingOrders: pendingOrders.length,
+        },
+      });
+    }
+
+    // All checks passed, delete account
+    // Use transaction to ensure atomicity
+    await this.prisma.$transaction(async (tx) => {
+      // Delete related data
+      await tx.refreshToken.deleteMany({ where: { userId } });
+      await tx.passwordResetToken.deleteMany({ where: { userId } });
+      await tx.emailVerificationToken.deleteMany({ where: { userId } });
+      await tx.notificationLog.deleteMany({ where: { userId } });
+      await tx.pushToken.deleteMany({ where: { userId } });
+      await tx.address.deleteMany({ where: { userId } });
+      
+      // Delete wishlist items (through wishlist relation)
+      await tx.wishlistItem.deleteMany({ where: { wishlist: { userId } } });
+      
+      // Delete collection items (through collection relation)
+      await tx.collectionItem.deleteMany({ where: { collection: { userId } } });
+      
+      // Delete collections (this will cascade delete collection items if onDelete: Cascade is set)
+      await tx.collection.deleteMany({ where: { userId } });
+      
+      // Delete wishlist (this will cascade delete wishlist items if onDelete: Cascade is set)
+      await tx.wishlist.deleteMany({ where: { userId } });
+      await tx.userFollow.deleteMany({
+        where: { OR: [{ followerId: userId }, { followingId: userId }] },
+      });
+
+      // Delete user
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    this.logger.log(`User account deleted: ${userId}`);
+
+    return {
+      message: 'Hesabınız başarıyla silindi',
+    };
   }
 
   private generateUUID(): string {

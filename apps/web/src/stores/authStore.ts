@@ -165,7 +165,8 @@ export const useAuthStore = create<AuthState>()(
       
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
         await authApi.register({ displayName, email, password, phone, birthDate, acceptsMarketingEmails: acceptMarketing });
-        await get().login(email, password);
+        // Don't auto-login after registration - user must verify email first
+        // await get().login(email, password);
       },
       
       logout: async () => {

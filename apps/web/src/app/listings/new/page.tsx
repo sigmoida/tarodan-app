@@ -79,9 +79,50 @@ export default function NewListingPage() {
     brand: '',
     scale: '1:64',
     isTradeEnabled: false,
+    quantity: '' as string | number,
     imageUrls: [] as string[],
   });
   const [uploadingImages, setUploadingImages] = useState(false);
+
+  // Load form data from localStorage on mount
+  useEffect(() => {
+    const savedFormData = localStorage.getItem('newListingFormData');
+    if (savedFormData) {
+      try {
+        const parsed = JSON.parse(savedFormData);
+        // Only restore if we have meaningful data
+        if (parsed.title || parsed.description || parsed.price || parsed.quantity !== undefined || parsed.imageUrls?.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            ...parsed,
+            // Ensure quantity is properly handled (empty string for unlimited, number as string)
+            quantity: parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
+              ? parsed.quantity.toString() 
+              : '',
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to parse saved form data:', e);
+      }
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes (debounced)
+  useEffect(() => {
+    // Always save form data, including quantity (even if empty string for unlimited stock)
+    const timeoutId = setTimeout(() => {
+      // Ensure quantity is always saved as string (empty string = unlimited)
+      const dataToSave = {
+        ...formData,
+        quantity: formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
+          ? String(formData.quantity) 
+          : '',
+      };
+      localStorage.setItem('newListingFormData', JSON.stringify(dataToSave));
+    }, 300); // Debounce to avoid too many writes
+    
+    return () => clearTimeout(timeoutId);
+  }, [formData]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -291,11 +332,15 @@ export default function NewListingPage() {
         brand: formData.brand || undefined,
         scale: formData.scale || undefined,
         isTradeEnabled: formData.isTradeEnabled,
+        quantity: formData.quantity ? Number(formData.quantity) : undefined, // undefined = unlimited stock
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
       };
 
       await listingsApi.create(payload as any);
       toast.success(locale === 'en' ? 'Your listing has been created! Pending approval.' : 'İlanınız oluşturuldu! Onay bekliyor.');
+      
+      // Clear saved form data after successful submission
+      localStorage.removeItem('newListingFormData');
       
       // Refresh user data and listing limits to update the count
       await refreshUser();
@@ -536,22 +581,47 @@ export default function NewListingPage() {
               )}
             </div>
 
-            {/* Price */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fiyat (₺) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+            {/* Price & Quantity */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fiyat (₺) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
                 placeholder="0.00"
                 required
                 min={1}
                 max={9999999}
                 step="0.01"
               />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Stok Miktarı
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  {locale === 'en' 
+                    ? 'Leave empty for unlimited stock' 
+                    : 'Boş bırakırsanız sınırsız stok olur'}
+                </p>
+                <input
+                  type="number"
+                  value={formData.quantity || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Save as string, empty string means unlimited stock
+                    setFormData({ ...formData, quantity: value === '' ? '' : value });
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                  placeholder={locale === 'en' ? 'Unlimited' : 'Sınırsız'}
+                  min={1}
+                />
+              </div>
             </div>
 
             {/* Images */}

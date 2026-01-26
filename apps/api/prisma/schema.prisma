@@ -199,6 +199,7 @@ model User {
   taxId           String?     @map("tax_id") // For corporate sellers (Vergi No)
   companyName     String?     @map("company_name") // For corporate sellers
   fcmToken        String?     @map("fcm_token") // Push notifications
+  acceptsMarketingEmails Boolean @default(false) @map("accepts_marketing_emails") // Marketing email consent
   isBanned        Boolean     @default(false) @map("is_banned")
   bannedAt        DateTime?   @map("banned_at")
   bannedReason    String?     @map("banned_reason")
