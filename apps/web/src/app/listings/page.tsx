@@ -11,7 +11,9 @@ import {
   ArrowsRightLeftIcon,
   XMarkIcon,
   ClockIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, searchApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
@@ -26,6 +28,10 @@ interface Listing {
   condition: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
+  rating?: {
+    average: number | null;
+    count: number;
+  };
   seller?: {
     id: string | number;
     displayName?: string;
@@ -160,6 +166,10 @@ export default function ListingsPage() {
               seller: r.seller || { displayName: r.sellerName },
               category: { name: r.categoryName },
               isTradeEnabled: r.isTradeEnabled || r.trade_available || false,
+              rating: r.rating || (r.averageRating ? {
+                average: r.averageRating,
+                count: r.ratingCount || 0,
+              } : undefined),
             })));
           } else {
             // Fallback to database search if ES returns empty
@@ -539,6 +549,18 @@ export default function ListingsPage() {
                       <p className="text-sm text-gray-500 mb-2">
                         {listing.brand} • {listing.scale}
                       </p>
+                      {/* Rating */}
+                      {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <StarIconSolid className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm font-semibold text-gray-900">
+                            {listing.rating.average.toFixed(1)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({listing.rating.count})
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <p className="text-xl font-bold text-primary-500">
                           ₺{listing.price.toLocaleString('tr-TR')}

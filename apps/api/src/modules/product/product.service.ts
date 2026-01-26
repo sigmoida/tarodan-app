@@ -247,6 +247,8 @@ export class ProductService {
 
         // Build order by
         let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+        const useScoring = !sortBy; // Use scoring only if no explicit sortBy is provided
+        
         switch (sortBy) {
           case 'price_asc':
             orderBy = { price: 'asc' };
@@ -271,22 +273,36 @@ export class ProductService {
         // Count total
         const total = await this.prisma.product.count({ where });
 
-        // Fetch products
+        // Fetch products with membership info if using scoring
         const products = await this.prisma.product.findMany({
           where,
-          orderBy,
-          skip: (page - 1) * limit,
-          take: limit,
+          orderBy: useScoring ? undefined : orderBy, // Skip orderBy if using scoring
+          skip: useScoring ? 0 : (page - 1) * limit, // Fetch all if scoring, then paginate after
+          take: useScoring ? undefined : limit,
           include: {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 }, // Only first image for list
-            seller: {
-              select: {
-                id: true,
-                displayName: true,
-                isVerified: true,
-                sellerType: true,
-              },
-            },
+            seller: useScoring
+              ? {
+                  include: {
+                    membership: {
+                      include: {
+                        tier: {
+                          select: {
+                            type: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                }
+              : {
+                  select: {
+                    id: true,
+                    displayName: true,
+                    isVerified: true,
+                    sellerType: true,
+                  },
+                },
             category: {
               select: {
                 id: true,
@@ -297,8 +313,76 @@ export class ProductService {
           },
         });
 
+        // Calculate scores and sort if using scoring
+        let productsToReturn = products;
+        if (useScoring) {
+          productsToReturn = products
+            .map((product) => {
+              // Calculate membership score
+              let membershipScore = 1; // Default: Free tier
+              // Check if seller has active membership
+              const membership = (product.seller as any).membership;
+              if (membership && membership.status === 'active' && membership.tier?.type) {
+                const tierType = membership.tier.type;
+                if (tierType === 'premium' || tierType === 'business') {
+                  membershipScore = 3;
+                } else {
+                  membershipScore = 1;
+                }
+              }
+
+              // Calculate view count score
+              const viewCount = product.viewCount || 0;
+              let viewScore = 1;
+              if (viewCount >= 10000) {
+                viewScore = 3;
+              } else if (viewCount >= 1000) {
+                viewScore = 2;
+              }
+
+              // Calculate like count score
+              const likeCount = product.likeCount || 0;
+              let likeScore = 1;
+              if (likeCount >= 100) {
+                likeScore = 3;
+              } else if (likeCount >= 50) {
+                likeScore = 2;
+              }
+
+              // Total score
+              const totalScore = membershipScore + viewScore + likeScore;
+
+              return {
+                ...product,
+                _score: totalScore,
+                _random: Math.random(), // For randomizing same scores
+              };
+            })
+            .sort((a, b) => {
+              // Sort by score (desc), then random for same scores
+              if (b._score !== a._score) {
+                return b._score - a._score;
+              }
+              return b._random - a._random;
+            })
+            .slice((page - 1) * limit, page * limit) // Paginate after sorting
+            .map(({ _score, _random, ...product }) => {
+              // Clean up seller object - remove membership if it was included
+              const cleanedProduct = { ...product };
+              if ((cleanedProduct.seller as any).membership) {
+                cleanedProduct.seller = {
+                  id: cleanedProduct.seller.id,
+                  displayName: (cleanedProduct.seller as any).displayName,
+                  isVerified: (cleanedProduct.seller as any).isVerified,
+                  sellerType: (cleanedProduct.seller as any).sellerType,
+                };
+              }
+              return cleanedProduct;
+            });
+        }
+
         const formattedProducts = await Promise.all(
-          products.map((p) => this.formatProductResponse(p))
+          productsToReturn.map((p) => this.formatProductResponse(p))
         );
 
         return {
@@ -679,6 +763,13 @@ export class ProductService {
       });
     }
 
+    // Get product rating stats
+    const ratingStats = await this.prisma.productRating.aggregate({
+      where: { productId: product.id },
+      _avg: { score: true },
+      _count: true,
+    });
+
     return {
       id: product.id,
       title: product.title,
@@ -694,6 +785,10 @@ export class ProductService {
         url: img.url,
         sortOrder: img.sortOrder,
       })) || [],
+      rating: {
+        average: ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null,
+        count: ratingStats._count || 0,
+      },
       seller: product.seller
         ? {
             id: product.seller.id,

@@ -386,7 +386,10 @@ export default function ListingDetailPage() {
     }
   };
 
-  const isOwner = listing && (listing.sellerId === user?.id || listing.seller?.id === user?.id);
+  const isOwner = isAuthenticated && user?.id && listing && (
+    listing.sellerId === user.id || 
+    listing.seller?.id === user.id
+  );
 
   const handleOpenCollectionModal = async () => {
     if (!isAuthenticated || !user) {

@@ -544,6 +544,10 @@ model Product {
   isTradeEnabled Boolean          @default(false) @map("is_trade_enabled") // GAP-001
   viewCount      Int              @default(0) @map("view_count")
   likeCount      Int              @default(0) @map("like_count")
+  quantity       Int?             @map("quantity")
+  maxQuantityPerOrder Int?       @map("max_quantity_per_order")
+  popularityScore Int?            @map("popularity_score")
+  popularityUpdatedAt DateTime?   @map("popularity_updated_at")
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
   version        Int              @default(1) // Optimistic locking
