@@ -1275,7 +1275,7 @@ export default function CheckoutPage() {
                         <p className="text-sm text-gray-500">Satıcı: {item.seller.displayName}</p>
                       </div>
                       <p className="font-bold text-primary-500">
-                        ₺{item.price.toLocaleString('tr-TR')}
+                        {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
                   ))}
@@ -1364,7 +1364,7 @@ export default function CheckoutPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.title}</p>
                       <p className="text-sm text-gray-500">
-                        ₺{item.price.toLocaleString('tr-TR')}
+                        {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
                   </div>
@@ -1381,7 +1381,7 @@ export default function CheckoutPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
-                  <span className="font-medium">₺{subtotal.toLocaleString('tr-TR')}</span>
+                  <span className="font-medium">{subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
@@ -1389,7 +1389,7 @@ export default function CheckoutPage() {
                     {shippingLoading ? (
                       <span className="text-gray-400">Hesaplanıyor...</span>
                     ) : shippingCost > 0 ? (
-                      `₺${shippingCost.toFixed(2)}`
+                      `${shippingCost.toFixed(2)} TL`
                     ) : (
                       <span className="text-gray-400">Adres seçin</span>
                     )}
@@ -1402,7 +1402,7 @@ export default function CheckoutPage() {
                     {shippingLoading ? (
                       <span className="text-gray-400">...</span>
                     ) : (
-                      `₺${grandTotal.toFixed(2)}`
+                      `${grandTotal.toFixed(2)} TL`
                     )}
                   </span>
                 </div>

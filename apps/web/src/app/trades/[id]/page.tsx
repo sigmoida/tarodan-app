@@ -628,7 +628,7 @@ export default function TradeDetailPage() {
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-orange-500">
-                                ₺{Number(product.price || 0).toLocaleString('tr-TR')}
+                                {Number(product.price || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </button>
@@ -690,7 +690,7 @@ export default function TradeDetailPage() {
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-orange-500">
-                                ₺{Number(product.price || 0).toLocaleString('tr-TR')}
+                                {Number(product.price || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </button>
@@ -882,7 +882,7 @@ export default function TradeDetailPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{item.productTitle}</p>
                     <p className="text-sm text-gray-500">
-                      {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                      {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                     </p>
                   </div>
                 </Link>
@@ -891,7 +891,7 @@ export default function TradeDetailPage() {
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-600">Toplam Değer</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₺{theirTotal.toLocaleString('tr-TR')}
+                {theirTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
           </div>
@@ -927,7 +927,7 @@ export default function TradeDetailPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{item.productTitle}</p>
                     <p className="text-sm text-gray-500">
-                      {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                      {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                     </p>
                   </div>
                 </Link>
@@ -936,7 +936,7 @@ export default function TradeDetailPage() {
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-600">Toplam Değer</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₺{myTotal.toLocaleString('tr-TR')}
+                {myTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
           </div>
@@ -949,7 +949,7 @@ export default function TradeDetailPage() {
               <div>
                 <p className="text-sm text-gray-600">Nakit Fark</p>
                 <p className="text-2xl font-bold text-green-700">
-                  ₺{Math.abs(trade.cashAmount).toLocaleString('tr-TR')}
+                  {Math.abs(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
               </div>
               <div className="text-right">

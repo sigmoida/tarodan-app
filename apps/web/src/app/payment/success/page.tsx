@@ -99,7 +99,7 @@ export default function PaymentSuccessPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Payment Amount:' : 'Ödeme Tutarı:'}</span>
                   <span className="font-semibold">
-                    ₺{payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    {payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </span>
                 </div>
                 <div className="flex justify-between">

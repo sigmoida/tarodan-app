@@ -497,8 +497,8 @@ export default function ListingsPage() {
       {/* Listings Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            {[...Array(12)].map((_, i) => (
               <div key={i} className="card animate-pulse">
                 <div className="aspect-square bg-gray-200" />
                 <div className="p-4 space-y-2">
@@ -514,7 +514,7 @@ export default function ListingsPage() {
             <p className="text-gray-500 text-lg">{t('product.noListings')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {listings.map((listing, index) => (
               <motion.div
                 key={listing.id}
@@ -563,7 +563,7 @@ export default function ListingsPage() {
                       )}
                       <div className="flex items-center justify-between">
                         <p className="text-xl font-bold text-primary-500">
-                          ₺{listing.price.toLocaleString('tr-TR')}
+                          {listing.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
                           {listing.condition}

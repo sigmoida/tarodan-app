@@ -485,7 +485,7 @@ export default function ListingDetailPage() {
   const shareToSocial = async (platform: string) => {
     const url = encodeURIComponent(window.location.href);
     const title = encodeURIComponent(listing?.title || 'Check this out on Tarodan!');
-    const text = encodeURIComponent(`${listing?.title} - ₺${listing?.price?.toLocaleString('tr-TR')}`);
+    const text = encodeURIComponent(`${listing?.title} - ${listing?.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
     
     let shareUrl = '';
     
@@ -1071,7 +1071,7 @@ export default function ListingDetailPage() {
             </div>
 
             <p className="text-4xl font-bold text-orange-500 mb-4">
-              ₺{Number(listing.price).toLocaleString('tr-TR')}
+              {Number(listing.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
             </p>
 
             {/* View & Like Stats */}

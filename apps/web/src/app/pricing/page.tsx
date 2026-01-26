@@ -234,7 +234,7 @@ export default function PricingPage() {
                   <div className="mb-6">
                     <div className="flex items-baseline">
                       <span className="text-4xl font-bold text-gray-900">
-                        {tier.price === 0 ? 'Ücretsiz' : `₺${displayPrice.toLocaleString('tr-TR')}`}
+                        {tier.price === 0 ? 'Ücretsiz' : `${displayPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
                       </span>
                       {tier.price > 0 && (
                         <span className="ml-2 text-gray-500">
@@ -244,7 +244,7 @@ export default function PricingPage() {
                     </div>
                     {selectedPeriod === 'yearly' && tier.price > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
-                        Ayda ₺{Math.round(displayPrice / 12).toLocaleString('tr-TR')}
+                        Ayda {Math.round(displayPrice / 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     )}
                   </div>

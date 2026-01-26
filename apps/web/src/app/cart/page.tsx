@@ -102,7 +102,7 @@ export default function CartPage() {
                     {t('product.seller')}: @{item.seller.displayName}
                   </p>
                   <p className="text-lg font-bold text-primary-500 mt-2">
-                    ₺{item.price.toLocaleString('tr-TR')}
+                    {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
                 </div>
                 <button
@@ -123,7 +123,7 @@ export default function CartPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('checkout.subtotal')}</span>
-                  <span className="font-medium">₺{total.toLocaleString('tr-TR')}</span>
+                  <span className="font-medium">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('checkout.shipping')}</span>

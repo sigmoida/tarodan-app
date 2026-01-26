@@ -1232,6 +1232,89 @@ export class UserService {
    * Based on collection engagement score: views + likes + sales
    * Algorithm: Score = (viewCount * 1) + (likeCount * 5) + (salesCount * 20)
    */
+  async getTopCollections(limit: number = 20) {
+    // Get collections from premium/business users that are public
+    const collections = await this.prisma.collection.findMany({
+      where: {
+        isPublic: true,
+        items: { some: {} }, // Has at least one item
+        user: {
+          membership: {
+            tier: {
+              type: {
+                in: ['premium', 'business'],
+              },
+            },
+          },
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true,
+            isVerified: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                images: {
+                  take: 1,
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+          take: 4,
+          orderBy: [
+            { isFeatured: 'desc' },
+            { sortOrder: 'asc' },
+          ],
+        },
+        _count: {
+          select: { items: true, likes: true },
+        },
+      },
+      orderBy: [
+        { viewCount: 'desc' },
+        { likeCount: 'desc' },
+      ],
+      take: limit,
+    });
+
+    return collections.map((collection) => {
+      const items = collection.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productTitle: item.product?.title || item.customTitle || 'Ürün',
+        productPrice: item.product?.price ? Number(item.product.price) : null,
+        productImage: item.customImageUrl || (item.product?.images?.[0]?.url),
+      }));
+
+      return {
+        id: collection.id,
+        name: collection.name,
+        description: collection.description,
+        coverImageUrl: collection.coverImageUrl,
+        viewCount: collection.viewCount,
+        likeCount: collection.likeCount,
+        itemCount: collection._count.items,
+        user: {
+          id: collection.user.id,
+          displayName: collection.user.displayName,
+          avatarUrl: collection.user.avatarUrl,
+          bio: collection.user.bio,
+          isVerified: collection.user.isVerified,
+        },
+        items,
+      };
+    });
+  }
+
   async getFeaturedCollector() {
     // Get all public collections with items
     const collections = await this.prisma.collection.findMany({

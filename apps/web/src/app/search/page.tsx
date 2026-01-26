@@ -373,7 +373,7 @@ function SearchContent() {
                         </h3>
                         <div className="flex items-center justify-between">
                           <span className="text-primary-500 font-bold text-lg">
-                            ₺{product.price?.toLocaleString()}
+                            {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </span>
                           <span className="text-xs text-gray-600">
                             {getConditionLabel(product.condition)}

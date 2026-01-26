@@ -343,7 +343,7 @@ export default function CategoryPage() {
                       </h3>
                       <div className="flex items-center justify-between">
                         <span className="text-primary-500 font-bold text-lg">
-                          ₺{product.price?.toLocaleString()}
+                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <span className="text-xs text-gray-600">
                           {getConditionLabel(product.condition)}
@@ -392,7 +392,7 @@ export default function CategoryPage() {
                       </div>
                       <div className="flex items-center justify-between mt-4">
                         <span className="text-primary-500 font-bold text-xl">
-                          ₺{product.price?.toLocaleString()}
+                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <button className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
                           <HeartIcon className="h-5 w-5 text-white" />

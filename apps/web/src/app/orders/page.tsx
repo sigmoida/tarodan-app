@@ -276,7 +276,7 @@ export default function OrdersPage() {
                               {productInfo.title || (locale === 'en' ? 'Product' : 'Ürün')}
                             </Link>
                             <p className="text-sm text-gray-500">
-                              1 {locale === 'en' ? 'x' : 'adet ×'} ₺{orderPrice.toLocaleString('tr-TR')}
+                              1 {locale === 'en' ? 'x' : 'adet ×'} {orderPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                             </p>
                           </div>
                         </div>
@@ -296,7 +296,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-primary-500">
-                        ₺{(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR')}
+                        {(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
                   </div>

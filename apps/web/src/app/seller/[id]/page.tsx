@@ -540,6 +540,7 @@ export default function SellerProfilePage() {
                               </span>
                             )}
                           </div>
+<<<<<<< HEAD
                         </div>
                       </Link>
                     </motion.div>
@@ -594,7 +595,7 @@ export default function SellerProfilePage() {
                           ))}
                         </div>
                         <p className="text-gray-500 text-sm">
-                          {seller.stats?.totalRatings} {locale === 'en' ? 'total reviews' : 'değerlendirme'}
+                          {seller.stats?.totalRatings || 0} {locale === 'en' ? 'total reviews' : 'değerlendirme'}
                         </p>
                       </div>
 

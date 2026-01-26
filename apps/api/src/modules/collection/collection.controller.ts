@@ -315,4 +315,33 @@ export class CollectionController {
     return this.collectionService.reorderItems(id, req.user.id, dto);
   }
 
+  /**
+   * Update collection cover image
+   * PATCH /collections/:id/cover
+   */
+  @Patch(':id/cover')
+  @UseInterceptors(FileInterceptor('cover'))
+  async updateCollectionCover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
+    @UploadedFile() coverFile?: Express.Multer.File,
+  ): Promise<CollectionResponseDto> {
+    if (!coverFile) {
+      throw new BadRequestException('Kapak resmi gerekli');
+    }
+
+    let coverImageUrl: string;
+    try {
+      const uploadResult = await this.mediaService.upload(coverFile, {
+        folder: 'collection-covers',
+        resize: { width: 1200, height: 600, fit: 'cover' },
+      });
+      coverImageUrl = uploadResult.url;
+    } catch (error: any) {
+      throw new BadRequestException('Kapak resmi yükleme başarısız: ' + (error.message || 'Bilinmeyen hata'));
+    }
+
+    return this.collectionService.updateCollectionCover(id, req.user.id, coverImageUrl);
+  }
+
 }
