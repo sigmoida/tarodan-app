@@ -5,12 +5,16 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from './dto';
 import { OfferStatus, ProductStatus, OrderStatus, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { EventService } from '../events';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 
 @Injectable()
 export class OfferService {
@@ -22,6 +26,8 @@ export class OfferService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {
     this.offerExpiryHours = parseInt(
       this.configService.get('OFFER_EXPIRY_HOURS') || '24',
@@ -173,6 +179,24 @@ export class OfferService {
     } catch (error) {
       // Log but don't fail - offer was already created
       this.logger.error(`Failed to emit offer.created event: ${error}`);
+    }
+
+    // Send direct in-app notification to seller
+    this.logger.log(`[CreateOffer] Sending notification to seller ${result.offer.sellerId}`);
+    try {
+      const notificationResult = await this.notificationService.createInAppNotification(
+        result.offer.sellerId,
+        NotificationType.OFFER_RECEIVED,
+        {
+          productId: result.offer.productId,
+          productTitle: result.productTitle,
+          amount: Number(result.offer.amount),
+          buyerName: result.offer.buyer.displayName || 'Bir kullanıcı',
+        },
+      );
+      this.logger.log(`[CreateOffer] Notification result: ${notificationResult}`);
+    } catch (error) {
+      this.logger.error(`[CreateOffer] Failed to send offer notification:`, error);
     }
 
     return this.formatOfferResponse(result.offer);
@@ -332,6 +356,22 @@ export class OfferService {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
 
+    // Send direct in-app notification to buyer
+    try {
+      await this.notificationService.createInAppNotification(
+        result.offer.buyerId,
+        NotificationType.OFFER_ACCEPTED,
+        {
+          productId: result.offer.productId,
+          productTitle: result.offer.product.title,
+          orderId: result.order.id,
+          amount: Number(result.offer.amount),
+        },
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send offer accepted notification: ${error}`);
+    }
+
     return this.formatOfferResponse(result.offer);
   }
 
@@ -377,6 +417,20 @@ export class OfferService {
         },
       },
     });
+
+    // Send notification to buyer that offer was rejected
+    try {
+      await this.notificationService.createInAppNotification(
+        rejectedOffer.buyerId,
+        NotificationType.OFFER_REJECTED,
+        {
+          productId: rejectedOffer.productId,
+          productTitle: rejectedOffer.product.title,
+        },
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send offer rejected notification: ${error}`);
+    }
 
     return this.formatOfferResponse(rejectedOffer);
   }
@@ -512,6 +566,32 @@ export class OfferService {
     });
 
     return this.formatOfferResponse(cancelledOffer);
+  }
+
+  /**
+   * Get pending offers count for badge
+   */
+  async getPendingCount(userId: string) {
+    const [received, sent] = await Promise.all([
+      this.prisma.offer.count({
+        where: {
+          sellerId: userId,
+          status: 'pending',
+        },
+      }),
+      this.prisma.offer.count({
+        where: {
+          buyerId: userId,
+          status: 'pending',
+        },
+      }),
+    ]);
+
+    return {
+      received,
+      sent,
+      total: received + sent,
+    };
   }
 
   /**

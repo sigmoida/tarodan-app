@@ -223,7 +223,7 @@ export default function OrderDetailPage() {
                   </Link>
                   <p className="text-sm text-gray-500 mt-1">{locale === 'en' ? 'Quantity: 1' : 'Adet: 1'}</p>
                   <p className="text-xl font-bold text-primary-500 mt-2">
-                    ₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    {orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
                 </div>
               </div>
@@ -356,7 +356,7 @@ export default function OrderDetailPage() {
                 <div className="border-t pt-3 flex justify-between font-semibold text-lg">
                   <span>{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="text-primary-500">
-                    ₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    {orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </span>
                 </div>
               </div>
@@ -434,7 +434,7 @@ export default function OrderDetailPage() {
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
               <p className="text-gray-600 mb-4">
-                {locale === 'en' ? 'Total payment amount:' : 'Toplam ödeme tutarı:'} ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                {locale === 'en' ? 'Total payment amount:' : 'Toplam ödeme tutarı:'} {order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">

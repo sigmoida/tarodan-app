@@ -366,7 +366,7 @@ export default function StatisticsPage() {
                   </div>
                   <div>
                     <p className="text-green-100">Toplam Kazanç</p>
-                    <p className="text-4xl font-bold">₺{stats.totalRevenue.toLocaleString('tr-TR')}</p>
+                    <p className="text-4xl font-bold">{stats.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-green-100 text-sm">
@@ -385,7 +385,7 @@ export default function StatisticsPage() {
                   </div>
                   <div>
                     <p className="text-orange-100">Toplam Harcama</p>
-                    <p className="text-4xl font-bold">₺{stats.totalSpent.toLocaleString('tr-TR')}</p>
+                    <p className="text-4xl font-bold">{stats.totalSpent.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-orange-100 text-sm">

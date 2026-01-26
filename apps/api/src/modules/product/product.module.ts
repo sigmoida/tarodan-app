@@ -12,7 +12,7 @@ import { NotificationModule } from '../notification/notification.module';
     forwardRef(() => MembershipModule),
     SearchModule,
     WishlistModule,
-    NotificationModule,
+    forwardRef(() => NotificationModule),
   ],
   controllers: [ProductController],
   providers: [ProductService, ProductSchedulerService],

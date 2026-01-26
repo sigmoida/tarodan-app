@@ -54,7 +54,8 @@ interface Order {
 // Status labels will be handled with translation function inside component
 
 // Statuses that allow reviews
-const REVIEWABLE_STATUSES = ['completed', 'paid', 'delivered'];
+// Only delivered and completed orders can be reviewed (must receive before rating)
+const REVIEWABLE_STATUSES = ['completed', 'delivered'];
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -90,6 +91,7 @@ export default function OrdersPage() {
   const [sellerCommunication, setSellerCommunication] = useState(5);
   const [sellerShipping, setSellerShipping] = useState(5);
   const [sellerPackaging, setSellerPackaging] = useState(5);
+  const [sellerReviewText, setSellerReviewText] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -121,6 +123,7 @@ export default function OrdersPage() {
     setSellerCommunication(5);
     setSellerShipping(5);
     setSellerPackaging(5);
+    setSellerReviewText('');
     setShowReviewModal(true);
   };
 
@@ -147,11 +150,15 @@ export default function OrdersPage() {
       // Submit seller rating (if seller exists)
       if (sellerId) {
         const avgSellerScore = Math.round((sellerCommunication + sellerShipping + sellerPackaging) / 3);
+        const scoreBreakdown = `İletişim: ${sellerCommunication}/5, Kargo: ${sellerShipping}/5, Paketleme: ${sellerPackaging}/5`;
+        const fullComment = sellerReviewText 
+          ? `${sellerReviewText}\n\n${scoreBreakdown}`
+          : scoreBreakdown;
         await ratingsApi.createUserRating({
           receiverId: sellerId,
           orderId: reviewingOrder.id,
           score: avgSellerScore,
-          comment: `İletişim: ${sellerCommunication}/5, Kargo: ${sellerShipping}/5, Paketleme: ${sellerPackaging}/5`,
+          comment: fullComment,
         });
       }
 
@@ -269,7 +276,7 @@ export default function OrdersPage() {
                               {productInfo.title || (locale === 'en' ? 'Product' : 'Ürün')}
                             </Link>
                             <p className="text-sm text-gray-500">
-                              1 {locale === 'en' ? 'x' : 'adet ×'} ₺{orderPrice.toLocaleString('tr-TR')}
+                              1 {locale === 'en' ? 'x' : 'adet ×'} {orderPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                             </p>
                           </div>
                         </div>
@@ -289,7 +296,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-primary-500">
-                        ₺{(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR')}
+                        {(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
                   </div>
@@ -494,6 +501,20 @@ export default function OrdersPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+                  
+                  {/* Seller Review Text */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t('review.sellerComment')}
+                    </label>
+                    <textarea
+                      value={sellerReviewText}
+                      onChange={(e) => setSellerReviewText(e.target.value)}
+                      placeholder={t('review.sellerCommentPlaceholder')}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      rows={3}
+                    />
                   </div>
                 </div>
               </div>

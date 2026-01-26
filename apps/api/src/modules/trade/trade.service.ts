@@ -4,9 +4,14 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { MembershipService } from '../membership/membership.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 import {
   TradeStatus,
   ProductStatus,
@@ -31,9 +36,13 @@ import {
 
 @Injectable()
 export class TradeService {
+  private readonly logger = new Logger(TradeService.name);
+  
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -241,6 +250,25 @@ export class TradeService {
       return newTrade;
     });
 
+    // Send notification to receiver about new trade offer
+    try {
+      const initiator = await this.prisma.user.findUnique({
+        where: { id: initiatorId },
+        select: { displayName: true },
+      });
+      
+      await this.notificationService.createInAppNotification(
+        dto.receiverId,
+        NotificationType.TRADE_RECEIVED,
+        {
+          tradeId: trade.id,
+          initiatorName: initiator?.displayName || 'Bir kullanıcı',
+        },
+      );
+    } catch (error) {
+      console.error('Failed to send trade notification:', error);
+    }
+
     return this.getTradeById(trade.id, initiatorId);
   }
 
@@ -283,6 +311,32 @@ export class TradeService {
     }
 
     return this.mapToResponseDto(trade);
+  }
+
+  // ==========================================================================
+  // PENDING COUNT FOR BADGE
+  // ==========================================================================
+  async getPendingCount(userId: string) {
+    const [received, sent] = await Promise.all([
+      this.prisma.trade.count({
+        where: {
+          receiverId: userId,
+          status: 'pending',
+        },
+      }),
+      this.prisma.trade.count({
+        where: {
+          initiatorId: userId,
+          status: 'pending',
+        },
+      }),
+    ]);
+
+    return {
+      received,
+      sent,
+      total: received + sent,
+    };
   }
 
   // ==========================================================================
@@ -447,6 +501,19 @@ export class TradeService {
       }
     });
 
+    // Send notification to initiator that trade was accepted
+    try {
+      await this.notificationService.createInAppNotification(
+        trade.initiatorId,
+        NotificationType.TRADE_ACCEPTED,
+        {
+          tradeId,
+        },
+      );
+    } catch (error) {
+      console.error('Failed to send trade accepted notification:', error);
+    }
+
     return this.getTradeById(tradeId, userId);
   }
 
@@ -494,6 +561,19 @@ export class TradeService {
         },
       });
     });
+
+    // Send notification to initiator that trade was rejected
+    try {
+      await this.notificationService.createInAppNotification(
+        trade.initiatorId,
+        NotificationType.TRADE_REJECTED,
+        {
+          tradeId,
+        },
+      );
+    } catch (error) {
+      console.error('Failed to send trade rejected notification:', error);
+    }
 
     return this.getTradeById(tradeId, userId);
   }
@@ -700,6 +780,25 @@ export class TradeService {
         })),
       });
     });
+
+    // Send notification to original initiator about counter offer
+    try {
+      const counterOfferer = await this.prisma.user.findUnique({
+        where: { id: originalReceiverId },
+        select: { displayName: true },
+      });
+      
+      await this.notificationService.createInAppNotification(
+        originalInitiatorId, // Original initiator receives the counter offer notification
+        NotificationType.TRADE_COUNTER,
+        {
+          tradeId,
+          counterOffererName: counterOfferer?.displayName || 'Bir kullanıcı',
+        },
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send counter trade notification: ${error}`);
+    }
 
     return this.getTradeById(tradeId, userId);
   }

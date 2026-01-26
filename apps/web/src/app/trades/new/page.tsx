@@ -255,7 +255,7 @@ export default function NewTradePage() {
                   {targetProduct.title}
                 </h3>
                 <p className="text-xl font-bold text-primary-500">
-                  ₺{Number(targetProduct.price).toLocaleString('tr-TR')}
+                  {Number(targetProduct.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
               </div>
             </div>
@@ -319,7 +319,7 @@ export default function NewTradePage() {
                           {product.title}
                         </p>
                         <p className="text-xs font-bold text-primary-500">
-                          ₺{Number(product.price).toLocaleString('tr-TR')}
+                          {Number(product.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                       </div>
                     </button>
@@ -429,18 +429,18 @@ export default function NewTradePage() {
             {parseFloat(cashAmount) > 0 && (
               <div className="flex justify-between">
                 <span>{t('trade.cashDifference')}:</span>
-                <span className="font-medium">₺{parseFloat(cashAmount).toLocaleString('tr-TR')}</span>
+                <span className="font-medium">{parseFloat(cashAmount || '0').toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
               </div>
             )}
             <div className="border-t border-orange-200 pt-2 mt-2">
               <div className="flex justify-between text-lg font-bold">
                 <span>{locale === 'en' ? 'Total Offer:' : 'Toplam Teklif:'}</span>
-                <span className="text-orange-600">₺{calculateTotal().toLocaleString('tr-TR')}</span>
+                <span className="text-orange-600">{calculateTotal().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
               </div>
             </div>
             <div className="flex justify-between text-gray-600">
               <span>{locale === 'en' ? 'Requested Product:' : 'İstenen Ürün:'}</span>
-              <span className="font-medium">₺{Number(targetProduct.price).toLocaleString('tr-TR')}</span>
+              <span className="font-medium">{Number(targetProduct.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
             </div>
           </div>
         </div>

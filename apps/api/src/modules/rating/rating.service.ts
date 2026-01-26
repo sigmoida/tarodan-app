@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { OrderStatus, TradeStatus } from '@prisma/client';
@@ -14,10 +16,18 @@ import {
   UserRatingStatsDto,
   ProductRatingStatsDto,
 } from './dto';
+import { CacheService } from '../cache/cache.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 
 @Injectable()
 export class RatingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
+  ) {}
 
   // ==========================================================================
   // CREATE USER RATING
@@ -55,8 +65,10 @@ export class RatingService {
         throw new NotFoundException('Sipariş bulunamadı');
       }
 
-      if (order.status !== OrderStatus.completed) {
-        throw new BadRequestException('Sadece tamamlanmış siparişler puanlanabilir');
+      // Allow rating only for delivered or completed orders (must receive before rating)
+      const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];
+      if (!allowedStatuses.includes(order.status)) {
+        throw new BadRequestException('Sadece teslim edilmiş siparişler puanlanabilir');
       }
 
       // Giver must be buyer or seller
@@ -128,10 +140,31 @@ export class RatingService {
         comment: dto.comment,
       },
       include: {
-        giver: { select: { id: true, displayName: true } },
+        giver: { select: { id: true, displayName: true, avatarUrl: true } },
         receiver: { select: { id: true, displayName: true } },
       },
     });
+
+    // Invalidate product caches for this seller (receiver) so rating updates show
+    await this.cache.delPattern(`products:detail:*`);
+    await this.cache.delPattern(`products:list:*`);
+
+    // Send notification to the receiver about the new review
+    try {
+      await this.notificationService.createInAppNotification(
+        dto.receiverId,
+        NotificationType.REVIEW_RECEIVED,
+        {
+          reviewerName: rating.giver?.displayName || 'Bir kullanıcı',
+          score: dto.score,
+          orderId: dto.orderId,
+          tradeId: dto.tradeId,
+        },
+      );
+    } catch (error) {
+      // Don't fail if notification fails
+      console.error('Failed to send review notification:', error);
+    }
 
     return this.mapUserRatingToDto(rating);
   }
@@ -161,10 +194,10 @@ export class RatingService {
       throw new BadRequestException('Siparişteki ürün eşleşmiyor');
     }
 
-    // Allow rating for completed, delivered, or paid orders (for testing with payment bypass)
-    const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid];
+    // Allow rating only for delivered or completed orders (must receive before rating)
+    const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];
     if (!allowedStatuses.includes(order.status)) {
-      throw new BadRequestException('Sadece tamamlanmış veya teslim edilmiş siparişler puanlanabilir');
+      throw new BadRequestException('Sadece teslim edilmiş siparişler puanlanabilir');
     }
 
     // Check if already rated
@@ -193,6 +226,10 @@ export class RatingService {
       },
     });
 
+    // Invalidate product cache so rating updates show immediately
+    await this.cache.del(`products:detail:${dto.productId}`);
+    await this.cache.delPattern(`products:list:*`);
+
     return this.mapProductRatingToDto(rating);
   }
 
@@ -211,8 +248,16 @@ export class RatingService {
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
         where: { receiverId: userId },
-        include: {
-          giver: { select: { id: true, displayName: true } },
+        select: {
+          id: true,
+          giverId: true,
+          receiverId: true,
+          orderId: true,
+          tradeId: true,
+          score: true,
+          comment: true,
+          createdAt: true,
+          giver: { select: { id: true, displayName: true, avatarUrl: true } },
           receiver: { select: { id: true, displayName: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -351,6 +396,11 @@ export class RatingService {
       score: rating.score,
       comment: rating.comment || undefined,
       createdAt: rating.createdAt,
+      giver: rating.giver ? {
+        id: rating.giver.id,
+        displayName: rating.giver.displayName || '',
+        avatarUrl: rating.giver.avatarUrl || undefined,
+      } : undefined,
     };
   }
 

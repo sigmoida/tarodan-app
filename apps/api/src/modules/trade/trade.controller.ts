@@ -44,6 +44,15 @@ export class TradeController {
   }
 
   /**
+   * Get pending trades count for badge
+   * GET /trades/pending-count
+   */
+  @Get('pending-count')
+  async getPendingCount(@Request() req: any) {
+    return this.tradeService.getPendingCount(req.user.id);
+  }
+
+  /**
    * List user's trades
    * GET /trades
    */

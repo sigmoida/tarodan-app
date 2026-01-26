@@ -270,16 +270,19 @@ export default function NewListingPage() {
 
     const maxImages = limits?.maxImagesPerListing || 5;
     const currentCount = formData.imageUrls.length;
+    const remainingSlots = maxImages - currentCount;
 
-    if (currentCount + files.length > maxImages) {
-      toast.error(`En fazla ${maxImages} resim yükleyebilirsiniz`);
-      return;
-    }
+    // Eğer yer yoksa sessizce çık (input zaten disabled olmalı)
+    if (remainingSlots <= 0) return;
+
+    // Sadece kalan slot kadar resim al, fazlasını sessizce yoksay
+    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    
+    if (filesToUpload.length === 0) return;
 
     setUploadingImages(true);
     try {
-      const fileArray = Array.from(files);
-      const response = await mediaApi.uploadProductImages(fileArray);
+      const response = await mediaApi.uploadProductImages(filesToUpload);
       
       const uploadedUrls = response.data.map((result: any) => result.url);
       setFormData({
@@ -627,18 +630,24 @@ export default function NewListingPage() {
             {/* Images */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 5})
+                Ürün Görselleri
               </label>
               <div className="space-y-3">
                 <div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handleFileUpload(e.target.files)}
-                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 5)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
+                  {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) ? (
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                      disabled={uploadingImages}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  ) : (
+                    <div className="w-full px-4 py-3 border border-green-300 bg-green-50 rounded-xl text-green-700 text-sm">
+                      ✓ Maksimum görsel sayısına ulaştınız
+                    </div>
+                  )}
                   {uploadingImages && (
                     <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
                   )}
@@ -668,9 +677,16 @@ export default function NewListingPage() {
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} resim yüklendi
-              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm text-gray-500">
+                  {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} görsel
+                </p>
+                {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) && (
+                  <p className="text-xs text-gray-400">
+                    {(limits?.maxImagesPerListing || 5) - formData.imageUrls.length} görsel daha ekleyebilirsiniz
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Submit */}

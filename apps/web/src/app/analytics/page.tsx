@@ -473,7 +473,7 @@ export default function AnalyticsPage() {
               />
               <StatCard
                 title="Toplam Gelir"
-                value={`₺${analytics.totalRevenue.toLocaleString('tr-TR')}`}
+                value={`${analytics.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
                 change={analytics.revenueChange}
                 icon={CurrencyDollarIcon}
                 gradient="bg-gradient-to-br from-purple-500 to-violet-500"
@@ -576,7 +576,7 @@ export default function AnalyticsPage() {
                           <span className="font-medium">{activity.productTitle}</span>
                           {' '}{getActivityText(activity.type)}
                           {activity.amount && (
-                            <span className="text-green-600 font-semibold"> ₺{activity.amount.toLocaleString('tr-TR')}</span>
+                            <span className="text-green-600 font-semibold"> {activity.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                           )}
                         </p>
                         {activity.userDisplayName && (
@@ -637,7 +637,7 @@ export default function AnalyticsPage() {
                             {product.favorites}
                           </span>
                           <span className="text-orange-600 font-medium">
-                            ₺{product.price.toLocaleString('tr-TR')}
+                            {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </span>
                         </div>
                       </div>

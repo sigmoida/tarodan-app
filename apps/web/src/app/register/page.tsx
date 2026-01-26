@@ -16,6 +16,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { api } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,6 +34,8 @@ export default function RegisterPage() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [acceptMarketing, setAcceptMarketing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   // Phone number formatting helper
   const formatPhoneNumber = (value: string): string => {
@@ -86,6 +89,109 @@ export default function RegisterPage() {
             {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  // Registration success - show verification pending screen
+  if (registrationSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+        {/* Header */}
+        <header className="p-6">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">T</span>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+              Tarodan
+            </span>
+          </Link>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 flex items-center justify-center px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
+          >
+            <div className="flex justify-center mb-6">
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center"
+              >
+                <EnvelopeIcon className="w-10 h-10 text-green-600" />
+              </motion.div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              {locale === 'en' ? 'Check Your Email! 📬' : 'E-postanızı Kontrol Edin! 📬'}
+            </h2>
+            
+            <p className="text-gray-500 mb-2">
+              {locale === 'en' 
+                ? 'We have sent a verification link to:' 
+                : 'Doğrulama linki gönderildi:'}
+            </p>
+            
+            <p className="font-semibold text-gray-800 mb-6">
+              {registeredEmail}
+            </p>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-left">
+              <p className="text-sm text-blue-800 mb-2">
+                📌 {locale === 'en' ? 'Next steps:' : 'Sonraki adımlar:'}
+              </p>
+              <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
+                <li>{locale === 'en' ? 'Open your email inbox' : 'E-posta kutunuzu açın'}</li>
+                <li>{locale === 'en' ? 'Find the email from Tarodan' : 'Tarodan\'dan gelen e-postayı bulun'}</li>
+                <li>{locale === 'en' ? 'Click the verification link' : 'Doğrulama linkine tıklayın'}</li>
+                <li>{locale === 'en' ? 'Login to your account' : 'Hesabınıza giriş yapın'}</li>
+              </ol>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-amber-800">
+                💡 {locale === 'en' 
+                  ? "Can't find the email? Check your spam/junk folder." 
+                  : "E-postayı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin."}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Link
+                href="/login"
+                className="block w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+              >
+                {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
+              </Link>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    await api.post('/auth/resend-verification', { email: registeredEmail });
+                    toast.success(locale === 'en' ? 'Verification email resent!' : 'Doğrulama e-postası tekrar gönderildi!');
+                  } catch (error) {
+                    toast.error(locale === 'en' ? 'Could not resend email' : 'E-posta gönderilemedi');
+                  }
+                }}
+                className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
+              </button>
+            </div>
+          </motion.div>
+        </main>
+
+        {/* Footer */}
+        <footer className="p-6 text-center">
+          <p className="text-sm text-gray-400">
+            © {new Date().getFullYear()} Tarodan. {locale === 'en' ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
+          </p>
+        </footer>
       </div>
     );
   }
@@ -146,14 +252,18 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      await register(displayName, email, password, formattedPhone, birthDate, acceptMarketing);
-      toast.success(
-        locale === 'en' 
-          ? 'Registration successful! Please check your email to verify your account.' 
-          : 'Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.'
-      );
-      // Redirect to login page with message about email verification
-      window.location.href = '/login?verified=false';
+      // Use API directly instead of authStore.register to avoid auto-login
+      await api.post('/auth/register', {
+        displayName,
+        email,
+        password,
+        phone: formattedPhone,
+        birthDate,
+        acceptsMarketingEmails: acceptMarketing,
+      });
+      setRegisteredEmail(email);
+      setRegistrationSuccess(true);
+      toast.success(locale === 'en' ? 'Registration successful! Please verify your email.' : 'Kayıt başarılı! Lütfen e-postanızı doğrulayın.');
     } catch (error: any) {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Registration failed' : 'Kayıt başarısız'));
     } finally {

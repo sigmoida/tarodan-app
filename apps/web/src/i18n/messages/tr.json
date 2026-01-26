@@ -29,6 +29,7 @@
     "noResults": "Sonuç bulunamadı",
     "required": "Zorunlu alan",
     "optional": "İsteğe bağlı",
+    "user": "Kullanıcı",
     "freeStart": "Ücretsiz Başla",
     "continue": "Devam Et",
     "sending": "Gönderiliyor...",
@@ -214,6 +215,10 @@
     "productReservedDesc": "Başka bir alıcı tarafından satın alma işlemi devam ediyor.",
     "productSold": "Bu ürün satılmıştır",
     "productSoldDesc": "Bu ürün artık satışta değil.",
+    "sold": "Satıldı",
+    "soldOut": "Stokta Yok",
+    "productNoLongerAvailable": "Bu ürün artık satışta değil.",
+    "reserved": "Rezerve Edildi",
     "productPending": "Bu ürün onay bekliyor",
     "productInactive": "Bu ürün aktif değil",
     "productRejected": "Bu ürün reddedilmiş",
@@ -701,6 +706,8 @@
     "communication": "İletişim",
     "shippingSpeed": "Kargo Hızı",
     "packaging": "Paketleme",
+    "sellerComment": "Satıcı Hakkında Yorumunuz (Opsiyonel)",
+    "sellerCommentPlaceholder": "Satıcıyla ilgili deneyiminizi paylaşın...",
     "submit": "Değerlendir"
   },
   "footer": {

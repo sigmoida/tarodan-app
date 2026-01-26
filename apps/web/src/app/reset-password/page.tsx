@@ -4,7 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { 
+  LockClosedIcon, 
+  EyeIcon, 
+  EyeSlashIcon, 
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  ShieldCheckIcon,
+  XCircleIcon,
+} from '@heroicons/react/24/outline';
+import { CheckIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -13,41 +23,42 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [tokenError, setTokenError] = useState(false);
+
+  // Password validation states
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+  const isPasswordValid = hasMinLength && hasUppercase && hasLowercase && hasNumber;
 
   useEffect(() => {
     if (!token) {
-      toast.error(t('auth.invalidResetLink'));
-      router.push('/forgot-password');
+      setTokenError(true);
     }
-  }, [token, router, t]);
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
-    if (!password || !confirmPassword) {
-      toast.error(t('common.fillAllFields'));
+    if (!isPasswordValid) {
+      setError(locale === 'tr' ? 'Şifre gereksinimleri karşılanmıyor' : 'Password requirements not met');
       return;
     }
 
-    if (password.length < 8) {
-      toast.error(t('validation.passwordMin8'));
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      toast.error(t('validation.passwordMatch'));
-      return;
-    }
-
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error(t('auth.passwordRequirements'));
+    if (!passwordsMatch) {
+      setError(locale === 'tr' ? 'Şifreler eşleşmiyor' : 'Passwords do not match');
       return;
     }
 
@@ -58,45 +69,59 @@ export default function ResetPasswordPage() {
         newPassword: password,
       });
       setIsSuccess(true);
-      toast.success(t('auth.passwordResetSuccess'));
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
+      toast.success(locale === 'tr' ? 'Şifreniz başarıyla değiştirildi!' : 'Password changed successfully!');
     } catch (error: any) {
       console.error('Failed to reset password:', error);
-      toast.error(error.response?.data?.message || t('common.operationFailed'));
+      const errorMessage = error.response?.data?.message || (locale === 'tr' ? 'Şifre sıfırlama başarısız' : 'Password reset failed');
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!token) {
-    return null;
-  }
-
-  if (isSuccess) {
+  // Token Error State
+  if (tokenError) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+        <header className="p-6">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">T</span>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+              Tarodan
+            </span>
+          </Link>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center px-4 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-sm p-8 text-center"
+            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-red-500/10 p-8 md:p-10 border border-gray-100 text-center"
           >
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-rose-100 rounded-full flex items-center justify-center">
+                <XCircleIcon className="w-12 h-12 text-red-600" />
+              </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">{t('auth.resetPassword')}</h2>
-            <p className="text-gray-600 mb-6">
-              {t('auth.passwordResetSuccess')}
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              {locale === 'tr' ? 'Geçersiz Bağlantı' : 'Invalid Link'}
+            </h2>
+            
+            <p className="text-gray-500 mb-8">
+              {locale === 'tr' 
+                ? 'Bu şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş olabilir. Lütfen yeni bir bağlantı isteyin.' 
+                : 'This password reset link is invalid or may have expired. Please request a new one.'}
             </p>
+
             <Link
-              href="/login"
-              className="inline-block px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
+              href="/forgot-password"
+              className="block w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
             >
-              {t('common.login')}
+              {locale === 'tr' ? 'Yeni Bağlantı İste' : 'Request New Link'}
             </Link>
           </motion.div>
         </main>
@@ -104,99 +129,254 @@ export default function ResetPasswordPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8"
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-          {t('auth.backToLogin')}
-        </Link>
+  // Success State
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+        <header className="p-6">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">T</span>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+              Tarodan
+            </span>
+          </Link>
+        </header>
 
+        <main className="flex-1 flex items-center justify-center px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
+          >
+            <div className="flex justify-center mb-6">
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center"
+              >
+                <CheckCircleIcon className="w-12 h-12 text-green-600" />
+              </motion.div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              {locale === 'tr' ? 'Şifreniz Değiştirildi!' : 'Password Changed!'}
+            </h2>
+            
+            <p className="text-gray-500 mb-8">
+              {locale === 'tr' 
+                ? 'Şifreniz başarıyla güncellendi. Artık yeni şifrenizle giriş yapabilirsiniz.' 
+                : 'Your password has been successfully updated. You can now login with your new password.'}
+            </p>
+
+            <Link
+              href="/login"
+              className="block w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25"
+            >
+              {locale === 'tr' ? 'Giriş Yap' : 'Login Now'}
+            </Link>
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
+
+  // Main Form
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+      {/* Header */}
+      <header className="p-6">
+        <Link href="/" className="inline-flex items-center gap-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+            <span className="text-white font-bold text-lg">T</span>
+          </div>
+          <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+            Tarodan
+          </span>
+        </Link>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm p-8"
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
         >
-          <h1 className="text-3xl font-bold mb-2">{t('auth.resetPassword')}</h1>
-          <p className="text-gray-600 mb-8">
-            {t('auth.newPassword')}
-          </p>
+          <div className="bg-white rounded-3xl shadow-xl shadow-orange-500/10 p-8 md:p-10 border border-gray-100">
+            {/* Back Link */}
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-600 transition-colors mb-8 group"
+            >
+              <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-sm font-medium">
+                {locale === 'tr' ? 'Giriş sayfasına dön' : 'Back to login'}
+              </span>
+            </Link>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('auth.newPassword')}
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  required
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl flex items-center justify-center">
+                <ShieldCheckIcon className="w-10 h-10 text-orange-600" />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {t('auth.passwordRequirements')}
+            </div>
+
+            {/* Title */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+                {locale === 'tr' ? 'Yeni Şifre Oluştur' : 'Create New Password'}
+              </h1>
+              <p className="text-gray-500">
+                {locale === 'tr' 
+                  ? 'Güçlü bir şifre seçin ve hesabınızı güvende tutun.' 
+                  : 'Choose a strong password to keep your account secure.'}
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('auth.confirmPassword')}
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  required
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  {locale === 'tr' ? 'Yeni Şifre' : 'New Password'}
+                </label>
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="••••••••"
+                    className="w-full pl-12 pr-12 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-orange-500 transition-colors text-gray-900"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isLoading ? t('common.loading') : t('auth.resetPassword')}
-            </button>
-          </form>
+              {/* Password Requirements */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <p className="text-xs font-medium text-gray-500 mb-2">
+                  {locale === 'tr' ? 'Şifre gereksinimleri:' : 'Password requirements:'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <PasswordRequirement met={hasMinLength} text={locale === 'tr' ? 'En az 8 karakter' : 'At least 8 characters'} />
+                  <PasswordRequirement met={hasUppercase} text={locale === 'tr' ? 'Büyük harf (A-Z)' : 'Uppercase (A-Z)'} />
+                  <PasswordRequirement met={hasLowercase} text={locale === 'tr' ? 'Küçük harf (a-z)' : 'Lowercase (a-z)'} />
+                  <PasswordRequirement met={hasNumber} text={locale === 'tr' ? 'Rakam (0-9)' : 'Number (0-9)'} />
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  {locale === 'tr' ? 'Şifreyi Onayla' : 'Confirm Password'}
+                </label>
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="••••••••"
+                    className={`w-full pl-12 pr-12 py-4 border-2 rounded-xl focus:ring-0 transition-colors text-gray-900 ${
+                      confirmPassword && !passwordsMatch ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-orange-500'
+                    }`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                  </button>
+                </div>
+                {confirmPassword && !passwordsMatch && (
+                  <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                    <ExclamationCircleIcon className="w-4 h-4" />
+                    {locale === 'tr' ? 'Şifreler eşleşmiyor' : 'Passwords do not match'}
+                  </p>
+                )}
+                {passwordsMatch && (
+                  <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircleIcon className="w-4 h-4" />
+                    {locale === 'tr' ? 'Şifreler eşleşiyor' : 'Passwords match'}
+                  </p>
+                )}
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-50 border border-red-200 rounded-xl p-4"
+                >
+                  <p className="text-sm text-red-600 flex items-center gap-2">
+                    <ExclamationCircleIcon className="w-5 h-5" />
+                    {error}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading || !isPasswordValid || !passwordsMatch}
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    {locale === 'tr' ? 'Değiştiriliyor...' : 'Changing...'}
+                  </span>
+                ) : (
+                  locale === 'tr' ? 'Şifremi Değiştir' : 'Change Password'
+                )}
+              </button>
+            </form>
+          </div>
         </motion.div>
       </main>
+
+      {/* Footer */}
+      <footer className="p-6 text-center">
+        <p className="text-sm text-gray-400">
+          © {new Date().getFullYear()} Tarodan. {locale === 'tr' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+// Password Requirement Component
+function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-400'}`}>
+      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-green-100' : 'bg-gray-100'}`}>
+        {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+      </div>
+      <span>{text}</span>
     </div>
   );
 }

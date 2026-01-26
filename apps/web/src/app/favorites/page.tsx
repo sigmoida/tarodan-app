@@ -161,7 +161,7 @@ export default function FavoritesPage() {
                     </Link>
                     <div className="flex items-center justify-between">
                       <p className="text-xl font-bold text-primary-500">
-                        ₺{Number(item.productPrice || 0).toLocaleString('tr-TR')}
+                        {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                       {item.productCondition && (
                         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">

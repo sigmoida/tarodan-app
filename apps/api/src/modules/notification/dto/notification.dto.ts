@@ -21,25 +21,57 @@ export enum NotificationType {
   // Product notifications
   PRODUCT_APPROVED = 'product_approved',
   PRODUCT_REJECTED = 'product_rejected',
+  PRODUCT_SOLD = 'product_sold',
 
   // Payment notifications
   PAYMENT_RECEIVED = 'payment_received',
   PAYMENT_RELEASED = 'payment_released',
 
-  // Trade notifications (GAP-001)
+  // Trade notifications
   TRADE_RECEIVED = 'trade_received',
   TRADE_ACCEPTED = 'trade_accepted',
   TRADE_REJECTED = 'trade_rejected',
+  TRADE_COUNTER = 'trade_counter',
   TRADE_SHIPPED = 'trade_shipped',
   TRADE_COMPLETED = 'trade_completed',
 
-  // Messaging notifications (GAP-002)
+  // Messaging notifications
   NEW_MESSAGE = 'new_message',
+
+  // Wishlist/Favorites notifications
+  PRICE_DROP = 'price_drop',
+  WISHLIST_ITEM_SOLD = 'wishlist_item_sold',
+  WISHLIST_SOLD = 'wishlist_sold',
+  BACK_IN_STOCK = 'back_in_stock',
+
+  // Social notifications
+  NEW_FOLLOWER = 'new_follower',
+  SELLER_NEW_LISTING = 'seller_new_listing',
+  COLLECTION_LIKED = 'collection_liked',
+  PRODUCT_LIKED = 'product_liked',
+
+  // Review notifications
+  REVIEW_RECEIVED = 'review_received',
+
+  // Membership notifications
+  MEMBERSHIP_EXPIRING = 'membership_expiring',
+  MEMBERSHIP_EXPIRED = 'membership_expired',
+  MEMBERSHIP_UPGRADED = 'membership_upgraded',
+
+  // Listing notifications
+  LISTING_EXPIRING = 'listing_expiring',
+  LISTING_EXPIRED = 'listing_expired',
+  LISTING_VIEWS_MILESTONE = 'listing_views_milestone',
+
+  // Promotion notifications
+  PROMOTION = 'promotion',
+  SPECIAL_OFFER = 'special_offer',
 
   // General
   WELCOME = 'welcome',
   PASSWORD_RESET = 'password_reset',
   EMAIL_VERIFICATION = 'email_verification',
+  SYSTEM_ANNOUNCEMENT = 'system_announcement',
 }
 
 export enum NotificationChannel {

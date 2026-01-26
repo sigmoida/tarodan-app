@@ -331,7 +331,7 @@ export default function MembershipCheckoutPage() {
                 ) : (
                   <>
                     <ShieldCheckIcon className="w-5 h-5" />
-                    ₺{finalPrice.toLocaleString('tr-TR')} Öde
+                    {finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL Öde
                   </>
                 )}
               </button>
@@ -370,21 +370,21 @@ export default function MembershipCheckoutPage() {
                   <>
                     <div className="flex justify-between text-sm text-gray-500">
                       <span>Normal fiyat</span>
-                      <span className="line-through">₺{(basePrice * 12).toLocaleString('tr-TR')}</span>
+                      <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                     <div className="flex justify-between text-sm text-green-600">
                       <span>İndirim (%20)</span>
-                      <span>-₺{(basePrice * 12 - finalPrice).toLocaleString('tr-TR')}</span>
+                      <span>-{(basePrice * 12 - finalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                   </>
                 )}
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Toplam</span>
-                  <span className="text-primary-500">₺{finalPrice.toLocaleString('tr-TR')}</span>
+                  <span className="text-primary-500">{finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
                 {period === 'yearly' && (
                   <p className="text-xs text-gray-500 text-right">
-                    Ayda ₺{monthlyPrice.toLocaleString('tr-TR')}
+                    Ayda {monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
                 )}
               </div>

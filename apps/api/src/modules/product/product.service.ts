@@ -6,25 +6,30 @@ import {
   ConflictException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { SearchService } from '../search/search.service';
-import { WishlistService } from '../wishlist/wishlist.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductService {
+  private readonly logger = new Logger(ProductService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
-    private readonly wishlistService: WishlistService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
   ) {}
 
@@ -200,17 +205,24 @@ export class ProductService {
           // Ignore any status parameter from query - only active products are visible publicly
           status: ProductStatus.active,
           // Only show products with available stock (quantity > 0 or quantity is null for unlimited)
-          OR: [
-            { quantity: { gt: 0 } },
-            { quantity: null },
+          AND: [
+            {
+              OR: [
+                { quantity: { gt: 0 } },
+                { quantity: null },
+              ],
+            },
           ],
         };
 
         if (search) {
-          where.OR = [
-            { title: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ];
+          const searchCondition = {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+            ],
+          };
+          where.AND = where.AND ? [...(where.AND as any[]), searchCondition] : [searchCondition];
         }
 
         // Brand filter - search in title (since brand is typically in product title)
@@ -447,10 +459,11 @@ export class ProductService {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
-        // IMPORTANT: Only show active products to public
-        // Pending, rejected, sold, inactive products are NOT visible publicly
-        // Sellers can see their own products via /products/my endpoint
-        if (product.status !== ProductStatus.active) {
+        // Allow active and sold products to be viewable
+        // Sold products will show "Out of Stock" on the frontend
+        // Pending, rejected, inactive products are NOT visible publicly
+        const viewableStatuses: ProductStatus[] = [ProductStatus.active, ProductStatus.sold];
+        if (!viewableStatuses.includes(product.status)) {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
@@ -602,7 +615,7 @@ export class ProductService {
           await this.notifyWishlistUsersOfPriceChange(id, oldPrice, newPrice, updated.title);
         } catch (error) {
           // Don't fail the update if notification fails
-          console.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
+          this.logger.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
         }
       }
 
@@ -635,6 +648,7 @@ export class ProductService {
 
   /**
    * Notify users who have this product in their wishlist about price change
+   * Sends both in-app notifications and emails
    */
   private async notifyWishlistUsersOfPriceChange(
     productId: string,
@@ -654,18 +668,10 @@ export class ProductService {
       },
     });
 
-    // Filter users who accept marketing emails
-    // After migration, acceptsMarketingEmails will be available in the select
+    // Filter users who accept marketing emails for email notifications
     const usersToNotify = wishlistItems
       .map((item) => (item as any).wishlist?.user)
-      .filter((user: any) => {
-        if (!user) return false;
-        try {
-          return user.acceptsMarketingEmails === true;
-        } catch {
-          return false; // Field doesn't exist yet, skip
-        }
-      });
+      .filter((user: any) => user !== null && user !== undefined);
 
     if (usersToNotify.length === 0) {
       return;
@@ -676,42 +682,66 @@ export class ProductService {
     const isPriceDrop = priceChange < 0;
     const priceChangePercent = ((priceChange / oldPrice) * 100).toFixed(1);
 
-    // Send email to each user using SmtpProvider (same as invoice system)
+    // Send both in-app notifications and emails to each user
     for (const user of usersToNotify) {
       try {
-        const htmlContent = this.generatePriceChangeEmailHtml(
-          user.displayName,
-          productTitle,
-          oldPrice,
-          newPrice,
-          priceChange,
-          priceChangePercent,
-          isPriceDrop,
-          productId,
-        );
-        const textContent = this.generatePriceChangeEmailText(
-          user.displayName,
-          productTitle,
-          oldPrice,
-          newPrice,
-          priceChange,
-          priceChangePercent,
-          isPriceDrop,
-          productId,
-        );
+        // 1. Send in-app notification (only for price drops)
+        if (isPriceDrop) {
+          await this.notificationService.createInAppNotification(
+            user.id,
+            NotificationType.PRICE_DROP,
+            {
+              productId,
+              productTitle,
+              newPrice,
+            },
+          );
+        }
 
-        await this.smtpProvider.sendEmail({
-          to: user.email,
-          subject: isPriceDrop
-            ? `🎉 Fiyat Düştü: ${productTitle}`
-            : `📈 Fiyat Değişti: ${productTitle}`,
-          html: htmlContent,
-          text: textContent,
-        });
+        // 2. Send email (only for users who accept marketing emails)
+        try {
+          const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
+          if (acceptsMarketingEmails) {
+            const htmlContent = this.generatePriceChangeEmailHtml(
+              user.displayName,
+              productTitle,
+              oldPrice,
+              newPrice,
+              priceChange,
+              priceChangePercent,
+              isPriceDrop,
+              productId,
+            );
+            const textContent = this.generatePriceChangeEmailText(
+              user.displayName,
+              productTitle,
+              oldPrice,
+              newPrice,
+              priceChange,
+              priceChangePercent,
+              isPriceDrop,
+              productId,
+            );
+
+            await this.smtpProvider.sendEmail({
+              to: user.email,
+              subject: isPriceDrop
+                ? `🎉 Fiyat Düştü: ${productTitle}`
+                : `📈 Fiyat Değişti: ${productTitle}`,
+              html: htmlContent,
+              text: textContent,
+            });
+          }
+        } catch (emailError: any) {
+          // Email failure shouldn't stop in-app notification
+          this.logger.warn(`Failed to send price change email for user ${user.id}:`, emailError);
+        }
       } catch (error: any) {
-        console.error(`Failed to send price change email for user ${user.id}:`, error);
+        this.logger.error(`Failed to send price change notification for user ${user.id}:`, error);
       }
     }
+
+    this.logger.log(`Sent price change notifications to ${usersToNotify.length} users for product ${productId}`);
   }
 
   /**
@@ -969,6 +999,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   private async formatProductResponse(product: any) {
     // Get seller's active listings count
     let sellerListingsCount = 0;
+    let sellerRating = null;
+    let sellerTotalRatings = 0;
+    
     if (product.seller?.id) {
       sellerListingsCount = await this.prisma.product.count({
         where: {
@@ -976,6 +1009,18 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           status: ProductStatus.active,
         },
       });
+
+      // Get seller rating stats
+      const sellerRatingStats = await this.prisma.rating.aggregate({
+        where: { receiverId: product.seller.id },
+        _avg: { score: true },
+        _count: true,
+      });
+
+      if (sellerRatingStats._count > 0 && sellerRatingStats._avg?.score) {
+        sellerRating = Number(sellerRatingStats._avg.score.toFixed(1));
+        sellerTotalRatings = sellerRatingStats._count;
+      }
     }
 
     // Get product rating stats
@@ -1013,6 +1058,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
             sellerType: product.seller.sellerType,
             listings_count: sellerListingsCount,
             productsCount: sellerListingsCount,
+            rating: sellerRating,
+            totalRatings: sellerTotalRatings,
           }
         : undefined,
       category: product.category
@@ -1200,7 +1247,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       throw new NotFoundException('Ürün bulunamadı');
     }
 
-    // Skip counting views from product owner
+    // Skip counting views from product owner (kendi ürününü görüntüleme sayılmaz)
     if (userId && product.sellerId === userId) {
       return { viewCount: product.viewCount };
     }
@@ -1210,37 +1257,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       return { viewCount: product.viewCount };
     }
 
-    // IP-based rate limiting for anonymous users
-    if (!userId && clientIp) {
-      const ipViewKey = `view:ip:${clientIp}:${productId}`;
-      const ipViewCount = await this.cache.incr(ipViewKey);
-      
-      // First increment, set TTL for 24 hours
-      if (ipViewCount === 1) {
-        await this.cache.expire(ipViewKey, 86400);
-      }
-      
-      // Max 10 views per day per IP per product for anonymous users
-      if (ipViewCount > 10) {
-        return { viewCount: product.viewCount };
-      }
-    }
-
-    // If user is logged in, check if they've already viewed today
-    if (userId) {
-      const viewKey = `product:view:${productId}:${userId}`;
-      const hasViewed = await this.cache.get(viewKey);
-      
-      if (hasViewed) {
-        // Already viewed today, return current count
-        return { viewCount: product.viewCount };
-      }
-
-      // Mark as viewed for 24 hours
-      await this.cache.set(viewKey, '1', { ttl: 86400 }); // 24 hours
-    }
-
-    // Increment view count
+    // Her görüntülemede sayacı artır
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
       data: { viewCount: { increment: 1 } },
@@ -1248,6 +1265,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { viewCount: updatedProduct.viewCount };
   }

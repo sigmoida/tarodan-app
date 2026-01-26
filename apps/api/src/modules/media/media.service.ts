@@ -210,6 +210,40 @@ export class MediaService {
     return this.minioClient.presignedPutObject(bucket, key, expiry);
   }
 
+  async uploadBuffer(
+    buffer: Buffer,
+    options: {
+      folder?: string;
+      filename?: string;
+      mimeType?: string;
+      bucket?: string;
+    } = {},
+  ): Promise<UploadResult> {
+    const bucket = options.bucket || this.defaultBucket;
+    const folder = options.folder || 'uploads';
+    const filename = options.filename || `${uuidv4()}.jpg`;
+    const mimeType = options.mimeType || 'image/jpeg';
+    const key = `${folder}/${filename}`;
+
+    try {
+      await this.minioClient.putObject(bucket, key, buffer, buffer.length, {
+        'Content-Type': mimeType,
+      });
+
+      const url = this.getPublicUrl(bucket, key);
+      return {
+        url,
+        key,
+        bucket,
+        size: buffer.length,
+        mimeType,
+      };
+    } catch (error) {
+      this.logger.error(`Buffer upload failed: ${error.message}`);
+      throw new BadRequestException('Buffer upload failed');
+    }
+  }
+
   private getPublicUrl(bucket: string, key: string): string {
     const endpoint = this.configService.get<string>('MINIO_PUBLIC_URL') ||
       `http://${this.configService.get<string>('MINIO_ENDPOINT')}:${this.configService.get<number>('MINIO_PORT')}`;

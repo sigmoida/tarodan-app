@@ -150,6 +150,7 @@ export class PushWorker {
   /**
    * Process notification by fetching user's push tokens from database
    * Used by EventService for order notifications
+   * Also stores in-app notification for web/mobile app
    */
   @Process('send-notification')
   async handleSendNotification(job: Job<PushNotificationJobData>) {
@@ -157,6 +158,15 @@ export class PushWorker {
 
     const { userId, title, body, data } = job.data;
 
+    // 1. Always store as in-app notification (for web and mobile app notification centers)
+    try {
+      await this.saveInAppNotification(userId, title, body, data);
+      this.logger.log(`In-app notification stored for user ${userId}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to store in-app notification: ${error.message}`);
+    }
+
+    // 2. Try to send push notification
     try {
       // Fetch user's FCM token from database
       const user = await this.prisma.user.findUnique({
@@ -168,7 +178,7 @@ export class PushWorker {
 
       if (!user) {
         this.logger.warn(`User ${userId} not found`);
-        return { success: false, reason: 'User not found' };
+        return { success: true, inAppStored: true, pushSent: false, reason: 'User not found' };
       }
 
       // Get push token
@@ -176,7 +186,7 @@ export class PushWorker {
       
       if (pushTokens.length === 0) {
         this.logger.warn(`No push tokens for user ${userId}`);
-        return { success: false, reason: 'No push tokens' };
+        return { success: true, inAppStored: true, pushSent: false, reason: 'No push tokens' };
       }
 
       // Determine channel based on notification type
@@ -205,7 +215,7 @@ export class PushWorker {
 
       if (messages.length === 0) {
         this.logger.warn(`No valid Expo push tokens for user ${userId}`);
-        return { success: false, reason: 'No valid Expo tokens' };
+        return { success: true, inAppStored: true, pushSent: false, reason: 'No valid Expo tokens' };
       }
 
       // Send to Expo Push API
@@ -229,13 +239,95 @@ export class PushWorker {
 
       return {
         success: true,
+        inAppStored: true,
+        pushSent: successCount > 0,
         sent: successCount,
         tickets: results,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to process notification: ${error.message}`);
-      throw error;
+      this.logger.error(`Failed to process push notification: ${error.message}`);
+      // Return success because in-app notification was stored
+      return { success: true, inAppStored: true, pushSent: false, error: error.message };
     }
+  }
+
+  /**
+   * Store in-app notification to database
+   */
+  private async saveInAppNotification(
+    userId: string,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ): Promise<void> {
+    const notificationType = data?.type || 'general';
+    
+    // Generate link based on notification type
+    let link: string | undefined;
+    if (data?.orderId) {
+      link = `/orders/${data.orderId}`;
+    } else if (data?.productId) {
+      link = `/listings/${data.productId}`;
+    } else if (data?.tradeId) {
+      link = `/trades/${data.tradeId}`;
+    } else if (data?.threadId) {
+      link = `/messages/${data.threadId}`;
+    } else if (data?.collectionId) {
+      link = `/collections/${data.collectionId}`;
+    }
+
+    // Get icon based on notification type
+    const icon = this.getNotificationIcon(notificationType);
+
+    await this.prisma.notificationLog.create({
+      data: {
+        userId,
+        channel: 'in_app',
+        type: notificationType,
+        title,
+        body,
+        data: {
+          ...data,
+          icon,
+          link,
+        },
+        status: 'sent',
+        sentAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Get icon emoji for notification type
+   */
+  private getNotificationIcon(type: string): string {
+    const icons: Record<string, string> = {
+      order_created: '📦',
+      payment_confirmed: '💳',
+      payment_received: '💰',
+      order_shipped: '🚚',
+      order_delivered: '✅',
+      order_completed: '🎉',
+      offer_received: '💵',
+      offer_accepted: '✅',
+      offer_rejected: '❌',
+      trade_received: '🔄',
+      trade_accepted: '✅',
+      trade_completed: '🎉',
+      new_message: '💬',
+      review_received: '⭐',
+      price_drop: '📉',
+      new_follower: '👤',
+      collection_liked: '❤️',
+      product_approved: '✅',
+      product_sold: '💰',
+      membership_expiring: '⏰',
+      listing_expiring: '⏰',
+      listing_views_milestone: '👀',
+      welcome: '🎉',
+      promotion: '🎁',
+    };
+    return icons[type] || '🔔';
   }
 
   @Process('send-bulk')

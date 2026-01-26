@@ -401,6 +401,17 @@ export class UserController {
   }
 
   /**
+   * GET /users/top-collections
+   * Get top collections from premium users (public)
+   */
+  @Get('top-collections')
+  @Public()
+  async getTopCollections(@Query('limit') limit?: string) {
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.userService.getTopCollections(limitNum);
+  }
+
+  /**
    * GET /users/featured-collector
    * Get featured collector of the week (public)
    */

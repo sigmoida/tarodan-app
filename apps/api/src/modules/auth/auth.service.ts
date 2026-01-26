@@ -453,6 +453,16 @@ export class AuthService {
   }
 
   /**
+   * Find user by email (for resend verification)
+   */
+  async findUserByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, isEmailVerified: true },
+    });
+  }
+
+  /**
    * Get current user profile
    */
   async getProfile(userId: string) {
