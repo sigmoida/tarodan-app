@@ -239,7 +239,7 @@ export default function TradesPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
                               <p className="text-xs text-gray-500">
-                                {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                                {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </div>
@@ -249,7 +249,7 @@ export default function TradesPage() {
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <p className="text-xs text-gray-500">Toplam</p>
                           <p className="text-sm font-semibold text-gray-900">
-                            ₺{myTotal.toLocaleString('tr-TR')}
+                            {myTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </p>
                         </div>
                       )}
@@ -285,7 +285,7 @@ export default function TradesPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
                               <p className="text-xs text-gray-500">
-                                {item.quantity}x • ₺{item.valueAtTrade.toLocaleString('tr-TR')}
+                                {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </div>
@@ -295,7 +295,7 @@ export default function TradesPage() {
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <p className="text-xs text-gray-500">Toplam</p>
                           <p className="text-sm font-semibold text-gray-900">
-                            ₺{theirTotal.toLocaleString('tr-TR')}
+                            {theirTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </p>
                         </div>
                       )}
@@ -310,7 +310,7 @@ export default function TradesPage() {
                   {(trade.cashAmount && trade.cashAmount > 0) && (
                     <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded-lg p-3">
                       <p className="text-sm text-gray-700">
-                        {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">₺{Number(trade.cashAmount).toLocaleString('tr-TR')}</span>
+                        {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                       </p>
                     </div>
                   )}

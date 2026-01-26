@@ -156,7 +156,7 @@ export default function PaymentPage() {
             <div>
               <p className="text-sm text-gray-500">Ödeme Tutarı</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₺{payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                {payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
             <div className="text-right">

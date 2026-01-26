@@ -367,7 +367,7 @@ export default function SellerProfilePage() {
                           {product.title}
                         </h3>
                         <p className="text-primary-500 font-bold mt-1">
-                          ₺{product.price.toLocaleString('tr-TR')}
+                          {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                       </div>
                     </Link>

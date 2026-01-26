@@ -163,7 +163,7 @@ export default function WishlistPage() {
                   </Link>
                   
                   <p className="text-xl font-bold text-primary-500 mb-4">
-                    ₺{item.productPrice.toLocaleString('tr-TR')}
+                    {item.productPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
 
                   <div className="flex gap-2">

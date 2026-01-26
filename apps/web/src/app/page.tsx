@@ -11,9 +11,10 @@ import {
   CheckBadgeIcon,
 } from '@heroicons/react/24/solid';
 import { api, listingsApi, collectionsApi } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
-import { RectangleStackIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
+import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Category {
@@ -147,7 +148,10 @@ export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
-  const [featuredCollector, setFeaturedCollector] = useState<FeaturedCollector | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(false);
+  const [topCollections, setTopCollections] = useState<FeaturedCollector[]>([]);
+  const [currentCollectionIndex, setCurrentCollectionIndex] = useState(0);
   const [companyOfWeek, setCompanyOfWeek] = useState<FeaturedBusiness | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalConfig, setAuthModalConfig] = useState({
@@ -159,63 +163,82 @@ export default function Home() {
 
   useEffect(() => {
     fetchBestSellers();
-    fetchFeaturedCollector();
+    fetchTopCollections();
     fetchCompanyOfWeek();
   }, []);
 
-  const fetchBestSellers = async () => {
+  // Auto-rotate collections every 10 seconds
+  useEffect(() => {
+    if (topCollections.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentCollectionIndex((prev) => (prev + 1) % topCollections.length);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [topCollections.length]);
+
+  const fetchBestSellers = async (page: number = 0) => {
+    setIsLoadingBestSellers(true);
     try {
       const response = await listingsApi.getAll({ 
-        limit: 6,
+        limit: 20,
+        page: page + 1,
         sortBy: 'viewCount',
+        sortOrder: 'desc',
         status: 'active'
       });
       const products = response.data.data || response.data.products || [];
-      setBestSellers(Array.isArray(products) ? products.slice(0, 6) : []);
+      if (page === 0) {
+        setBestSellers(Array.isArray(products) ? products : []);
+      } else {
+        setBestSellers(prev => [...prev, ...(Array.isArray(products) ? products : [])]);
+      }
     } catch (error) {
       console.error('Failed to fetch best sellers:', error);
+    } finally {
+      setIsLoadingBestSellers(false);
     }
   };
 
-  const fetchFeaturedCollector = async () => {
+  const handleNextPage = () => {
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    const itemsPerPage = 5;
+    const currentIndex = nextPage * itemsPerPage;
+    
+    // Load more if we're near the end
+    if (currentIndex + itemsPerPage >= bestSellers.length && !isLoadingBestSellers) {
+      fetchBestSellers(Math.floor(bestSellers.length / 20));
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const fetchTopCollections = async () => {
     try {
-      // Use the new featured-collector API endpoint
-      const response = await api.get('/users/featured-collector');
-      if (response.data) {
-        setFeaturedCollector(response.data);
+      const response = await api.get('/users/top-collections', { params: { limit: 20 } });
+      if (response.data && Array.isArray(response.data)) {
+        setTopCollections(response.data);
       }
     } catch (error) {
-      console.error('Failed to fetch featured collector:', error);
-      // Fallback to old method if new endpoint fails
-      try {
-        const response = await collectionsApi.browse({ isPublic: true, page: 1, pageSize: 1 });
-        const collections = response.data?.collections || response.data?.data || [];
-        if (collections.length > 0) {
-          const collectionId = collections[0].id;
-          const detailResponse = await collectionsApi.getOne(collectionId);
-          const collection = detailResponse.data?.collection || detailResponse.data;
-          // Convert old format to new format
-          if (collection) {
-            setFeaturedCollector({
-              id: collection.id,
-              name: collection.name,
-              description: collection.description,
-              coverImageUrl: collection.coverImageUrl,
-              viewCount: collection.viewCount || 0,
-              likeCount: collection.likeCount || 0,
-              itemCount: collection.itemCount || collection.items?.length || 0,
-              user: {
-                id: collection.userId,
-                displayName: collection.userName || 'Kullanıcı',
-                isVerified: false,
-              },
-              items: collection.items || [],
-            });
-          }
-        }
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-      }
+      console.error('Failed to fetch top collections:', error);
+    }
+  };
+
+  const handleNextCollection = () => {
+    if (topCollections.length > 0) {
+      setCurrentCollectionIndex((prev) => (prev + 1) % topCollections.length);
+    }
+  };
+
+  const handlePrevCollection = () => {
+    if (topCollections.length > 0) {
+      setCurrentCollectionIndex((prev) => (prev - 1 + topCollections.length) % topCollections.length);
     }
   };
 
@@ -251,7 +274,6 @@ export default function Home() {
     
     if (daysSinceCreation < 7) return locale === 'en' ? 'New' : 'Yeni';
     if (product.viewCount && product.viewCount > 1000) return locale === 'en' ? 'Rare' : 'Nadir';
-    if (Math.random() > 0.7) return locale === 'en' ? 'Sale' : 'İndirim';
     return null;
   };
 
@@ -443,13 +465,13 @@ export default function Home() {
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
 
-      {/* Çok Satanlar Section */}
+      {/* Popüler İlanlar Section */}
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
-              <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Best Sellers' : 'Çok Satanlar'}</h2>
+              <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Popular Listings' : 'Popüler İlanlar'}</h2>
             </div>
             <Link 
               href="/listings?sortBy=viewCount"
@@ -459,56 +481,100 @@ export default function Home() {
             </Link>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bestSellers.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-gray-500">
-                {locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
-              </div>
-            ) : (
-              bestSellers.map((product) => {
-                const tag = getProductTag(product);
-                return (
-                  <Link key={product.id} href={`/listings/${product.id}`}>
-                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative aspect-square bg-gray-100">
-                        <Image
-                          src={getImageUrl(product.images?.[0])}
-                          alt={product.title}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                          }}
-                        />
-                        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
-                          <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
-                          <span className="text-xs font-semibold">{product.likeCount || Math.floor(Math.random() * 2000 + 200)}</span>
-                        </div>
-                        {tag && (
-                          <div className="absolute top-3 right-3">
-                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
-                              tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
-                            }`}>
-                              {tag}
-                            </span>
+          {/* Carousel Container */}
+          <div className="relative">
+            {/* Navigation Buttons */}
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 0}
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center transition-all ${
+                currentPage === 0 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'hover:bg-orange-500 hover:text-white text-orange-500'
+              }`}
+              aria-label="Previous"
+            >
+              <ChevronLeftIcon className="w-6 h-6" />
+            </button>
+            
+            <button
+              onClick={handleNextPage}
+              disabled={isLoadingBestSellers || (currentPage + 1) * 5 >= bestSellers.length}
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center transition-all ${
+                (currentPage + 1) * 5 >= bestSellers.length && !isLoadingBestSellers
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'hover:bg-orange-500 hover:text-white text-orange-500'
+              }`}
+              aria-label="Next"
+            >
+              {isLoadingBestSellers ? (
+                <ArrowPathIcon className="w-6 h-6 animate-spin text-orange-500" />
+              ) : (
+                <ChevronRightIcon className="w-6 h-6" />
+              )}
+            </button>
+
+            {/* Products Carousel */}
+            <div className="overflow-hidden px-14">
+              <div 
+                className="flex transition-transform duration-300 ease-in-out gap-6"
+                style={{ 
+                  transform: `translateX(calc(-${currentPage * 20}% - ${currentPage * 1.5}rem))`
+                }}
+              >
+                {bestSellers.length === 0 ? (
+                  <div className="w-full text-center py-8 text-gray-500">
+                    {locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
+                  </div>
+                ) : (
+                  bestSellers.map((product) => {
+                    const tag = getProductTag(product);
+                    return (
+                      <div key={product.id} className="flex-shrink-0 w-[calc(20%-1.5rem)] min-w-[200px]">
+                        <Link href={`/listings/${product.id}`}>
+                          <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                            <div className="relative aspect-square bg-gray-100">
+                              <Image
+                                src={getImageUrl(product.images?.[0])}
+                                alt={product.title}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                                }}
+                              />
+                              <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                                <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
+                                <span className="text-xs font-semibold">{product.likeCount || 0}</span>
+                              </div>
+                              {tag && (
+                                <div className="absolute top-3 right-3">
+                                  <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
+                                    tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                                  }`}>
+                                    {tag}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-4">
+                              <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {extractBrandFromTitle(product.title)} • {extractScaleFromTitle(product.title)}
+                              </p>
+                              <p className="text-lg font-bold text-orange-500">
+                                {formatPrice(product.price)}
+                              </p>
+                            </div>
                           </div>
-                        )}
+                        </Link>
                       </div>
-                      <div className="p-4">
-                        <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                        <p className="text-xs text-gray-500 mb-2">
-                          {extractBrandFromTitle(product.title)} • {extractScaleFromTitle(product.title)}
-                        </p>
-                        <p className="text-lg font-bold text-orange-500">
-                          TRY {product.price.toLocaleString('tr-TR')}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })
-            )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -516,14 +582,14 @@ export default function Home() {
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
 
-      {/* Haftanın Koleksiyoneri Section */}
-      {featuredCollector && (
+      {/* En İyi Koleksiyonlar Section */}
+      {topCollections.length > 0 && (
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-8 bg-orange-500 rounded"></div>
-                <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Collector of the Week' : 'Haftanın Koleksiyoneri'}</h2>
+                <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Top Collections' : 'En İyi Koleksiyonlar'}</h2>
               </div>
               <Link 
                 href="/collections"
@@ -533,100 +599,148 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
-              <div className="grid md:grid-cols-4 gap-6">
-                {/* Collector Profile */}
-                <div className="md:col-span-1">
-                  <div className="flex flex-col items-center md:items-start">
-                    {featuredCollector.user?.avatarUrl ? (
-                      <Image
-                        src={featuredCollector.user.avatarUrl}
-                        alt={featuredCollector.user.displayName}
-                        width={80}
-                        height={80}
-                        className="rounded-full mb-4 object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-4">
-                        {featuredCollector.user?.displayName?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                    )}
-                    <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
-                      {featuredCollector.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
-                      {featuredCollector.user?.isVerified && (
-                        <CheckBadgeIcon className="w-5 h-5 text-green-500" />
-                      )}
-                    </h3>
-                    <p className="text-base text-orange-600 font-medium mb-2">{featuredCollector.name}</p>
-                    <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
-                      {featuredCollector.description || (locale === 'en' ? `${featuredCollector.itemCount || 0} items collection` : `${featuredCollector.itemCount || 0} araçlık koleksiyon`)}
-                    </p>
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="flex items-center gap-1 text-blue-500">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                        </svg>
-                        <span className="font-semibold">{featuredCollector.viewCount?.toLocaleString() || 0}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-red-500">
-                        <HandThumbUpIcon className="w-5 h-5" />
-                        <span className="font-semibold">{featuredCollector.likeCount?.toLocaleString() || 0}</span>
-                      </div>
-                    </div>
-                    <Link
-                      href={`/collections/${featuredCollector.id}`}
-                      className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
-                    >
-                      {locale === 'en' ? 'View Collection' : 'Koleksiyonu incele'} <ArrowRightIcon className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
+            {/* Carousel Container */}
+            <div className="relative">
+              {/* Navigation Buttons */}
+              {topCollections.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevCollection}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center transition-all hover:bg-orange-500 hover:text-white text-orange-500"
+                    aria-label="Previous"
+                  >
+                    <ChevronLeftIcon className="w-6 h-6" />
+                  </button>
+                  
+                  <button
+                    onClick={handleNextCollection}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center transition-all hover:bg-orange-500 hover:text-white text-orange-500"
+                    aria-label="Next"
+                  >
+                    <ChevronRightIcon className="w-6 h-6" />
+                  </button>
+                </>
+              )}
 
-                {/* Featured Products */}
-                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {featuredCollector.items?.slice(0, 3).map((item, index) => (
-                    <Link key={item.id} href={`/listings/${item.productId}`}>
-                      <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="relative aspect-square bg-gray-100">
-                          <Image
-                            src={getImageUrl(item.productImage)}
-                            alt={item.productTitle}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
-                            }}
-                          />
-                          <div className="absolute top-3 right-3">
-                            <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                              {index === 0 ? (locale === 'en' ? 'New' : 'Yeni') : (locale === 'en' ? 'Rare' : 'Nadir')}
-                            </span>
+              {/* Collections Carousel */}
+              <div className="overflow-hidden px-14">
+                <div 
+                  className="flex transition-transform duration-500 ease-in-out gap-6"
+                  style={{ 
+                    transform: `translateX(calc(-${currentCollectionIndex * 100}% - ${currentCollectionIndex * 1.5}rem))`
+                  }}
+                >
+                  {topCollections.map((collection) => (
+                    <div key={collection.id} className="flex-shrink-0 w-full">
+                      <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
+                        <div className="grid md:grid-cols-4 gap-6">
+                          {/* Collector Profile */}
+                          <div className="md:col-span-1">
+                            <div className="flex flex-col items-center md:items-start">
+                              {collection.user?.avatarUrl ? (
+                                <Image
+                                  src={collection.user.avatarUrl}
+                                  alt={collection.user.displayName}
+                                  width={80}
+                                  height={80}
+                                  className="rounded-full mb-4 object-cover"
+                                  unoptimized
+                                />
+                              ) : (
+                                <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-4">
+                                  {collection.user?.displayName?.charAt(0).toUpperCase() || '?'}
+                                </div>
+                              )}
+                              <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
+                                {collection.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
+                                {collection.user?.isVerified && (
+                                  <CheckBadgeIcon className="w-5 h-5 text-green-500" />
+                                )}
+                              </h3>
+                              <p className="text-base text-orange-600 font-medium mb-2">{collection.name}</p>
+                              <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
+                                {collection.description || (locale === 'en' ? `${collection.itemCount || 0} items collection` : `${collection.itemCount || 0} araçlık koleksiyon`)}
+                              </p>
+                              <div className="flex items-center gap-4 mb-4">
+                                <div className="flex items-center gap-1 text-blue-500">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="font-semibold">{collection.viewCount?.toLocaleString() || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-red-500">
+                                  <HandThumbUpIcon className="w-5 h-5" />
+                                  <span className="font-semibold">{collection.likeCount?.toLocaleString() || 0}</span>
+                                </div>
+                              </div>
+                              <Link
+                                href={`/collections/${collection.id}`}
+                                className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+                              >
+                                {locale === 'en' ? 'View Collection' : 'Koleksiyonu incele'} <ArrowRightIcon className="w-4 h-4" />
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Featured Products */}
+                          <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {collection.items?.slice(0, 3).map((item) => (
+                              <Link key={item.id} href={item.productId ? `/listings/${item.productId}` : '#'}>
+                                <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                                  <div className="relative aspect-square bg-gray-100">
+                                    <Image
+                                      src={getImageUrl(item.productImage)}
+                                      alt={item.productTitle}
+                                      fill
+                                      className="object-cover"
+                                      unoptimized
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="p-4">
+                                    <h4 className="font-semibold text-sm mb-1 line-clamp-2">{item.productTitle}</h4>
+                                    {item.productPrice && (
+                                      <p className="text-lg font-bold text-orange-500">
+                                        {formatPrice(item.productPrice)}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </Link>
+                            ))}
                           </div>
                         </div>
-                        <div className="p-4">
-                          <h4 className="font-semibold text-sm mb-1 line-clamp-2">{item.productTitle}</h4>
-                          <p className="text-xs text-gray-500 mb-2">
-                            {extractBrandFromTitle(item.productTitle)} • {extractScaleFromTitle(item.productTitle)}
-                          </p>
-                          <p className="text-lg font-bold text-orange-500">
-                            TRY {item.productPrice.toLocaleString('tr-TR')}
-                          </p>
-                        </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </div>
+
+              {/* Collection Indicators */}
+              {topCollections.length > 1 && (
+                <div className="flex justify-center gap-2 mt-6">
+                  {topCollections.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentCollectionIndex(index)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        index === currentCollectionIndex ? 'bg-orange-500 w-8' : 'bg-gray-300'
+                      }`}
+                      aria-label={`Go to collection ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
       )}
 
       {/* Section Divider - Gradient Line */}
-      {featuredCollector && (
+      {topCollections.length > 0 && (
         <div className="h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-30"></div>
       )}
 

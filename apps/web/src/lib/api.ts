@@ -305,6 +305,15 @@ export const messagesApi = {
 
 // Collections
 export const collectionsApi = {
+  updateCover: (id: string | number, file: File) => {
+    const formData = new FormData();
+    formData.append('cover', file);
+    return api.patch(`/collections/${id}/cover`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   browse: (params?: Record<string, any>) =>
     api.get('/collections/browse', { params }),
   getMyCollections: (params?: Record<string, any>) =>

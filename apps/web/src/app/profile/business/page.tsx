@@ -243,7 +243,7 @@ export default function BusinessDashboardPage() {
             <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-green-400 mb-2">Toplam Gelir</h3>
               <p className="text-4xl font-bold text-white">
-                ₺{stats.overview.totalRevenue.toLocaleString('tr-TR')}
+                {stats.overview.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
 
@@ -409,7 +409,7 @@ function ProductRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{product.title}</p>
-        <p className="text-sm text-orange-400">₺{product.price.toLocaleString('tr-TR')}</p>
+        <p className="text-sm text-orange-400">{product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
       </div>
       <div className="flex items-center gap-4 text-sm">
         <div className={`flex items-center gap-1 ${metric === 'views' ? 'text-blue-400' : 'text-gray-400'}`}>

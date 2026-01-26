@@ -476,7 +476,7 @@ export default function CollectionDetailPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {sortedItems.map((item, index) => (
                 <motion.div
                   key={item.id}
@@ -522,7 +522,7 @@ export default function CollectionDetailPage() {
                           </h3>
                           {item.productPrice !== undefined && (
                             <p className="text-primary-500 font-bold text-xl">
-                              ₺{item.productPrice.toLocaleString('tr-TR')}
+                              {item.productPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                             </p>
                           )}
                         </div>
@@ -680,7 +680,7 @@ export default function CollectionDetailPage() {
                           </div>
                           <div className="flex-1 text-left">
                             <p className="font-medium text-gray-900 line-clamp-1">{product.title}</p>
-                            <p className="text-primary-600 text-sm font-semibold">₺{Number(product.price).toLocaleString('tr-TR')}</p>
+                            <p className="text-primary-600 text-sm font-semibold">{Number(product.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                           </div>
                           <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
                             isSelected

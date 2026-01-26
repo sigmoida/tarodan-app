@@ -6,6 +6,7 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
+import Image from 'next/image';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Collection {
@@ -46,6 +47,9 @@ export default function EditCollectionPage() {
   const [description, setDescription] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [coverImagePreview, setCoverImagePreview] = useState<string>('');
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -89,6 +93,7 @@ export default function EditCollectionPage() {
       setName(data.name || '');
       setDescription(data.description || '');
       setCoverImageUrl(data.coverImageUrl || '');
+      setCoverImagePreview(data.coverImageUrl || '');
       setIsPublic(data.isPublic ?? true);
     } catch (error: any) {
       console.error('Fetch collection error:', error);
@@ -96,6 +101,44 @@ export default function EditCollectionPage() {
       toast.error(t('collection.loadFailed'));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir resim dosyası seçin');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Resim boyutu 10MB\'dan küçük olmalıdır');
+      return;
+    }
+
+    setCoverImageFile(file);
+    const preview = URL.createObjectURL(file);
+    setCoverImagePreview(preview);
+
+    // Upload cover image
+    setIsUploadingCover(true);
+    try {
+      const response = await collectionsApi.updateCover(collection!.id, file);
+      const newCoverUrl = response.data.collection?.coverImageUrl || response.data.coverImageUrl;
+      if (newCoverUrl) {
+        setCoverImageUrl(newCoverUrl);
+        setCoverImagePreview(newCoverUrl);
+        toast.success('Kapak resmi yüklendi');
+      }
+    } catch (error: any) {
+      console.error('Cover image upload error:', error);
+      toast.error(error.response?.data?.message || 'Kapak resmi yüklenemedi');
+      setCoverImageFile(null);
+      setCoverImagePreview(coverImageUrl);
+    } finally {
+      setIsUploadingCover(false);
     }
   };
 
@@ -234,33 +277,37 @@ export default function EditCollectionPage() {
               </p>
             </div>
 
-            {/* Cover Image URL */}
+            {/* Cover Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('collection.coverImageUrl')}
+                Kapak Resmi
               </label>
-              <input
-                type="url"
-                value={coverImageUrl}
-                onChange={(e) => setCoverImageUrl(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder={t('collection.coverImagePlaceholder')}
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                {t('collection.coverImageHelp')}
-              </p>
-              {coverImageUrl && (
-                <div className="mt-3">
-                  <img
-                    src={coverImageUrl}
-                    alt="Kapak önizleme"
-                    className="w-full h-48 object-cover rounded-lg border border-gray-300"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
+              <div className="space-y-3">
+                {coverImagePreview && (
+                  <div className="relative w-full h-48 rounded-xl overflow-hidden border border-gray-300">
+                    <Image
+                      src={coverImagePreview}
+                      alt="Cover preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverImageChange}
+                  disabled={isUploadingCover}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {isUploadingCover && (
+                  <p className="text-sm text-gray-500">Yükleniyor...</p>
+                )}
+                <p className="text-sm text-gray-500">
+                  Kapak resmi yükleyin (maksimum 10MB). Kapak resmi yoksa otomatik olarak ilk 4 ürünün resimlerinden oluşturulacaktır.
+                </p>
+              </div>
             </div>
 
             {/* Public/Private */}

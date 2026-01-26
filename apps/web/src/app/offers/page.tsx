@@ -229,7 +229,7 @@ export default function OffersPage() {
                         {offer.product.title}
                       </Link>
                       <p className="text-gray-400 text-sm mt-1">
-                        İlan Fiyatı: ₺{offer.product.price.toLocaleString('tr-TR')}
+                        İlan Fiyatı: {offer.product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
                     {getStatusBadge(offer.status)}
@@ -239,7 +239,7 @@ export default function OffersPage() {
                     <div className="bg-primary-500/20 px-4 py-2 rounded-lg">
                       <p className="text-xs text-gray-400">Teklif Tutarı</p>
                       <p className="text-xl font-bold text-primary-400">
-                        ₺{offer.amount.toLocaleString('tr-TR')}
+                        {offer.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
 

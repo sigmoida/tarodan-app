@@ -301,7 +301,7 @@ export default function ProfileListingsPage() {
                       {listing.title}
                     </h3>
                     <p className="text-xl font-bold text-primary-500 mb-3">
-                      ₺{Number(listing.price).toLocaleString('tr-TR')}
+                      {Number(listing.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                     </p>
                     
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-3">

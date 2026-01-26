@@ -359,7 +359,7 @@ export default function MembershipManagePage() {
                       <p className="font-medium text-gray-900">Otomatik Yenileme</p>
                       <p className="text-sm text-gray-500">
                         {membership?.autoRenew
-                          ? `Sonraki ödeme: ${membership.nextBillingDate && new Date(membership.nextBillingDate).toLocaleDateString('tr-TR')} - ₺${membership.nextBillingAmount || tierPrices[tier]}`
+                          ? `Sonraki ödeme: ${membership.nextBillingDate && new Date(membership.nextBillingDate).toLocaleDateString('tr-TR')} - ${(membership.nextBillingAmount || tierPrices[tier]).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
                           : 'Kapalı - Dönem sonunda üyeliğiniz sona erecek'}
                       </p>
                     </div>
