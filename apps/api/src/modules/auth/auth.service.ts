@@ -230,6 +230,11 @@ export class AuthService {
         throw new UnauthorizedException('Email veya şifre hatalı');
       }
 
+      // Check if email is verified
+      if (!user.isEmailVerified) {
+        throw new UnauthorizedException('Lütfen önce e-posta adresinizi doğrulayın. Doğrulama linki e-posta adresinize gönderildi.');
+      }
+
       // Generate tokens
       const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
 
@@ -372,6 +377,16 @@ export class AuthService {
     // In a production system with Redis, we would add the token to a blacklist
     // For now, we just return success and client removes the token
     return { message: 'Çıkış yapıldı' };
+  }
+
+  /**
+   * Find user by email (for resend verification)
+   */
+  async findUserByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, isEmailVerified: true },
+    });
   }
 
   /**

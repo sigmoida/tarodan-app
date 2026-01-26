@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -20,23 +20,42 @@ import {
   MapPinIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
+  ClockIcon,
+  XCircleIcon,
+  FireIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
-import { messagesApi } from '@/lib/api';
+import { messagesApi, api } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
+
+const RECENT_SEARCHES_KEY = 'tarodan_recent_searches';
+const MAX_RECENT_SEARCHES = 5;
+
+// Popular search suggestions
+const POPULAR_SEARCHES = {
+  tr: ['Hot Wheels', 'Matchbox', 'Minichamps', '1:18 ölçek', 'Ferrari', 'Porsche'],
+  en: ['Hot Wheels', 'Matchbox', 'Minichamps', '1:18 scale', 'Ferrari', 'Porsche'],
+};
 
 export default function Navbar() {
   const router = useRouter();
   const { t, locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { itemCount: cartCount } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [pendingOffersCount, setPendingOffersCount] = useState(0);
+  const [pendingTradesCount, setPendingTradesCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTradesAuthModal, setShowTradesAuthModal] = useState(false);
 
@@ -54,13 +73,72 @@ export default function Navbar() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchUnreadMessageCount();
-      // Poll for new messages every 30 seconds
-      const interval = setInterval(fetchUnreadMessageCount, 30000);
+      fetchPendingCounts();
+      // Poll for new messages and pending counts every 30 seconds
+      const interval = setInterval(() => {
+        fetchUnreadMessageCount();
+        fetchPendingCounts();
+      }, 30000);
       return () => clearInterval(interval);
     } else {
       setUnreadMessageCount(0);
+      setPendingOffersCount(0);
+      setPendingTradesCount(0);
     }
   }, [isAuthenticated]);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved));
+      } catch {
+        setRecentSearches([]);
+      }
+    }
+  }, []);
+
+  // Handle click outside to close search dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const saveRecentSearch = (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    
+    const updated = [trimmed, ...recentSearches.filter(s => s.toLowerCase() !== trimmed.toLowerCase())].slice(0, MAX_RECENT_SEARCHES);
+    setRecentSearches(updated);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+  };
+
+  const removeRecentSearch = (searchToRemove: string) => {
+    const updated = recentSearches.filter(s => s !== searchToRemove);
+    setRecentSearches(updated);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+  };
+
+  const clearAllRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  };
+
+  const handleSearchSubmit = (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      saveRecentSearch(trimmed);
+      setShowSearchDropdown(false);
+      setSearchQuery('');
+      router.push(`/listings?search=${encodeURIComponent(trimmed)}`);
+    }
+  };
 
   const fetchUnreadMessageCount = async () => {
     try {
@@ -72,6 +150,19 @@ export default function Navbar() {
       setUnreadMessageCount(totalUnread);
     } catch (error) {
       console.error('Failed to fetch unread message count:', error);
+    }
+  };
+
+  const fetchPendingCounts = async () => {
+    try {
+      const [offersRes, tradesRes] = await Promise.all([
+        api.get('/offers/pending-count').catch(() => null),
+        api.get('/trades/pending-count').catch(() => null),
+      ]);
+      setPendingOffersCount(offersRes?.data?.received || 0);
+      setPendingTradesCount(tradesRes?.data?.received || 0);
+    } catch (error) {
+      console.error('Failed to fetch pending counts:', error);
     }
   };
 
@@ -103,25 +194,102 @@ export default function Navbar() {
           </Link>
 
           {/* Search Bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchQuery.trim()) {
-                  router.push(`/listings?search=${encodeURIComponent(searchQuery.trim())}`);
-                }
-              }}
-              className="relative w-full"
-            >
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
-              <input
-                type="text"
-                placeholder={t('nav.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-2.5 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white focus:ring-2 focus:ring-white/30 transition-all placeholder:text-gray-500"
-              />
-            </form>
+          <div className="hidden md:flex flex-1 max-w-xl mx-8" ref={searchContainerRef}>
+            <div className="relative w-full">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSearchSubmit(searchQuery);
+                }}
+                className="relative w-full"
+              >
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder={t('nav.searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowSearchDropdown(true)}
+                  className="w-full pl-12 pr-4 py-3 bg-white border-2 border-transparent rounded-xl focus:outline-none focus:border-orange-300 focus:ring-0 transition-all placeholder:text-gray-400 text-gray-900 shadow-sm"
+                />
+              </form>
+
+              {/* Search Dropdown */}
+              <AnimatePresence>
+                {showSearchDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                  >
+                    {/* Recent Searches */}
+                    {recentSearches.length > 0 && (
+                      <div className="p-3 border-b border-gray-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                            <ClockIcon className="w-3.5 h-3.5" />
+                            {locale === 'en' ? 'Recent Searches' : 'Son Aramalar'}
+                          </span>
+                          <button
+                            onClick={clearAllRecentSearches}
+                            className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                          >
+                            {locale === 'en' ? 'Clear' : 'Temizle'}
+                          </button>
+                        </div>
+                        <div className="space-y-1">
+                          {recentSearches.map((search, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between group"
+                            >
+                              <button
+                                onClick={() => handleSearchSubmit(search)}
+                                className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors text-left"
+                              >
+                                <ClockIcon className="w-4 h-4 text-gray-400" />
+                                {search}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeRecentSearch(search);
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <XCircleIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Popular Searches */}
+                    <div className="p-3">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                        <FireIcon className="w-3.5 h-3.5" />
+                        {locale === 'en' ? 'Popular' : 'Popüler'}
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {POPULAR_SEARCHES[locale as 'tr' | 'en'].map((search, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleSearchSubmit(search)}
+                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 rounded-lg transition-colors"
+                          >
+                            {search}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Nav Links - Desktop */}
@@ -137,6 +305,21 @@ export default function Navbar() {
                   >
                     {link.label}
                   </button>
+                );
+              }
+              // Show badge for trades if there are pending trades
+              if (link.href === '/trades' && pendingTradesCount > 0) {
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1"
+                  >
+                    {link.label}
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                      {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
+                    </span>
+                  </Link>
                 );
               }
               return (
@@ -242,6 +425,25 @@ export default function Navbar() {
                       >
                         <TagIcon className="w-5 h-5" />
                         {t('order.myOrders')}
+                      </Link>
+                      <Link
+                        href="/offers"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <div className="relative">
+                          <CurrencyDollarIcon className="w-5 h-5" />
+                          {pendingOffersCount > 0 && (
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                              {pendingOffersCount > 9 ? '9+' : pendingOffersCount}
+                            </span>
+                          )}
+                        </div>
+                        {t('offer.myOffers')}
+                        {pendingOffersCount > 0 && (
+                          <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full">
+                            {pendingOffersCount}
+                          </span>
+                        )}
                       </Link>
                       <Link
                         href="/wishlist"
@@ -353,25 +555,59 @@ export default function Navbar() {
           >
             <div className="px-4 py-4 space-y-4">
               {/* Mobile Search */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (searchQuery.trim()) {
-                    router.push(`/listings?search=${encodeURIComponent(searchQuery.trim())}`);
-                    setIsOpen(false);
-                  }
-                }}
-                className="relative w-full"
-              >
-                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-300" />
-                <input
-                  type="text"
-                  placeholder={t('nav.searchPlaceholderMobile')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/90 border border-white/50 rounded-xl focus:outline-none focus:border-white placeholder:text-gray-500"
-                />
-              </form>
+              <div className="space-y-3">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      handleSearchSubmit(searchQuery);
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="relative w-full"
+                >
+                  <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={t('nav.searchPlaceholderMobile')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-white border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 placeholder:text-gray-400 text-gray-900"
+                  />
+                </form>
+
+                {/* Mobile Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <div className="bg-white/10 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-white/70 uppercase tracking-wide flex items-center gap-1.5">
+                        <ClockIcon className="w-3.5 h-3.5" />
+                        {locale === 'en' ? 'Recent' : 'Son Aramalar'}
+                      </span>
+                      <button
+                        onClick={clearAllRecentSearches}
+                        className="text-xs text-white/70 hover:text-white font-medium"
+                      >
+                        {locale === 'en' ? 'Clear' : 'Temizle'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recentSearches.slice(0, 3).map((search, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            handleSearchSubmit(search);
+                            setIsOpen(false);
+                          }}
+                          className="px-3 py-1.5 text-sm bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+                        >
+                          {search}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Mobile Nav Links */}
               {NAV_LINKS.map((link) => {
@@ -435,6 +671,18 @@ export default function Navbar() {
                       onClick={() => setIsOpen(false)}
                     >
                       {t('order.myOrders')}
+                    </Link>
+                    <Link
+                      href="/offers"
+                      className="flex items-center gap-2 py-2 text-white hover:text-orange-100 font-medium"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {t('offer.myOffers')}
+                      {pendingOffersCount > 0 && (
+                        <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                          {pendingOffersCount}
+                        </span>
+                      )}
                     </Link>
                     {/* Language Switcher - Mobile */}
                     <div className="py-2">

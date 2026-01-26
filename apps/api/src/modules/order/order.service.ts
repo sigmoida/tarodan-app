@@ -4,12 +4,16 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, Prisma } from '@prisma/client';
 import { EventService } from '../events';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 
 /**
  * Commission calculation result interface
@@ -33,6 +37,8 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
     private readonly cache: CacheService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   // Shipping cost settings
@@ -678,9 +684,63 @@ export class OrderService {
     // Invalidate product cache after successful transaction
     if (productIdForCache) {
       await this.invalidateProductCaches(productIdForCache);
+      
+      // Send notifications about product sold
+      await this.sendProductSoldNotifications(productIdForCache, result.seller?.id);
     }
     
     return result;
+  }
+
+  /**
+   * Send notifications when product is sold
+   */
+  private async sendProductSoldNotifications(productId: string, sellerId?: string): Promise<void> {
+    try {
+      // Get product details
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true, title: true, sellerId: true },
+      });
+      
+      if (!product) return;
+      
+      const actualSellerId = sellerId || product.sellerId;
+      
+      // 1. Notify seller that product was sold
+      if (actualSellerId) {
+        await this.notificationService.createInAppNotification(
+          actualSellerId,
+          NotificationType.ORDER_CREATED,
+          {
+            productId: product.id,
+            productTitle: product.title,
+          },
+        );
+      }
+      
+      // 2. Notify users who have this product in wishlist
+      const wishlistEntries = await this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      });
+      
+      for (const entry of wishlistEntries) {
+        const userId = entry.wishlist.userId;
+        if (userId !== actualSellerId) {
+          await this.notificationService.createInAppNotification(
+            userId,
+            NotificationType.WISHLIST_SOLD,
+            {
+              productId: product.id,
+              productTitle: product.title,
+            },
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send product sold notifications:', error);
+    }
   }
 
   /**

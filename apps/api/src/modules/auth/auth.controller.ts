@@ -144,4 +144,38 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
+
+  /**
+   * POST /auth/verify-email
+   * Verify email with token
+   */
+  @Post('verify-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'E-posta doğrulama' })
+  @ApiResponse({ status: 200, description: 'E-posta başarıyla doğrulandı' })
+  @ApiResponse({ status: 400, description: 'Geçersiz veya süresi dolmuş token' })
+  async verifyEmail(@Body() body: { token: string }) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  /**
+   * POST /auth/resend-verification
+   * Resend email verification link
+   */
+  @Post('resend-verification')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Doğrulama e-postasını tekrar gönder' })
+  @ApiResponse({ status: 200, description: 'Doğrulama e-postası gönderildi' })
+  @ApiResponse({ status: 400, description: 'E-posta zaten doğrulanmış' })
+  async resendVerification(@Body() body: { email: string }) {
+    // Find user by email
+    const user = await this.authService.findUserByEmail(body.email);
+    if (!user) {
+      // Don't reveal if user exists for security
+      return { message: 'Eğer bu email kayıtlıysa, doğrulama linki gönderildi' };
+    }
+    return this.authService.resendEmailVerification(user.id);
+  }
 }

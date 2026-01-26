@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { Prisma } from '@prisma/client';
@@ -16,12 +18,16 @@ import {
   CollectionItemResponseDto,
 } from './dto';
 import { MembershipService } from '../membership/membership.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 
 @Injectable()
 export class CollectionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -751,7 +757,7 @@ export class CollectionService {
         // Try to find by ID first
         collection = await this.prisma.collection.findUnique({
           where: { id: idOrSlug },
-          select: { id: true, likeCount: true, isPublic: true, userId: true },
+          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
         });
         
         // If not found and it's a collection- prefixed ID, try to find by slug (strip prefix)
@@ -759,7 +765,7 @@ export class CollectionService {
           const slug = idOrSlug.replace('collection-', '');
           collection = await this.prisma.collection.findFirst({
             where: { slug },
-            select: { id: true, likeCount: true, isPublic: true, userId: true },
+            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
           });
         }
       } else {
@@ -767,14 +773,14 @@ export class CollectionService {
         // First try to find public collection with this slug
         collection = await this.prisma.collection.findFirst({
           where: { slug: idOrSlug, isPublic: true },
-          select: { id: true, likeCount: true, isPublic: true, userId: true },
+          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
         });
         
         // If not found and user is logged in, try to find user's own collection (even if private)
         if (!collection && userId) {
           collection = await this.prisma.collection.findFirst({
             where: { slug: idOrSlug, userId: userId },
-            select: { id: true, likeCount: true, isPublic: true, userId: true },
+            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
           });
         }
         
@@ -782,7 +788,7 @@ export class CollectionService {
         if (!collection) {
           collection = await this.prisma.collection.findFirst({
             where: { slug: idOrSlug },
-            select: { id: true, likeCount: true, isPublic: true, userId: true },
+            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
           });
         }
         
@@ -894,6 +900,26 @@ export class CollectionService {
         liked = true;
         likeCount = (collection.likeCount || 0) + 1;
         console.log('[likeCollection] Like complete, new count:', likeCount);
+
+        // Send notification to collection owner
+        try {
+          const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { displayName: true },
+          });
+          
+          await this.notificationService.createInAppNotification(
+            collection.userId,
+            NotificationType.COLLECTION_LIKED,
+            {
+              collectionId: collection.id,
+              collectionName: collection.name,
+              userName: user?.displayName || 'Bir kullanıcı',
+            },
+          );
+        } catch (notifError) {
+          console.error('[likeCollection] Failed to send notification:', notifError);
+        }
       }
     } catch (error) {
       console.error('[likeCollection] Error in transaction:', error);

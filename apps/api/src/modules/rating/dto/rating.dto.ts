@@ -71,6 +71,11 @@ export class UserRatingResponseDto {
   score: number;
   comment?: string;
   createdAt: Date;
+  giver?: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
 }
 
 export class ProductRatingResponseDto {

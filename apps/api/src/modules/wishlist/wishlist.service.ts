@@ -2,9 +2,14 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 import { ProductStatus } from '@prisma/client';
 import {
   AddToWishlistDto,
@@ -14,9 +19,13 @@ import {
 
 @Injectable()
 export class WishlistService {
+  private readonly logger = new Logger(WishlistService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -139,6 +148,26 @@ export class WishlistService {
 
     // Invalidate product cache so likeCount updates immediately
     await this.cache.del(`products:detail:${dto.productId}`);
+
+    // Send notification to seller that their product was liked
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true },
+      });
+
+      await this.notificationService.createInAppNotification(
+        product.sellerId,
+        NotificationType.PRODUCT_LIKED,
+        {
+          productId: product.id,
+          productTitle: product.title,
+          userName: user?.displayName || 'Bir kullanıcı',
+        },
+      );
+    } catch (error) {
+      this.logger.error('Failed to send product liked notification:', error);
+    }
 
     return this.mapItemToDto(item);
   }

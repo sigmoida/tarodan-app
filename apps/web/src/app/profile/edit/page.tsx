@@ -4,7 +4,20 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, CameraIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
+import { 
+  ArrowLeftIcon, 
+  CameraIcon, 
+  UserCircleIcon,
+  UserIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+  CalendarIcon,
+  PencilSquareIcon,
+  BuildingOfficeIcon,
+  IdentificationIcon,
+  CheckCircleIcon,
+} from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -16,6 +29,7 @@ export default function EditProfilePage() {
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isBusinessTier = user?.membershipTier === 'business';
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -49,7 +63,6 @@ export default function EditProfilePage() {
         taxId: (user as any).taxId || '',
         taxOffice: (user as any).taxOffice || '',
       });
-      // Set profile photo if exists
       if ((user as any).profilePhotoUrl || (user as any).avatarUrl) {
         setProfilePhoto((user as any).profilePhotoUrl || (user as any).avatarUrl);
       }
@@ -60,13 +73,11 @@ export default function EditProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error(locale === 'en' ? 'Please select an image file' : 'Lütfen bir resim dosyası seçin');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error(locale === 'en' ? 'File size must be less than 5MB' : 'Dosya boyutu 5MB\'dan küçük olmalıdır');
       return;
@@ -83,8 +94,6 @@ export default function EditProfilePage() {
       });
 
       const uploadedUrl = response.data.url || response.data.fileUrl;
-      
-      // Update user profile with new photo URL
       const updateResponse = await api.patch('/users/me', { profilePhotoUrl: uploadedUrl });
       const updatedUser = updateResponse.data.user || updateResponse.data;
       
@@ -106,8 +115,9 @@ export default function EditProfilePage() {
       const response = await api.patch('/users/me', formData);
       const updatedUser = response.data.user || response.data;
       setUser(updatedUser);
-      toast.success(locale === 'en' ? 'Profile updated' : 'Profil güncellendi');
-      router.push('/profile');
+      setSaved(true);
+      toast.success(locale === 'en' ? 'Profile updated successfully!' : 'Profil başarıyla güncellendi!');
+      setTimeout(() => setSaved(false), 3000);
     } catch (error: any) {
       console.error('Profile update error:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update profile' : 'Profil güncellenemedi'));
@@ -121,51 +131,48 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <Link
-          href="/profile"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8"
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-          Profile Dön
-        </Link>
-
-        <div className="bg-gray-800 rounded-xl p-6">
-          <h1 className="text-2xl font-bold mb-6">Profili Düzenle</h1>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <Link
+            href="/profile"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors group"
+          >
+            <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-medium">{locale === 'en' ? 'Back to Profile' : 'Profile Dön'}</span>
+          </Link>
+          
+          <div className="flex items-center gap-6">
             {/* Profile Photo */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative">
-                <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-700 border-4 border-gray-600">
-                  {profilePhoto ? (
-                    <Image
-                      src={profilePhoto}
-                      alt="Profil Fotoğrafı"
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <UserCircleIcon className="w-20 h-20 text-gray-500" />
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  className="absolute bottom-0 right-0 w-10 h-10 bg-primary-500 hover:bg-primary-600 rounded-full flex items-center justify-center transition-colors disabled:opacity-50"
-                >
-                  {uploadingPhoto ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CameraIcon className="w-5 h-5 text-white" />
-                  )}
-                </button>
+            <div className="relative">
+              <div className="w-28 h-28 rounded-2xl overflow-hidden bg-white/20 border-4 border-white/30 shadow-lg">
+                {profilePhoto ? (
+                  <Image
+                    src={profilePhoto}
+                    alt="Profil Fotoğrafı"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <UserCircleIcon className="w-16 h-16 text-white/60" />
+                  </div>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-orange-500 hover:bg-orange-50 rounded-xl shadow-lg flex items-center justify-center transition-all disabled:opacity-50"
+              >
+                {uploadingPhoto ? (
+                  <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <CameraIcon className="w-5 h-5" />
+                )}
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -173,104 +180,164 @@ export default function EditProfilePage() {
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
-              <p className="text-sm text-gray-400 mt-2">
-                Fotoğraf değiştirmek için kamera ikonuna tıklayın
+            </div>
+            
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {locale === 'en' ? 'Edit Profile' : 'Profili Düzenle'}
+              </h1>
+              <p className="text-white/80 mt-1">
+                {locale === 'en' ? 'Update your personal information' : 'Kişisel bilgilerinizi güncelleyin'}
               </p>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Görünen İsim
-              </label>
-              <input
-                type="text"
-                value={formData.displayName}
-                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                required
-              />
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 py-8 -mt-4">
+        <motion.form 
+          onSubmit={handleSubmit}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          {/* Personal Information Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-orange-500" />
+                {locale === 'en' ? 'Personal Information' : 'Kişisel Bilgiler'}
+              </h2>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                E-posta
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
-                disabled
-                title="E-posta adresini değiştirmek için destek ile iletişime geçin"
-              />
-              <p className="text-xs text-gray-400 mt-1">E-posta değişikliği için destek ile iletişime geçin</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            
+            <div className="p-6 space-y-5">
+              {/* Display Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Telefon
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Display Name' : 'Görünen İsim'} <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="+90 555 123 4567"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Doğum Tarihi
-                </label>
-                <input
-                  type="date"
-                  value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Hakkımda
-              </label>
-              <textarea
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                rows={4}
-                placeholder="Kendiniz hakkında kısa bir bilgi..."
-                maxLength={500}
-              />
-            </div>
-
-            {/* Corporate Seller Section */}
-            <div className="border-t border-gray-600 pt-6">
-              {isBusinessTier ? (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold">İşletme Bilgileri</h3>
-                    <span className="px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded">İş Üyeliği</span>
-                  </div>
-                  <p className="text-sm text-gray-400">
-                    İşletme üyeliğiniz için şirket bilgilerinizi doldurmanız gerekmektedir.
-                  </p>
+                <div className="relative">
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.displayName}
+                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    placeholder={locale === 'en' ? 'Your name' : 'Adınız'}
+                    required
+                  />
                 </div>
-              ) : (
-                <div className="flex items-center justify-between mb-4">
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Email Address' : 'E-posta Adresi'}
+                </label>
+                <div className="relative">
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={formData.email}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
+                    disabled
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                  <span>🔒</span>
+                  {locale === 'en' ? 'Contact support to change email' : 'E-posta değişikliği için destek ile iletişime geçin'}
+                </p>
+              </div>
+
+              {/* Phone and Birth Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {locale === 'en' ? 'Phone Number' : 'Telefon Numarası'}
+                  </label>
+                  <div className="relative">
+                    <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                      placeholder="+90 555 123 4567"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {locale === 'en' ? 'Birth Date' : 'Doğum Tarihi'}
+                  </label>
+                  <div className="relative">
+                    <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                      max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'About Me' : 'Hakkımda'}
+                </label>
+                <div className="relative">
+                  <PencilSquareIcon className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                  <textarea
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all resize-none"
+                    rows={4}
+                    placeholder={locale === 'en' ? 'Tell us about yourself and your collection...' : 'Kendiniz ve koleksiyonunuz hakkında bilgi verin...'}
+                    maxLength={500}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1 text-right">{formData.bio.length}/500</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Information Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <BuildingOfficeIcon className="w-5 h-5 text-orange-500" />
+                  {locale === 'en' ? 'Business Information' : 'İşletme Bilgileri'}
+                </h2>
+                {isBusinessTier && (
+                  <span className="px-3 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
+                    {locale === 'en' ? 'Business Tier' : 'İş Üyeliği'}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {!isBusinessTier && (
+                <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-xl">
                   <div>
-                    <h3 className="text-lg font-semibold">Kurumsal Satıcı</h3>
-                    <p className="text-sm text-gray-400">Şirket adına satış yapıyorsanız aktifleştirin</p>
+                    <p className="font-medium text-gray-900">
+                      {locale === 'en' ? 'Corporate Seller' : 'Kurumsal Satıcı'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {locale === 'en' ? 'Enable if you sell on behalf of a company' : 'Şirket adına satış yapıyorsanız aktifleştirin'}
+                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, isCorporateSeller: !formData.isCorporateSeller })}
                     className={`relative w-14 h-8 rounded-full transition-colors ${
-                      formData.isCorporateSeller ? 'bg-primary-500' : 'bg-gray-600'
+                      formData.isCorporateSeller ? 'bg-orange-500' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -283,81 +350,121 @@ export default function EditProfilePage() {
               )}
 
               {(formData.isCorporateSeller || isBusinessTier) && (
-                <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-5"
+                >
+                  {/* Company Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Şirket / Ticari Unvan
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'en' ? 'Company Name' : 'Şirket / Ticari Unvan'}
+                      {isBusinessTier && <span className="text-red-500"> *</span>}
                     </label>
-                    <input
-                      type="text"
-                      value={formData.companyName}
-                      onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="ABC Ltd. Şti."
-                      required={isBusinessTier}
-                    />
+                    <div className="relative">
+                      <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                        placeholder="ABC Ltd. Şti."
+                        required={isBusinessTier}
+                      />
+                    </div>
                     {isBusinessTier && !formData.companyName && (
-                      <p className="text-xs text-orange-400 mt-1">
-                        ⚠️ İşletme panelini kullanmak için şirket adı zorunludur.
+                      <p className="text-xs text-orange-600 mt-1.5 flex items-center gap-1">
+                        ⚠️ {locale === 'en' ? 'Company name is required for business tier' : 'İşletme panelini kullanmak için şirket adı zorunludur'}
                       </p>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Tax Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Vergi Kimlik No
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {locale === 'en' ? 'Tax ID' : 'Vergi Kimlik No'}
                       </label>
-                      <input
-                        type="text"
-                        value={formData.taxId}
-                        onChange={(e) => setFormData({ ...formData, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="1234567890"
-                        maxLength={11}
-                      />
+                      <div className="relative">
+                        <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          value={formData.taxId}
+                          onChange={(e) => setFormData({ ...formData, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                          placeholder="1234567890"
+                          maxLength={11}
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Vergi Dairesi
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {locale === 'en' ? 'Tax Office' : 'Vergi Dairesi'}
                       </label>
                       <input
                         type="text"
                         value={formData.taxOffice}
                         onChange={(e) => setFormData({ ...formData, taxOffice: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                         placeholder="Kadıköy VD"
                       />
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-400">
-                    ℹ️ Kurumsal satıcı bilgileri fatura kesiminde kullanılır. 
-                    Yanlış bilgi girişi yasal sorumluluk doğurabilir.
-                  </p>
-                </div>
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                    <p className="text-sm text-blue-700">
+                      ℹ️ {locale === 'en' 
+                        ? 'Business information is used for invoicing. Incorrect information may result in legal liability.' 
+                        : 'Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi girişi yasal sorumluluk doğurabilir.'}
+                    </p>
+                  </div>
+                </motion.div>
               )}
             </div>
+          </div>
 
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                İptal
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {loading ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...') : (locale === 'en' ? 'Save' : 'Kaydet')}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Action Buttons */}
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex-1 px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+            >
+              {locale === 'en' ? 'Cancel' : 'İptal'}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {locale === 'en' ? 'Saving...' : 'Kaydediliyor...'}
+                </>
+              ) : saved ? (
+                <>
+                  <CheckCircleIcon className="w-5 h-5" />
+                  {locale === 'en' ? 'Saved!' : 'Kaydedildi!'}
+                </>
+              ) : (
+                locale === 'en' ? 'Save Changes' : 'Değişiklikleri Kaydet'
+              )}
+            </button>
+          </div>
+
+          {/* Settings Link */}
+          <div className="text-center pt-4">
+            <Link
+              href="/profile/settings"
+              className="text-sm text-gray-500 hover:text-orange-600 transition-colors"
+            >
+              {locale === 'en' ? 'Looking for account settings?' : 'Hesap ayarlarını mı arıyorsunuz?'}{' '}
+              <span className="underline">{locale === 'en' ? 'Click here' : 'Tıklayın'}</span>
+            </Link>
+          </div>
+        </motion.form>
       </main>
     </div>
   );

@@ -61,6 +61,29 @@ export class OfferController {
   }
 
   /**
+   * GET /offers/pending-count - Get pending offers count for badge
+   */
+  @Get('pending-count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of pending offers (received)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pending offers count',
+    schema: {
+      type: 'object',
+      properties: {
+        received: { type: 'number', description: 'Pending offers received' },
+        sent: { type: 'number', description: 'Pending offers sent' },
+        total: { type: 'number', description: 'Total pending offers' },
+      },
+    },
+  })
+  async getPendingCount(@CurrentUser('id') userId: string) {
+    return this.offerService.getPendingCount(userId);
+  }
+
+  /**
    * GET /offers - Get user's offers
    */
   @Get()

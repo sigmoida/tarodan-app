@@ -6,22 +6,29 @@ import {
   ConflictException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { SearchService } from '../search/search.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductService {
+  private readonly logger = new Logger(ProductService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -436,10 +443,11 @@ export class ProductService {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
-        // IMPORTANT: Only show active products to public
-        // Pending, rejected, sold, inactive products are NOT visible publicly
-        // Sellers can see their own products via /products/my endpoint
-        if (product.status !== ProductStatus.active) {
+        // Allow active and sold products to be viewable
+        // Sold products will show "Out of Stock" on the frontend
+        // Pending, rejected, inactive products are NOT visible publicly
+        const viewableStatuses: ProductStatus[] = [ProductStatus.active, ProductStatus.sold];
+        if (!viewableStatuses.includes(product.status)) {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
@@ -575,6 +583,11 @@ export class ProductService {
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
 
+      // Check if price dropped and notify wishlist users
+      if (dto.price && dto.price < Number(product.price)) {
+        await this.sendPriceDropNotifications(id, updated.title, dto.price);
+      }
+
       // Update Elasticsearch index (only if status is active)
       if (updated.status === ProductStatus.active) {
         try {
@@ -599,6 +612,36 @@ export class ProductService {
         throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
       }
       throw error;
+    }
+  }
+
+  /**
+   * Send price drop notifications to users who have this product in wishlist
+   */
+  private async sendPriceDropNotifications(productId: string, productTitle: string, newPrice: number): Promise<void> {
+    try {
+      // Get all wishlist entries for this product with user info
+      const wishlistEntries = await this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      });
+
+      // Send notification to each user
+      for (const entry of wishlistEntries) {
+        await this.notificationService.createInAppNotification(
+          entry.wishlist.userId,
+          NotificationType.PRICE_DROP,
+          {
+            productId,
+            productTitle,
+            newPrice,
+          },
+        );
+      }
+
+      this.logger.log(`Sent price drop notifications to ${wishlistEntries.length} users for product ${productId}`);
+    } catch (error) {
+      this.logger.error('Failed to send price drop notifications:', error);
     }
   }
 
@@ -754,6 +797,9 @@ export class ProductService {
   private async formatProductResponse(product: any) {
     // Get seller's active listings count
     let sellerListingsCount = 0;
+    let sellerRating = null;
+    let sellerTotalRatings = 0;
+    
     if (product.seller?.id) {
       sellerListingsCount = await this.prisma.product.count({
         where: {
@@ -761,6 +807,18 @@ export class ProductService {
           status: ProductStatus.active,
         },
       });
+
+      // Get seller rating stats
+      const sellerRatingStats = await this.prisma.rating.aggregate({
+        where: { receiverId: product.seller.id },
+        _avg: { score: true },
+        _count: true,
+      });
+
+      if (sellerRatingStats._count > 0 && sellerRatingStats._avg?.score) {
+        sellerRating = Number(sellerRatingStats._avg.score.toFixed(1));
+        sellerTotalRatings = sellerRatingStats._count;
+      }
     }
 
     // Get product rating stats
@@ -797,6 +855,8 @@ export class ProductService {
             sellerType: product.seller.sellerType,
             listings_count: sellerListingsCount,
             productsCount: sellerListingsCount,
+            rating: sellerRating,
+            totalRatings: sellerTotalRatings,
           }
         : undefined,
       category: product.category
@@ -984,7 +1044,7 @@ export class ProductService {
       throw new NotFoundException('Ürün bulunamadı');
     }
 
-    // Skip counting views from product owner
+    // Skip counting views from product owner (kendi ürününü görüntüleme sayılmaz)
     if (userId && product.sellerId === userId) {
       return { viewCount: product.viewCount };
     }
@@ -994,37 +1054,7 @@ export class ProductService {
       return { viewCount: product.viewCount };
     }
 
-    // IP-based rate limiting for anonymous users
-    if (!userId && clientIp) {
-      const ipViewKey = `view:ip:${clientIp}:${productId}`;
-      const ipViewCount = await this.cache.incr(ipViewKey);
-      
-      // First increment, set TTL for 24 hours
-      if (ipViewCount === 1) {
-        await this.cache.expire(ipViewKey, 86400);
-      }
-      
-      // Max 10 views per day per IP per product for anonymous users
-      if (ipViewCount > 10) {
-        return { viewCount: product.viewCount };
-      }
-    }
-
-    // If user is logged in, check if they've already viewed today
-    if (userId) {
-      const viewKey = `product:view:${productId}:${userId}`;
-      const hasViewed = await this.cache.get(viewKey);
-      
-      if (hasViewed) {
-        // Already viewed today, return current count
-        return { viewCount: product.viewCount };
-      }
-
-      // Mark as viewed for 24 hours
-      await this.cache.set(viewKey, '1', { ttl: 86400 }); // 24 hours
-    }
-
-    // Increment view count
+    // Her görüntülemede sayacı artır
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
       data: { viewCount: { increment: 1 } },
@@ -1032,6 +1062,7 @@ export class ProductService {
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { viewCount: updatedProduct.viewCount };
   }

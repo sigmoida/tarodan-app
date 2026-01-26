@@ -29,6 +29,7 @@
     "noResults": "No results found",
     "required": "Required field",
     "optional": "Optional",
+    "user": "User",
     "freeStart": "Start Free",
     "continue": "Continue",
     "sending": "Sending...",
@@ -214,6 +215,10 @@
     "productReservedDesc": "Another buyer is in the process of purchasing.",
     "productSold": "This product has been sold",
     "productSoldDesc": "This product is no longer for sale.",
+    "sold": "Sold",
+    "soldOut": "Out of Stock",
+    "productNoLongerAvailable": "This product is no longer available for purchase.",
+    "reserved": "Reserved",
     "productPending": "This product is pending approval",
     "productInactive": "This product is inactive",
     "productRejected": "This product has been rejected",
@@ -702,6 +707,8 @@
     "communication": "Communication",
     "shippingSpeed": "Shipping Speed",
     "packaging": "Packaging",
+    "sellerComment": "Comment About Seller (Optional)",
+    "sellerCommentPlaceholder": "Share your experience with this seller...",
     "submit": "Submit Review"
   },
   "footer": {

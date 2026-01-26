@@ -8,6 +8,7 @@ import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { api } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationBanner, setShowVerificationBanner] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -46,9 +49,32 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error('[Login] Login error:', error);
       const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
+      
+      // Check if error is about unverified email
+      if (message.includes('doğrulayın') || message.includes('verify')) {
+        setShowVerificationBanner(true);
+      }
+      
       toast.error(message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim()) {
+      toast.error(locale === 'en' ? 'Please enter your email first' : 'Lütfen önce e-postanızı girin');
+      return;
+    }
+    
+    setIsResending(true);
+    try {
+      await api.post('/auth/resend-verification', { email });
+      toast.success(locale === 'en' ? 'Verification email sent!' : 'Doğrulama e-postası gönderildi!');
+    } catch (error) {
+      toast.error(locale === 'en' ? 'Could not send email' : 'E-posta gönderilemedi');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -77,6 +103,31 @@ export default function LoginPage() {
               {locale === 'en' ? 'Sign in to your account' : 'Hesabınıza giriş yapın'}
             </p>
           </div>
+
+          {/* Email verification banner */}
+          {showVerificationBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6"
+            >
+              <p className="text-sm text-amber-800 mb-3">
+                ⚠️ {locale === 'en' 
+                  ? 'Your email is not verified yet. Please check your inbox for the verification link.' 
+                  : 'E-postanız henüz doğrulanmadı. Lütfen gelen kutunuzdaki doğrulama linkine tıklayın.'}
+              </p>
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={isResending}
+                className="text-sm font-semibold text-amber-700 hover:text-amber-800 underline disabled:opacity-50"
+              >
+                {isResending 
+                  ? (locale === 'en' ? 'Sending...' : 'Gönderiliyor...') 
+                  : (locale === 'en' ? 'Resend verification email' : 'Doğrulama e-postasını tekrar gönder')}
+              </button>
+            </motion.div>
+          )}
 
           <form
             onSubmit={(e) => {

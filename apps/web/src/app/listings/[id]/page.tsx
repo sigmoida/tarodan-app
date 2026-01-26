@@ -195,23 +195,27 @@ export default function ListingDetailPage() {
     try {
       const response = await listingsApi.getOne(id);
       const productData = response.data.product || response.data;
-      setListing(productData);
       
       // Increment view count ONLY ONCE per page load
       // Use ref to prevent double counting when auth state changes
       if (!viewCountedRef.current) {
         viewCountedRef.current = true;
         try {
+          console.log('[ViewCount] Attempting to increment view for product:', id);
           const viewResponse = await api.post(`/products/${id}/view`);
+          console.log('[ViewCount] API Response:', viewResponse.data);
+          
           if (viewResponse.data?.viewCount !== undefined) {
-            // Update the listing with the new view count
-            setListing((prev: any) => prev ? { ...prev, viewCount: viewResponse.data.viewCount } : prev);
+            // Update the product data with the new view count before setting state
+            productData.viewCount = viewResponse.data.viewCount;
+            console.log('[ViewCount] Updated viewCount to:', viewResponse.data.viewCount);
           }
-        } catch (viewError) {
-          // Silent fail - view tracking is not critical
-          console.debug('View tracking skipped or failed');
+        } catch (viewError: any) {
+          console.error('[ViewCount] Failed to increment view:', viewError?.response?.data || viewError?.message || viewError);
         }
       }
+      
+      setListing(productData);
     } catch (error) {
       console.error('Failed to fetch listing:', error);
     } finally {
@@ -946,10 +950,32 @@ export default function ListingDetailPage() {
 
           {/* Details */}
           <div>
+            {/* Sold/Out of Stock Banner */}
+            {listing.status === 'sold' && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-red-800">{t('product.soldOut')}</p>
+                  <p className="text-sm text-red-600">{t('product.productNoLongerAvailable')}</p>
+                </div>
+              </div>
+            )}
+            
             <div className="flex items-start justify-between gap-4 mb-4">
-              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-                {listing.title}
-              </h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                  {listing.title}
+                </h1>
+                {listing.status === 'sold' && (
+                  <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded-full">
+                    {t('product.sold')}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleToggleFavorite}
@@ -1153,10 +1179,22 @@ export default function ListingDetailPage() {
                       </button>
                     )}
                     <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
-                        {listing.seller.rating?.toFixed(1) || '0.0'}
-                      </div>
+                      {listing.seller.rating && listing.seller.rating > 0 ? (
+                        <div className="flex items-center">
+                          <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
+                          {listing.seller.rating.toFixed(1)}
+                          {listing.seller.totalRatings > 0 && (
+                            <span className="ml-1 text-gray-400">
+                              ({listing.seller.totalRatings})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-gray-400">
+                          <StarIcon className="w-4 h-4 mr-1" />
+                          <span>{locale === 'en' ? 'No ratings yet' : 'Henüz değerlendirme yok'}</span>
+                        </div>
+                      )}
                       <span>•</span>
                       <span>
                         {listing.seller.listings_count || listing.seller.productsCount || 0} {t('product.listings')}
@@ -1432,13 +1470,15 @@ export default function ListingDetailPage() {
                   <div className="flex items-start gap-4">
                     <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-orange-600 font-semibold">
-                        {review.user?.displayName?.[0]?.toUpperCase() || '?'}
+                        {(review.userName || review.user?.displayName)?.[0]?.toUpperCase() || '?'}
                       </span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">
-                          {review.user?.displayName || (locale === 'en' ? 'Anonymous' : 'Anonim')}
+                          {review.isAnonymous || (!review.userName && !review.user?.displayName) 
+                            ? (locale === 'en' ? 'Anonymous' : 'Anonim') 
+                            : (review.userName || review.user?.displayName)}
                         </span>
                         <div className="flex">
                           {[1, 2, 3, 4, 5].map((star) => (
@@ -1461,8 +1501,8 @@ export default function ListingDetailPage() {
                           {review.title}
                         </h4>
                       )}
-                      {review.comment && (
-                        <p className="text-gray-700">{review.comment}</p>
+                      {(review.review || review.comment) && (
+                        <p className="text-gray-700">{review.review || review.comment}</p>
                       )}
                     </div>
                   </div>

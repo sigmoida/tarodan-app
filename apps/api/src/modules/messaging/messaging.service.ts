@@ -4,9 +4,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { ContentFilterService } from './content-filter.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 import { MessageStatus, Prisma } from '@prisma/client';
 import {
   CreateThreadDto,
@@ -31,6 +35,8 @@ export class MessagingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentFilterService: ContentFilterService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -180,6 +186,28 @@ export class MessagingService {
       where: { id: threadId },
       data: { lastMessageAt: new Date() },
     });
+
+    // Send notification to receiver about new message
+    if (status === MessageStatus.sent) {
+      try {
+        // Get short preview of message (first 50 chars)
+        const messagePreview = dto.content.length > 50
+          ? dto.content.substring(0, 50) + '...'
+          : dto.content;
+
+        await this.notificationService.createInAppNotification(
+          receiverId,
+          NotificationType.NEW_MESSAGE,
+          {
+            threadId,
+            senderName: message.sender?.displayName || 'Bir kullanıcı',
+            messagePreview,
+          },
+        );
+      } catch (error) {
+        this.logger.error('Failed to send message notification:', error);
+      }
+    }
 
     return this.mapMessageToDto(message);
   }
