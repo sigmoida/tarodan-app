@@ -540,7 +540,6 @@ export default function SellerProfilePage() {
                               </span>
                             )}
                           </div>
-<<<<<<< HEAD
                         </div>
                       </Link>
                     </motion.div>

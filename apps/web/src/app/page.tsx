@@ -292,7 +292,8 @@ export default function Home() {
   };
 
   const extractScaleFromTitle = (title: string): string => {
-    const scaleMatch = title.match(/\d+:\d+/);
+    const scalePattern = /\d+:\d+/;
+    const scaleMatch = title.match(scalePattern);
     if (scaleMatch) return scaleMatch[0];
     return '1:18';
   };
@@ -485,7 +486,6 @@ export default function Home() {
             </Link>
           </div>
           
-<<<<<<< HEAD
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
