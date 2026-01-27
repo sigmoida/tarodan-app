@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
 import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
 
 interface Category {
   id: string;
@@ -164,6 +165,7 @@ export default function Home() {
     icon: null as React.ReactNode | null,
     redirectPath: undefined as string | undefined,
   });
+  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-3');
 
   useEffect(() => {
     fetchBestSellers();
@@ -478,19 +480,99 @@ export default function Home() {
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
               <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Popular Listings' : 'Popüler İlanlar'}</h2>
             </div>
-            <Link 
-              href="/listings?sortBy=viewCount"
-              className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
-            >
-              {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-4">
+              <ProductLayoutSelector
+                layout={productLayout}
+                onLayoutChange={setProductLayout}
+                storageKey="homepage-product-layout"
+              />
+              <Link 
+                href="/listings?sortBy=viewCount"
+                className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
+              >
+                {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={
+            productLayout === 'grid-3'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+              : productLayout === 'grid-4'
+              ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'
+              : 'space-y-4'
+          }>
             {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
                 {locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
               </div>
+            ) : productLayout === 'list' ? (
+              bestSellers.map((product) => {
+                const tag = getProductTag(product);
+                return (
+                  <Link key={product.id} href={`/listings/${product.id}`}>
+                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all border border-gray-100 flex gap-4 p-4">
+                      <div className="relative w-32 h-32 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={getImageUrl(product.images?.[0])}
+                          alt={product.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                          }}
+                        />
+                        {tag && (
+                          <div className="absolute top-2 right-2">
+                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
+                              tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                            }`}>
+                              {tag}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between min-w-0">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-primary-500 transition-colors">
+                            {product.title}
+                          </h3>
+                          <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                            {(product.viewCount !== undefined && product.viewCount > 0) && (
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <span>{product.viewCount}</span>
+                              </div>
+                            )}
+                            {(product.likeCount !== undefined && product.likeCount > 0) && (
+                              <div className="flex items-center gap-1">
+                                <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
+                                <span>{product.likeCount}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-primary-500 font-bold text-lg">
+                            {formatPrice(product.price)}
+                          </p>
+                          {product.rating && product.rating.average !== null && product.rating.count > 0 && (
+                            <div className="flex items-center gap-1">
+                              <StarIcon className="w-4 h-4 text-yellow-400" />
+                              <span className="text-sm font-semibold">{product.rating.average.toFixed(1)}</span>
+                              <span className="text-xs text-gray-500">({product.rating.count})</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
               bestSellers.map((product) => {
                 const tag = getProductTag(product);

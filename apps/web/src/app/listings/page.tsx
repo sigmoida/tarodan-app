@@ -17,6 +17,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, searchApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
+import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
 
 interface Listing {
   id: string | number;
@@ -59,6 +60,7 @@ export default function ListingsPage() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [showFilters, setShowFilters] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const recentSearchesRef = useRef<HTMLDivElement>(null);
   
@@ -370,6 +372,13 @@ export default function ListingsPage() {
               )}
             </form>
 
+            {/* Layout Selector */}
+            <ProductLayoutSelector
+              layout={productLayout}
+              onLayoutChange={setProductLayout}
+              storageKey="listings-product-layout"
+            />
+
             {/* Sort Dropdown */}
             <select
               value={filters.sortBy}
@@ -497,11 +506,17 @@ export default function ListingsPage() {
       {/* Listings Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+          <div className={
+            productLayout === 'grid-3'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+              : productLayout === 'grid-4'
+              ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'
+              : 'space-y-4'
+          }>
             {[...Array(12)].map((_, i) => (
-              <div key={i} className="card animate-pulse">
-                <div className="aspect-square bg-gray-200" />
-                <div className="p-4 space-y-2">
+              <div key={i} className={productLayout === 'list' ? 'card animate-pulse flex gap-4' : 'card animate-pulse'}>
+                <div className={productLayout === 'list' ? 'w-32 h-32 bg-gray-200 rounded-lg flex-shrink-0' : 'aspect-square bg-gray-200'} />
+                <div className={productLayout === 'list' ? 'flex-1 space-y-2' : 'p-4 space-y-2'}>
                   <div className="h-4 bg-gray-200 rounded w-3/4" />
                   <div className="h-3 bg-gray-200 rounded w-1/2" />
                   <div className="h-5 bg-gray-200 rounded w-1/3" />
@@ -513,8 +528,74 @@ export default function ListingsPage() {
           <div className="text-center py-16">
             <p className="text-gray-500 text-lg">{t('product.noListings')}</p>
           </div>
+        ) : productLayout === 'list' ? (
+          <div className="space-y-3">
+            {listings.map((listing, index) => (
+              <motion.div
+                key={listing.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Link href={`/listings/${listing.id}`}>
+                  <div className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-md transition-all flex gap-4 p-4">
+                    <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                      <Image
+                        src={getImageUrl(listing.images?.[0])}
+                        alt={listing.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                        }}
+                      />
+                      {(listing.trade_available || listing.isTradeEnabled) && (
+                        <div className="absolute top-1 right-1 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <ArrowsRightLeftIcon className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">
+                          {listing.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-1">
+                          {listing.brand} • {listing.scale}
+                        </p>
+                        {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
+                          <div className="flex items-center gap-1">
+                            <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" />
+                            <span className="text-xs font-semibold text-gray-900">
+                              {listing.rating.average.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({listing.rating.count})
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 ml-4">
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                          {listing.condition}
+                        </span>
+                        <p className="text-lg font-bold text-primary-500 whitespace-nowrap">
+                          {listing.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+          <div className={
+            productLayout === 'grid-3'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+              : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6'
+          }>
             {listings.map((listing, index) => (
               <motion.div
                 key={listing.id}
