@@ -1,0 +1,10 @@
+# Railway Configuration for API Service
+# This file helps Railway understand the monorepo structure
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "pnpm install --frozen-lockfile && pnpm prisma generate && pnpm build"
+
+[deploy]
+startCommand = "pnpm start:prod"
+watchPatterns = ["apps/api/**"]

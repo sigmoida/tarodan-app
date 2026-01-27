@@ -1371,6 +1371,32 @@ export class OrderService {
       },
     });
 
+    // Mark product as sold when order is completed
+    if (order.productId) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+      });
+
+      if (product && product.status !== ProductStatus.sold) {
+        // Update product status to SOLD
+        // If stock is 0, set product to inactive instead
+        const updateData: any = { 
+          status: product.quantity !== null && product.quantity === 0 
+            ? ProductStatus.inactive 
+            : ProductStatus.sold 
+        };
+
+        await this.prisma.product.update({
+          where: { id: order.productId },
+          data: updateData,
+        });
+
+        // Invalidate cache
+        await this.cache.del(`products:detail:${order.productId}`);
+        await this.cache.delPattern('products:list:*');
+      }
+    }
+
     // Note: This will trigger seller payout release in PaymentModule
 
     return this.formatOrderResponse(updatedOrder, buyerId);

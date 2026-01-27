@@ -1061,6 +1061,9 @@ export class AdminService {
   async updateOrderStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: {
+        product: true,
+      },
     });
 
     if (!order) {
@@ -1071,6 +1074,32 @@ export class AdminService {
     const validStatuses = Object.values(OrderStatus);
     if (!validStatuses.includes(dto.status as OrderStatus)) {
       throw new BadRequestException('Geçersiz sipariş durumu');
+    }
+
+    // If order is being marked as completed, mark product as sold
+    if (dto.status === OrderStatus.completed && order.productId) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+      });
+
+      if (product && product.status !== ProductStatus.sold) {
+        // Update product status to SOLD
+        // If stock is 0, set product to inactive instead
+        const updateData: any = { 
+          status: product.quantity !== null && product.quantity === 0 
+            ? ProductStatus.inactive 
+            : ProductStatus.sold 
+        };
+
+        await this.prisma.product.update({
+          where: { id: order.productId },
+          data: updateData,
+        });
+
+        // Invalidate cache
+        await this.cache.del(`products:detail:${order.productId}`);
+        await this.cache.delPattern('products:list:*');
+      }
     }
 
     const updated = await this.prisma.order.update({
