@@ -22,6 +22,10 @@ function getCacheHeaders() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Heroicons: Sadece kullandığımız ikonlar (ok, menü, çöp kutusu vb.) bundle'a girer; kullanılmayanlar kesilir, JS küçülür.
+  experimental: {
+    optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
+  },
   async headers() {
     return getCacheHeaders();
   },
