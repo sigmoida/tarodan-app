@@ -93,7 +93,7 @@ export default function OrderDetailPage() {
     } catch (error: any) {
       console.error('Order load error:', error);
       toast.error(error.response?.data?.message || 'Sipariş yüklenemedi');
-      router.push('/admin/orders');
+      router.push('/orders');
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ export default function OrderDetailPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              href="/admin/orders"
+              href="/orders"
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
@@ -258,7 +258,7 @@ export default function OrderDetailPage() {
                       <span className="uppercase">{order.payment.provider}</span>
                     </div>
                     <Link
-                      href={`/admin/payments/${order.payment.id}`}
+                      href={`/payments/${order.payment.id}`}
                       className="block mt-3 text-primary-600 hover:text-primary-700 text-sm"
                     >
                       Ödeme Detayını Görüntüle →
@@ -340,7 +340,7 @@ export default function OrderDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Alıcı</h3>
                 <div className="space-y-2">
                   <Link
-                    href={`/admin/users/${order.buyer.id}`}
+                    href={`/users/${order.buyer.id}`}
                     className="text-primary-600 hover:text-primary-700 font-medium block"
                   >
                     {order.buyer.displayName}
@@ -357,7 +357,7 @@ export default function OrderDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Satıcı</h3>
                 <div className="space-y-2">
                   <Link
-                    href={`/admin/users/${order.seller.id}`}
+                    href={`/users/${order.seller.id}`}
                     className="text-primary-600 hover:text-primary-700 font-medium block"
                   >
                     {order.seller.displayName}

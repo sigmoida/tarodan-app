@@ -94,7 +94,7 @@ export default function AdminPaymentStatisticsPage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
-            href="/admin/payments"
+            href="/payments"
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <ArrowLeftIcon className="w-6 h-6 text-gray-600" />

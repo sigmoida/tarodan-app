@@ -50,6 +50,18 @@ interface AnalyticsData {
 
 type DateRange = '7d' | '30d' | '90d' | '1y';
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending_payment: 'Ödeme Bekliyor',
+  paid: 'Ödendi',
+  preparing: 'Hazırlanıyor',
+  shipped: 'Kargoda',
+  delivered: 'Teslim Edildi',
+  completed: 'Tamamlandı',
+  cancelled: 'İptal',
+  refund_requested: 'İade Talebi',
+  refunded: 'İade Edildi',
+};
+
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
@@ -88,59 +100,125 @@ export default function AnalyticsPage() {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const params = getDateRangeParams();
-      
-      const [salesRes, userRes, productRes, tradeRes] = await Promise.all([
-        adminApi.getSalesReport(params),
-        adminApi.getUserReport(params),
-        adminApi.getProductReport(params),
-        adminApi.getTradeReport(params),
+      const params = { ...getDateRangeParams(), groupBy: 'day' as const };
+
+      const [salesRes, revenueRes, userRes, productRes, tradeRes] = await Promise.all([
+        adminApi.getSalesAnalytics(params).catch((e) => {
+          console.error('Sales analytics error:', e);
+          return { data: null };
+        }),
+        adminApi.getRevenueAnalytics(params).catch(() => ({ data: null })),
+        adminApi.getUserAnalytics(params).catch((e) => {
+          console.error('User analytics error:', e);
+          return { data: null };
+        }),
+        adminApi.getProductReport(params).catch(() => ({ data: null })),
+        adminApi.getTradeReport(params).catch(() => ({ data: null })),
       ]);
 
+      const salesData = salesRes?.data?.data ?? salesRes?.data;
+      const salesSummary = salesRes?.data?.summary ?? {};
+      const revenueSummary = revenueRes?.data?.summary ?? {};
+      const userData = userRes?.data?.data ?? userRes?.data;
+      const userSummary = userRes?.data?.summary ?? {};
+
+      const dailyArray = Array.isArray(salesData) ? salesData : salesData?.data ?? [];
+      const dailyData = dailyArray.map((d: any) => ({
+        date: typeof d.date === 'string' ? d.date : d.date?.slice(0, 10),
+        orders: Number(d.orderCount ?? d.orders ?? 0),
+        revenue: Number(d.totalSales ?? d.revenue ?? 0),
+      }));
+
+      const userGrowthArray = Array.isArray(userData) ? userData : userData?.data ?? [];
+      const userGrowth = userGrowthArray.map((d: any) => ({
+        month: typeof d.date === 'string' ? d.date.slice(5) : d.date?.slice(0, 7) ?? '',
+        users: Number(d.newUsers ?? d.users ?? 0),
+      }));
+
       setData({
-        salesReport: salesRes.data,
-        userReport: userRes.data,
-        productReport: productRes.data,
-        tradeReport: tradeRes.data,
+        salesReport: {
+          totalOrders: salesSummary.totalOrders ?? 0,
+          totalRevenue: salesSummary.totalSales ?? 0,
+          totalCommission: revenueSummary.totalCommission ?? 0,
+          averageOrderValue: salesSummary.averageOrderValue ?? 0,
+          ordersByStatus: salesSummary.ordersByStatus ?? {},
+          dailyData: dailyData.length > 0 ? dailyData : generateMockDailyData(),
+        },
+        userReport: {
+          totalUsers: userSummary.totalUsers ?? 0,
+          newUsers: userSummary.totalNewUsers ?? 0,
+          activeUsers: userSummary.averageDailyActiveUsers ?? 0,
+          sellerCount: userSummary.totalNewSellers ?? 0,
+          userGrowth: userGrowth.length > 0 ? userGrowth : generateMockGrowthData(),
+        },
+        productReport: productRes?.data ? normalizeProductReport(productRes.data) : {
+          totalProducts: 0,
+          activeProducts: 0,
+          pendingProducts: 0,
+          averagePrice: 0,
+          categoryDistribution: generateMockCategoryData(),
+        },
+        tradeReport: tradeRes?.data ? normalizeTradeReport(tradeRes.data) : {
+          totalTrades: 0,
+          completedTrades: 0,
+          pendingTrades: 0,
+          disputedTrades: 0,
+          averageTradeValue: 0,
+        },
       });
     } catch (error) {
       console.error('Failed to load analytics:', error);
-      // Use mock data for display
       setData({
         salesReport: {
-          totalOrders: 1234,
-          totalRevenue: 456789,
-          totalCommission: 22839,
-          averageOrderValue: 370.25,
-          ordersByStatus: { completed: 890, pending: 120, cancelled: 45, refunded: 15 },
+          totalOrders: 0,
+          totalRevenue: 0,
+          totalCommission: 0,
+          averageOrderValue: 0,
+          ordersByStatus: {},
           dailyData: generateMockDailyData(),
         },
         userReport: {
-          totalUsers: 5678,
-          newUsers: 234,
-          activeUsers: 1890,
-          sellerCount: 456,
+          totalUsers: 0,
+          newUsers: 0,
+          activeUsers: 0,
+          sellerCount: 0,
           userGrowth: generateMockGrowthData(),
         },
         productReport: {
-          totalProducts: 8765,
-          activeProducts: 6543,
-          pendingProducts: 123,
-          averagePrice: 185.50,
+          totalProducts: 0,
+          activeProducts: 0,
+          pendingProducts: 0,
+          averagePrice: 0,
           categoryDistribution: generateMockCategoryData(),
         },
         tradeReport: {
-          totalTrades: 567,
-          completedTrades: 432,
-          pendingTrades: 89,
-          disputedTrades: 12,
-          averageTradeValue: 450.75,
+          totalTrades: 0,
+          completedTrades: 0,
+          pendingTrades: 0,
+          disputedTrades: 0,
+          averageTradeValue: 0,
         },
       });
     } finally {
       setLoading(false);
     }
   };
+
+  const normalizeProductReport = (raw: any) => ({
+    totalProducts: raw.total ?? raw.totalProducts ?? 0,
+    activeProducts: raw.active ?? raw.activeProducts ?? 0,
+    pendingProducts: raw.pending ?? raw.pendingProducts ?? 0,
+    averagePrice: raw.averagePrice ?? 0,
+    categoryDistribution: raw.categoryDistribution ?? raw.categories ?? generateMockCategoryData(),
+  });
+
+  const normalizeTradeReport = (raw: any) => ({
+    totalTrades: raw.total ?? raw.totalTrades ?? 0,
+    completedTrades: raw.completedTrades ?? 0,
+    pendingTrades: raw.pendingTrades ?? 0,
+    disputedTrades: raw.disputedTrades ?? 0,
+    averageTradeValue: raw.averageTradeValue ?? 0,
+  });
 
   // Mock data generators
   const generateMockDailyData = () => {
@@ -362,7 +440,7 @@ export default function AnalyticsPage() {
                 {Object.entries(data?.salesReport.ordersByStatus || {}).map(([status, count]) => (
                   <div key={status} className="bg-dark-700 rounded-lg p-4 text-center">
                     <p className="text-2xl font-bold text-white">{String(count)}</p>
-                    <p className="text-sm text-gray-400 capitalize">{status}</p>
+                    <p className="text-sm text-gray-400">{ORDER_STATUS_LABELS[status] ?? status}</p>
                   </div>
                 ))}
               </div>
@@ -544,22 +622,49 @@ export default function AnalyticsPage() {
         {/* Export Buttons */}
         <div className="flex justify-end gap-4">
           <button
-            onClick={() => {
+            onClick={async () => {
               const type = activeTab === 'sales' ? 'sales' : activeTab === 'users' ? 'users' : activeTab === 'products' ? 'products' : 'trades';
-              adminApi.exportReport(type, 'csv', getDateRangeParams());
+              try {
+                const res = await adminApi.exportReport(type, 'csv', getDateRangeParams());
+                const content = (res.data as { content?: string })?.content ?? '';
+                const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `rapor-${type}-${getDateRangeParams().startDate}-${getDateRangeParams().endDate}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error('CSV indirme hatası:', e);
+              }
             }}
             className="btn-secondary"
           >
             CSV İndir
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               const type = activeTab === 'sales' ? 'sales' : activeTab === 'users' ? 'users' : activeTab === 'products' ? 'products' : 'trades';
-              adminApi.exportReport(type, 'json', getDateRangeParams());
+              try {
+                const res = await adminApi.exportReport(type, 'pdf', getDateRangeParams());
+                const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `rapor-${type}-${getDateRangeParams().startDate}-${getDateRangeParams().endDate}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error('Rapor indirme hatası:', e);
+              }
             }}
             className="btn-primary"
           >
-            PDF İndir
+            JSON İndir
           </button>
         </div>
       </div>

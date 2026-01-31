@@ -143,7 +143,7 @@ export default function AdminPaymentsPage() {
           </div>
           <div className="flex gap-3">
             <Link
-              href="/admin/payments/statistics"
+              href="/payments/statistics"
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
             >
               <ChartBarIcon className="w-5 h-5" />
@@ -338,7 +338,7 @@ export default function AdminPaymentsPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <Link
-                              href={`/admin/payments/${payment.id}`}
+                              href={`/payments/${payment.id}`}
                               className="text-primary-600 hover:text-primary-700"
                             >
                               Detay

@@ -24,16 +24,25 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
       throw new UnauthorizedException('Geçersiz admin token');
     }
 
-    // Check if admin user exists and is active
+    // Check if admin user exists and is active – select only User columns that exist in DB
     const adminUser = await this.prisma.adminUser.findFirst({
       where: {
         userId: payload.sub,
         isActive: true,
       },
-      include: { user: true },
+      select: {
+        role: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            isSeller: true,
+          },
+        },
+      },
     });
 
-    if (!adminUser) {
+    if (!adminUser || !adminUser.user) {
       throw new UnauthorizedException('Admin kullanıcı bulunamadı veya deaktif');
     }
 

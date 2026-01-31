@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
-import { MagnifyingGlassIcon, CheckIcon, XMarkIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, XMarkIcon, EyeIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface Message {
   id: string;
   content: string;
   originalContent: string;
+  senderId: string;
   sender: { displayName: string; email: string };
   receiver: { displayName: string; email: string };
   status: 'pending' | 'approved' | 'rejected';
@@ -26,37 +27,47 @@ export default function MessagesPage() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    // API only returns pending messages, so only load when filter is 'pending' or 'all'
-    if (filter === 'pending' || filter === 'all') {
-      loadMessages();
-    } else {
-      // For approved/rejected, show empty for now (API doesn't support these filters yet)
-      setMessages([]);
-      setTotal(0);
-      setLoading(false);
-    }
+    loadMessages();
   }, [page, filter]);
+
+  // Map frontend filter values to API status values
+  const mapFilterToApiStatus = (f: string) => {
+    if (f === 'all') return undefined;
+    if (f === 'pending') return 'pending_approval';
+    return f; // 'approved' and 'rejected' stay the same
+  };
 
   const loadMessages = async () => {
     setLoading(true);
     try {
-      const response = await adminApi.getMessages({ page, pageSize: 20 });
-      // API returns: { messages: [{ id, senderName, receiverName, originalContent, flaggedReason, ... }], total, page, pageSize }
-      const apiMessages = response.data.messages || [];
-      // Map API response to frontend format
+      const apiStatus = mapFilterToApiStatus(filter);
+      const response = await adminApi.getMessages({ 
+        page, 
+        limit: 20,
+        status: apiStatus,
+      });
+      const apiMessages = response.data.data || response.data.messages || [];
+      const meta = response.data.meta || {};
       const mappedMessages: Message[] = apiMessages.map((m: any) => ({
         id: m.id,
-        content: m.originalContent || '',
-        originalContent: m.originalContent || '',
-        sender: { displayName: m.senderName || 'Bilinmeyen', email: '' },
-        receiver: { displayName: m.receiverName || 'Bilinmeyen', email: '' },
-        status: 'pending' as const, // API only returns pending messages
+        content: m.content || m.originalContent || '',
+        originalContent: m.content || m.originalContent || '',
+        senderId: m.senderId || m.sender?.id || '',
+        sender: {
+          displayName: m.sender?.displayName || m.senderName || 'Bilinmeyen',
+          email: m.sender?.email || '',
+        },
+        receiver: {
+          displayName: m.receiver?.displayName || m.receiverName || 'Bilinmeyen',
+          email: m.receiver?.email || '',
+        },
+        status: (m.status === 'pending_approval' ? 'pending' : m.status) as Message['status'],
         flaggedReason: m.flaggedReason || '',
         createdAt: m.createdAt,
-        threadId: m.threadId,
+        threadId: m.threadId || m.thread?.id || '',
       }));
       setMessages(mappedMessages);
-      setTotal(response.data.total || 0);
+      setTotal(meta.total ?? response.data.total ?? 0);
     } catch (error) {
       console.error('Load messages error:', error);
       toast.error('Mesajlar yüklenemedi');
@@ -90,6 +101,22 @@ export default function MessagesPage() {
     }
   };
 
+  const handleBanSender = async (message: Message) => {
+    if (!message.senderId) {
+      toast.error('Gönderen bilgisi bulunamadı');
+      return;
+    }
+    const reason = window.prompt('Yasaklama sebebi (mesaj ihlali):', 'Mesaj kuralları ihlali');
+    if (reason === null) return;
+    try {
+      await adminApi.banUser(message.senderId, reason.trim() || 'Mesaj kuralları ihlali');
+      toast.success('Gönderen kullanıcı engellendi');
+      loadMessages();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    }
+  };
+
   const getStatusBadge = (status: string, flaggedReason: string) => {
     if (status === 'pending') {
       return <span className="badge badge-warning">⏳ Onay Bekliyor</span>;
@@ -109,7 +136,13 @@ export default function MessagesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Mesaj Moderation</h1>
           <p className="text-gray-400 mt-1">
-            {filter === 'pending' || filter === 'all' ? `${total} mesaj onay bekliyor` : 'Bu filtre henüz desteklenmiyor'}
+            {filter === 'all' 
+              ? `Toplam ${total} mesaj` 
+              : filter === 'pending' 
+                ? `${total} mesaj onay bekliyor — Bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın`
+                : filter === 'approved'
+                  ? `${total} onaylanmış mesaj`
+                  : `${total} reddedilen mesaj`}
           </p>
         </div>
 
@@ -207,6 +240,15 @@ export default function MessagesPage() {
                               >
                                 <XMarkIcon className="h-5 w-5" />
                               </button>
+                              {message.senderId && (
+                                <button
+                                  onClick={() => handleBanSender(message)}
+                                  className="p-2 text-orange-400 hover:bg-orange-500/10 rounded-lg"
+                                  title="Göndereni yasakla (hesap engeli)"
+                                >
+                                  <NoSymbolIcon className="h-5 w-5" />
+                                </button>
+                              )}
                             </>
                           )}
                           <button

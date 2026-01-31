@@ -121,4 +121,23 @@ body {
   box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
 }
 
-
+/* Slim Top Bar - Image Marquee (right to left infinite scroll) */
+@keyframes ad-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.ad-marquee-track {
+  animation: ad-marquee 28s linear infinite;
+}
+.ad-marquee-track:hover {
+  animation-play-state: paused;
+}
+@media (max-width: 767px) {
+  .ad-marquee-track {
+    animation-duration: 24s;
+  }
+}

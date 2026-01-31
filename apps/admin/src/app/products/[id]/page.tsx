@@ -79,7 +79,7 @@ export default function ProductDetailPage() {
     } catch (error: any) {
       console.error('Product load error:', error);
       toast.error(error.response?.data?.message || 'Ürün yüklenemedi');
-      router.push('/admin/products');
+      router.push('/products');
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ export default function ProductDetailPage() {
     try {
       await adminApi.deleteProduct(productId);
       toast.success('Ürün silindi');
-      router.push('/admin/products');
+      router.push('/products');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Silme işlemi başarısız');
       setProcessing(false);
@@ -167,7 +167,7 @@ export default function ProductDetailPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              href="/admin/products"
+              href="/products"
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
@@ -265,7 +265,7 @@ export default function ProductDetailPage() {
                   <p>
                     <span className="text-gray-600">İsim:</span>{' '}
                     <Link
-                      href={`/admin/users/${product.seller.id}`}
+                      href={`/users/${product.seller.id}`}
                       className="text-primary-600 hover:text-primary-700 font-medium"
                     >
                       {product.seller.displayName}
@@ -319,13 +319,13 @@ export default function ProductDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Linkler</h3>
                 <div className="space-y-2">
                   <Link
-                    href={`/admin/users/${product.seller.id}`}
+                    href={`/users/${product.seller.id}`}
                     className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                   >
                     Satıcıyı Görüntüle
                   </Link>
                   <Link
-                    href={`/admin/orders?productId=${product.id}`}
+                    href={`/orders?productId=${product.id}`}
                     className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                   >
                     Siparişleri Görüntüle

@@ -89,7 +89,7 @@ export default function SupportTicketDetailPage() {
     } catch (error: any) {
       console.error('Ticket load error:', error);
       toast.error(error.response?.data?.message || 'Destek talebi yüklenemedi');
-      router.push('/admin/support');
+      router.push('/support');
     } finally {
       setLoading(false);
     }
@@ -162,7 +162,7 @@ export default function SupportTicketDetailPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              href="/admin/support"
+              href="/support"
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
@@ -264,7 +264,7 @@ export default function SupportTicketDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Oluşturan</h3>
                 <div className="space-y-2">
                   <Link
-                    href={`/admin/users/${ticket.creator.id}`}
+                    href={`/users/${ticket.creator.id}`}
                     className="text-primary-600 hover:text-primary-700 font-medium block"
                   >
                     {ticket.creator.displayName}

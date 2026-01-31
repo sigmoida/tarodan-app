@@ -17,8 +17,9 @@ import {
   Bars3Icon,
   XMarkIcon,
   CurrencyDollarIcon,
-  DocumentChartBarIcon,
   UserCircleIcon,
+  MegaphoneIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -27,8 +28,9 @@ const navigation = [
   { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon },
   { name: 'Kullanıcılar', href: '/users', icon: UsersIcon },
   { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
+  { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
+  { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon },
   { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
-  { name: 'Raporlar', href: '/reports', icon: DocumentChartBarIcon },
   { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon },
 ];
 

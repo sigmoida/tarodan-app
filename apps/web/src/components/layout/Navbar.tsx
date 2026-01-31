@@ -58,6 +58,20 @@ export default function Navbar() {
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTradesAuthModal, setShowTradesAuthModal] = useState(false);
+  const [topAds, setTopAds] = useState<Array<{ 
+    id: string; 
+    title: string; 
+    imageUrl: string | null; 
+    linkUrl: string | null; 
+    content: string | null;
+    altText: string | null;
+    width: number | null;
+    height: number | null;
+    deviceType: string;
+  }>>([]);
+  const recordedImpressions = useRef<Set<string>>(new Set());
+  const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
+  const [isMobile, setIsMobile] = useState(false);
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
@@ -166,16 +180,157 @@ export default function Navbar() {
     }
   };
 
-  // Premium ve Business üyeler için reklam banner'ını gizle
-  const shouldShowAd = !isAuthenticated || (user?.membershipTier !== 'premium' && user?.membershipTier !== 'business');
+  // Reklam barı her durumda göster (giriş yapılsa da kalır; Premium/Business için de gösterilebilir)
+  const shouldShowAd = true;
+
+  // Detect mobile/desktop for responsive ads
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Fetch active top ads (public API, no auth) - with device type
+  useEffect(() => {
+    if (!shouldShowAd) return;
+    const deviceType = isMobile ? 'mobile' : 'desktop';
+    api.get<Array<{ 
+      id: string; 
+      title: string; 
+      imageUrl: string | null; 
+      linkUrl: string | null; 
+      content: string | null;
+      altText: string | null;
+      width: number | null;
+      height: number | null;
+      deviceType: string;
+    }>>('/ads/active', { params: { position: 'header', device: deviceType } })
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setTopAds(list);
+        setAdImageError(new Set());
+      })
+      .catch((err) => {
+        console.error('Failed to fetch ads:', err);
+        setTopAds([]);
+      });
+  }, [shouldShowAd, isMobile]);
+
+  // Record impression once per ad when bar is shown
+  useEffect(() => {
+    if (topAds.length === 0) return;
+    topAds.forEach((ad) => {
+      if (recordedImpressions.current.has(ad.id)) return;
+      recordedImpressions.current.add(ad.id);
+      api.post(`/ads/${ad.id}/impression`).catch(() => {});
+    });
+  }, [topAds]);
+
+  const handleAdClick = (ad: { id: string; linkUrl: string | null }) => {
+    api.post(`/ads/${ad.id}/click`).catch(() => {});
+    if (ad.linkUrl) window.open(ad.linkUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleAdImageError = (adId: string) => {
+    setAdImageError((prev) => new Set(prev).add(adId));
+  };
 
   return (
     <>
-      {/* Reklam Banner */}
+      {/* Slim Top Bar - Image Marquee (50px / 40px mobile) */}
       {shouldShowAd && (
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-center py-2 text-xs font-medium">
-          🎉 {t('nav.banner')}
-        </div>
+        <>
+          {topAds.length > 0 ? (
+            <div
+              className="w-full relative flex items-center overflow-hidden border-b border-gray-700"
+              style={{
+                height: isMobile ? 40 : 50,
+                maxHeight: 60,
+                backgroundColor: '#1f2937',
+              }}
+              role="region"
+              aria-label="Reklam alanı"
+            >
+              {/* Marquee: bir set reklam + viewport boşluğu + tekrar aynı set → aynı anda tek logo görünür */}
+              <div className="ad-marquee-track flex flex-nowrap items-center flex-shrink-0 gap-8 h-full pr-8">
+                {topAds.map((ad, index) => (
+                  <button
+                    key={`a-${ad.id}-${index}`}
+                    type="button"
+                    onClick={() => handleAdClick(ad)}
+                    className="flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity"
+                    style={{ height: isMobile ? 40 : 50 }}
+                    aria-label={ad.altText || ad.title}
+                  >
+                    {ad.imageUrl && !adImageError.has(ad.id) ? (
+                      <img
+                        src={ad.imageUrl}
+                        alt={ad.altText || ad.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-auto object-contain max-w-[280px] sm:max-w-[400px]"
+                        style={{ maxHeight: isMobile ? 40 : 50 }}
+                        onError={() => handleAdImageError(ad.id)}
+                      />
+                    ) : (
+                      <span className="text-orange-400 text-xs font-medium px-4 whitespace-nowrap">
+                        {ad.title}
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {/* İki set arasında en az viewport genişliği boşluk → ikinci logo ekranda çıkana kadar birinci kayar */}
+                <div className="flex-shrink-0 h-full" style={{ minWidth: '100vw' }} aria-hidden />
+                {topAds.map((ad, index) => (
+                  <button
+                    key={`b-${ad.id}-${index}`}
+                    type="button"
+                    onClick={() => handleAdClick(ad)}
+                    className="flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity"
+                    style={{ height: isMobile ? 40 : 50 }}
+                    aria-label={ad.altText || ad.title}
+                  >
+                    {ad.imageUrl && !adImageError.has(ad.id) ? (
+                      <img
+                        src={ad.imageUrl}
+                        alt={ad.altText || ad.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-auto object-contain max-w-[280px] sm:max-w-[400px]"
+                        style={{ maxHeight: isMobile ? 40 : 50 }}
+                        onError={() => handleAdImageError(ad.id)}
+                      />
+                    ) : (
+                      <span className="text-orange-400 text-xs font-medium px-4 whitespace-nowrap">
+                        {ad.title}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {/* Sponsorlu badge - sol üst */}
+              <span
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-[9px] text-gray-500 opacity-60 select-none pointer-events-none"
+                aria-hidden
+              >
+                Sponsorlu
+              </span>
+            </div>
+          ) : (
+            <div
+              className="w-full relative flex items-center justify-center border-b border-gray-700 text-white text-xs font-medium"
+              style={{
+                height: isMobile ? 40 : 50,
+                backgroundColor: '#1f2937',
+              }}
+            >
+              🎉 {t('nav.banner')}
+            </div>
+          )}
+        </>
       )}
       
       <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">

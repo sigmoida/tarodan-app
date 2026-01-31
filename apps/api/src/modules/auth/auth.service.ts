@@ -308,6 +308,17 @@ export class AuthService {
         );
       }
 
+      // Update lastLoginAt immediately so it's persisted before any other async work
+      const now = new Date();
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: now, lastActivityAt: now },
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to update lastLoginAt for user ${user.id}: ${err}`);
+      }
+
       // Generate tokens
       const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
 
@@ -372,10 +383,19 @@ export class AuthService {
    * POST /auth/admin/login
    */
   async adminLogin(dto: LoginDto) {
-    // Find user by email
+    // Find user by email – select only columns that exist in DB (avoids schema/DB drift)
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      include: { adminUser: true },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        displayName: true,
+        isVerified: true,
+        isSeller: true,
+        createdAt: true,
+        adminUser: true,
+      },
     });
 
     console.log('Admin login attempt:', { email: dto.email, userFound: !!user, hasAdminUser: !!user?.adminUser });
@@ -405,6 +425,18 @@ export class AuthService {
       user.email,
       user.adminUser.role,
     );
+
+    // Update lastLoginAt for both user and admin user
+    await Promise.all([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }),
+      this.prisma.adminUser.update({
+        where: { id: user.adminUser.id },
+        data: { lastLoginAt: new Date() },
+      }),
+    ]);
 
     return {
       user: {

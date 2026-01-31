@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
-import { MagnifyingGlassIcon, EyeIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, EyeIcon, PencilIcon, CheckIcon, XMarkIcon, UserIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface Order {
@@ -13,10 +14,16 @@ interface Order {
   status: string;
   totalAmount: number;
   commission: number;
-  buyer: { displayName: string };
-  seller: { displayName: string };
+  buyer: { id: string; displayName: string };
+  seller: { id: string; displayName: string };
   createdAt: string;
   itemCount: number;
+}
+
+interface User {
+  id: string;
+  displayName: string;
+  email: string;
 }
 
 const statusOptions = [
@@ -31,6 +38,12 @@ const statusOptions = [
 ];
 
 export default function OrdersPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const urlUserId = useMemo(() => searchParams.get('userId') || '', [searchParams]);
+  const urlUserRole = useMemo(() => (searchParams.get('userRole') === 'buyer' || searchParams.get('userRole') === 'seller' ? searchParams.get('userRole') : '') as '' | 'buyer' | 'seller', [searchParams]);
+  const productId = useMemo(() => searchParams.get('productId') || undefined, [searchParams]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -41,9 +54,80 @@ export default function OrdersPage() {
   const [newStatus, setNewStatus] = useState<string>('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // User filtering
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
+  const [userRole, setUserRole] = useState<'buyer' | 'seller' | ''>(urlUserRole);
+  const [userSearch, setUserSearch] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Load users for dropdown
+  const loadUsers = useCallback(async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setUsers([]);
+      return;
+    }
+    setLoadingUsers(true);
+    try {
+      const response = await adminApi.getUsers({ search: searchTerm, limit: 10 });
+      const data = response.data.data || response.data.users || [];
+      setUsers(data.map((u: any) => ({ id: u.id, displayName: u.displayName, email: u.email })));
+    } catch (error) {
+      console.error('Load users error:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  // Debounce user search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (userSearch) loadUsers(userSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearch, loadUsers]);
+
+  // Sync URL with state
+  useEffect(() => {
+    setSelectedUserId(urlUserId);
+    setUserRole(urlUserRole);
+  }, [urlUserId, urlUserRole]);
+
+  const updateUrl = (userId: string, role: '' | 'buyer' | 'seller') => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (userId) params.set('userId', userId);
+    else params.delete('userId');
+    if (role) params.set('userRole', role);
+    else params.delete('userRole');
+    router.push(`/orders?${params.toString()}`);
+  };
+
+  const handleSelectUser = (user: User) => {
+    setSelectedUserId(user.id);
+    setUserSearch(user.displayName);
+    setShowUserDropdown(false);
+    updateUrl(user.id, userRole);
+  };
+
+  const handleUserRoleChange = (role: 'buyer' | 'seller' | '') => {
+    setUserRole(role);
+    if (selectedUserId) updateUrl(selectedUserId, role);
+  };
+
+  const clearUserFilter = () => {
+    setSelectedUserId('');
+    setUserSearch('');
+    setUserRole('');
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('userId');
+    params.delete('userRole');
+    router.push(`/orders?${params.toString()}`);
+  };
+
   useEffect(() => {
     loadOrders();
-  }, [page, status]);
+  }, [page, status, selectedUserId, userRole, productId]);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -53,6 +137,9 @@ export default function OrdersPage() {
         limit: 20,
         status: status === 'all' ? undefined : status,
         search: search || undefined,
+        userId: selectedUserId || undefined,
+        userRole: selectedUserId && userRole ? userRole : undefined,
+        productId,
       });
       const data = response.data.data || response.data.orders || [];
       const meta = response.data.meta || {};
@@ -62,8 +149,8 @@ export default function OrdersPage() {
         status: o.status,
         totalAmount: Number(o.totalAmount || o.total || 0),
         commission: Number(o.commissionAmount || 0),
-        buyer: o.buyer || { displayName: 'Alıcı' },
-        seller: o.seller || { displayName: 'Satıcı' },
+        buyer: o.buyer || { id: '', displayName: 'Alıcı' },
+        seller: o.seller || { id: '', displayName: 'Satıcı' },
         createdAt: o.createdAt,
         itemCount: o.items?.length || 1,
       })));
@@ -130,7 +217,15 @@ export default function OrdersPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Siparişler</h1>
-          <p className="text-gray-400 mt-1">Toplam {total} sipariş</p>
+          <p className="text-gray-400 mt-1">
+            Toplam {total} sipariş
+            {(selectedUserId || productId) && (
+              <span className="ml-2">
+                — Filtreleniyor
+                <button onClick={clearUserFilter} className="ml-2 text-primary-500 hover:underline">Filtreyi kaldır</button>
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -144,6 +239,78 @@ export default function OrdersPage() {
               className="admin-input pl-10"
             />
           </div>
+          
+          {/* User Filter */}
+          <div className="w-full sm:w-64 space-y-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleUserRoleChange(userRole === 'buyer' ? '' : 'buyer')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  userRole === 'buyer'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-dark-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                Alıcı
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUserRoleChange(userRole === 'seller' ? '' : 'seller')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  userRole === 'seller'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-dark-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                Satıcı
+              </button>
+            </div>
+            <div className="relative">
+              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Kullanıcı ara..."
+                value={userSearch}
+                onChange={(e) => {
+                  setUserSearch(e.target.value);
+                  setShowUserDropdown(true);
+                }}
+                onFocus={() => setShowUserDropdown(true)}
+                className="admin-input pl-10 pr-10 w-full"
+              />
+            {selectedUserId && (
+              <button
+                onClick={clearUserFilter}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                <XCircleIcon className="h-5 w-5" />
+              </button>
+            )}
+            
+              {showUserDropdown && userSearch.length >= 2 && (
+                <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {loadingUsers ? (
+                    <div className="p-3 text-center text-gray-400">Aranıyor...</div>
+                  ) : users.length > 0 ? (
+                    users.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleSelectUser(user)}
+                        className="w-full px-4 py-2 text-left hover:bg-dark-600 text-white"
+                      >
+                        <div className="font-medium">{user.displayName}</div>
+                        <div className="text-xs text-gray-400">{user.email}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-gray-400">Kullanıcı bulunamadı</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -237,8 +404,22 @@ export default function OrdersPage() {
                           </div>
                         )}
                       </td>
-                      <td>{order.buyer.displayName}</td>
-                      <td>{order.seller.displayName}</td>
+                      <td>
+                        <Link
+                          href={`/users/${order.buyer.id}`}
+                          className="text-white hover:text-primary-500"
+                        >
+                          {order.buyer.displayName}
+                        </Link>
+                      </td>
+                      <td>
+                        <Link
+                          href={`/users/${order.seller.id}`}
+                          className="text-white hover:text-primary-500"
+                        >
+                          {order.seller.displayName}
+                        </Link>
+                      </td>
                       <td>{order.itemCount} adet</td>
                       <td className="text-primary-400 font-medium">
                         ₺{order.totalAmount.toLocaleString()}
@@ -257,7 +438,7 @@ export default function OrdersPage() {
                             <PencilIcon className="h-5 w-5" />
                           </button>
                             <Link
-                              href={`/admin/orders/${order.id}`}
+                              href={`/orders/${order.id}`}
                               className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                               title="Detay"
                             >
