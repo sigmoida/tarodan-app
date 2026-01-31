@@ -22,6 +22,7 @@ interface User {
   isVerified: boolean;
   isBanned: boolean;
   createdAt: string;
+  lastLoginAt?: string;
   membershipTier?: string;
   ordersCount: number;
   productsCount: number;
@@ -39,31 +40,35 @@ export default function UsersPage() {
     loadUsers();
   }, [page, filter]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (pageOverride?: number) => {
+    const currentPage = pageOverride ?? page;
     setLoading(true);
     try {
       const response = await adminApi.getUsers({
-        page,
+        page: currentPage,
         limit: 20,
         search: search || undefined,
         isSeller: filter === 'sellers' ? true : filter === 'buyers' ? false : undefined,
+        isBanned: filter === 'banned' ? true : undefined,
       });
       const data = response.data.data || response.data.users || [];
       const meta = response.data.meta || {};
       setUsers(data.map((u: any) => ({
         id: u.id,
         email: u.email,
-        displayName: u.displayName,
+        displayName: u.displayName ?? u.email?.split('@')[0] ?? '-',
         phone: u.phone,
         isSeller: u.isSeller,
         isVerified: u.isVerified,
-        isBanned: false, // Not in API response yet
+        isBanned: Boolean(u.isBanned),
         createdAt: u.createdAt,
-        membershipTier: 'basic', // Not in API response yet
-        ordersCount: u._count?.buyerOrders || 0,
-        productsCount: u._count?.products || 0,
+        lastLoginAt: u.lastLoginAt,
+        membershipTier: u.membershipTier?.name ?? 'basic',
+        ordersCount: u._count?.buyerOrders ?? u._count?.sellerOrders ?? 0,
+        productsCount: u._count?.products ?? 0,
       })));
       setTotal(meta.total || data.length);
+      if (pageOverride !== undefined) setPage(pageOverride);
     } catch (error) {
       console.error('Users load error:', error);
       toast.error('Kullanıcılar yüklenemedi');
@@ -78,12 +83,13 @@ export default function UsersPage() {
         await adminApi.unbanUser(userId);
         toast.success('Kullanıcı engeli kaldırıldı');
       } else {
-        await adminApi.banUser(userId);
+        const reason = window.prompt('Engelleme sebebi (isteğe bağlı):') ?? 'Admin tarafından engellendi';
+        await adminApi.banUser(userId, reason);
         toast.success('Kullanıcı engellendi');
       }
       loadUsers();
-    } catch (error) {
-      toast.error('İşlem başarısız');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'İşlem başarısız');
     }
   };
 
@@ -116,15 +122,19 @@ export default function UsersPage() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <div className="relative flex-1 flex gap-2">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
             <input
               type="text"
               placeholder="E-posta veya isim ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="admin-input pl-10"
+              onKeyDown={(e) => e.key === 'Enter' && loadUsers(1)}
+              className="admin-input pl-10 flex-1"
             />
+            <button type="button" onClick={() => loadUsers(1)} className="btn-primary whitespace-nowrap">
+              Ara
+            </button>
           </div>
           <select
             value={filter}
@@ -150,19 +160,20 @@ export default function UsersPage() {
                   <th>Sipariş</th>
                   <th>Ürün</th>
                   <th>Kayıt Tarihi</th>
+                  <th>Son Giriş</th>
                   <th>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8">
+                    <td colSpan={8} className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-400">
+                    <td colSpan={8} className="text-center py-8 text-gray-400">
                       Kullanıcı bulunamadı
                     </td>
                   </tr>
@@ -173,7 +184,7 @@ export default function UsersPage() {
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center mr-3">
                             <span className="text-primary-500 font-medium">
-                              {user.displayName.charAt(0)}
+                              {user.displayName?.charAt(0) ?? '?'}
                             </span>
                           </div>
                           <div>
@@ -212,9 +223,24 @@ export default function UsersPage() {
                         {new Date(user.createdAt).toLocaleDateString('tr-TR')}
                       </td>
                       <td>
+                        {user.lastLoginAt ? (
+                          <span className="text-gray-300">
+                            {new Date(user.lastLoginAt).toLocaleDateString('tr-TR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">Hiç giriş yapmadı</span>
+                        )}
+                      </td>
+                      <td>
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/admin/users/${user.id}`}
+                            href={`/users/${user.id}`}
                             className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                             title="Detay"
                           >

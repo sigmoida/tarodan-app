@@ -217,6 +217,8 @@ model User {
   bannedAt        DateTime?   @map("banned_at")
   bannedReason    String?     @map("banned_reason")
   bannedBy        String?     @map("banned_by") // AdminUser ID
+  lastLoginAt     DateTime?   @map("last_login_at")
+  lastActivityAt  DateTime?   @map("last_activity_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
@@ -1491,6 +1493,69 @@ model UserFollow {
   @@index([followerId])
   @@index([followingId])
   @@map("user_follows")
+}
+
+// =============================================================================
+// ADVERTISEMENTS (Admin-managed banners for web)
+// =============================================================================
+
+// IAB Standard Ad Sizes Reference:
+// - Leaderboard: 728x90
+// - Medium Rectangle: 300x250
+// - Wide Skyscraper: 160x600
+// - Half Page: 300x600
+// - Billboard: 970x250
+// - Mobile Leaderboard: 320x50
+// - Mobile Banner: 320x100
+// - Large Mobile Banner: 320x480
+
+enum AdDeviceType {
+  desktop
+  mobile
+  all
+}
+
+enum AdPosition {
+  header      // top banner (leaderboard 728x90, billboard 970x250)
+  sidebar     // right/left sidebar (medium rectangle 300x250, wide skyscraper 160x600)
+  footer      // bottom banner
+  inline      // between content
+  popup       // modal popup
+}
+
+model Advertisement {
+  id              String       @id @default(uuid())
+  title           String
+  imageUrl        String?      @map("image_url")
+  linkUrl         String?      @map("link_url")
+  content         String?      // HTML or plain text (for text ads)
+  altText         String?      @map("alt_text") // Accessibility
+  
+  // IAB Dimensions
+  width           Int?         // Image width in pixels
+  height          Int?         // Image height in pixels
+  
+  // Targeting
+  position        AdPosition   @default(header)
+  deviceType      AdDeviceType @default(all) @map("device_type")
+  
+  // Display settings
+  displayOrder    Int          @default(0) @map("display_order")
+  isActive        Boolean      @default(true) @map("is_active")
+  startDate       DateTime?    @map("start_date")
+  endDate         DateTime?    @map("end_date")
+  
+  // Analytics
+  clickCount      Int          @default(0) @map("click_count")
+  impressionCount Int          @default(0) @map("impression_count")
+  
+  // Timestamps
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@index([position, deviceType, isActive])
+  @@index([startDate, endDate])
+  @@map("advertisements")
 }
 
 // =============================================================================

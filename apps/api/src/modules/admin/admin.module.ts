@@ -8,9 +8,21 @@ import { MessagingModule } from '../messaging';
 import { SupportModule } from '../support';
 import { SearchModule } from '../search/search.module';
 import { CacheModule } from '../cache';
+import { AdvertisementModule } from '../advertisement/advertisement.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, PaymentModule, MessagingModule, SupportModule, SearchModule, CacheModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    PaymentModule,
+    MessagingModule,
+    SupportModule,
+    SearchModule,
+    CacheModule,
+    AdvertisementModule,
+    MediaModule,
+  ],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],

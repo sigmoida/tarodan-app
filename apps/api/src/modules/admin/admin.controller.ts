@@ -10,15 +10,23 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { AdvertisementService } from '../advertisement/advertisement.service';
+import { MediaService } from '../media/media.service';
+import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -52,7 +60,11 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly advertisementService: AdvertisementService,
+    private readonly mediaService: MediaService,
+  ) {}
 
   // ==================== COMMISSION RULES ====================
 
@@ -198,6 +210,30 @@ export class AdminController {
     return this.adminService.rejectProduct(adminId, id, dto);
   }
 
+  @Post('products/bulk-approve')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk approve multiple products' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Products approved' })
+  async bulkApproveProducts(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { ids: string[]; note?: string },
+  ) {
+    return this.adminService.bulkApproveProducts(adminId, body.ids, body.note);
+  }
+
+  @Post('products/bulk-reject')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk reject multiple products' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Products rejected' })
+  async bulkRejectProducts(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { ids: string[]; reason: string },
+  ) {
+    return this.adminService.bulkRejectProducts(adminId, body.ids, body.reason);
+  }
+
   // ==================== ORDER MANAGEMENT ====================
 
   @Get('orders')
@@ -317,6 +353,27 @@ export class AdminController {
   @ApiOperation({ summary: 'Generate custom report with flexible parameters' })
   async getCustomReport(@Query() query: ReportQueryDto) {
     return this.adminService.generateCustomReport(query);
+  }
+
+  @Get('reports/users')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Users report (CSV/PDF/JSON)' })
+  async getUsersReport(@Query() query: ReportQueryDto) {
+    return this.adminService.generateUsersReport(query);
+  }
+
+  @Get('reports/products')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Products report (CSV/PDF/JSON)' })
+  async getProductsReport(@Query() query: ReportQueryDto) {
+    return this.adminService.generateProductsReport(query);
+  }
+
+  @Get('reports/trades')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Trades report (CSV/PDF/JSON)' })
+  async getTradesReport(@Query() query: ReportQueryDto) {
+    return this.adminService.generateTradesReport(query);
   }
 
   @Get('commission/revenue')
@@ -495,6 +552,7 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('initiatorId') initiatorId?: string,
     @Query('receiverId') receiverId?: string,
+    @Query('userId') userId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('page') page?: string,
@@ -504,6 +562,7 @@ export class AdminController {
       status: status as any,
       initiatorId,
       receiverId,
+      userId,
       fromDate,
       toDate,
       page: page ? parseInt(page, 10) : 1,
@@ -747,6 +806,100 @@ export class AdminController {
     },
   ) {
     return this.adminService.updateMembershipTier(adminId, id, body);
+  }
+
+  // ==================== ADVERTISEMENT MANAGEMENT ====================
+
+  @Get('ads')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List all advertisements' })
+  @ApiQuery({ name: 'position', required: false, description: 'Filter by position' })
+  @ApiQuery({ name: 'deviceType', required: false, description: 'Filter by device type' })
+  @ApiQuery({ name: 'isActive', required: false, description: 'Filter by active status' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of ads' })
+  async getAds(
+    @Query('position') position?: string,
+    @Query('deviceType') deviceType?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    const active = isActive === 'true' ? true : isActive === 'false' ? false : undefined;
+    return this.advertisementService.findAll(position, deviceType, active);
+  }
+
+  @Get('ads/statistics')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get advertisement statistics' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Statistics summary' })
+  async getAdStatistics() {
+    return this.advertisementService.getStatistics();
+  }
+
+  @Get('ads/iab-sizes')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get IAB standard ad sizes' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of IAB sizes' })
+  async getIABSizes() {
+    return this.advertisementService.getIABSizes();
+  }
+
+  @Get('ads/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get single advertisement' })
+  @ApiParam({ name: 'id', description: 'Ad ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Ad details' })
+  async getAd(@Param('id') id: string) {
+    return this.advertisementService.findOne(id);
+  }
+
+  @Post('ads')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create advertisement' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Ad created' })
+  async createAd(@Body() dto: CreateAdvertisementDto) {
+    return this.advertisementService.create(dto);
+  }
+
+  @Patch('ads/reorder')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reorder advertisements' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Ads reordered' })
+  async reorderAds(@Body() dto: ReorderAdsDto) {
+    return this.advertisementService.reorder(dto.ids);
+  }
+
+  @Patch('ads/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update advertisement' })
+  @ApiParam({ name: 'id', description: 'Ad ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Ad updated' })
+  async updateAd(@Param('id') id: string, @Body() dto: UpdateAdvertisementDto) {
+    return this.advertisementService.update(id, dto);
+  }
+
+  @Delete('ads/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete advertisement' })
+  @ApiParam({ name: 'id', description: 'Ad ID' })
+  async deleteAd(@Param('id') id: string) {
+    return this.advertisementService.remove(id);
+  }
+
+  @Post('media/upload')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload image (e.g. for ad banner)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Returns { url, key }' })
+  async uploadMedia(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Dosya gönderilmedi');
+    }
+    return this.mediaService.upload(file, {
+      folder: 'ads',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      maxSize: 5 * 1024 * 1024, // 5MB
+    });
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================

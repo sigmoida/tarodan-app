@@ -95,7 +95,7 @@ export default function AdminPaymentDetailPage() {
     } catch (error: any) {
       console.error('Payment load error:', error);
       toast.error(error.response?.data?.message || 'Ödeme yüklenemedi');
-      router.push('/admin/payments');
+      router.push('/payments');
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ export default function AdminPaymentDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Sipariş No:</span>
                   <Link
-                    href={`/admin/orders/${payment.orderId}`}
+                    href={`/orders/${payment.orderId}`}
                     className="text-primary-600 hover:text-primary-700 font-medium"
                   >
                     #{payment.order.orderNumber}

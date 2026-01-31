@@ -51,9 +51,10 @@ export interface UserReport {
 export interface ProductReport {
   totalProducts: number;
   activeProducts: number;
+  pendingProducts: number;
   soldProducts: number;
   averagePrice: number;
-  productsByCategory: Record<string, number>;
+  categoryDistribution: Array<{ name: string; count: number; percentage: number }>;
   productsByCondition: Record<string, number>;
 }
 
@@ -276,6 +277,9 @@ export class ReportsService {
     const activeProducts = products.filter(
       (p) => p.status === ProductStatus.active,
     ).length;
+    const pendingProducts = products.filter(
+      (p) => p.status === ProductStatus.pending,
+    ).length;
     const soldProducts = products.filter(
       (p) => p.status === ProductStatus.sold,
     ).length;
@@ -284,13 +288,20 @@ export class ReportsService {
     const averagePrice =
       prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
 
-    // Products by category
-    const productsByCategory: Record<string, number> = {};
+    // Products by category -> categoryDistribution [{ name, count, percentage }]
+    const categoryCounts: Record<string, number> = {};
     for (const product of products) {
       const categoryName = product.category.name;
-      productsByCategory[categoryName] =
-        (productsByCategory[categoryName] || 0) + 1;
+      categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
     }
+    const totalForPct = totalProducts || 1;
+    const categoryDistribution = Object.entries(categoryCounts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: Math.round((count / totalForPct) * 1000) / 10,
+      }))
+      .sort((a, b) => b.count - a.count);
 
     // Products by condition
     const productsByCondition: Record<string, number> = {};
@@ -302,9 +313,10 @@ export class ReportsService {
     return {
       totalProducts,
       activeProducts,
+      pendingProducts,
       soldProducts,
       averagePrice: Math.round(averagePrice * 100) / 100,
-      productsByCategory,
+      categoryDistribution,
       productsByCondition,
     };
   }

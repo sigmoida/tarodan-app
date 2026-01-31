@@ -18,6 +18,11 @@ const nextConfig = {
         hostname: 'localhost',
       },
       {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '9000',
+      },
+      {
         protocol: 'https',
         hostname: '*.minio.tarodan.com',
       },

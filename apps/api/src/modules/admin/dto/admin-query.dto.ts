@@ -1,6 +1,6 @@
-import { IsOptional, IsEnum, IsString, IsNumber, Min, Max, IsDateString } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsNumber, Min, Max, IsDateString, IsBoolean, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ProductStatus, OrderStatus } from '@prisma/client';
 
 export class AdminUserQueryDto {
@@ -16,6 +16,12 @@ export class AdminUserQueryDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   isVerified?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isBanned?: boolean;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
@@ -49,6 +55,11 @@ export class AdminProductQueryDto {
   @IsString()
   categoryId?: string;
 
+  @ApiPropertyOptional({ example: 'uuid-seller-id' })
+  @IsOptional()
+  @IsString()
+  sellerId?: string;
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @IsNumber()
@@ -80,6 +91,21 @@ export class AdminOrderQueryDto {
   @IsOptional()
   @IsDateString()
   toDate?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-user-id' })
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @ApiPropertyOptional({ enum: ['buyer', 'seller'], description: 'When filtering by userId: buyer or seller' })
+  @IsOptional()
+  @IsIn(['buyer', 'seller'])
+  userRole?: 'buyer' | 'seller';
+
+  @ApiPropertyOptional({ example: 'uuid-product-id' })
+  @IsOptional()
+  @IsString()
+  productId?: string;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

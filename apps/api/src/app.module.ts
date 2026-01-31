@@ -64,6 +64,9 @@ import { MediaModule } from './modules/media';
 // Event service for queue publishing
 import { EventModule } from './modules/events';
 
+// Advertisement banners (public + admin)
+import { AdvertisementModule } from './modules/advertisement/advertisement.module';
+
 @Module({
   imports: [
     // Configuration
@@ -142,6 +145,9 @@ import { EventModule } from './modules/events';
 
     // Event publishing (BullMQ queues)
     EventModule,        // order.created, order.paid events
+
+    // Advertisement banners (public /api/ads + admin /api/admin/ads)
+    AdvertisementModule,
   ],
   controllers: [],
   providers: [

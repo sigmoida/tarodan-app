@@ -1,22 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
-import { MagnifyingGlassIcon, EyeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { adminApi } from '@/lib/api';
+import { MagnifyingGlassIcon, EyeIcon, ExclamationTriangleIcon, UserIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface Trade {
   id: string;
   tradeNumber: string;
   status: string;
-  initiator: { displayName: string };
-  receiver: { displayName: string };
+  initiator: { id: string; displayName: string };
+  receiver: { id: string; displayName: string };
   initiatorItemsCount: number;
   receiverItemsCount: number;
   cashAmount?: number;
   hasDispute: boolean;
   createdAt: string;
+}
+
+interface User {
+  id: string;
+  displayName: string;
+  email: string;
 }
 
 const statusOptions = [
@@ -30,15 +38,70 @@ const statusOptions = [
 ];
 
 export default function TradesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const urlUserId = useMemo(() => searchParams.get('userId') || '', [searchParams]);
+
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  // User filtering
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
+  const [userSearch, setUserSearch] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Load users for dropdown
+  const loadUsers = useCallback(async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setUsers([]);
+      return;
+    }
+    setLoadingUsers(true);
+    try {
+      const response = await adminApi.getUsers({ search: searchTerm, limit: 10 });
+      const data = response.data.data || response.data.users || [];
+      setUsers(data.map((u: any) => ({ id: u.id, displayName: u.displayName, email: u.email })));
+    } catch (error) {
+      console.error('Load users error:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  // Debounce user search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (userSearch) loadUsers(userSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearch, loadUsers]);
+
+  // Sync URL userId with state
+  useEffect(() => {
+    setSelectedUserId(urlUserId);
+  }, [urlUserId]);
+
+  const handleSelectUser = (user: User) => {
+    setSelectedUserId(user.id);
+    setUserSearch(user.displayName);
+    setShowUserDropdown(false);
+    router.push(`/trades?userId=${user.id}`);
+  };
+
+  const clearUserFilter = () => {
+    setSelectedUserId('');
+    setUserSearch('');
+    router.push('/trades');
+  };
+
   useEffect(() => {
     loadTrades();
-  }, [page, status]);
+  }, [page, status, selectedUserId]);
 
   const loadTrades = async () => {
     setLoading(true);
@@ -47,6 +110,7 @@ export default function TradesPage() {
         page,
         limit: 20,
         status: status === 'all' ? undefined : status,
+        userId: selectedUserId || undefined,
       });
       const data = response.data.data || response.data.trades || [];
       const meta = response.data.meta || {};
@@ -54,8 +118,8 @@ export default function TradesPage() {
         id: t.id,
         tradeNumber: t.tradeNumber || `TRD-${t.id.slice(0, 8)}`,
         status: t.status,
-        initiator: t.initiator || { displayName: 'Başlatan' },
-        receiver: t.receiver || { displayName: 'Alıcı' },
+        initiator: t.initiator || { id: '', displayName: 'Başlatan' },
+        receiver: t.receiver || { id: '', displayName: 'Alıcı' },
         initiatorItemsCount: t.initiatorItems?.length || 0,
         receiverItemsCount: t.receiverItems?.length || 0,
         cashAmount: Number(t.cashAmount || 0),
@@ -106,7 +170,15 @@ export default function TradesPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-white">Takaslar</h1>
-            <p className="text-gray-400 mt-1">Toplam {total} takas</p>
+            <p className="text-gray-400 mt-1">
+              Toplam {total} takas
+              {selectedUserId && (
+                <span className="ml-2">
+                  — Kullanıcıya göre filtreleniyor
+                  <button onClick={clearUserFilter} className="ml-2 text-primary-500 hover:underline">Filtreyi kaldır</button>
+                </span>
+              )}
+            </p>
           </div>
           {disputedCount > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 bg-red-900/20 border border-red-700 rounded-lg">
@@ -116,11 +188,56 @@ export default function TradesPage() {
           )}
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* User Filter */}
+          <div className="relative w-full sm:w-64">
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Kullanıcı ara..."
+              value={userSearch}
+              onChange={(e) => {
+                setUserSearch(e.target.value);
+                setShowUserDropdown(true);
+              }}
+              onFocus={() => setShowUserDropdown(true)}
+              className="admin-input pl-10 pr-10"
+            />
+            {selectedUserId && (
+              <button
+                onClick={clearUserFilter}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                <XCircleIcon className="h-5 w-5" />
+              </button>
+            )}
+            
+            {showUserDropdown && userSearch.length >= 2 && (
+              <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {loadingUsers ? (
+                  <div className="p-3 text-center text-gray-400">Aranıyor...</div>
+                ) : users.length > 0 ? (
+                  users.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleSelectUser(user)}
+                      className="w-full px-4 py-2 text-left hover:bg-dark-600 text-white"
+                    >
+                      <div className="font-medium">{user.displayName}</div>
+                      <div className="text-xs text-gray-400">{user.email}</div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-3 text-center text-gray-400">Kullanıcı bulunamadı</div>
+                )}
+              </div>
+            )}
+          </div>
+          
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="admin-input w-48"
+            className="admin-input w-full sm:w-48"
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -163,8 +280,22 @@ export default function TradesPage() {
                     <tr key={trade.id} className={trade.hasDispute ? 'bg-red-900/10' : ''}>
                       <td className="font-mono text-sm">{trade.tradeNumber}</td>
                       <td>{getStatusBadge(trade.status, trade.hasDispute)}</td>
-                      <td>{trade.initiator.displayName}</td>
-                      <td>{trade.receiver.displayName}</td>
+                      <td>
+                        <Link
+                          href={`/users/${trade.initiator.id}`}
+                          className="text-white hover:text-primary-500"
+                        >
+                          {trade.initiator.displayName}
+                        </Link>
+                      </td>
+                      <td>
+                        <Link
+                          href={`/users/${trade.receiver.id}`}
+                          className="text-white hover:text-primary-500"
+                        >
+                          {trade.receiver.displayName}
+                        </Link>
+                      </td>
                       <td>
                         {trade.initiatorItemsCount} ↔️ {trade.receiverItemsCount}
                       </td>
@@ -181,7 +312,7 @@ export default function TradesPage() {
                       <td>
                         <div className="flex gap-1">
                           <Link
-                            href={`/admin/trades/${trade.id}`}
+                            href={`/trades/${trade.id}`}
                             className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
                             title="Detay"
                           >

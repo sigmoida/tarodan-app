@@ -98,7 +98,7 @@ export default function TradeDetailPage() {
     } catch (error: any) {
       console.error('Trade load error:', error);
       toast.error(error.response?.data?.message || 'Takas yüklenemedi');
-      router.push('/admin/trades');
+      router.push('/trades');
     } finally {
       setLoading(false);
     }
@@ -153,7 +153,7 @@ export default function TradeDetailPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              href="/admin/trades"
+              href="/trades"
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
@@ -189,7 +189,7 @@ export default function TradeDetailPage() {
                 </h2>
                 <div className="space-y-2 mb-4">
                   <Link
-                    href={`/admin/users/${trade.initiator.id}`}
+                    href={`/users/${trade.initiator.id}`}
                     className="text-primary-600 hover:text-primary-700 font-medium block"
                   >
                     {trade.initiator.displayName}
@@ -211,7 +211,7 @@ export default function TradeDetailPage() {
                       )}
                       <div className="flex-1">
                         <Link
-                          href={`/admin/products/${item.product.id}`}
+                          href={`/products/${item.product.id}`}
                           className="text-primary-600 hover:text-primary-700 font-medium text-sm"
                         >
                           {item.product.title}
@@ -235,7 +235,7 @@ export default function TradeDetailPage() {
                 </h2>
                 <div className="space-y-2 mb-4">
                   <Link
-                    href={`/admin/users/${trade.receiver.id}`}
+                    href={`/users/${trade.receiver.id}`}
                     className="text-primary-600 hover:text-primary-700 font-medium block"
                   >
                     {trade.receiver.displayName}
@@ -257,7 +257,7 @@ export default function TradeDetailPage() {
                       )}
                       <div className="flex-1">
                         <Link
-                          href={`/admin/products/${item.product.id}`}
+                          href={`/products/${item.product.id}`}
                           className="text-primary-600 hover:text-primary-700 font-medium text-sm"
                         >
                           {item.product.title}

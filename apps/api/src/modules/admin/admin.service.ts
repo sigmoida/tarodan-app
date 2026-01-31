@@ -335,6 +335,10 @@ export class AdminService {
       where.isVerified = isVerified;
     }
 
+    if (query.isBanned === true) {
+      where.isBanned = true;
+    }
+
     const [total, users] = await Promise.all([
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({
@@ -347,7 +351,10 @@ export class AdminService {
           isSeller: true,
           sellerType: true,
           isVerified: true,
+          isBanned: true,
           createdAt: true,
+          lastLoginAt: true,
+          lastActivityAt: true,
           _count: {
             select: {
               products: true,
@@ -356,7 +363,10 @@ export class AdminService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [
+          { lastLoginAt: { sort: 'desc', nulls: 'last' } },
+          { createdAt: 'desc' },
+        ],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -386,37 +396,56 @@ export class AdminService {
             price: true,
             status: true,
             createdAt: true,
+            images: { take: 1, select: { url: true } },
           },
         },
         buyerOrders: {
           take: 10,
           orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            orderNumber: true,
-            totalAmount: true,
-            status: true,
-            createdAt: true,
+          include: {
+            seller: { select: { id: true, displayName: true } },
+            product: { select: { id: true, title: true } },
           },
         },
         sellerOrders: {
           take: 10,
           orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            orderNumber: true,
-            totalAmount: true,
-            status: true,
-            createdAt: true,
+          include: {
+            buyer: { select: { id: true, displayName: true } },
+            product: { select: { id: true, title: true } },
+          },
+        },
+        initiatedTrades: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            receiver: { select: { id: true, displayName: true } },
+            initiatorItems: { include: { product: { select: { id: true, title: true } } } },
+            receiverItems: { include: { product: { select: { id: true, title: true } } } },
+          },
+        },
+        receivedTrades: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            initiator: { select: { id: true, displayName: true } },
+            initiatorItems: { include: { product: { select: { id: true, title: true } } } },
+            receiverItems: { include: { product: { select: { id: true, title: true } } } },
           },
         },
         givenRatings: {
           take: 5,
           orderBy: { createdAt: 'desc' },
+          include: {
+            receiver: { select: { id: true, displayName: true } },
+          },
         },
         receivedRatings: {
           take: 5,
           orderBy: { createdAt: 'desc' },
+          include: {
+            giver: { select: { id: true, displayName: true } },
+          },
         },
         membership: {
           include: {
@@ -430,6 +459,10 @@ export class AdminService {
             sellerOrders: true,
             givenRatings: true,
             receivedRatings: true,
+            initiatedTrades: true,
+            receivedTrades: true,
+            sentMessages: true,
+            receivedMessages: true,
           },
         },
       },
@@ -444,21 +477,61 @@ export class AdminService {
       ? user.receivedRatings.reduce((sum, r) => sum + r.score, 0) / user.receivedRatings.length
       : null;
 
+    // Combine and sort all trades
+    const allTrades = [
+      ...user.initiatedTrades.map((t) => ({ ...t, role: 'initiator' as const })),
+      ...user.receivedTrades.map((t) => ({ ...t, role: 'receiver' as const })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
+
+    // Combine and sort all orders (as buyer and seller)
+    const allOrders = [
+      ...user.buyerOrders.map((o) => ({ 
+        ...o, 
+        role: 'buyer' as const,
+        totalAmount: Number(o.totalAmount),
+        commissionAmount: Number(o.commissionAmount),
+        otherParty: o.seller,
+      })),
+      ...user.sellerOrders.map((o) => ({ 
+        ...o, 
+        role: 'seller' as const,
+        totalAmount: Number(o.totalAmount),
+        commissionAmount: Number(o.commissionAmount),
+        otherParty: o.buyer,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
+
     return {
       ...user,
+      lastLoginAt: user.lastLoginAt ?? null,
+      lastActivityAt: user.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
       products: user.products.map((p) => ({
         ...p,
         price: Number(p.price),
+        imageUrl: p.images?.[0]?.url || null,
       })),
-      buyerOrders: user.buyerOrders.map((o) => ({
-        ...o,
-        totalAmount: Number(o.totalAmount),
+      recentOrders: allOrders,
+      recentTrades: allTrades.map((t) => ({
+        ...t,
+        cashAmount: t.cashAmount ? Number(t.cashAmount) : null,
       })),
-      sellerOrders: user.sellerOrders.map((o) => ({
-        ...o,
-        totalAmount: Number(o.totalAmount),
-      })),
+      givenRatings: user.givenRatings,
+      receivedRatings: user.receivedRatings,
+      stats: {
+        productsCount: user._count.products,
+        ordersCount: user._count.buyerOrders + user._count.sellerOrders,
+        buyerOrdersCount: user._count.buyerOrders,
+        sellerOrdersCount: user._count.sellerOrders,
+        tradesCount: user._count.initiatedTrades + user._count.receivedTrades,
+        initiatedTradesCount: user._count.initiatedTrades,
+        receivedTradesCount: user._count.receivedTrades,
+        messagesCount: user._count.sentMessages + user._count.receivedMessages,
+        sentMessagesCount: user._count.sentMessages,
+        receivedMessagesCount: user._count.receivedMessages,
+        givenRatingsCount: user._count.givenRatings,
+        receivedRatingsCount: user._count.receivedRatings,
+      },
     };
   }
 
@@ -544,7 +617,7 @@ export class AdminService {
    * Get products with filters
    */
   async getProducts(query: AdminProductQueryDto) {
-    const { search, status, categoryId, page = 1, limit = 20 } = query;
+    const { search, status, categoryId, sellerId, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {};
 
@@ -561,6 +634,10 @@ export class AdminService {
 
     if (categoryId) {
       where.categoryId = categoryId;
+    }
+
+    if (sellerId) {
+      where.sellerId = sellerId;
     }
 
     const [total, products] = await Promise.all([
@@ -653,18 +730,152 @@ export class AdminService {
     return { success: true, productId, status: 'rejected', reason: dto.reason };
   }
 
+  /**
+   * Bulk approve multiple products
+   */
+  async bulkApproveProducts(adminId: string, ids: string[], note?: string) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('En az bir ürün seçilmelidir');
+    }
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const productId of ids) {
+      try {
+        const product = await this.prisma.product.findUnique({
+          where: { id: productId },
+        });
+
+        if (!product) {
+          results.push({ id: productId, success: false, error: 'Ürün bulunamadı' });
+          continue;
+        }
+
+        if (product.status !== ProductStatus.pending) {
+          results.push({ id: productId, success: false, error: 'Sadece bekleyen ürünler onaylanabilir' });
+          continue;
+        }
+
+        const updated = await this.prisma.product.update({
+          where: { id: productId },
+          data: { status: ProductStatus.active },
+        });
+
+        await this.createAuditLog(adminId, 'product_bulk_approve', 'Product', productId, product, { ...updated, note });
+
+        // Index to Elasticsearch
+        try {
+          await this.searchService.indexProduct(productId);
+        } catch (error) {
+          this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
+        }
+
+        // Invalidate product cache
+        await this.cache.del(`product:${productId}`);
+
+        results.push({ id: productId, success: true });
+      } catch (error) {
+        results.push({ id: productId, success: false, error: error.message });
+      }
+    }
+
+    // Invalidate product list cache
+    await this.cache.delPattern('products:list:*');
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    return {
+      success: true,
+      message: `${successCount} ürün onaylandı${failCount > 0 ? `, ${failCount} ürün başarısız oldu` : ''}`,
+      results,
+    };
+  }
+
+  /**
+   * Bulk reject multiple products
+   */
+  async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('En az bir ürün seçilmelidir');
+    }
+
+    if (!reason || reason.trim() === '') {
+      throw new BadRequestException('Red sebebi zorunludur');
+    }
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const productId of ids) {
+      try {
+        const product = await this.prisma.product.findUnique({
+          where: { id: productId },
+        });
+
+        if (!product) {
+          results.push({ id: productId, success: false, error: 'Ürün bulunamadı' });
+          continue;
+        }
+
+        const updated = await this.prisma.product.update({
+          where: { id: productId },
+          data: { status: ProductStatus.rejected },
+        });
+
+        await this.createAuditLog(adminId, 'product_bulk_reject', 'Product', productId, product, { ...updated, reason });
+
+        // Invalidate product cache
+        await this.cache.del(`product:${productId}`);
+
+        results.push({ id: productId, success: true });
+      } catch (error) {
+        results.push({ id: productId, success: false, error: error.message });
+      }
+    }
+
+    // Invalidate product list cache
+    await this.cache.delPattern('products:list:*');
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    return {
+      success: true,
+      message: `${successCount} ürün reddedildi${failCount > 0 ? `, ${failCount} ürün başarısız oldu` : ''}`,
+      results,
+      reason,
+    };
+  }
+
   // ==================== ORDER MANAGEMENT ====================
 
   /**
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { status, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
 
     const where: Prisma.OrderWhereInput = {};
 
     if (status) {
       where.status = status;
+    }
+
+    if (userId) {
+      if (userRole === 'buyer') {
+        where.buyerId = userId;
+      } else if (userRole === 'seller') {
+        where.sellerId = userId;
+      } else {
+        where.OR = [
+          { buyerId: userId },
+          { sellerId: userId },
+        ];
+      }
+    }
+
+    if (productId) {
+      where.productId = productId;
     }
 
     if (fromDate || toDate) {
@@ -816,6 +1027,7 @@ export class AdminService {
       completedOrders,
       totalRevenue,
       revenue7d,
+      byCategory,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
@@ -836,7 +1048,26 @@ export class AdminService {
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
       }),
+      this.prisma.product.groupBy({
+        by: ['categoryId'],
+        _count: { id: true },
+      }),
     ]);
+
+    const categoryIds = [...new Set(byCategory.map((c) => c.categoryId).filter(Boolean))] as string[];
+    const categories = categoryIds.length > 0
+      ? await this.prisma.category.findMany({
+          where: { id: { in: categoryIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+    const categoryDistribution = byCategory
+      .map((c) => ({
+        name: c.categoryId ? (categoryMap.get(c.categoryId) || 'Kategorisiz') : 'Kategorisiz',
+        count: c._count.id,
+      }))
+      .sort((a, b) => b.count - a.count);
 
     return {
       users: {
@@ -857,6 +1088,7 @@ export class AdminService {
         total: Number(totalRevenue._sum.commissionAmount || 0),
         last7d: Number(revenue7d._sum.commissionAmount || 0),
       },
+      categoryDistribution,
     };
   }
 
@@ -888,26 +1120,41 @@ export class AdminService {
    * Requirement: GET /admin/analytics/sales (7.2)
    */
   async getSalesAnalytics(query: AnalyticsQueryDto) {
-    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
+    const endDate = new Date(endDateRaw);
+    endDate.setHours(23, 59, 59, 999);
     const startDate = query.startDate 
       ? new Date(query.startDate) 
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    startDate.setHours(0, 0, 0, 0);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-        status: { in: [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid] },
-      },
-      select: {
-        createdAt: true,
-        totalAmount: true,
-      },
-      orderBy: { createdAt: 'asc' },
+    const completedStatuses = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid] as const;
+    const [orders, ordersByStatus] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: { in: [...completedStatuses] },
+        },
+        select: {
+          createdAt: true,
+          totalAmount: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: { createdAt: { gte: startDate, lte: endDate } },
+        _count: { id: true },
+      }),
+    ]);
+
+    const ordersByStatusMap: Record<string, number> = {};
+    ordersByStatus.forEach((row) => {
+      ordersByStatusMap[row.status] = row._count.id;
     });
 
-    // Group by date
+    // Group by date (period data for charts and summary)
     const groupedData = new Map<string, { totalSales: number; orderCount: number }>();
-    
     orders.forEach((order) => {
       const dateKey = this.getDateKey(order.createdAt, query.groupBy);
       const existing = groupedData.get(dateKey) || { totalSales: 0, orderCount: 0 };
@@ -926,15 +1173,19 @@ export class AdminService {
         : 0,
     }));
 
+    const periodTotalSales = result.reduce((sum, r) => sum + r.totalSales, 0);
+    const periodTotalOrders = result.reduce((sum, r) => sum + r.orderCount, 0);
+    const periodAvgOrderValue = periodTotalOrders > 0
+      ? Math.round((periodTotalSales / periodTotalOrders) * 100) / 100
+      : 0;
+
     return {
       data: result,
       summary: {
-        totalSales: result.reduce((sum, r) => sum + r.totalSales, 0),
-        totalOrders: result.reduce((sum, r) => sum + r.orderCount, 0),
-        averageOrderValue: result.length > 0
-          ? Math.round((result.reduce((sum, r) => sum + r.totalSales, 0) / 
-              result.reduce((sum, r) => sum + r.orderCount, 0)) * 100) / 100
-          : 0,
+        totalSales: periodTotalSales,
+        totalOrders: periodTotalOrders,
+        averageOrderValue: periodAvgOrderValue,
+        ordersByStatus: ordersByStatusMap,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       },
@@ -946,11 +1197,15 @@ export class AdminService {
    * Requirement: GET /admin/analytics/revenue (7.2)
    */
   async getRevenueAnalytics(query: AnalyticsQueryDto) {
-    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
+    const endDate = new Date(endDateRaw);
+    endDate.setHours(23, 59, 59, 999);
     const startDate = query.startDate 
       ? new Date(query.startDate) 
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    startDate.setHours(0, 0, 0, 0);
 
+    const completedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid];
     const orders = await this.prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
@@ -966,15 +1221,11 @@ export class AdminService {
 
     // Group by date
     const groupedData = new Map<string, { gross: number; commission: number; refunded: number }>();
-    
     orders.forEach((order) => {
       const dateKey = this.getDateKey(order.createdAt, query.groupBy);
       const existing = groupedData.get(dateKey) || { gross: 0, commission: 0, refunded: 0 };
-      
       const isRefunded = order.status === OrderStatus.refunded;
-      const completedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid];
       const isCompleted = completedStatuses.includes(order.status);
-      
       groupedData.set(dateKey, {
         gross: existing.gross + (isCompleted ? Number(order.totalAmount) : 0),
         commission: existing.commission + (isCompleted ? Number(order.commissionAmount) : 0),
@@ -989,11 +1240,13 @@ export class AdminService {
       netRevenue: Math.round((data.gross - data.refunded) * 100) / 100,
     }));
 
+    const periodCommission = result.reduce((sum, r) => sum + r.commissionRevenue, 0);
+
     return {
       data: result,
       summary: {
         totalGrossRevenue: result.reduce((sum, r) => sum + r.grossRevenue, 0),
-        totalCommission: result.reduce((sum, r) => sum + r.commissionRevenue, 0),
+        totalCommission: periodCommission,
         totalNetRevenue: result.reduce((sum, r) => sum + r.netRevenue, 0),
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
@@ -1006,21 +1259,28 @@ export class AdminService {
    * Requirement: GET /admin/analytics/users (7.2)
    */
   async getUserAnalytics(query: AnalyticsQueryDto) {
-    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
+    const endDate = new Date(endDateRaw);
+    endDate.setHours(23, 59, 59, 999);
     const startDate = query.startDate 
       ? new Date(query.startDate) 
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    startDate.setHours(0, 0, 0, 0);
 
-    const users = await this.prisma.user.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-      },
-      select: {
-        createdAt: true,
-        isSeller: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [users, totalUsers, totalSellers] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+          createdAt: true,
+          isSeller: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { isSeller: true } }),
+    ]);
 
     // Get active users (those who placed orders or listed products in the period)
     const [activeOrderUsers, activeSellerUsers] = await Promise.all([
@@ -1069,8 +1329,10 @@ export class AdminService {
     return {
       data: result,
       summary: {
+        totalUsers,
         totalNewUsers: result.reduce((sum, r) => sum + r.newUsers, 0),
         totalNewSellers: result.reduce((sum, r) => sum + r.newSellers, 0),
+        totalSellers,
         averageDailyActiveUsers: result.length > 0
           ? Math.round(result.reduce((sum, r) => sum + r.activeUsers, 0) / result.length)
           : 0,
@@ -1398,6 +1660,271 @@ export class AdminService {
 
     // Default JSON format
     return { format: 'json', data: reportData, summary };
+  }
+
+  /**
+   * Generate users report (CSV/PDF/JSON)
+   * GET /admin/reports/users
+   */
+  async generateUsersReport(query: ReportQueryDto) {
+    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const users = await this.prisma.user.findMany({
+      where: { createdAt: { gte: startDate, lte: endDate } },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        isSeller: true,
+        sellerType: true,
+        isVerified: true,
+        isBanned: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const reportData = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      displayName: u.displayName ?? '',
+      phone: u.phone ?? '',
+      isSeller: u.isSeller,
+      sellerType: u.sellerType ?? '',
+      isVerified: u.isVerified,
+      isBanned: (u as any).isBanned ?? false,
+      createdAt: u.createdAt.toISOString().split('T')[0],
+    }));
+
+    const [totalUsers, newInPeriod] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { createdAt: { gte: startDate, lte: endDate } } }),
+    ]);
+
+    const summary = {
+      totalUsers,
+      newInPeriod: reportData.length,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+
+    if (query.format === 'csv') {
+      const headers = 'Id,Email,Display Name,Phone,Is Seller,Seller Type,Verified,Banned,Created At\n';
+      const rows = reportData
+        .map(
+          (r) =>
+            `${r.id},${r.email},"${(r.displayName || '').replace(/"/g, '""')}",${r.phone || ''},${r.isSeller},${r.sellerType},${r.isVerified},${r.isBanned},${r.createdAt}`,
+        )
+        .join('\n');
+      return { format: 'csv', content: headers + rows, summary };
+    }
+
+    if (query.format === 'pdf') {
+      return {
+        format: 'pdf',
+        data: reportData,
+        summary,
+        message: 'PDF generation requires frontend implementation with the provided data',
+      };
+    }
+
+    return { format: 'json', data: reportData, summary };
+  }
+
+  /**
+   * Generate products report (CSV/PDF/JSON)
+   * GET /admin/reports/products - also used by analytics dashboard (summary + categoryDistribution)
+   */
+  async generateProductsReport(query: ReportQueryDto) {
+    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [products, total, active, pending, byCategory, avgPrice] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { createdAt: { gte: startDate, lte: endDate } },
+        include: {
+          seller: { select: { id: true, displayName: true, email: true } },
+          category: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.product.count(),
+      this.prisma.product.count({ where: { status: ProductStatus.active } }),
+      this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+      this.prisma.product.groupBy({
+        by: ['categoryId'],
+        where: { createdAt: { gte: startDate, lte: endDate } },
+        _count: { id: true },
+      }),
+      this.prisma.product.aggregate({
+        where: { createdAt: { gte: startDate, lte: endDate }, status: ProductStatus.active },
+        _avg: { price: true },
+      }),
+    ]);
+
+    const categoryIds = [...new Set(byCategory.map((c) => c.categoryId).filter(Boolean))] as string[];
+    const categories = await this.prisma.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, name: true },
+    });
+    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+    const totalInPeriod = byCategory.reduce((sum, c) => sum + c._count.id, 0);
+    const categoryDistribution = byCategory
+      .map((c) => {
+        const name = c.categoryId ? categoryMap.get(c.categoryId) || 'Kategorisiz' : 'Kategorisiz';
+        const count = c._count.id;
+        const percentage = totalInPeriod > 0 ? Math.round((count / totalInPeriod) * 1000) / 10 : 0;
+        return { name, count, percentage };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    const reportData = products.map((p) => ({
+      id: p.id,
+      title: p.title,
+      price: Number(p.price),
+      status: p.status,
+      category: p.category?.name ?? 'N/A',
+      sellerName: p.seller?.displayName ?? '',
+      sellerEmail: p.seller?.email ?? '',
+      createdAt: p.createdAt.toISOString().split('T')[0],
+    }));
+
+    const summary = {
+      totalProducts: total,
+      activeProducts: active,
+      pendingProducts: pending,
+      averagePrice: Number(avgPrice._avg.price || 0),
+      categoryDistribution,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+
+    if (query.format === 'csv') {
+      const headers = 'Id,Title,Price,Status,Category,Seller Name,Seller Email,Created At\n';
+      const rows = reportData
+        .map(
+          (r) =>
+            `${r.id},"${(r.title || '').replace(/"/g, '""')}",${r.price},${r.status},${r.category},"${(r.sellerName || '').replace(/"/g, '""')}",${r.sellerEmail},${r.createdAt}`,
+        )
+        .join('\n');
+      return { format: 'csv', content: headers + rows, summary };
+    }
+
+    if (query.format === 'pdf') {
+      return {
+        format: 'pdf',
+        data: reportData,
+        summary,
+        message: 'PDF generation requires frontend implementation with the provided data',
+      };
+    }
+
+    // JSON: top-level summary fields for analytics dashboard + data for export
+    return {
+      format: 'json',
+      data: reportData,
+      summary,
+      totalProducts: total,
+      activeProducts: active,
+      pendingProducts: pending,
+      averagePrice: Number(avgPrice._avg.price || 0),
+      categoryDistribution,
+    };
+  }
+
+  /**
+   * Generate trades report (CSV/PDF/JSON)
+   * GET /admin/reports/trades - also used by analytics dashboard
+   */
+  async generateTradesReport(query: ReportQueryDto) {
+    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const trades = await this.prisma.trade.findMany({
+      where: { createdAt: { gte: startDate, lte: endDate } },
+      include: {
+        initiator: { select: { id: true, displayName: true, email: true } },
+        receiver: { select: { id: true, displayName: true, email: true } },
+        initiatorItems: { include: { product: { select: { title: true, price: true } } } },
+        receiverItems: { include: { product: { select: { title: true, price: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const [totalTrades, completedTrades, pendingTrades, disputedTrades] = await Promise.all([
+      this.prisma.trade.count(),
+      this.prisma.trade.count({ where: { status: TradeStatus.completed } }),
+      this.prisma.trade.count({
+        where: { status: { in: [TradeStatus.pending, TradeStatus.accepted] } },
+      }),
+      this.prisma.trade.count({
+        where: { dispute: { isNot: null } },
+      }),
+    ]);
+
+    const reportData = trades.map((t) => ({
+      id: t.id,
+      status: t.status,
+      initiatorName: t.initiator?.displayName ?? '',
+      initiatorEmail: t.initiator?.email ?? '',
+      receiverName: t.receiver?.displayName ?? '',
+      receiverEmail: t.receiver?.email ?? '',
+      createdAt: t.createdAt.toISOString().split('T')[0],
+      completedAt: t.completedAt?.toISOString().split('T')[0] ?? '',
+    }));
+
+    const summary = {
+      totalTrades,
+      completedTrades,
+      pendingTrades,
+      disputedTrades,
+      averageTradeValue: 0,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+
+    if (query.format === 'csv') {
+      const headers = 'Id,Status,Initiator Name,Initiator Email,Receiver Name,Receiver Email,Created At,Completed At\n';
+      const rows = reportData
+        .map(
+          (r) =>
+            `${r.id},${r.status},${r.initiatorName},${r.initiatorEmail},${r.receiverName},${r.receiverEmail},${r.createdAt},${r.completedAt}`,
+        )
+        .join('\n');
+      return { format: 'csv', content: headers + rows, summary };
+    }
+
+    if (query.format === 'pdf') {
+      return {
+        format: 'pdf',
+        data: reportData,
+        summary,
+        message: 'PDF generation requires frontend implementation with the provided data',
+      };
+    }
+
+    // JSON: top-level summary fields for analytics dashboard + data for export
+    return {
+      format: 'json',
+      data: reportData,
+      summary,
+      totalTrades: summary.totalTrades,
+      completedTrades: summary.completedTrades,
+      pendingTrades: summary.pendingTrades,
+      disputedTrades: summary.disputedTrades,
+      averageTradeValue: summary.averageTradeValue,
+    };
   }
 
   /**
@@ -2553,12 +3080,13 @@ export class AdminService {
     status?: TradeStatus;
     initiatorId?: string;
     receiverId?: string;
+    userId?: string;
     fromDate?: string;
     toDate?: string;
     page?: number;
     limit?: number;
   }) {
-    const { status, initiatorId, receiverId, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, initiatorId, receiverId, userId, fromDate, toDate, page = 1, limit = 20 } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -2566,12 +3094,18 @@ export class AdminService {
       where.status = status;
     }
 
-    if (initiatorId) {
-      where.initiatorId = initiatorId;
-    }
-
-    if (receiverId) {
-      where.receiverId = receiverId;
+    if (userId) {
+      where.OR = [
+        { initiatorId: userId },
+        { receiverId: userId },
+      ];
+    } else {
+      if (initiatorId) {
+        where.initiatorId = initiatorId;
+      }
+      if (receiverId) {
+        where.receiverId = receiverId;
+      }
     }
 
     if (fromDate || toDate) {
@@ -2832,11 +3366,9 @@ export class AdminService {
 
     const where: Prisma.MessageWhereInput = {};
 
-    if (status) {
+    // Only filter by status when explicitly provided (e.g. "Tümü" = no status = all messages)
+    if (status != null) {
       where.status = status;
-    } else {
-      // Default to pending_approval if no status specified
-      where.status = MessageStatus.pending_approval;
     }
 
     if (fromDate || toDate) {

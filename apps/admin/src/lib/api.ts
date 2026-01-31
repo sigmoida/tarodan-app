@@ -103,6 +103,8 @@ export const adminApi = {
     return api.post(`/admin/products/${id}/approve`, body);
   },
   rejectProduct: (id: string, reason: string) => api.post(`/admin/products/${id}/reject`, { reason }),
+  bulkApproveProducts: (ids: string[], note?: string) => api.post('/admin/products/bulk-approve', { ids, note }),
+  bulkRejectProducts: (ids: string[], reason: string) => api.post('/admin/products/bulk-reject', { ids, reason }),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
   
   // Orders
@@ -132,11 +134,11 @@ export const adminApi = {
     api.get('/admin/reports/sales', { params }),
   getCommissionReport: (params?: { startDate?: string; endDate?: string }) => 
     api.get('/admin/reports/commission', { params }),
-  getUserReport: (params?: any) => api.get('/reports/users', { params }),
-  getTradeReport: (params?: any) => api.get('/reports/trades', { params }),
-  getProductReport: (params?: any) => api.get('/reports/products', { params }),
-  exportReport: (type: string, format: string, params?: any) => 
-    api.get(`/admin/reports/${type}`, { params: { ...params, format }, responseType: format === 'json' ? 'json' : 'blob' }),
+  getUserReport: (params?: any) => api.get('/admin/reports/users', { params }),
+  getTradeReport: (params?: any) => api.get('/admin/reports/trades', { params }),
+  getProductReport: (params?: any) => api.get('/admin/reports/products', { params }),
+  exportReport: (type: string, format: string, params?: any) =>
+    api.get(`/admin/reports/${type}`, { params: { ...params, format }, responseType: 'json' }),
   
   // Settings
   getSettings: () => api.get('/admin/settings'),
@@ -156,6 +158,20 @@ export const adminApi = {
   updateCategory: (id: string, data: any) => api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
   
+  // Advertisements
+  getAds: () => api.get('/admin/ads'),
+  createAd: (data: any) => api.post('/admin/ads', data),
+  updateAd: (id: string, data: any) => api.patch(`/admin/ads/${id}`, data),
+  deleteAd: (id: string) => api.delete(`/admin/ads/${id}`),
+  reorderAds: (ids: string[]) => api.patch('/admin/ads/reorder', { ids }),
+  uploadAdImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ url: string }>('/admin/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   // Audit Logs
   getAuditLogs: (params?: any) => api.get('/admin/audit-logs', { params }),
   
