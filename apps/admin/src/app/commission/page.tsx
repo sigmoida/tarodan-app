@@ -30,7 +30,6 @@ interface CommissionRule {
   sellerMax: number | null;
   buyerMin: number | null;
   buyerMax: number | null;
-  priority: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,7 +50,6 @@ interface RuleFormData {
   sellerMax: string;
   buyerMin: string;
   buyerMax: string;
-  priority: number;
   isActive: boolean;
 }
 
@@ -124,7 +122,6 @@ export default function CommissionPage() {
       sellerMax: '',
       buyerMin: '',
       buyerMax: '',
-      priority: 0,
       isActive: true,
     });
     setPreviewPrice('');
@@ -144,7 +141,6 @@ export default function CommissionPage() {
       sellerMax: rule.sellerMax?.toString() || '',
       buyerMin: rule.buyerMin?.toString() || '',
       buyerMax: rule.buyerMax?.toString() || '',
-      priority: rule.priority,
       isActive: rule.isActive,
     });
     setPreviewPrice('');
@@ -225,7 +221,6 @@ export default function CommissionPage() {
         sellerMax: formData.sellerMax ? parseFloat(formData.sellerMax) : null,
         buyerMin: formData.buyerMin ? parseFloat(formData.buyerMin) : null,
         buyerMax: formData.buyerMax ? parseFloat(formData.buyerMax) : null,
-        priority: formData.priority,
         isActive: formData.isActive,
       };
 
@@ -302,9 +297,9 @@ export default function CommissionPage() {
             <div>
               <h4 className="text-blue-400 font-medium">Komisyon Hesaplama</h4>
               <p className="text-gray-400 text-sm mt-1">
-                Komisyon kuralları öncelik sırasına göre değerlendirilir. Bir sipariş için ilk eşleşen kural uygulanır.
-                Eşleşme sırası: Kategori + Satıcı Tipi &gt; Kategori &gt; Satıcı Tipi &gt; Varsayılan
-                Aynı eşleşme seviyesinde birden fazla kural varsa, öncelik (priority) yüksek olan uygulanır.
+                Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir sipariş için ilk eşleşen kural uygulanır.
+                Eşleşme sırası: Kategori + Satıcı Tipi &gt; Kategori + Tümü &gt; Satıcı Tipi &gt; Varsayılan (Tümü + Tümü)
+                Aynı kombinasyon (kategori + satıcı tipi) için sadece bir kural oluşturulabilir.
               </p>
             </div>
           </div>
@@ -335,9 +330,6 @@ export default function CommissionPage() {
                     Alıcı Oranı
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Öncelik
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Durum
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -348,7 +340,7 @@ export default function CommissionPage() {
               <tbody className="divide-y divide-dark-700">
                 {rules.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-400">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
                       Henüz komisyon kuralı eklenmemiş
                     </td>
                   </tr>
@@ -382,9 +374,6 @@ export default function CommissionPage() {
                         <span className="text-primary-400 font-semibold">
                           {rule.buyerRate !== null ? `%${rule.buyerRate.toFixed(2)}` : '-'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-gray-300">{rule.priority}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
@@ -518,15 +507,6 @@ export default function CommissionPage() {
                           onChange={(e) => setFormData({ ...formData, sellerRate: e.target.value })}
                           className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
                           required={formData.appliesTo === 'SELLER' || formData.appliesTo === 'BOTH'}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Öncelik</label>
-                        <input
-                          type="number"
-                          value={formData.priority}
-                          onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
-                          className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
                         />
                       </div>
                     </div>

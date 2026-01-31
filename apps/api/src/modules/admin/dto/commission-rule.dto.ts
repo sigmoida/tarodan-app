@@ -98,15 +98,6 @@ export class CreateCommissionRuleDto {
   buyerMax?: number;
 
   @ApiPropertyOptional({
-    example: 0,
-    description: 'Priority (higher = more important)',
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  priority?: number;
-
-  @ApiPropertyOptional({
     example: true,
     description: 'Whether the rule is active',
   })
@@ -220,12 +211,6 @@ export class UpdateCommissionRuleDto {
   @Min(0)
   buyerMax?: number;
 
-  @ApiPropertyOptional({ example: 0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  priority?: number;
-
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()
@@ -289,9 +274,6 @@ export class CommissionRuleResponseDto {
 
   @ApiPropertyOptional({ example: 50.0 })
   buyerMax?: number | null;
-
-  @ApiProperty({ example: 0 })
-  priority: number;
 
   @ApiProperty({ example: true })
   isActive: boolean;

@@ -214,49 +214,49 @@ export class OrderService {
 
   /**
    * Find matching commission rule by specificity
-   * Order: 1) cat+type, 2) type-only, 3) cat+ALL, 4) ALL+NULL
-   * Within same specificity, use priority (desc)
+   * Order: 1) cat+type, 2) cat+ALL (kategori öncelikli), 3) type-only, 4) ALL+NULL
+   * Each level can only have one rule (validated in admin service)
    */
   private findMatchingRule(
     rules: any[],
     categoryId: string | null | undefined,
     sellerType: CommissionSellerType
   ): any | null {
-    // 1. categoryId + sellerType
+    // 1. categoryId + sellerType (most specific)
     if (categoryId) {
-      const exact = rules
-        .filter(r => r.categoryId === categoryId && r.sellerType === sellerType)
-        .sort((a, b) => b.priority - a.priority)[0];
+      const exact = rules.find(
+        r => r.categoryId === categoryId && r.sellerType === sellerType
+      );
       if (exact) {
         this.logger.debug(`Matched exact rule: category=${categoryId}, sellerType=${sellerType}`);
         return exact;
       }
     }
 
-    // 2. categoryId IS NULL + sellerType
-    const typeOnly = rules
-      .filter(r => r.categoryId === null && r.sellerType === sellerType)
-      .sort((a, b) => b.priority - a.priority)[0];
-    if (typeOnly) {
-      this.logger.debug(`Matched seller type rule: sellerType=${sellerType}`);
-      return typeOnly;
-    }
-
-    // 3. categoryId + ALL
+    // 2. categoryId + ALL (category priority - more specific than seller type)
     if (categoryId) {
-      const catAll = rules
-        .filter(r => r.categoryId === categoryId && r.sellerType === CommissionSellerType.ALL)
-        .sort((a, b) => b.priority - a.priority)[0];
+      const catAll = rules.find(
+        r => r.categoryId === categoryId && r.sellerType === CommissionSellerType.ALL
+      );
       if (catAll) {
         this.logger.debug(`Matched category rule: category=${categoryId}, sellerType=ALL`);
         return catAll;
       }
     }
 
+    // 3. categoryId IS NULL + sellerType
+    const typeOnly = rules.find(
+      r => r.categoryId === null && r.sellerType === sellerType
+    );
+    if (typeOnly) {
+      this.logger.debug(`Matched seller type rule: sellerType=${sellerType}`);
+      return typeOnly;
+    }
+
     // 4. categoryId IS NULL + ALL (default)
-    const defaultRule = rules
-      .filter(r => r.categoryId === null && r.sellerType === CommissionSellerType.ALL)
-      .sort((a, b) => b.priority - a.priority)[0];
+    const defaultRule = rules.find(
+      r => r.categoryId === null && r.sellerType === CommissionSellerType.ALL
+    );
     
     if (defaultRule) {
       this.logger.debug('Using default commission rule (ALL+NULL)');

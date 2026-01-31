@@ -68,7 +68,6 @@ export class AdminService {
       sellerMax: r.sellerMax ? Number(r.sellerMax) : null,
       buyerMin: r.buyerMin ? Number(r.buyerMin) : null,
       buyerMax: r.buyerMax ? Number(r.buyerMax) : null,
-      priority: r.priority,
       isActive: r.isActive,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -106,6 +105,25 @@ export class AdminService {
     // If categoryId is empty string, set to null
     const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
 
+    // Check if a rule with the same combination already exists
+    const existingRule = await this.prisma.commissionRule.findFirst({
+      where: {
+        categoryId: categoryId,
+        sellerType: dto.sellerType,
+        isActive: true,
+      },
+    });
+
+    if (existingRule) {
+      const categoryName = categoryId 
+        ? (await this.prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name || 'Kategori'
+        : 'Tüm Kategoriler';
+      const sellerTypeName = dto.sellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : dto.sellerType;
+      throw new BadRequestException(
+        `Bu kombinasyon için zaten bir kural mevcut: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
+      );
+    }
+
     const rule = await this.prisma.commissionRule.create({
       data: {
         name: dto.name,
@@ -118,7 +136,7 @@ export class AdminService {
         sellerMax: dto.sellerMax != null ? dto.sellerMax : null,
         buyerMin: dto.buyerMin != null ? dto.buyerMin : null,
         buyerMax: dto.buyerMax != null ? dto.buyerMax : null,
-        priority: dto.priority ?? 0,
+        priority: 0, // Priority removed - each combination can only have one rule
         isActive: dto.isActive ?? true,
         // Legacy fields (for backward compatibility)
         percentage: dto.percentage ?? (dto.sellerRate || 0),
@@ -144,7 +162,6 @@ export class AdminService {
       sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
       buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
       buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
-      priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
@@ -198,6 +215,35 @@ export class AdminService {
       throw new BadRequestException('buyerMin cannot be greater than buyerMax');
     }
 
+    // Determine final categoryId and sellerType
+    const finalCategoryId = dto.categoryId !== undefined 
+      ? (dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null)
+      : existing.categoryId;
+    const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
+
+    // Check if changing categoryId or sellerType would conflict with another rule
+    if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
+        (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
+      const conflictingRule = await this.prisma.commissionRule.findFirst({
+        where: {
+          categoryId: finalCategoryId,
+          sellerType: finalSellerType,
+          isActive: true,
+          id: { not: existing.id }, // Exclude current rule
+        },
+      });
+
+      if (conflictingRule) {
+        const categoryName = finalCategoryId 
+          ? (await this.prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } }))?.name || 'Kategori'
+          : 'Tüm Kategoriler';
+        const sellerTypeName = finalSellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : finalSellerType;
+        throw new BadRequestException(
+          `Bu kombinasyon başka bir kural tarafından kullanılıyor: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
+        );
+      }
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name;
@@ -212,7 +258,7 @@ export class AdminService {
     if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
     if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
     if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
-    if (dto.priority !== undefined) updateData.priority = dto.priority;
+    // Priority removed - not used anymore
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     // Legacy fields
     if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
@@ -240,7 +286,6 @@ export class AdminService {
       sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
       buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
       buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
-      priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
