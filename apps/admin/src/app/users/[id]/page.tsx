@@ -150,7 +150,7 @@ export default function UserDetailPage() {
       const response = await adminApi.getUser(userId);
       setUser(response.data);
     } catch (error: any) {
-      console.error('User load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('User load error:', error);
       toast.error(error.response?.data?.message || 'Kullanıcı yüklenemedi');
       router.push('/users');
     } finally {

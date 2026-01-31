@@ -140,27 +140,22 @@ export const useAuthStore = create<AuthState>()(
       limits: null,
       
       login: async (email: string, password: string) => {
-        console.log('[AuthStore] login called with:', email);
         const response = await authApi.login(email, password);
-        console.log('[AuthStore] API response:', response.data);
         const { user: apiUser, tokens } = response.data;
         const token = tokens.accessToken;
         const refreshToken = tokens.refreshToken;
-        console.log('[AuthStore] Token extracted:', token ? 'yes' : 'no');
         
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', token);
           if (refreshToken) {
             localStorage.setItem('refresh_token', refreshToken);
           }
-          console.log('[AuthStore] Tokens saved to localStorage');
         }
         
         const user = mapApiUser(apiUser);
         const limits = TIER_LIMITS[user.membershipTier];
         
         set({ user, token, refreshToken, isAuthenticated: true, limits });
-        console.log('[AuthStore] State updated, isAuthenticated: true, tier:', user.membershipTier);
       },
       
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
@@ -230,7 +225,9 @@ export const useAuthStore = create<AuthState>()(
           const limits = TIER_LIMITS[user.membershipTier];
           set({ user, limits });
         } catch (error) {
-          console.error('Failed to refresh user:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to refresh user:', error);
+          }
         }
       },
       

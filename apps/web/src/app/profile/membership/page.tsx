@@ -39,7 +39,7 @@ export default function MembershipPage() {
         setMembership({ tier: 'free', isActive: true });
       }
     } catch (error) {
-      console.error('Membership load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Membership load error:', error);
       setMembership({ tier: 'free', isActive: true });
     } finally {
       setLoading(false);

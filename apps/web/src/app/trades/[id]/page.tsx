@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import {
   ArrowsRightLeftIcon,
@@ -139,13 +140,12 @@ const getStatusConfig = (locale: string): Record<string, { label: string; color:
 export default function TradeDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   const tradeId = params.id as string;
   const STATUS_CONFIG = getStatusConfig(locale);
 
-  const [trade, setTrade] = useState<Trade | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -166,9 +166,31 @@ export default function TradeDetailPage() {
       router.push(`/login?redirect=/trades/${tradeId}`);
       return;
     }
+  }, [isAuthenticated, locale, router, tradeId]);
 
-    fetchTrade();
-  }, [tradeId, isAuthenticated]);
+  const tradeQuery = useQuery({
+    queryKey: ['trade', tradeId],
+    queryFn: async (): Promise<Trade> => {
+      const response = await tradesApi.getOne(tradeId);
+      return response.data.trade || response.data;
+    },
+    enabled: !!tradeId && isAuthenticated,
+    meta: { page: 'trade-detail' },
+    retry: false,
+  });
+  const trade = tradeQuery.data ?? null;
+  const isLoading = tradeQuery.isLoading;
+  useEffect(() => {
+    if (tradeQuery.isError && tradeId) {
+      toast.error(locale === 'en' ? 'Failed to load trade' : 'Takas yüklenemedi');
+      router.push('/trades');
+    }
+  }, [tradeQuery.isError, tradeId, locale, router]);
+
+  const invalidateTrade = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['trade', tradeId] }),
+    queryClient.invalidateQueries({ queryKey: ['trades'] }),
+  ]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -222,20 +244,6 @@ export default function TradeDetailPage() {
     return () => clearInterval(interval);
   }, [trade]);
 
-  const fetchTrade = async () => {
-    setIsLoading(true);
-    try {
-      const response = await tradesApi.getOne(tradeId);
-      setTrade(response.data.trade || response.data);
-    } catch (error: any) {
-      console.error('Failed to fetch trade:', error);
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to load trade' : 'Takas yüklenemedi'));
-      router.push('/trades');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleAccept = async () => {
     if (!trade) return;
     
@@ -243,9 +251,9 @@ export default function TradeDetailPage() {
     try {
       await tradesApi.accept(trade.id, locale === 'en' ? 'I accept the trade offer' : 'Takas teklifini kabul ediyorum');
       toast.success(locale === 'en' ? 'Trade accepted!' : 'Takas kabul edildi!');
-      fetchTrade();
+      await invalidateTrade();
     } catch (error: any) {
-      console.error('Failed to accept trade:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to accept trade:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to accept trade' : 'Takas kabul edilemedi'));
     } finally {
       setIsActionLoading(false);
@@ -263,9 +271,9 @@ export default function TradeDetailPage() {
       toast.success(locale === 'en' ? 'Trade rejected' : 'Takas reddedildi');
       setShowRejectModal(false);
       setRejectReason('');
-      fetchTrade();
+      await invalidateTrade();
     } catch (error: any) {
-      console.error('Failed to reject trade:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to reject trade:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to reject trade' : 'Takas reddedilemedi'));
     } finally {
       setIsActionLoading(false);
@@ -283,9 +291,9 @@ export default function TradeDetailPage() {
     try {
       await tradesApi.cancel(trade.id, locale === 'en' ? 'Cancelled by user' : 'Kullanıcı tarafından iptal edildi');
       toast.success(locale === 'en' ? 'Trade cancelled' : 'Takas iptal edildi');
-      fetchTrade();
+      await invalidateTrade();
     } catch (error: any) {
-      console.error('Failed to cancel trade:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to cancel trade:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to cancel trade' : 'Takas iptal edilemedi'));
     } finally {
       setIsActionLoading(false);
@@ -387,7 +395,7 @@ export default function TradeDetailPage() {
 
       setCounterMessage('');
     } catch (error: any) {
-      console.error('Failed to load counter-offer data:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load counter-offer data:', error);
       toast.error(locale === 'en' ? 'Failed to load products' : 'Ürünler yüklenemedi');
       setIsCounterMode(false);
     } finally {
@@ -471,9 +479,9 @@ export default function TradeDetailPage() {
       });
       toast.success(locale === 'en' ? 'Counter offer sent!' : 'Karşı teklif gönderildi!');
       setIsCounterMode(false);
-      fetchTrade();
+      await invalidateTrade();
     } catch (error: any) {
-      console.error('Failed to send counter offer:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to send counter offer:', error);
       const errorMessage = error.response?.data?.message || (locale === 'en' ? 'Failed to send counter offer' : 'Karşı teklif gönderilemedi');
       
       // Handle specific error for identical counter-offer
@@ -615,12 +623,12 @@ export default function TradeDetailPage() {
                               </div>
                             )}
                             <div className="aspect-square relative bg-gray-100">
-                              <Image
+                              <OptimizedImage
                                 src={getProductImage(product)}
                                 alt={product.title}
                                 fill
                                 className="object-cover"
-                                unoptimized
+                                logContext={{ productId: product.id, page: 'trades-detail-receiver' }}
                               />
                             </div>
                             <div className="p-2 text-left">
@@ -677,12 +685,12 @@ export default function TradeDetailPage() {
                               </div>
                             )}
                             <div className="aspect-square relative bg-gray-100">
-                              <Image
+                              <OptimizedImage
                                 src={getProductImage(product)}
                                 alt={product.title}
                                 fill
                                 className="object-cover"
-                                unoptimized
+                                logContext={{ productId: product.id, page: 'trades-detail-counter' }}
                               />
                             </div>
                             <div className="p-2 text-left">
@@ -869,14 +877,14 @@ export default function TradeDetailPage() {
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                    <Image
+                    <OptimizedImage
                       src={getItemImage(item)}
                       alt={item.productTitle}
                       fill
                       className="object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                      }}
+                      sizes="64px"
+                      fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                      logContext={{ tradeId, itemId: item.id, page: 'trade-detail-their' }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -914,14 +922,14 @@ export default function TradeDetailPage() {
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                    <Image
+                    <OptimizedImage
                       src={getItemImage(item)}
                       alt={item.productTitle}
                       fill
                       className="object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                      }}
+                      sizes="64px"
+                      fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                      logContext={{ tradeId, itemId: item.id, page: 'trade-detail-mine' }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">

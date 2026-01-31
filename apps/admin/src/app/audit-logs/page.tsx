@@ -63,7 +63,7 @@ export default function AuditLogsPage() {
       setLogs(data);
       setTotal(response.data.meta?.total || response.data.total || 0);
     } catch (error: any) {
-      console.error('Load audit logs error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Load audit logs error:', error);
       toast.error(error.response?.data?.message || 'Audit loglar yüklenemedi');
     } finally {
       setLoading(false);

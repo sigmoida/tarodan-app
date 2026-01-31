@@ -25,7 +25,6 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('[Login] Already authenticated, redirecting...');
       const redirect = new URLSearchParams(window.location.search).get('redirect');
       router.push(redirect || '/');
     }
@@ -38,16 +37,16 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    console.log('[Login] Attempting login with:', email);
-    
+
     try {
       await login(email, password);
-      console.log('[Login] Login successful!');
       toast.success(t('auth.loginSuccess'));
       // Use window.location for reliable redirect
       window.location.href = '/';
     } catch (error: any) {
-      console.error('[Login] Login error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Login] Login error:', error);
+      }
       const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
       
       // Check if error is about unverified email

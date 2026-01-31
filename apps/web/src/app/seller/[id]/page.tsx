@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -28,9 +30,18 @@ import {
 import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
-import ReportModal from '@/components/ReportModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
+const ReportModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/ReportModal'), 'ReportModal'),
+  { ssr: false }
+);
 
 interface UserRating {
   id: string;
@@ -87,116 +98,104 @@ interface Product {
 
 export default function SellerProfilePage() {
   const params = useParams();
+  const queryClient = useQueryClient();
   const sellerId = params.id as string;
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
   
-  const [seller, setSeller] = useState<Seller | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [reviews, setReviews] = useState<UserRating[]>([]);
-  const [ratingStats, setRatingStats] = useState<RatingStats | null>(null);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [tab, setTab] = useState<'listings' | 'reviews'>('listings');
 
-  useEffect(() => {
-    if (sellerId) {
-      fetchSeller();
-      fetchProducts();
-      if (isAuthenticated && user?.id !== sellerId) {
-        checkFollowingStatus();
-      }
-    }
-  }, [sellerId, isAuthenticated]);
-
-  const checkFollowingStatus = async () => {
-    try {
-      const response = await api.get(`/users/${sellerId}/follow`);
-      setIsFollowing(response.data.following);
-    } catch (error) {
-      setIsFollowing(false);
-    }
-  };
-
-  const fetchSeller = async () => {
-    try {
+  const sellerQuery = useQuery({
+    queryKey: ['seller', sellerId],
+    queryFn: async (): Promise<Seller | null> => {
       const [profileRes, ratingStatsRes] = await Promise.all([
         api.get(`/users/${sellerId}/profile`).catch(() => null),
         ratingsApi.getUserStats(sellerId).catch(() => null),
       ]);
-      
       const statsData = ratingStatsRes?.data;
-      if (statsData) {
-        setRatingStats(statsData);
-      }
-      
       if (profileRes?.data) {
-        setSeller({
+        return {
           ...profileRes.data,
           stats: {
             ...profileRes.data.stats,
-            averageRating: statsData?.averageScore || profileRes.data.stats?.averageRating || 0,
-            totalRatings: statsData?.totalRatings || profileRes.data.stats?.totalRatings || 0,
+            averageRating: statsData?.averageScore ?? profileRes.data.stats?.averageRating ?? 0,
+            totalRatings: statsData?.totalRatings ?? profileRes.data.stats?.totalRatings ?? 0,
           }
-        });
-        setFollowersCount(profileRes.data.followersCount || 0);
-      } else {
-        const productsRes = await listingsApi.getAll({ sellerId, limit: 1 });
-        const firstProduct = productsRes.data?.data?.[0] || productsRes.data?.products?.[0];
-        if (firstProduct?.seller) {
-          setSeller({
-            id: firstProduct.seller.id,
-            displayName: firstProduct.seller.displayName,
-            avatarUrl: firstProduct.seller.avatarUrl,
-            createdAt: firstProduct.seller.createdAt || new Date().toISOString(),
-            isVerified: firstProduct.seller.isVerified || false,
-            stats: {
-              totalListings: 0,
-              totalSales: 0,
-              totalTrades: 0,
-              averageRating: statsData?.averageScore || firstProduct.seller.rating || 0,
-              totalRatings: statsData?.totalRatings || firstProduct.seller.totalRatings || 0,
-            }
-          });
-        }
+        };
       }
-    } catch (error) {
-      console.error('Failed to fetch seller:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const productsRes = await listingsApi.getAll({ sellerId, limit: 1 });
+      const firstProduct = productsRes.data?.data?.[0] || productsRes.data?.products?.[0];
+      if (firstProduct?.seller) {
+        return {
+          id: firstProduct.seller.id,
+          displayName: firstProduct.seller.displayName,
+          avatarUrl: firstProduct.seller.avatarUrl,
+          createdAt: firstProduct.seller.createdAt || new Date().toISOString(),
+          isVerified: firstProduct.seller.isVerified || false,
+          stats: {
+            totalListings: 0,
+            totalSales: 0,
+            totalTrades: 0,
+            averageRating: statsData?.averageScore ?? firstProduct.seller.rating ?? 0,
+            totalRatings: statsData?.totalRatings ?? firstProduct.seller.totalRatings ?? 0,
+          }
+        };
+      }
+      return null;
+    },
+    enabled: !!sellerId,
+    meta: { page: 'seller-profile' },
+  });
+  const seller = sellerQuery.data ?? null;
+  const isLoading = sellerQuery.isLoading;
+  const followersCount = (seller as any)?.followersCount ?? 0;
 
-  const fetchProducts = async () => {
-    try {
-      const response = await listingsApi.getAll({ 
-        sellerId, 
-        status: 'active',
-        limit: 50 
-      });
-      const data = response.data?.data || response.data?.products || [];
-      setProducts(data);
-    } catch (error) {
-      console.error('Failed to fetch products:', error);
-    }
-  };
+  const productsQuery = useQuery({
+    queryKey: ['seller-products', sellerId],
+    queryFn: async (): Promise<Product[]> => {
+      const response = await listingsApi.getAll({ sellerId, status: 'active', limit: 50 });
+      return response.data?.data || response.data?.products || [];
+    },
+    enabled: !!sellerId,
+    meta: { page: 'seller-products' },
+  });
+  const products = productsQuery.data ?? [];
 
-  const fetchReviews = async () => {
-    setReviewsLoading(true);
-    try {
+  const followQuery = useQuery({
+    queryKey: ['follow', sellerId],
+    queryFn: async () => {
+      const response = await api.get(`/users/${sellerId}/follow`);
+      return response.data.following;
+    },
+    enabled: !!sellerId && !!isAuthenticated && user?.id !== sellerId,
+    meta: { page: 'seller-follow' },
+  });
+  const isFollowing = followQuery.data ?? false;
+
+  const reviewsQuery = useQuery({
+    queryKey: ['seller-reviews', sellerId],
+    queryFn: async (): Promise<UserRating[]> => {
       const response = await ratingsApi.getUserRatings(sellerId);
-      const ratingsData = response.data?.ratings || response.data?.data || [];
-      setReviews(ratingsData);
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error);
-    } finally {
-      setReviewsLoading(false);
-    }
-  };
+      return response.data?.ratings || response.data?.data || [];
+    },
+    enabled: !!sellerId,
+    meta: { page: 'seller-reviews' },
+  });
+  const reviews = reviewsQuery.data ?? [];
+  const reviewsLoading = reviewsQuery.isLoading;
+
+  const ratingStatsQuery = useQuery({
+    queryKey: ['seller-rating-stats', sellerId],
+    queryFn: async () => {
+      const res = await ratingsApi.getUserStats(sellerId);
+      return res.data;
+    },
+    enabled: !!sellerId,
+    meta: { page: 'seller-rating-stats' },
+  });
+  const ratingStats = ratingStatsQuery.data ?? null;
 
   const handleFollow = async () => {
     if (!isAuthenticated) {
@@ -207,15 +206,15 @@ export default function SellerProfilePage() {
     try {
       if (isFollowing) {
         await api.delete(`/users/${sellerId}/follow`);
-        setIsFollowing(false);
-        setFollowersCount(prev => Math.max(0, prev - 1));
         toast.success(t('seller.unfollowed'));
       } else {
         await api.post(`/users/${sellerId}/follow`);
-        setIsFollowing(true);
-        setFollowersCount(prev => prev + 1);
         toast.success(t('seller.followed'));
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['follow', sellerId] }),
+        queryClient.invalidateQueries({ queryKey: ['seller', sellerId] }),
+      ]);
     } catch (error) {
       toast.error(t('common.operationFailed'));
     }
@@ -460,9 +459,6 @@ export default function SellerProfilePage() {
           <button
             onClick={() => {
               setTab('reviews');
-              if (reviews.length === 0) {
-                fetchReviews();
-              }
             }}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
               tab === 'reviews'
@@ -511,11 +507,13 @@ export default function SellerProfilePage() {
                         className="block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-gray-100"
                       >
                         <div className="relative aspect-square bg-gray-50">
-                          <Image
+                          <OptimizedImage
                             src={getImageUrl(product.images)}
                             alt={product.title}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            fallbackSrc="https://placehold.co/400x400/f8fafc/94a3b8?text=Ürün"
+                            logContext={{ productId: product.id, page: 'seller-products' }}
                           />
                           {product.isTradeEnabled && (
                             <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { OrderStatus, TradeStatus } from '@prisma/client';
@@ -22,6 +23,8 @@ import { NotificationType } from '../notification/dto';
 
 @Injectable()
 export class RatingService {
+  private readonly logger = new Logger(RatingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
@@ -163,7 +166,7 @@ export class RatingService {
       );
     } catch (error) {
       // Don't fail if notification fails
-      console.error('Failed to send review notification:', error);
+      this.logger.warn('Failed to send review notification');
     }
 
     return this.mapUserRatingToDto(rating);

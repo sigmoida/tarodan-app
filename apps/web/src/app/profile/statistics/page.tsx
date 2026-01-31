@@ -131,7 +131,7 @@ export default function StatisticsPage() {
         });
       }
     } catch (error) {
-      console.error('Statistics load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Statistics load error:', error);
       // Set default stats to prevent error state
       setStats({
         productsCount: 0,

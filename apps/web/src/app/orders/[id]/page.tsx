@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -85,11 +86,10 @@ const getStatusLabels = (locale: string): Record<string, { label: string; color:
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
   const statusLabels = getStatusLabels(locale);
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number | undefined>(undefined);
   const [processingRefund, setProcessingRefund] = useState(false);
@@ -101,30 +101,34 @@ export default function OrderDetailPage() {
       router.push('/login');
       return;
     }
-    if (orderId) {
-      loadOrder();
-    }
-  }, [isAuthenticated, orderId]);
+  }, [isAuthenticated, router]);
 
-  const loadOrder = async () => {
-    setLoading(true);
-    try {
+  const orderQuery = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: async (): Promise<OrderDetail> => {
       const response = await api.get(`/orders/${orderId}`);
-      setOrder(response.data);
-    } catch (error: any) {
-      console.error('Order load error:', error);
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to load order' : 'Sipariş yüklenemedi'));
+      return response.data;
+    },
+    enabled: !!orderId && isAuthenticated,
+    meta: { page: 'order-detail' },
+    retry: false,
+  });
+  const order = orderQuery.data ?? null;
+  const loading = orderQuery.isLoading;
+  useEffect(() => {
+    if (orderQuery.isError && orderId) {
+      toast.error(locale === 'en' ? 'Failed to load order' : 'Sipariş yüklenemedi');
       router.push('/orders');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [orderQuery.isError, orderId, locale, router]);
+
+  const invalidateOrder = () => queryClient.invalidateQueries({ queryKey: ['order', orderId] }).then(() => queryClient.invalidateQueries({ queryKey: ['orders'] }));
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
       await api.patch(`/orders/${orderId}/status`, { status: newStatus });
       toast.success(locale === 'en' ? 'Order status updated' : 'Sipariş durumu güncellendi');
-      loadOrder();
+      await invalidateOrder();
     } catch (error: any) {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update status' : 'Durum güncellenemedi'));
     }
@@ -135,14 +139,13 @@ export default function OrderDetailPage() {
       toast.error(locale === 'en' ? 'Payment information not found' : 'Ödeme bilgisi bulunamadı');
       return;
     }
-
     setProcessingRefund(true);
     try {
       await paymentsApi.refund(order.id, refundAmount);
       toast.success(locale === 'en' ? 'Refund process started' : 'İade işlemi başlatıldı');
       setShowRefundModal(false);
       setRefundAmount(undefined);
-      loadOrder();
+      await invalidateOrder();
     } catch (error: any) {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to start refund' : 'İade işlemi başlatılamadı'));
     } finally {

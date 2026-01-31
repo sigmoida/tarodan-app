@@ -46,7 +46,7 @@ export default function PaymentSuccessPage() {
         : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
     } catch (error) {
-      console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
     } finally {
       setIsLoading(false);
     }

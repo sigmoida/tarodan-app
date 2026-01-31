@@ -91,7 +91,7 @@ export default function OrderDetailPage() {
       setOrder(response.data);
       setNewStatus(response.data.status);
     } catch (error: any) {
-      console.error('Order load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Order load error:', error);
       toast.error(error.response?.data?.message || 'Sipariş yüklenemedi');
       router.push('/orders');
     } finally {

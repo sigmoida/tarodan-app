@@ -75,7 +75,7 @@ export default function ProductsPage() {
       const data = response.data.data || response.data.users || [];
       setUsers(data.map((u: any) => ({ id: u.id, displayName: u.displayName, email: u.email })));
     } catch (error) {
-      console.error('Load users error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Load users error:', error);
     } finally {
       setLoadingUsers(false);
     }
@@ -141,7 +141,7 @@ export default function ProductsPage() {
       setPendingCount(mappedProducts.filter((p: Product) => p.status === 'pending').length);
       setSelectedIds(new Set()); // Clear selection on page change
     } catch (error) {
-      console.error('Products load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Products load error:', error);
       toast.error('Ürünler yüklenemedi');
     } finally {
       setLoading(false);
@@ -154,8 +154,8 @@ export default function ProductsPage() {
       toast.success('Ürün onaylandı');
       loadProducts();
     } catch (error: any) {
-      console.error('Approve error:', error);
-      
+      if (process.env.NODE_ENV === 'development') console.error('Approve error:', error);
+
       // Better error handling
       let errorMessage = 'İşlem başarısız';
       
@@ -183,7 +183,7 @@ export default function ProductsPage() {
       toast.success('Ürün reddedildi');
       loadProducts();
     } catch (error: any) {
-      console.error('Reject error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Reject error:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'İşlem başarısız';
       toast.error(errorMessage);
     }
@@ -236,7 +236,7 @@ export default function ProductsPage() {
       setSelectedIds(new Set());
       loadProducts();
     } catch (error: any) {
-      console.error('Bulk approve error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Bulk approve error:', error);
       toast.error(error.response?.data?.message || 'Toplu onaylama başarısız');
     } finally {
       setBulkProcessing(false);
@@ -259,7 +259,7 @@ export default function ProductsPage() {
       setSelectedIds(new Set());
       loadProducts();
     } catch (error: any) {
-      console.error('Bulk reject error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Bulk reject error:', error);
       toast.error(error.response?.data?.message || 'Toplu reddetme başarısız');
     } finally {
       setBulkProcessing(false);

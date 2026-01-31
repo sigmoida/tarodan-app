@@ -178,7 +178,7 @@ export class ProductService {
       try {
         await this.searchService.indexProduct(product.id);
       } catch (error) {
-        console.error('Failed to index product to Elasticsearch:', error);
+        this.logger.warn('Failed to index product to Elasticsearch');
         // Don't fail the request if indexing fails
       }
     }
@@ -653,7 +653,7 @@ export class ProductService {
         try {
           await this.searchService.indexProduct(updated.id);
         } catch (error) {
-          console.error('Failed to update product in Elasticsearch:', error);
+          this.logger.warn('Failed to update product in Elasticsearch');
           // Don't fail the request if indexing fails
         }
       } else {
@@ -661,7 +661,7 @@ export class ProductService {
         try {
           await this.searchService.removeProduct(updated.id);
         } catch (error) {
-          console.error('Failed to remove product from Elasticsearch:', error);
+          this.logger.warn('Failed to remove product from Elasticsearch');
           // Don't fail the request if indexing fails
         }
       }
@@ -916,7 +916,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     try {
       await this.searchService.removeProduct(id);
     } catch (error) {
-      console.error('Failed to remove product from Elasticsearch:', error);
+      this.logger.warn('Failed to remove product from Elasticsearch');
       // Don't fail the request if indexing fails
     }
 

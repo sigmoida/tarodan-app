@@ -96,7 +96,7 @@ export default function TradeDetailPage() {
       const response = await adminApi.getTrade(tradeId);
       setTrade(response.data);
     } catch (error: any) {
-      console.error('Trade load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Trade load error:', error);
       toast.error(error.response?.data?.message || 'Takas yüklenemedi');
       router.push('/trades');
     } finally {

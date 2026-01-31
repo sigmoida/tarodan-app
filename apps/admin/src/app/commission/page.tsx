@@ -102,7 +102,7 @@ export default function CommissionPage() {
       setRules(rulesResponse.data.data || rulesResponse.data || []);
       setCategories(categoriesResponse.data.data || categoriesResponse.data || []);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load data:', error);
       toast.error('Veriler yüklenirken hata oluştu');
     } finally {
       setLoading(false);
@@ -235,7 +235,7 @@ export default function CommissionPage() {
       setShowModal(false);
       loadData();
     } catch (error: any) {
-      console.error('Failed to save commission rule:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to save commission rule:', error);
       toast.error(error.response?.data?.message || 'Komisyon kuralı kaydedilirken hata oluştu');
     }
   };
@@ -247,7 +247,7 @@ export default function CommissionPage() {
       setDeleteConfirm(null);
       loadData();
     } catch (error) {
-      console.error('Failed to delete commission rule:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to delete commission rule:', error);
       toast.error('Komisyon kuralı silinirken hata oluştu');
     }
   };
@@ -258,7 +258,7 @@ export default function CommissionPage() {
       toast.success(`Kural ${rule.isActive ? 'devre dışı bırakıldı' : 'aktifleştirildi'}`);
       loadData();
     } catch (error) {
-      console.error('Failed to toggle rule status:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to toggle rule status:', error);
       toast.error('Kural durumu güncellenirken hata oluştu');
     }
   };

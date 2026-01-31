@@ -38,7 +38,7 @@ export default function PaymentMethodsPage() {
       const response = await api.get('/payments/methods');
       setPaymentMethods(response.data.methods || response.data || []);
     } catch (error) {
-      console.error('Failed to fetch payment methods:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
       // If endpoint doesn't exist yet, show empty state
       setPaymentMethods([]);
     } finally {

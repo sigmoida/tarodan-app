@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
@@ -26,39 +27,40 @@ interface FollowedUser {
 
 export default function FollowingPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
-  const [following, setFollowing] = useState<FollowedUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/following');
       return;
     }
-    loadFollowing();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const loadFollowing = async () => {
-    setLoading(true);
-    try {
+  const followingQuery = useQuery({
+    queryKey: ['profile-following'],
+    queryFn: async (): Promise<FollowedUser[]> => {
       const response = await api.get('/users/me/following');
       const data = response.data.data || response.data.following || response.data || [];
-      setFollowing(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to load following:', error);
-      setFollowing([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'profile-following' },
+  });
+  const following = followingQuery.data ?? [];
+  const loading = followingQuery.isLoading;
 
   const handleUnfollow = async (userId: string) => {
     try {
       await api.delete(`/users/${userId}/follow`);
       toast.success('Takip bırakıldı');
-      setFollowing(prev => prev.filter(f => f.following.id !== userId));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile-following'] }),
+        queryClient.invalidateQueries({ queryKey: ['follow', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['seller', userId] }),
+      ]);
     } catch (error: any) {
-      console.error('Unfollow error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Unfollow error:', error);
       toast.error('Takip bırakılamadı');
     }
   };

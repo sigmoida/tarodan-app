@@ -104,12 +104,12 @@ export default function AnalyticsPage() {
 
       const [salesRes, revenueRes, userRes, productRes, tradeRes] = await Promise.all([
         adminApi.getSalesAnalytics(params).catch((e) => {
-          console.error('Sales analytics error:', e);
+          if (process.env.NODE_ENV === 'development') console.error('Sales analytics error:', e);
           return { data: null };
         }),
         adminApi.getRevenueAnalytics(params).catch(() => ({ data: null })),
         adminApi.getUserAnalytics(params).catch((e) => {
-          console.error('User analytics error:', e);
+          if (process.env.NODE_ENV === 'development') console.error('User analytics error:', e);
           return { data: null };
         }),
         adminApi.getProductReport(params).catch(() => ({ data: null })),
@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
         },
       });
     } catch (error) {
-      console.error('Failed to load analytics:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load analytics:', error);
       setData({
         salesReport: {
           totalOrders: 0,
@@ -637,7 +637,7 @@ export default function AnalyticsPage() {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
               } catch (e) {
-                console.error('CSV indirme hatası:', e);
+                if (process.env.NODE_ENV === 'development') console.error('CSV indirme hatası:', e);
               }
             }}
             className="btn-secondary"
@@ -659,7 +659,7 @@ export default function AnalyticsPage() {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
               } catch (e) {
-                console.error('Rapor indirme hatası:', e);
+                if (process.env.NODE_ENV === 'development') console.error('Rapor indirme hatası:', e);
               }
             }}
             className="btn-primary"

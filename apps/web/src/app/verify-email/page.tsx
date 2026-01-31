@@ -35,7 +35,7 @@ function VerifyEmailContent() {
         setStatus('success');
         toast.success(locale === 'tr' ? 'E-posta adresiniz doğrulandı!' : 'Email verified successfully!');
       } catch (error: any) {
-        console.error('Email verification failed:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Email verification failed:', error);
         setStatus('error');
         setErrorMessage(
           error.response?.data?.message || 

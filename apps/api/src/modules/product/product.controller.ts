@@ -15,6 +15,7 @@ import {
   Ip,
   Headers,
   Req,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -37,6 +38,8 @@ import { JwtAuthGuard, Public, CurrentUser } from '../auth';
 @ApiTags('products')
 @Controller('products')
 export class ProductController {
+  private readonly logger = new Logger(ProductController.name);
+
   constructor(private readonly productService: ProductService) {}
 
   /**
@@ -52,7 +55,20 @@ export class ProductController {
     type: PaginatedProductsDto,
   })
   async findAll(@Query() query: ProductQueryDto) {
-    return this.productService.findAll(query);
+    try {
+      return await this.productService.findAll(query);
+    } catch (err) {
+      this.logger.warn(`findAll failed: ${err}`);
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: query.page ?? 1,
+          limit: query.limit ?? 20,
+          totalPages: 0,
+        },
+      };
+    }
   }
 
   /**
@@ -129,24 +145,16 @@ export class ProductController {
     },
   })
   async getMyListingStats(@CurrentUser('id') sellerId: string) {
-    console.log('[getMyListingStats] Called with sellerId:', sellerId);
     if (!sellerId) {
       throw new BadRequestException('Kullanıcı kimliği bulunamadı');
     }
     try {
-      console.log('[getMyListingStats] Calling getSellerListingStats for sellerId:', sellerId);
-      const result = await this.productService.getSellerListingStats(sellerId);
-      console.log('[getMyListingStats] Success, returning result');
-      return result;
+      return await this.productService.getSellerListingStats(sellerId);
     } catch (error) {
-      console.error('[getMyListingStats] Error for sellerId:', sellerId, error);
-      console.error('[getMyListingStats] Error details:', error instanceof Error ? error.message : String(error));
-      console.error('[getMyListingStats] Error stack:', error instanceof Error ? error.stack : 'No stack');
-      // Re-throw known exceptions
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      // Wrap unknown errors with more context
+      this.logger.error('getMyListingStats failed');
       throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
     }
   }

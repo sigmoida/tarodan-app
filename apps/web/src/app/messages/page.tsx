@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -67,20 +68,16 @@ const checkContentFilter = (text: string, locale: string): { passed: boolean; wa
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
-  const [threads, setThreads] = useState<MessageThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [maxMessageLength, setMaxMessageLength] = useState<number>(1000);
 
-  // URL params for product-specific messaging
   const sellerId = searchParams.get('user');
   const productId = searchParams.get('listing');
 
@@ -89,28 +86,75 @@ export default function MessagesPage() {
       router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
       return;
     }
-    loadThreads();
-    loadMessageSettings();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const loadMessageSettings = async () => {
-    try {
+  const messageSettingsQuery = useQuery({
+    queryKey: ['message-settings'],
+    queryFn: async () => {
       const response = await api.get('/admin/settings/public');
-      const settings = response.data || {};
-      if (settings.max_message_length) {
-        setMaxMessageLength(settings.max_message_length);
-      }
-    } catch (error) {
-      console.error('Failed to load message settings:', error);
-    }
-  };
+      return response.data || {};
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'message-settings' },
+  });
+  const maxMessageLength = messageSettingsQuery.data?.max_message_length ?? 1000;
 
-  // Handle creating a new thread when coming from a product page
+  const threadsQuery = useQuery({
+    queryKey: ['message-threads'],
+    queryFn: async (): Promise<MessageThread[]> => {
+      const response = await messagesApi.getThreads();
+      const rawThreads = response.data.data || response.data.threads || [];
+      return rawThreads.map((t: any) => {
+        if (t.otherUser) return t;
+        const isParticipant1 = t.participant1Id === user?.id;
+        return {
+          ...t,
+          otherUser: {
+            id: isParticipant1 ? t.participant2Id : t.participant1Id,
+            displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
+            avatarUrl: null,
+          },
+          lastMessage: t.lastMessage ? {
+            ...t.lastMessage,
+            isFromMe: t.lastMessage.senderId === user?.id,
+          } : undefined,
+          product: t.productId ? {
+            id: t.productId,
+            title: t.productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
+            imageUrl: t.productImage,
+          } : undefined,
+        };
+      });
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'message-threads' },
+  });
+  const threads = threadsQuery.data ?? [];
+  const loading = threadsQuery.isLoading;
+
+  const messagesQuery = useQuery({
+    queryKey: ['messages', selectedThread?.id],
+    queryFn: async (): Promise<Message[]> => {
+      const response = await messagesApi.getMessages(selectedThread!.id);
+      const messages = response.data.data || response.data.messages || [];
+      return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    },
+    enabled: isAuthenticated && !!selectedThread?.id,
+    meta: { page: 'messages' },
+  });
+  const messages = messagesQuery.data ?? [];
+
   useEffect(() => {
-    if (sellerId && isAuthenticated && !loading && !creatingThread) {
+    if (selectedThread?.id && messagesQuery.isSuccess) {
+      queryClient.invalidateQueries({ queryKey: ['message-threads'] });
+    }
+  }, [selectedThread?.id, messagesQuery.isSuccess, queryClient]);
+
+  useEffect(() => {
+    if (sellerId && isAuthenticated && !threadsQuery.isLoading && !creatingThread) {
       handleCreateThreadForProduct();
     }
-  }, [sellerId, isAuthenticated, loading]);
+  }, [sellerId, isAuthenticated, threadsQuery.isLoading]);
 
   const handleCreateThreadForProduct = async () => {
     if (!sellerId || creatingThread) return;
@@ -123,7 +167,7 @@ export default function MessagesPage() {
         const product = productResponse.data.product || productResponse.data;
         productTitle = product.title || (locale === 'en' ? 'Product' : 'Ürün');
       } catch (error) {
-        console.error('Failed to fetch product:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch product:', error);
       }
     }
     
@@ -171,24 +215,22 @@ export default function MessagesPage() {
         } : undefined,
       };
 
-      setThreads(prev => [transformedThread, ...prev]);
+      await queryClient.invalidateQueries({ queryKey: ['message-threads'] });
       setSelectedThread(transformedThread);
       
-      // Pre-fill message with product reference
       if (productTitle) {
         setNewMessage(locale === 'en'
           ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
           : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
       }
       
-      // Clear URL params
       window.history.replaceState({}, '', '/messages');
     } catch (error: any) {
-      console.error('Failed to create thread:', error);
-      // If thread already exists, try to find it in the threads
+      if (process.env.NODE_ENV === 'development') console.error('Failed to create thread:', error);
       if (error.response?.status === 409) {
-        await loadThreads();
-        const existingThread = threads.find(t => t.otherUser?.id === sellerId);
+        await queryClient.refetchQueries({ queryKey: ['message-threads'] });
+        const list = (queryClient.getQueryData(['message-threads']) as MessageThread[] | undefined) ?? [];
+        const existingThread = list.find((t) => t.otherUser?.id === sellerId);
         if (existingThread) {
           setSelectedThread(existingThread);
           if (productTitle) {
@@ -200,74 +242,6 @@ export default function MessagesPage() {
       }
     } finally {
       setCreatingThread(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedThread) {
-      loadMessages(selectedThread.id);
-    }
-  }, [selectedThread]);
-
-  const loadThreads = async () => {
-    try {
-      const response = await messagesApi.getThreads();
-      const rawThreads = response.data.data || response.data.threads || [];
-      
-      // Transform API response to include otherUser object
-      // Backend returns participant1Id/participant2Id, not otherUser
-      const transformedThreads = rawThreads.map((t: any) => {
-        // If otherUser already exists (properly formatted), use it
-        if (t.otherUser) {
-          return t;
-        }
-        
-        // Otherwise, transform from participant1/participant2 format
-        const isParticipant1 = t.participant1Id === user?.id;
-        return {
-          ...t,
-          otherUser: {
-            id: isParticipant1 ? t.participant2Id : t.participant1Id,
-            displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
-            avatarUrl: null, // Backend doesn't provide avatarUrl in threads
-          },
-          lastMessage: t.lastMessage ? {
-            ...t.lastMessage,
-            isFromMe: t.lastMessage.senderId === user?.id,
-          } : undefined,
-          product: t.productId ? {
-            id: t.productId,
-            title: t.productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
-            imageUrl: t.productImage,
-          } : undefined,
-        };
-      });
-      
-      setThreads(transformedThreads);
-    } catch (error) {
-      console.error('Threads load error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMessages = async (threadId: string) => {
-    try {
-      const response = await messagesApi.getMessages(threadId);
-      const messages = response.data.data || response.data.messages || [];
-      // Backend returns messages in desc order (newest first), but chat should show oldest first
-      // Sort by createdAt ascending (oldest to newest)
-      const sortedMessages = [...messages].sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateA - dateB; // Ascending order (oldest first)
-      });
-      setMessages(sortedMessages);
-      
-      // Refresh thread list to update unread counts (backend marks messages as read when loading)
-      await loadThreads();
-    } catch (error) {
-      console.error('Messages load error:', error);
     }
   };
 
@@ -317,12 +291,13 @@ export default function MessagesPage() {
         toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
       }
 
-      setMessages((prev) => [...prev, sentMessage]);
       setNewMessage('');
       setContentWarning(null);
-      loadThreads(); // Refresh threads to update last message
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['messages', selectedThread.id] }),
+        queryClient.invalidateQueries({ queryKey: ['message-threads'] }),
+      ]);
       
-      // Scroll to bottom after sending new message
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);

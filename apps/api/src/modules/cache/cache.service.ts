@@ -2,6 +2,7 @@ import {
   Injectable,
   OnModuleInit,
   OnModuleDestroy,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
@@ -13,6 +14,7 @@ export interface CacheOptions {
 
 @Injectable()
 export class CacheService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CacheService.name);
   private client: Redis;
   private subscriber: Redis;
   private readonly DEFAULT_TTL = 3600; // 1 hour
@@ -29,11 +31,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     this.subscriber = new Redis(redisUrl);
 
     this.client.on('connect', () => {
-      console.log('✅ Connected to Redis');
+      this.logger.log('Connected to Redis');
     });
 
-    this.client.on('error', (err: Error) => {
-      console.error('Redis error:', err);
+    this.client.on('error', () => {
+      this.logger.error('Redis error');
     });
   }
 
@@ -51,7 +53,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (value === null) return null;
       return JSON.parse(value) as T;
     } catch (error) {
-      console.error(`Cache get error for key ${key}:`, error);
+      this.logger.warn('Cache get error');
       return null;
     }
   }
@@ -65,7 +67,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       const serialized = JSON.stringify(value);
       await this.client.setex(key, ttl, serialized);
     } catch (error) {
-      console.error(`Cache set error for key ${key}:`, error);
+      this.logger.warn('Cache set error');
     }
   }
 
@@ -76,7 +78,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.del(key);
     } catch (error) {
-      console.error(`Cache delete error for key ${key}:`, error);
+      this.logger.warn('Cache delete error');
     }
   }
 
@@ -89,7 +91,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (keys.length === 0) return 0;
       return await this.client.del(...keys);
     } catch (error) {
-      console.error(`Cache delete pattern error for ${pattern}:`, error);
+      this.logger.warn('Cache delete pattern error');
       return 0;
     }
   }
@@ -101,7 +103,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return (await this.client.exists(key)) === 1;
     } catch (error) {
-      console.error(`Cache exists error for key ${key}:`, error);
+      this.logger.warn('Cache exists error');
       return false;
     }
   }
@@ -113,7 +115,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return (await this.client.expire(key, seconds)) === 1;
     } catch (error) {
-      console.error(`Cache expire error for key ${key}:`, error);
+      this.logger.warn('Cache expire error');
       return false;
     }
   }
@@ -125,7 +127,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.ttl(key);
     } catch (error) {
-      console.error(`Cache ttl error for key ${key}:`, error);
+      this.logger.warn('Cache ttl error');
       return -2;
     }
   }
@@ -137,7 +139,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.incr(key);
     } catch (error) {
-      console.error(`Cache incr error for key ${key}:`, error);
+      this.logger.warn('Cache incr error');
       return 0;
     }
   }
@@ -237,7 +239,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.rpush(queueName, JSON.stringify(data));
     } catch (error) {
-      console.error(`Queue push error for ${queueName}:`, error);
+      this.logger.warn('Queue push error');
     }
   }
 
@@ -250,7 +252,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (!data) return null;
       return JSON.parse(data) as T;
     } catch (error) {
-      console.error(`Queue pop error for ${queueName}:`, error);
+      this.logger.warn('Queue pop error');
       return null;
     }
   }
@@ -262,7 +264,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.llen(queueName);
     } catch (error) {
-      console.error(`Queue length error for ${queueName}:`, error);
+      this.logger.warn('Queue length error');
       return 0;
     }
   }
@@ -278,7 +280,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.publish(channel, JSON.stringify(message));
     } catch (error) {
-      console.error(`Publish error for channel ${channel}:`, error);
+      this.logger.warn('Publish error');
     }
   }
 
@@ -370,7 +372,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
       return result;
     } catch (error) {
-      console.error('Redis info error:', error);
+      this.logger.warn('Redis info error');
       return {};
     }
   }

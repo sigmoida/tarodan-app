@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 // =============================================================================
@@ -67,6 +67,7 @@ export interface ArasRateResponse {
 
 @Injectable()
 export class ArasKargoService {
+  private readonly logger = new Logger(ArasKargoService.name);
   private readonly username: string;
   private readonly password: string;
   private readonly customerCode: string;
@@ -82,7 +83,7 @@ export class ArasKargoService {
     );
 
     if (!this.username || !this.password || !this.customerCode) {
-      console.warn('⚠️ Aras Kargo API credentials not configured');
+      this.logger.warn('Aras Kargo API credentials not configured');
     }
   }
 
@@ -111,14 +112,7 @@ export class ArasKargoService {
     // Calculate cost
     const cost = this.calculateShippingCost(request);
 
-    // Log for development
-    console.log('📦 Aras Kargo shipment created:', {
-      trackingNumber,
-      from: `${request.senderAddress.city}/${request.senderAddress.district}`,
-      to: `${request.receiverAddress.city}/${request.receiverAddress.district}`,
-      weight: request.weight,
-      cost,
-    });
+    this.logger.log('Aras Kargo shipment created');
 
     return {
       success: true,
@@ -134,8 +128,7 @@ export class ArasKargoService {
    * Cancel shipment
    */
   async cancelShipment(trackingNumber: string): Promise<boolean> {
-    // In production, this would call the actual API
-    console.log(`📦 Aras Kargo shipment cancelled: ${trackingNumber}`);
+    this.logger.log('Aras Kargo shipment cancelled');
     return true;
   }
 

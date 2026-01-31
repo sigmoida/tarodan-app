@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { ArrowsRightLeftIcon, ArrowLeftIcon, PlusIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -41,9 +41,8 @@ export default function NewTradePage() {
     ? limits.canTrade 
     : (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   
-  // Debug: Log membership info
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (process.env.NODE_ENV === 'development' && isAuthenticated && user) {
       console.log('[Trades/New] User membership:', {
         membershipTier: user.membershipTier,
         limits: limits,
@@ -97,7 +96,7 @@ export default function NewTradePage() {
       );
       setMyProducts(tradeableProducts);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch data:', error);
       toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
@@ -168,8 +167,7 @@ export default function NewTradePage() {
       toast.success(t('trade.tradeSent'));
       router.push('/trades');
     } catch (error: any) {
-      console.error('Failed to create trade:', error);
-      console.error('Error response:', error.response?.data);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to create trade:', error);
       const errorMessage = error.response?.data?.message || error.message || (locale === 'en' ? 'Failed to send trade offer' : 'Takas teklifi gönderilemedi');
       
       // If error is about membership, refresh user data and show specific message
@@ -242,12 +240,12 @@ export default function NewTradePage() {
             </h2>
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-full aspect-square max-w-[200px] rounded-lg overflow-hidden bg-gray-100">
-                <Image
+                <OptimizedImage
                   src={getProductImage(targetProduct)}
                   alt={targetProduct.title}
                   fill
                   className="object-cover"
-                  unoptimized
+                  logContext={{ productId: targetProduct.id, page: 'trades-new-target' }}
                 />
               </div>
               <div className="text-center w-full">
@@ -306,12 +304,12 @@ export default function NewTradePage() {
                         </div>
                       )}
                       <div className="aspect-square relative bg-gray-100">
-                        <Image
+                        <OptimizedImage
                           src={getProductImage(product)}
                           alt={product.title}
                           fill
                           className="object-cover"
-                          unoptimized
+                          logContext={{ productId: product.id, page: 'trades-new-myproduct' }}
                         />
                       </div>
                       <div className="p-2 text-left">

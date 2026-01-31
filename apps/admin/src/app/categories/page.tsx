@@ -59,7 +59,7 @@ export default function CategoriesPage() {
       const response = await adminApi.getCategories();
       setCategories(response.data.data || response.data || []);
     } catch (error: any) {
-      console.error('Failed to load categories:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load categories:', error);
       toast.error(error.response?.data?.message || 'Kategoriler yüklenirken hata oluştu');
     } finally {
       setLoading(false);

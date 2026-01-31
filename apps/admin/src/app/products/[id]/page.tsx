@@ -77,7 +77,7 @@ export default function ProductDetailPage() {
       const response = await adminApi.getProduct(productId);
       setProduct(response.data);
     } catch (error: any) {
-      console.error('Product load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Product load error:', error);
       toast.error(error.response?.data?.message || 'Ürün yüklenemedi');
       router.push('/products');
     } finally {

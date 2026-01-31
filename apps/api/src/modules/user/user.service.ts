@@ -415,7 +415,7 @@ export class UserService {
         message: 'Hesabınız başarıyla silindi',
       };
     } catch (error: any) {
-      console.error('Delete account error:', error);
+      this.logger.error('Delete account failed');
       
       // If hard delete fails, try soft delete (anonymize)
       try {
@@ -434,7 +434,7 @@ export class UserService {
         });
         return { message: 'Hesabınız başarıyla silindi' };
       } catch (softDeleteError) {
-        console.error('Soft delete also failed:', softDeleteError);
+        this.logger.error('Soft delete also failed');
         throw new BadRequestException('Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.');
       }
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
@@ -24,22 +25,36 @@ interface Notification {
 
 export default function NotificationBell() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { locale } = useTranslation();
   const { isAuthenticated } = useAuthStore();
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchUnreadCount();
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(fetchUnreadCount, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated]);
+  const unreadCountQuery = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: async () => {
+      const response = await api.get('/notifications/unread-count');
+      return response.data.count ?? response.data.unreadCount ?? 0;
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 60_000,
+    meta: { page: 'notification-bell-count' },
+  });
+  const unreadCount = unreadCountQuery.data ?? 0;
+
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications-bell'],
+    queryFn: async (): Promise<Notification[]> => {
+      const response = await api.get('/notifications', { params: { page: 1, limit: 5 } });
+      const data = response.data.notifications || response.data.data || [];
+      return data;
+    },
+    enabled: isAuthenticated && showDropdown,
+    meta: { page: 'notification-bell-list' },
+  });
+  const notifications = notificationsQuery.data ?? [];
+  const loading = notificationsQuery.isLoading;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -51,47 +66,20 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await api.get('/notifications/unread-count');
-      setUnreadCount(response.data.count || response.data.unreadCount || 0);
-    } catch (error) {
-      console.error('Failed to fetch unread count:', error);
-    }
-  };
-
-  const fetchNotifications = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const response = await api.get('/notifications', {
-        params: { page: 1, limit: 5 },
-      });
-      const data = response.data.notifications || response.data.data || [];
-      setNotifications(data);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const markAsRead = async (id: string) => {
     try {
       await api.patch(`/notifications/${id}/read`);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+        queryClient.invalidateQueries({ queryKey: ['notifications-bell'] }),
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      ]);
     } catch (error) {
-      console.error('Failed to mark as read:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to mark as read:', error);
     }
   };
 
   const handleBellClick = () => {
-    if (!showDropdown) {
-      fetchNotifications();
-    }
     setShowDropdown(!showDropdown);
   };
 

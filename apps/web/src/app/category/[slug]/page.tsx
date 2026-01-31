@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   FunnelIcon,
@@ -41,9 +42,6 @@ export default function CategoryPage() {
   const router = useRouter();
   const slug = params.slug as string;
 
-  const [category, setCategory] = useState<Category | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filters, setFilters] = useState({
     minPrice: '',
@@ -54,62 +52,52 @@ export default function CategoryPage() {
     sortOrder: 'desc',
   });
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    if (slug) {
-      loadCategory();
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    if (category) {
-      loadProducts();
-    }
-  }, [category, filters, page]);
-
-  const loadCategory = async () => {
-    try {
+  const categoryQuery = useQuery({
+    queryKey: ['category', slug],
+    queryFn: async () => {
       const response = await categoriesApi.findBySlug(slug);
-      setCategory(response.data);
-    } catch (error) {
-      console.error('Failed to load category:', error);
-      // Redirect to listings if category not found
-      router.push('/listings');
-    }
-  };
+      return response.data;
+    },
+    enabled: !!slug,
+    meta: { page: 'category' },
+    retry: false,
+  });
+  const category = categoryQuery.data ?? null;
+  useEffect(() => {
+    if (categoryQuery.isError && slug) router.replace('/listings');
+  }, [categoryQuery.isError, slug, router]);
 
-  const loadProducts = async () => {
-    if (!category) return;
-
-    try {
-      setLoading(true);
+  const productsQuery = useQuery({
+    queryKey: ['category-products', slug, category?.id, filters, page],
+    queryFn: async () => {
       const params: any = {
-        categoryId: category.id,
+        categoryId: category!.id,
         page,
         limit: 24,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
       };
-
       if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
       if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
       if (filters.condition) params.condition = filters.condition;
       if (filters.isTradeEnabled) params.isTradeEnabled = true;
-
       const response = await listingsApi.getAll(params);
       const data = response.data;
-      setProducts(data.data || data.products || []);
-      setTotalPages(data.meta?.totalPages || 1);
-      setTotalItems(data.meta?.total || 0);
-    } catch (error) {
-      console.error('Failed to load products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        products: data.data || data.products || [],
+        totalPages: data.meta?.totalPages || 1,
+        totalItems: data.meta?.total || 0,
+      };
+    },
+    enabled: !!category?.id,
+    meta: { page: 'category-products' },
+  });
+  const products = productsQuery.data?.products ?? [];
+  const totalPages = productsQuery.data?.totalPages ?? 1;
+  const totalItems = productsQuery.data?.totalItems ?? 0;
+  const loading = productsQuery.isLoading;
 
   const getConditionLabel = (condition: string) => {
     const labels: Record<string, string> = {
@@ -122,9 +110,7 @@ export default function CategoryPage() {
     return labels[condition] || condition;
   };
 
-  if (!category && !loading) {
-    return null;
-  }
+  if (!category) return null;
 
   return (
     <div className="min-h-screen bg-dark-900">
@@ -320,12 +306,13 @@ export default function CategoryPage() {
                     className="bg-white rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all group shadow-sm border border-gray-200"
                   >
                     <div className="aspect-square relative bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                         alt={product.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform"
-                        unoptimized
+                        fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
+                        logContext={{ productId: product.id, page: 'category-grid' }}
                       />
                       {product.isTradeEnabled && (
                         <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
@@ -362,12 +349,13 @@ export default function CategoryPage() {
                     className="bg-white rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all flex shadow-sm border border-gray-200"
                   >
                     <div className="w-48 h-48 relative flex-shrink-0 bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                         alt={product.title}
                         fill
                         className="object-cover"
-                        unoptimized
+                        fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
+                        logContext={{ productId: product.id, page: 'category-list' }}
                       />
                     </div>
                     <div className="p-4 flex-1 flex flex-col justify-between">

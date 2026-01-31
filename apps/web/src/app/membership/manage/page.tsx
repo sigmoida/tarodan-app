@@ -91,7 +91,7 @@ export default function MembershipManagePage() {
       const response = await api.get('/membership/me');
       setMembership(response.data);
     } catch (error) {
-      console.error('Failed to fetch membership:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch membership:', error);
       const tier = user?.membershipTier || 'free';
       setMembership({
         tier,
@@ -119,7 +119,7 @@ export default function MembershipManagePage() {
         setSelectedPaymentMethod(defaultCard.id);
       }
     } catch (error) {
-      console.error('Failed to fetch payment methods:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
       setPaymentMethods([]);
     }
   };

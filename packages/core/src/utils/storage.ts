@@ -19,7 +19,9 @@ export const storage = {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      console.error('Storage set error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Storage set error:', error);
+      }
     }
   },
 
@@ -52,7 +54,9 @@ export const storage = {
       try {
         sessionStorage.setItem(key, JSON.stringify(value));
       } catch (error) {
-        console.error('Session storage set error:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Session storage set error:', error);
+        }
       }
     },
 

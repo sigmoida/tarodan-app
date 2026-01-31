@@ -139,7 +139,7 @@ export default function AnalyticsPage() {
         categoryStats: data.categoryStats || [],
       });
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch analytics:', error);
       // Set empty/zero data on error - no fake data
       const daysInPeriod = period === '7d' ? 7 : period === '30d' ? 14 : 14;
       const dailyViews = Array.from({ length: daysInPeriod }, (_, i) => {

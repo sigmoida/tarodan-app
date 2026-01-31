@@ -102,7 +102,7 @@ export default function AdsPage() {
       const data = Array.isArray(res.data) ? res.data : (res.data as any)?.data ?? [];
       setAds(data);
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV === 'development') console.error(e);
       toast.error('Reklamlar yüklenemedi');
     } finally {
       setLoading(false);

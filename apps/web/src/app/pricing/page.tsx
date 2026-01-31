@@ -54,7 +54,7 @@ export default function PricingPage() {
           yearly_discount_percentage: settings.yearly_discount_percentage,
         });
       } catch (error) {
-        console.error('Failed to fetch settings:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch settings:', error);
         // Use defaults if API fails
         setListingLimits({
           free_listing_limit: 5,

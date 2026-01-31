@@ -1015,14 +1015,9 @@ export class CollectionService {
   // LIKE COLLECTION
   // ==========================================================================
   async likeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    console.log('[likeCollection] Starting with idOrSlug:', idOrSlug, 'userId:', userId);
-    
-    // Check if idOrSlug is UUID or collection- prefixed ID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
     const isCollectionId = idOrSlug.startsWith('collection-');
-    
-    console.log('[likeCollection] isUUID:', isUUID, 'isCollectionId:', isCollectionId);
-    
+
     // Find collection by ID or slug
     let collection;
     try {
@@ -1071,15 +1066,15 @@ export class CollectionService {
         }
       }
     } catch (error) {
-      console.error('Error finding collection:', error);
       if (error instanceof ForbiddenException) {
         throw error;
       }
+      this.logger.error('likeCollection: error finding collection');
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
 
     if (!collection || !collection.id) {
-      console.error(`[likeCollection] Collection not found: idOrSlug=${idOrSlug}, isUUID=${isUUID}, userId=${userId}`);
+      this.logger.warn('likeCollection: collection not found');
       throw new NotFoundException('Koleksiyon bulunamadı');
     }
     
@@ -1088,8 +1083,6 @@ export class CollectionService {
       throw new BadRequestException('Kendi koleksiyonunuzu beğenemezsiniz');
     }
     
-    console.log('[likeCollection] Found collection:', collection.id, 'likeCount:', collection.likeCount);
-
     // Check if user already liked this collection
     // Use findFirst to avoid composite key issues
     let existingLike;
@@ -1100,9 +1093,8 @@ export class CollectionService {
           userId: userId,
         },
       });
-      console.log('[likeCollection] Existing like:', existingLike ? 'found' : 'not found');
     } catch (findError) {
-      console.error('[likeCollection] Error finding existing like:', findError);
+      this.logger.error('likeCollection: error finding existing like');
       throw findError;
     }
 
@@ -1111,68 +1103,50 @@ export class CollectionService {
 
     try {
       if (existingLike) {
-        console.log('[likeCollection] Removing like...');
-        // Unlike: Remove the like and decrement count
         await this.prisma.$transaction(async (tx) => {
-          // Find the like first, then delete by ID
           const likeToDelete = await tx.collectionLike.findFirst({
             where: {
               collectionId: collection.id,
               userId: userId,
             },
           });
-          
-          console.log('[likeCollection] Like to delete:', likeToDelete?.id);
-          
           if (likeToDelete) {
             await tx.collectionLike.delete({
               where: { id: likeToDelete.id },
             });
-            console.log('[likeCollection] Like deleted');
           }
           await tx.collection.update({
             where: { id: collection.id },
             data: { likeCount: { decrement: 1 } },
           });
-          console.log('[likeCollection] Like count decremented');
         });
 
         liked = false;
         likeCount = Math.max(0, (collection.likeCount || 0) - 1);
-        console.log('[likeCollection] Unlike complete, new count:', likeCount);
       } else {
-        console.log('[likeCollection] Adding like...');
-        // Like: Add the like and increment count
         await this.prisma.$transaction(async (tx) => {
-          // Check if like already exists (race condition protection)
           const existing = await tx.collectionLike.findFirst({
             where: {
               collectionId: collection.id,
               userId: userId,
             },
           });
-          
-          console.log('[likeCollection] Existing check in transaction:', existing ? 'found' : 'not found');
-          
           if (!existing) {
-            const newLike = await tx.collectionLike.create({
+            await tx.collectionLike.create({
               data: {
                 collectionId: collection.id,
                 userId: userId,
               },
             });
-            console.log('[likeCollection] Like created with ID:', newLike.id, 'for collection:', collection.id, 'by user:', userId);
           }
           await tx.collection.update({
             where: { id: collection.id },
             data: { likeCount: { increment: 1 } },
           });
-          console.log('[likeCollection] Like count incremented');
         });
 
         liked = true;
         likeCount = (collection.likeCount || 0) + 1;
-        console.log('[likeCollection] Like complete, new count:', likeCount);
 
         // Send notification to collection owner
         try {
@@ -1191,11 +1165,11 @@ export class CollectionService {
             },
           );
         } catch (notifError) {
-          console.error('[likeCollection] Failed to send notification:', notifError);
+          this.logger.warn('likeCollection: failed to send notification');
         }
       }
     } catch (error) {
-      console.error('[likeCollection] Error in transaction:', error);
+      this.logger.error('likeCollection: transaction error');
       throw error;
     }
 
@@ -1278,12 +1252,7 @@ export class CollectionService {
     page: number = 1,
     pageSize: number = 20,
   ): Promise<CollectionListResponseDto> {
-    console.log(`\n\n========================================`);
-    console.log(`[getLikedCollections] Starting for user: ${userId}, page: ${page}`);
-    console.log(`========================================\n`);
-    
     if (!userId) {
-      console.error('[getLikedCollections] No userId provided');
       return {
         collections: [],
         total: 0,
@@ -1295,8 +1264,6 @@ export class CollectionService {
     try {
       const skip = (page - 1) * pageSize;
 
-      console.log(`[getLikedCollections] Querying database...`);
-      
       const [likedCollections, total] = await Promise.all([
         this.prisma.collectionLike.findMany({
           where: { userId },
@@ -1338,44 +1305,21 @@ export class CollectionService {
         }),
       ]);
 
-      console.log(`[getLikedCollections] Found ${likedCollections.length} liked collections, total: ${total}`);
-      
-      // Debug: Log each like to see what's happening
-      likedCollections.forEach((like, index) => {
-        console.log(`[getLikedCollections] Like ${index + 1}:`, {
-          likeId: like.id,
-          collectionId: like.collectionId,
-          hasCollection: !!like.collection,
-          collectionName: like.collection?.name,
-          isPublic: like.collection?.isPublic,
-        });
-      });
-
-      // Don't filter by isPublic for owned collections - show all liked
       const collections = likedCollections
         .filter(like => {
-          if (!like.collection) {
-            console.log('[getLikedCollections] Filtered out: no collection data');
-            return false;
-          }
-          // Show both public collections and user's own private collections
-          if (!like.collection.isPublic && like.collection.userId !== userId) {
-            console.log(`[getLikedCollections] Filtered out: private collection ${like.collection.name}`);
-            return false;
-          }
+          if (!like.collection) return false;
+          if (!like.collection.isPublic && like.collection.userId !== userId) return false;
           return true;
         })
         .map(like => {
           try {
             return this.mapCollectionToDto(like.collection, true);
           } catch (err) {
-            console.error('[getLikedCollections] Error mapping collection:', err, like.collection?.id);
+            this.logger.error('getLikedCollections: error mapping collection');
             return null;
           }
         })
         .filter(collection => collection !== null);
-
-      console.log(`[getLikedCollections] Returning ${collections.length} collections after filtering`);
 
       return {
         collections,
@@ -1384,7 +1328,7 @@ export class CollectionService {
         pageSize,
       };
     } catch (error) {
-      console.error('[getLikedCollections] Database error:', error);
+      this.logger.error('getLikedCollections: database error');
       // Return empty result instead of throwing
       return {
         collections: [],
@@ -1423,7 +1367,7 @@ export class CollectionService {
             try {
               return this.mapItemToDto(item);
             } catch (itemError) {
-              console.error('Error mapping item:', itemError, item);
+              this.logger.warn('mapCollectionToDto: error mapping item');
               return null;
             }
           }).filter((item: any) => item !== null)
@@ -1496,7 +1440,7 @@ export class CollectionService {
         isCustom: false,
       };
     } catch (error) {
-      console.error('Error mapping collection item to DTO:', error, item);
+      this.logger.warn('mapItemToDto: error mapping collection item');
       // Return safe fallback
       return {
         id: item?.id || '',

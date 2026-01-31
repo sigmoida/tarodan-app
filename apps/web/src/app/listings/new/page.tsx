@@ -102,7 +102,7 @@ export default function NewListingPage() {
           }));
         }
       } catch (e) {
-        console.error('Failed to parse saved form data:', e);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to parse saved form data:', e);
       }
     }
   }, []);
@@ -214,9 +214,7 @@ export default function NewListingPage() {
         remainingListings: remaining,
       });
     } catch (error: any) {
-      console.error('Failed to update listing limits:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to update listing limits:', error);
       // Fallback to auth store data
       const membershipTier = user?.membershipTier || 'free';
       const currentCount = user?.listingCount || 0;
@@ -243,7 +241,7 @@ export default function NewListingPage() {
       const cats = response.data.data || response.data || [];
       setCategories(cats);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch categories:', error);
       toast.error(locale === 'en' ? 'Failed to load categories' : 'Kategoriler yüklenemedi');
     }
   };
@@ -299,7 +297,7 @@ export default function NewListingPage() {
       });
       toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
     } catch (error: any) {
-      console.error('Failed to upload images:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
     } finally {
       setUploadingImages(false);
@@ -359,7 +357,7 @@ export default function NewListingPage() {
       
       router.push('/profile/listings?status=pending');
     } catch (error: any) {
-      console.error('Failed to create listing:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to create listing:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to create listing' : 'İlan oluşturulamadı'));
     } finally {
       setIsLoading(false);

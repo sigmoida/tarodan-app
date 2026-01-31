@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import OptimizedImage from '@/components/OptimizedImage';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -32,37 +33,38 @@ interface WishlistItem {
 
 export default function WishlistPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const { addToCart } = useCartStore();
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/wishlist');
       return;
     }
-    fetchWishlist();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const fetchWishlist = async () => {
-    try {
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: async (): Promise<WishlistItem[]> => {
       const response = await wishlistApi.get();
       const data = response.data?.items || response.data?.data || response.data || [];
-      setItems(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to fetch wishlist:', error);
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'wishlist' },
+  });
+  const items = wishlistQuery.data ?? [];
+  const isLoading = wishlistQuery.isLoading;
 
   const handleRemove = async (productId: string) => {
     try {
       await wishlistApi.remove(productId);
-      setItems(items.filter(item => item.productId !== productId && item.product?.id !== productId));
       toast.success('Favorilerden çıkarıldı');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist-check', productId] }),
+      ]);
     } catch (error) {
       toast.error('İşlem başarısız');
     }
@@ -146,11 +148,13 @@ export default function WishlistPage() {
               >
                 <Link href={`/listings/${item.productId}`}>
                   <div className="relative aspect-square bg-gray-100">
-                    <Image
+                    <OptimizedImage
                       src={getImageUrl(item.productImage)}
                       alt={item.productTitle}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
+                      logContext={{ productId: item.productId, page: 'wishlist' }}
                     />
                   </div>
                 </Link>

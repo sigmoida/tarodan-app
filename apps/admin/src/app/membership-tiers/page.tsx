@@ -76,7 +76,7 @@ export default function MembershipTiersPage() {
       const response = await adminApi.getMembershipTiers();
       setTiers(response.data.data || response.data || []);
     } catch (error: any) {
-      console.error('Failed to load membership tiers:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load membership tiers:', error);
       toast.error(error.response?.data?.message || 'Üyelik seviyeleri yüklenirken hata oluştu');
     } finally {
       setLoading(false);

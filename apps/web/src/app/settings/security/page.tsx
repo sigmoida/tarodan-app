@@ -46,7 +46,7 @@ export default function SecuritySettingsPage() {
       const response = await api.get('/auth/2fa/status');
       setStatus(response.data);
     } catch (err) {
-      console.error('Failed to fetch 2FA status:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch 2FA status:', err);
     } finally {
       setIsLoading(false);
     }

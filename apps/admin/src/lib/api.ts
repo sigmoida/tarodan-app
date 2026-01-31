@@ -16,7 +16,7 @@ api.interceptors.request.use(
       const token = localStorage.getItem('admin_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-      } else {
+      } else if (process.env.NODE_ENV === 'development') {
         console.warn('No admin token found in localStorage');
       }
     }
@@ -64,7 +64,9 @@ api.interceptors.response.use(
 
     // Handle network errors
     if (!error.response) {
-      console.error('Network Error:', error.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Network Error:', error.message);
+      }
       error.message = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
     }
 

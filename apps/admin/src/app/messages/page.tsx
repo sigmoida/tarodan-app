@@ -69,7 +69,7 @@ export default function MessagesPage() {
       setMessages(mappedMessages);
       setTotal(meta.total ?? response.data.total ?? 0);
     } catch (error) {
-      console.error('Load messages error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Load messages error:', error);
       toast.error('Mesajlar yüklenemedi');
     } finally {
       setLoading(false);

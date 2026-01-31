@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
@@ -34,56 +35,50 @@ interface Collection {
 
 export default function LikedCollectionsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { t } = useTranslation();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
-    loadLikedCollections();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const loadLikedCollections = async () => {
-    setLoading(true);
-    setError(null);
-    console.log('[LikedCollections] Loading... User:', user?.id, 'isAuthenticated:', isAuthenticated);
-    console.log('[LikedCollections] Auth token:', localStorage.getItem('auth_token')?.substring(0, 30) + '...');
-    try {
+  const likedQuery = useQuery({
+    queryKey: ['collections-liked'],
+    queryFn: async (): Promise<Collection[]> => {
       const response = await collectionsApi.getLiked();
       const data = response.data;
-      console.log('[LikedCollections] API Response:', JSON.stringify(data, null, 2).substring(0, 500));
-      // Handle different response formats
-      const collectionsList = data?.collections || data?.data || (Array.isArray(data) ? data : []);
-      console.log('[LikedCollections] Parsed collections count:', collectionsList.length);
-      setCollections(collectionsList);
-    } catch (err: any) {
-      console.error('Liked collections load error:', err);
-      console.error('Error details:', err.response?.data);
-      
-      // Check if it's an auth error
-      if (err.response?.status === 401) {
-        setError(t('auth.sessionExpired'));
-        // Redirect to login
-        router.push('/login?redirect=/collections/liked');
-        return;
-      }
-      
-      setError(t('collection.loadFailed'));
-      setCollections([]);
-    } finally {
-      setLoading(false);
+      const list = data?.collections || data?.data || (Array.isArray(data) ? data : []);
+      return list;
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'collections-liked' },
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 401) return false;
+      return failureCount < 2;
+    },
+  });
+  const collections = likedQuery.data ?? [];
+  const loading = likedQuery.isLoading;
+  const error = likedQuery.isError
+    ? (likedQuery.error as any)?.response?.status === 401
+      ? t('auth.sessionExpired')
+      : t('collection.loadFailed')
+    : null;
+
+  useEffect(() => {
+    if ((likedQuery.error as any)?.response?.status === 401 && isAuthenticated) {
+      router.push('/login?redirect=/collections/liked');
     }
-  };
+  }, [likedQuery.error, isAuthenticated, router]);
 
   const handleUnlike = async (collectionId: string) => {
     try {
       await collectionsApi.unlike(collectionId);
-      setCollections(collections.filter(c => c.id !== collectionId));
+      await queryClient.invalidateQueries({ queryKey: ['collections-liked'] });
     } catch (err: any) {
       alert(err.response?.data?.message || t('collection.unlikeFailed'));
     }

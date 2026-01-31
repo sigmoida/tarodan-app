@@ -105,7 +105,7 @@ export default function AdminPaymentsPage() {
         totalPages: data.meta.totalPages,
       });
     } catch (error: any) {
-      console.error('Payment load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Payment load error:', error);
       toast.error(error.response?.data?.message || 'Ödemeler yüklenemedi');
     } finally {
       setLoading(false);

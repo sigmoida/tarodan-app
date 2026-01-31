@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   MagnifyingGlassIcon,
@@ -48,9 +49,6 @@ function SearchContent() {
   const query = searchParams.get('q') || '';
   
   const [searchTerm, setSearchTerm] = useState(query);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     categoryId: searchParams.get('category') || '',
@@ -62,55 +60,50 @@ function SearchContent() {
     sortOrder: searchParams.get('order') || 'desc',
   });
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-
-  useEffect(() => {
-    loadCategories();
-  }, []);
 
   useEffect(() => {
     setSearchTerm(query);
-    loadProducts();
-  }, [query, filters, page]);
+  }, [query]);
 
-  const loadCategories = async () => {
-    try {
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async (): Promise<Category[]> => {
       const response = await categoriesApi.findAll();
-      setCategories(response.data.data || response.data || []);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-    }
-  };
+      return response.data.data || response.data || [];
+    },
+    meta: { page: 'search-categories' },
+  });
+  const categories = categoriesQuery.data ?? [];
 
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
+  const productsQuery = useQuery({
+    queryKey: ['search-products', query, filters, page],
+    queryFn: async () => {
       const params: any = {
         page,
         limit: 24,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
       };
-
       if (query) params.search = query;
       if (filters.categoryId) params.categoryId = filters.categoryId;
       if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
       if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
       if (filters.condition) params.condition = filters.condition;
       if (filters.isTradeEnabled) params.isTradeEnabled = true;
-
       const response = await listingsApi.getAll(params);
       const data = response.data;
-      setProducts(data.data || data.products || []);
-      setTotalPages(data.meta?.totalPages || 1);
-      setTotalItems(data.meta?.total || 0);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        products: data.data || data.products || [],
+        totalPages: data.meta?.totalPages || 1,
+        totalItems: data.meta?.total || 0,
+      };
+    },
+    meta: { page: 'search-products' },
+  });
+  const products = productsQuery.data?.products ?? [];
+  const totalPages = productsQuery.data?.totalPages ?? 1;
+  const totalItems = productsQuery.data?.totalItems ?? 0;
+  const loading = productsQuery.isLoading;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,12 +343,13 @@ function SearchContent() {
                       className="bg-white rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all group shadow-sm border border-gray-200"
                     >
                       <div className="aspect-square relative bg-gray-100">
-                        <Image
+                        <OptimizedImage
                           src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                           alt={product.title}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform"
-                          unoptimized
+                          fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
+                          logContext={{ productId: product.id, page: 'search' }}
                         />
                         {product.isTradeEnabled && (
                           <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">

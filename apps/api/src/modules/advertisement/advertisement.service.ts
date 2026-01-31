@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CreateAdvertisementDto, AdPosition, AdDeviceType, IAB_STANDARD_SIZES } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
@@ -18,6 +18,8 @@ type PrismaWithAd = PrismaService & {
 
 @Injectable()
 export class AdvertisementService {
+  private readonly logger = new Logger(AdvertisementService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private get adRepo(): PrismaWithAd['advertisement'] {
@@ -54,36 +56,37 @@ export class AdvertisementService {
    * Get active ads for display (public). Filters by isActive, startDate, endDate, position, deviceType.
    */
   async getActive(position?: string, deviceType?: string) {
-    const now = new Date();
-    
-    // Base conditions for date filtering
-    const dateConditions = [
-      { startDate: null, endDate: null },
-      { startDate: null, endDate: { gte: now } },
-      { startDate: { lte: now }, endDate: null },
-      { startDate: { lte: now }, endDate: { gte: now } },
-    ];
-    
-    const where: any = {
-      isActive: true,
-      OR: dateConditions,
-    };
-    
-    if (position) {
-      where.position = position;
-    }
-    
-    // Filter by device type - include 'all' type as well
-    if (deviceType && deviceType !== 'all') {
-      where.deviceType = { in: [deviceType, 'all'] };
-    }
-    
-    const ads = await this.adRepo.findMany({
-      where,
-      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-    });
-    
-    return ads.map((a: any) => ({
+    try {
+      const now = new Date();
+
+      // Base conditions for date filtering
+      const dateConditions = [
+        { startDate: null, endDate: null },
+        { startDate: null, endDate: { gte: now } },
+        { startDate: { lte: now }, endDate: null },
+        { startDate: { lte: now }, endDate: { gte: now } },
+      ];
+
+      const where: any = {
+        isActive: true,
+        OR: dateConditions,
+      };
+
+      if (position) {
+        where.position = position;
+      }
+
+      // Filter by device type - include 'all' type as well
+      if (deviceType && deviceType !== 'all') {
+        where.deviceType = { in: [deviceType, 'all'] };
+      }
+
+      const ads = await this.adRepo.findMany({
+        where,
+        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+      });
+
+      return ads.map((a: any) => ({
       id: a.id,
       title: a.title,
       imageUrl: a.imageUrl,
@@ -95,6 +98,10 @@ export class AdvertisementService {
       position: a.position,
       deviceType: a.deviceType,
     }));
+    } catch (err) {
+      this.logger.warn(`getActive failed: ${err}`);
+      return [];
+    }
   }
 
   /**
@@ -208,8 +215,7 @@ export class AdvertisementService {
     if (dto.width && dto.height) {
       const compliance = this.checkIABCompliance(dto.width, dto.height);
       if (!compliance.isCompliant) {
-        // Just log warning, don't reject
-        console.warn(`Ad "${dto.title}" dimensions (${dto.width}x${dto.height}) not IAB compliant. Suggestions: ${compliance.suggestions.join(', ')}`);
+        this.logger.warn('Ad dimensions not IAB compliant');
       }
     }
 
@@ -246,7 +252,7 @@ export class AdvertisementService {
     if (newWidth && newHeight && (dto.width !== undefined || dto.height !== undefined)) {
       const compliance = this.checkIABCompliance(newWidth, newHeight);
       if (!compliance.isCompliant) {
-        console.warn(`Ad "${dto.title || existing.title}" dimensions (${newWidth}x${newHeight}) not IAB compliant.`);
+        this.logger.warn('Ad dimensions not IAB compliant');
       }
     }
 

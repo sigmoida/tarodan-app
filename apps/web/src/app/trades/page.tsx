@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { ArrowsRightLeftIcon, ClockIcon, CheckCircleIcon, XCircleIcon, TruckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -53,8 +54,6 @@ export default function TradesPage() {
     cancelled: { label: t('trade.statusCancelled'), color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
     disputed: { label: t('common.error'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
   };
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,19 +61,15 @@ export default function TradesPage() {
       router.push('/login?redirect=/trades');
       return;
     }
-    fetchTrades();
-  }, [isAuthenticated, statusFilter]);
+  }, [isAuthenticated, router]);
 
-  const fetchTrades = async () => {
-    setIsLoading(true);
-    try {
+  const tradesQuery = useQuery({
+    queryKey: ['trades', statusFilter],
+    queryFn: async (): Promise<Trade[]> => {
       const response = await api.get('/trades');
       let allTrades = response.data.data || response.data.trades || [];
-      
-      // Frontend'de status bazlı filtreleme
       if (statusFilter) {
         if (statusFilter === 'shipped') {
-          // Kargoda: initiator_shipped, receiver_shipped, both_shipped
           allTrades = allTrades.filter((trade: Trade) => 
             trade.status === 'initiator_shipped' || 
             trade.status === 'receiver_shipped' || 
@@ -84,15 +79,13 @@ export default function TradesPage() {
           allTrades = allTrades.filter((trade: Trade) => trade.status === statusFilter);
         }
       }
-      
-      setTrades(allTrades);
-    } catch (error) {
-      console.error('Failed to fetch trades:', error);
-      toast.error(t('trade.tradesLoadFailed'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return allTrades;
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'trades' },
+  });
+  const trades = tradesQuery.data ?? [];
+  const isLoading = tradesQuery.isLoading;
 
   const getStatusBadge = (status: string) => {
     const config = statusConfig[status] || statusConfig.pending;
@@ -225,15 +218,13 @@ export default function TradesPage() {
                         {myItems.map((item, idx) => (
                           <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                              <Image
+                              <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
                                 fill
                                 className="object-cover"
-                                unoptimized
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün';
-                                }}
+                                fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                                logContext={{ itemId: item.id, page: 'trades-list' }}
                               />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -271,15 +262,13 @@ export default function TradesPage() {
                         {theirItems.map((item, idx) => (
                           <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                              <Image
+                              <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
                                 fill
                                 className="object-cover"
-                                unoptimized
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün';
-                                }}
+                                fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                                logContext={{ itemId: item.id, page: 'trades-list' }}
                               />
                             </div>
                             <div className="flex-1 min-w-0">

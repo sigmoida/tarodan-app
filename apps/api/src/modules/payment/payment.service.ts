@@ -423,14 +423,8 @@ export class PaymentService {
    * Requirement: iyzico signature verification (3.1)
    */
   async handleIyzicoCallback(dto: IyzicoCallbackDto, rawBody?: string, signature?: string) {
-    // Enhanced logging for debugging
-    this.logger.log(`=== Iyzico Callback Received ===`);
-    this.logger.log(`Token: ${dto.token}`);
-    this.logger.log(`Status: ${dto.status || 'not provided'}`);
-    this.logger.log(`Payment ID: ${dto.paymentId || 'not provided'}`);
-    this.logger.log(`Conversation ID: ${dto.conversationId || 'not provided'}`);
-    this.logger.log(`Raw Body Present: ${!!rawBody}`);
-    this.logger.log(`Signature Present: ${!!signature}`);
+    // Log only that callback was received — never log token, paymentId, conversationId (PCI/security)
+    this.logger.log('Iyzico callback received');
 
     // Verify signature if provided (webhook verification)
     if (rawBody && signature) {
@@ -462,12 +456,11 @@ export class PaymentService {
     });
 
     if (!payment) {
-      this.logger.warn(`Payment not found for token: ${dto.token}`);
-      this.logger.warn(`Searched with token/conversationId: ${dto.token}, ${dto.conversationId}`);
+      this.logger.warn('Payment not found for Iyzico callback');
       throw new NotFoundException('Payment not found');
     }
 
-    this.logger.log(`Payment found: ${payment.id}, Order: ${payment.orderId}, Status: ${payment.status}`);
+    this.logger.log(`Payment found: internalId=${payment.id}, orderId=${payment.orderId}, status=${payment.status}`);
 
     // Retrieve checkout form result from Iyzico
     try {
@@ -487,8 +480,8 @@ export class PaymentService {
         return { status: 'error', message: errorMessage };
       }
     } catch (error: any) {
-      this.logger.error(`Error retrieving Iyzico checkout form: ${error.message}`);
-      
+      this.logger.error('Error retrieving Iyzico checkout form (do not log provider details)');
+
       // Fallback: use status from DTO if available
       if (dto.status === 'success') {
         await this.processSuccessfulPayment(payment, dto.paymentId || dto.token);
@@ -505,7 +498,7 @@ export class PaymentService {
    * Called by frontend after iyzico redirects back
    */
   async verifyIyzicoCheckoutForm(token: string, paymentId?: string) {
-    this.logger.log(`Verifying Iyzico checkout form with token: ${token}`);
+    this.logger.log('Verifying Iyzico checkout form');
 
     // Find payment by token or paymentId
     const payment = await this.prisma.payment.findFirst({
@@ -528,7 +521,7 @@ export class PaymentService {
     });
 
     if (!payment) {
-      this.logger.warn(`Payment not found for token: ${token}, paymentId: ${paymentId}`);
+      this.logger.warn('Payment not found for verify request');
       return { success: false, status: 'error', message: 'Ödeme bulunamadı' };
     }
 
@@ -544,8 +537,6 @@ export class PaymentService {
     // Retrieve checkout form result from Iyzico
     try {
       const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(token);
-
-      this.logger.log(`Iyzico checkout result: ${JSON.stringify(checkoutResult)}`);
 
       if (checkoutResult.status === 'success' && checkoutResult.paymentId) {
         // Payment successful - process it
@@ -567,7 +558,7 @@ export class PaymentService {
         return { success: false, status: 'failed', message: errorMessage };
       }
     } catch (error: any) {
-      this.logger.error(`Error verifying Iyzico checkout form: ${error.message}`);
+      this.logger.error('Error verifying Iyzico checkout form (do not log provider details)');
       return { success: false, status: 'error', message: error.message || 'Doğrulama hatası' };
     }
   }
@@ -577,7 +568,7 @@ export class PaymentService {
    * POST /payments/callback/paytr
    */
   async handlePayTRCallback(dto: PayTRCallbackDto) {
-    this.logger.log(`PayTR callback received: ${dto.merchant_oid}`);
+    this.logger.log('PayTR callback received');
 
     // Verify hash using PayTR service
     const isValid = this.paytrService.verifyCallback({

@@ -14,6 +14,7 @@ import {
   BadRequestException,
   UseInterceptors,
   UploadedFile,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CollectionService } from './collection.service';
@@ -31,6 +32,8 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('collections')
 export class CollectionController {
+  private readonly logger = new Logger(CollectionController.name);
+
   constructor(
     private readonly collectionService: CollectionService,
     private readonly mediaService: MediaService,
@@ -102,20 +105,14 @@ export class CollectionController {
     req.res?.setHeader('Pragma', 'no-cache');
     req.res?.setHeader('Expires', '0');
     
-    console.log('\n=== LIKED COLLECTIONS REQUEST ===');
-    console.log('User:', req.user?.id, req.user?.email);
-    
     if (!req.user || !req.user.id) {
-      console.error('[getLikedCollections] NOT AUTHENTICATED');
       return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
     }
-    
+
     try {
-      const result = await this.collectionService.getLikedCollections(req.user.id, page, pageSize);
-      console.log(`[getLikedCollections] Found ${result.collections.length} collections for user ${req.user.id}`);
-      return result;
+      return await this.collectionService.getLikedCollections(req.user.id, page, pageSize);
     } catch (error) {
-      console.error('[getLikedCollections] Error:', error);
+      this.logger.error('getLikedCollections failed');
       return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
     }
   }
@@ -165,17 +162,13 @@ export class CollectionController {
     @Param('id') idOrSlug: string,
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
-    console.log(`[likeCollection] Request: idOrSlug=${idOrSlug}, userId=${req.user?.id}`);
-    
     if (!req.user || !req.user.id) {
       throw new BadRequestException('Kullanıcı kimlik doğrulaması gerekli');
     }
     try {
-      const result = await this.collectionService.likeCollection(idOrSlug, req.user.id);
-      console.log(`[likeCollection] Result: liked=${result.liked}, likeCount=${result.likeCount}`);
-      return result;
+      return await this.collectionService.likeCollection(idOrSlug, req.user.id);
     } catch (error) {
-      console.error('Error in likeCollection controller:', error);
+      this.logger.error('likeCollection failed');
       throw error;
     }
   }
@@ -197,7 +190,7 @@ export class CollectionController {
     try {
       return await this.collectionService.unlikeCollection(idOrSlug, req.user.id);
     } catch (error) {
-      console.error('Error in unlikeCollection controller:', error);
+      this.logger.error('unlikeCollection failed');
       throw error;
     }
   }

@@ -87,7 +87,7 @@ export default function SupportTicketDetailPage() {
       setTicket(response.data);
       setNewStatus(response.data.status);
     } catch (error: any) {
-      console.error('Ticket load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Ticket load error:', error);
       toast.error(error.response?.data?.message || 'Destek talebi yüklenemedi');
       router.push('/support');
     } finally {

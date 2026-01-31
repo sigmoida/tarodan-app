@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import {
   ArrowsRightLeftIcon,
@@ -28,8 +29,17 @@ import toast from 'react-hot-toast';
 import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
-import ReportModal from '@/components/ReportModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
+const ReportModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/ReportModal'), 'ReportModal'),
+  { ssr: false }
+);
 import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 
@@ -76,6 +86,7 @@ interface Listing {
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const id = params.id as string;
   const { t, locale } = useTranslation();
   
@@ -86,10 +97,7 @@ export default function ListingDetailPage() {
   const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
   
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
@@ -118,12 +126,72 @@ export default function ListingDetailPage() {
   const [imageContainerRef, setImageContainerRef] = useState<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const zoomPreviewRef = useRef<HTMLDivElement | null>(null);
-  const viewCountedRef = useRef<boolean>(false); // Track if view has been counted
-  
-  // Product reviews state
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [reviewStats, setReviewStats] = useState<{ averageRating: number; totalRatings: number; scoreDistribution?: Record<number, number> } | null>(null);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const viewCountedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    viewCountedRef.current = false;
+  }, [id]);
+
+  // Listing: React Query (cache + single source of truth)
+  const listingQuery = useQuery({
+    queryKey: ['listing', id],
+    queryFn: async (): Promise<Listing> => {
+      const response = await listingsApi.getOne(id);
+      const productData = response.data.product || response.data;
+      if (!viewCountedRef.current) {
+        viewCountedRef.current = true;
+        try {
+          const viewResponse = await api.post(`/products/${id}/view`);
+          if (viewResponse.data?.viewCount !== undefined) productData.viewCount = viewResponse.data.viewCount;
+        } catch {
+          // ignore
+        }
+      }
+      return productData;
+    },
+    enabled: !!id,
+    meta: { page: 'listing-detail' },
+  });
+  const listing = listingQuery.data ?? null;
+  const isLoading = listingQuery.isLoading;
+
+  // Wishlist check: React Query (only when authenticated)
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist-check', id],
+    queryFn: async () => {
+      const response = await wishlistApi.check(id);
+      return response.data?.inWishlist ?? false;
+    },
+    enabled: !!id && !!isAuthenticated,
+    meta: { page: 'listing-detail-wishlist' },
+  });
+  const isFavorite = wishlistQuery.data ?? false;
+
+  // Reviews: React Query
+  const reviewsQuery = useQuery({
+    queryKey: ['listing-reviews', id],
+    queryFn: async () => {
+      const [reviewsRes, statsRes] = await Promise.all([
+        api.get(`/ratings/products/${id}`),
+        api.get(`/ratings/products/${id}/stats`),
+      ]);
+      const reviewsList = reviewsRes.data?.ratings || reviewsRes.data?.data || [];
+      const stats = statsRes.data;
+      return {
+        reviews: reviewsList,
+        stats: stats ? {
+          averageRating: stats.averageScore || 0,
+          totalRatings: stats.totalRatings || 0,
+          scoreDistribution: stats.scoreDistribution,
+        } : null,
+      };
+    },
+    enabled: !!id,
+    meta: { page: 'listing-detail-reviews' },
+  });
+  const reviews = reviewsQuery.data?.reviews ?? [];
+  const reviewStats = reviewsQuery.data?.stats ?? null;
+  const reviewsLoading = reviewsQuery.isLoading;
   
   // Check if product is in cart
   const cartItem = listing ? cartItems.find(item => item.productId === listing.id) : null;
@@ -144,14 +212,6 @@ export default function ListingDetailPage() {
       ? listing.images.map(img => getImageUrl(img))
       : ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
   }, [listing]);
-
-  useEffect(() => {
-    if (id) {
-      fetchListing();
-      checkFavorite();
-      fetchReviews();
-    }
-  }, [id, isAuthenticated]);
 
   // Handle ESC key to close lightbox
   useEffect(() => {
@@ -191,71 +251,6 @@ export default function ListingDetailPage() {
       setLightboxImageIndex(activeImageIndex);
     }
   }, [isLightboxOpen, activeImageIndex]);
-
-  const fetchListing = async () => {
-    try {
-      const response = await listingsApi.getOne(id);
-      const productData = response.data.product || response.data;
-      
-      // Increment view count ONLY ONCE per page load
-      // Use ref to prevent double counting when auth state changes
-      if (!viewCountedRef.current) {
-        viewCountedRef.current = true;
-        try {
-          console.log('[ViewCount] Attempting to increment view for product:', id);
-          const viewResponse = await api.post(`/products/${id}/view`);
-          console.log('[ViewCount] API Response:', viewResponse.data);
-          
-          if (viewResponse.data?.viewCount !== undefined) {
-            // Update the product data with the new view count before setting state
-            productData.viewCount = viewResponse.data.viewCount;
-            console.log('[ViewCount] Updated viewCount to:', viewResponse.data.viewCount);
-          }
-        } catch (viewError: any) {
-          console.error('[ViewCount] Failed to increment view:', viewError?.response?.data || viewError?.message || viewError);
-        }
-      }
-      
-      setListing(productData);
-    } catch (error) {
-      console.error('Failed to fetch listing:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const checkFavorite = async () => {
-    if (!isAuthenticated) return;
-    try {
-      const response = await wishlistApi.check(id);
-      setIsFavorite(response.data?.inWishlist || false);
-    } catch (error) {
-      // Ignore - wishlist check is optional
-      setIsFavorite(false);
-    }
-  };
-
-  const fetchReviews = async () => {
-    setReviewsLoading(true);
-    try {
-      const [reviewsRes, statsRes] = await Promise.all([
-        api.get(`/ratings/products/${id}`),
-        api.get(`/ratings/products/${id}/stats`),
-      ]);
-      setReviews(reviewsRes.data?.ratings || reviewsRes.data?.data || []);
-      // Map API response to frontend expected format
-      const stats = statsRes.data;
-      setReviewStats(stats ? {
-        averageRating: stats.averageScore || 0,
-        totalRatings: stats.totalRatings || 0,
-        scoreDistribution: stats.scoreDistribution,
-      } : null);
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error);
-    } finally {
-      setReviewsLoading(false);
-    }
-  };
 
   const handleAddToCart = async () => {
     if (!listing) return;
@@ -415,7 +410,7 @@ export default function ListingDetailPage() {
       const data = response.data?.collections || response.data?.data || [];
       setCollections(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch collections:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch collections:', error);
       toast.error(t('product.collectionsLoadFailed'));
     } finally {
       setLoadingCollections(false);
@@ -431,7 +426,7 @@ export default function ListingDetailPage() {
       toast.success(t('product.addedToCollection'));
       setShowCollectionModal(false);
     } catch (error: any) {
-      console.error('Failed to add to collection:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add to collection:', error);
       toast.error(error.response?.data?.message || t('common.operationFailed'));
     } finally {
       setAddingToCollection(false);
@@ -449,7 +444,6 @@ export default function ListingDetailPage() {
       return;
     }
     
-    // Cannot favorite own product
     if (isOwner) {
       toast.error(t('product.cannotFavoriteOwn'));
       return;
@@ -458,21 +452,15 @@ export default function ListingDetailPage() {
     try {
       if (isFavorite) {
         await wishlistApi.remove(id);
-        setIsFavorite(false);
-        // Update displayed like count
-        if (listing) {
-          setListing({ ...listing, likeCount: Math.max(0, (listing.likeCount || 1) - 1) });
-        }
         toast.success(t('product.removedFromFavorites'));
       } else {
         await wishlistApi.add(id);
-        setIsFavorite(true);
-        // Update displayed like count
-        if (listing) {
-          setListing({ ...listing, likeCount: (listing.likeCount || 0) + 1 });
-        }
         toast.success(t('product.addToFavorites'));
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['wishlist-check', id] }),
+        queryClient.invalidateQueries({ queryKey: ['listing', id] }),
+      ]);
     } catch (error: any) {
       const message = error?.response?.data?.message || t('common.operationFailed');
       toast.error(message);
@@ -710,15 +698,14 @@ export default function ListingDetailPage() {
               onMouseMove={handleMagnifierMouseMove}
               onMouseLeave={handleMagnifierMouseLeave}
             >
-              <Image
+              <OptimizedImage
                 src={images[activeImageIndex]}
                 alt={listing.title}
                 fill
                 className="object-cover rounded-2xl"
-                unoptimized
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
-                }}
+                fallbackSrc="https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün"
+                logContext={{ listingId: listing.id, page: 'listing-detail-main' }}
+                priority
               />
 
               {/* Kare Büyüteç (Viewport) */}
@@ -810,7 +797,7 @@ export default function ListingDetailPage() {
                       index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
                     }`}
                   >
-                    <Image src={img} alt="" fill className="object-cover" unoptimized />
+                    <OptimizedImage src={img} alt="" fill className="object-cover" logContext={{ page: 'listing-detail-thumb' }} />
                   </button>
                 ))}
               </div>
@@ -870,16 +857,14 @@ export default function ListingDetailPage() {
                       transition: isDragging ? 'none' : 'transform 0.2s ease-out',
                     }}
                   >
-                    <Image
+                    <OptimizedImage
                       src={images[lightboxImageIndex]}
                       alt={listing.title}
                       width={1200}
                       height={1200}
                       className="max-w-[90vw] max-h-[90vh] object-contain"
-                      unoptimized
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
-                      }}
+                      fallbackSrc="https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün"
+                      logContext={{ listingId: listing.id, page: 'listing-detail-lightbox' }}
                     />
                   </div>
                 </div>
@@ -927,12 +912,12 @@ export default function ListingDetailPage() {
                             : 'border-white/20 hover:border-white/40'
                         }`}
                       >
-                        <Image 
+                        <OptimizedImage 
                           src={img} 
                           alt="" 
                           fill 
-                          className="object-cover" 
-                          unoptimized
+                          className="object-cover"
+                          logContext={{ page: 'listing-detail-lightbox-thumb' }}
                         />
                       </button>
                     ))}

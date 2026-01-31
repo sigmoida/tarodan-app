@@ -59,7 +59,7 @@ export default function PaymentPage() {
         }
       }
     } catch (error: any) {
-      console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
       toast.error('Ödeme bilgisi yüklenemedi');
       // Redirect to home for guests, orders page for authenticated users
       router.push(isGuestCheckout ? '/' : '/orders');
@@ -89,7 +89,7 @@ export default function PaymentPage() {
           router.push(`/payment/fail?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
         }
       } catch (error) {
-        console.error('Failed to check payment status:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to check payment status:', error);
       }
     }, 2000);
 

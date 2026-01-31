@@ -68,7 +68,7 @@ export default function SettingsPage() {
         });
       }
       
-      console.log('Loaded settings:', settingsObj); // Debug log
+      if (process.env.NODE_ENV === 'development') console.log('Loaded settings:', settingsObj);
       
       // Load membership tier prices if not in platform settings
       let premiumMonthlyPrice = settingsObj.premium_monthly_price ? Number(settingsObj.premium_monthly_price) : null;
@@ -102,7 +102,7 @@ export default function SettingsPage() {
             }
           }
         } catch (error) {
-          console.error('Failed to load membership tiers:', error);
+          if (process.env.NODE_ENV === 'development') console.error('Failed to load membership tiers:', error);
         }
       }
       
@@ -123,7 +123,7 @@ export default function SettingsPage() {
         yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
       });
     } catch (error) {
-      console.error('Settings load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Settings load error:', error);
       toast.error('Ayarlar yüklenemedi');
     } finally {
       setLoading(false);
@@ -168,7 +168,7 @@ export default function SettingsPage() {
       // Reload settings after save to reflect changes
       await loadSettings();
     } catch (error) {
-      console.error('Settings save error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Settings save error:', error);
       toast.error('Ayarlar kaydedilemedi');
     } finally {
       setSaving(false);

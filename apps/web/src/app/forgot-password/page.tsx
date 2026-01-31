@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
       await api.post('/auth/forgot-password', { email });
       setIsSubmitted(true);
     } catch (error: any) {
-      console.error('Failed to request password reset:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to request password reset:', error);
       // Always show success for security reasons
       setIsSubmitted(true);
     } finally {

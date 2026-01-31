@@ -29,7 +29,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { messagesApi, api } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -163,7 +169,7 @@ export default function Navbar() {
       }, 0);
       setUnreadMessageCount(totalUnread);
     } catch (error) {
-      console.error('Failed to fetch unread message count:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch unread message count:', error);
     }
   };
 
@@ -176,7 +182,7 @@ export default function Navbar() {
       setPendingOffersCount(offersRes?.data?.received || 0);
       setPendingTradesCount(tradesRes?.data?.received || 0);
     } catch (error) {
-      console.error('Failed to fetch pending counts:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
     }
   };
 
@@ -214,7 +220,7 @@ export default function Navbar() {
         setAdImageError(new Set());
       })
       .catch((err) => {
-        console.error('Failed to fetch ads:', err);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch ads:', err);
         setTopAds([]);
       });
   }, [shouldShowAd, isMobile]);
@@ -344,6 +350,7 @@ export default function Navbar() {
               width={160}
               height={52}
               className="object-contain"
+              style={{ width: 'auto', height: 'auto' }}
               priority
             />
           </Link>

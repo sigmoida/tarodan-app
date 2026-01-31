@@ -70,7 +70,7 @@ export default function UsersPage() {
       setTotal(meta.total || data.length);
       if (pageOverride !== undefined) setPage(pageOverride);
     } catch (error) {
-      console.error('Users load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Users load error:', error);
       toast.error('Kullanıcılar yüklenemedi');
     } finally {
       setLoading(false);

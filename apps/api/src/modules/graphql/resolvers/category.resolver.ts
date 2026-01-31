@@ -2,6 +2,7 @@
 // GAP-L02: GRAPHQL CATEGORY RESOLVER
 // =============================================================================
 
+import { Logger } from '@nestjs/common';
 import { Resolver, Query, Args, Int, ID } from '@nestjs/graphql';
 import { CategoryType, CategoryTreeType } from '../types/category.type';
 import { PrismaService } from '../../../prisma';
@@ -9,6 +10,8 @@ import { ProductStatus } from '@prisma/client';
 
 @Resolver(() => CategoryType)
 export class CategoryResolver {
+  private readonly logger = new Logger(CategoryResolver.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   @Query(() => CategoryType, { name: 'category', nullable: true })
@@ -93,7 +96,7 @@ export class CategoryResolver {
         total: categories.length,
       };
     } catch (error) {
-      console.error('GraphQL categories query error:', error);
+      this.logger.warn('GraphQL categories query error');
       return {
         categories: [],
         total: 0,
@@ -127,7 +130,7 @@ export class CategoryResolver {
         parent: undefined,
       }));
     } catch (error) {
-      console.error('GraphQL allCategories query error:', error);
+      this.logger.warn('GraphQL allCategories query error');
       return [];
     }
   }

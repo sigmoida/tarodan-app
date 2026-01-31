@@ -245,7 +245,7 @@ export default function ProfilePage() {
       
       refreshUserData();
     } catch (error) {
-      console.error('Profile load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Profile load error:', error);
     } finally {
       setLoading(false);
     }

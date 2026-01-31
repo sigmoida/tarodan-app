@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -36,69 +37,54 @@ type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
 export default function CollectionsPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [myCollections, setMyCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Free üyeler koleksiyon oluşturamaz
+
+  // Public collections: React Query (cache + refetch on sort/search)
+  const publicQuery = useQuery({
+    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null],
+    queryFn: async (): Promise<Collection[]> => {
+      const params: Record<string, any> = {
+        sortBy,
+        ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+      };
+      const response = await collectionsApi.browse(params);
+      const data = response.data?.collections || response.data?.data || [];
+      return Array.isArray(data) ? data : [];
+    },
+    meta: { page: 'collections-public' },
+  });
+  const collections = publicQuery.data ?? [];
+
+  // My collections: React Query (only when authenticated)
+  const myQuery = useQuery({
+    queryKey: ['collections', 'mine'],
+    queryFn: async (): Promise<Collection[]> => {
+      const response = await collectionsApi.getMyCollections();
+      const data = response.data?.collections || response.data?.data || [];
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'collections-mine' },
+  });
+  const myCollections = myQuery.data ?? [];
+
+  const loading = activeTab === 'public' ? publicQuery.isLoading : myQuery.isLoading;
+
   const canCreateCollection = user?.membershipTier !== 'free' || limits?.canCreateCollections;
-  
+
   const handleCreateClick = () => {
     if (!canCreateCollection) {
       setShowPremiumModal(true);
       return;
     }
     setShowCreateModal(true);
-  };
-
-  useEffect(() => {
-    loadCollections();
-  }, [isAuthenticated, sortBy]);
-
-  // Debounced search for public collections
-  useEffect(() => {
-    if (activeTab === 'public') {
-      const timeoutId = setTimeout(() => {
-        loadCollections();
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [searchQuery, activeTab]);
-
-  const loadCollections = async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, any> = {
-        sortBy,
-        ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-      };
-      const publicResponse = await collectionsApi.browse(params);
-      const publicData = publicResponse.data?.collections || publicResponse.data?.data || [];
-      setCollections(Array.isArray(publicData) ? publicData : []);
-
-      if (isAuthenticated) {
-        try {
-          const myResponse = await collectionsApi.getMyCollections();
-          const myData = myResponse.data?.collections || myResponse.data?.data || [];
-          setMyCollections(Array.isArray(myData) ? myData : []);
-        } catch (e) {
-          console.error('My collections load error:', e);
-          setMyCollections([]);
-        }
-      }
-    } catch (error) {
-      console.error('Collections load error:', error);
-      setCollections([]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Client-side filtering and sorting for my collections
@@ -152,10 +138,7 @@ export default function CollectionsPage() {
   }, [activeTab, collections, myCollections, searchQuery, sortBy]);
 
   const handleSearch = () => {
-    if (activeTab === 'public') {
-      loadCollections();
-    }
-    // For my collections, filtering is done client-side via useMemo
+    // Public: useQuery refetches when searchQuery/sortBy (queryKey) change. Mine: client-side filter via useMemo.
   };
 
   const displayedCollections = filteredAndSortedCollections;
@@ -240,12 +223,7 @@ export default function CollectionsPage() {
             />
             {searchQuery && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  if (activeTab === 'public') {
-                    loadCollections();
-                  }
-                }}
+                onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 ✕
@@ -270,12 +248,7 @@ export default function CollectionsPage() {
               <label className="text-sm text-gray-600 font-medium">{t('common.sort')}:</label>
               <select
                 value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value as SortOption);
-                  if (activeTab === 'public') {
-                    loadCollections();
-                  }
-                }}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
               >
                 <option value="popular">{t('common.popular')}</option>
@@ -312,12 +285,7 @@ export default function CollectionsPage() {
             </p>
             {searchQuery && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  if (activeTab === 'public') {
-                    loadCollections();
-                  }
-                }}
+                onClick={() => setSearchQuery('')}
                 className="mt-4 px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
               >
                 {t('common.clear')}
@@ -342,11 +310,13 @@ export default function CollectionsPage() {
               >
                 <div className="aspect-video bg-gray-100 relative">
                   {collection.coverImageUrl ? (
-                    <Image
+                    <OptimizedImage
                       src={collection.coverImageUrl}
                       alt={collection.name}
                       fill
                       className="object-cover"
+                      fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
+                      logContext={{ collectionId: collection.id, page: 'collections' }}
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-6xl">
@@ -389,7 +359,7 @@ export default function CollectionsPage() {
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
             setShowCreateModal(false);
-            loadCollections();
+            queryClient.invalidateQueries({ queryKey: ['collections', 'mine'] });
           }}
         />
       )}
@@ -453,7 +423,7 @@ function CreateCollectionModal({
       await collectionsApi.create({ name, description, isPublic });
       onCreated();
     } catch (error: any) {
-      console.error('Create collection error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';
       alert(errorMessage);
       // If it's a membership restriction error, suggest upgrading

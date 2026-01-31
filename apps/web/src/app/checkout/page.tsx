@@ -148,7 +148,7 @@ export default function CheckoutPage() {
         setUseNewCard(false);
       }
     } catch (error) {
-      console.error('Failed to fetch saved cards:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch saved cards:', error);
       setSavedCards([]);
     }
   };
@@ -206,7 +206,7 @@ export default function CheckoutPage() {
         const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
         setShippingCost(baseRate + carrierExtra);
       } catch (error) {
-        console.error('Failed to calculate shipping:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to calculate shipping:', error);
         setShippingCost(49.90); // Default fallback
       } finally {
         setShippingLoading(false);
@@ -232,7 +232,7 @@ export default function CheckoutPage() {
         },
       });
     } catch (error) {
-      console.error('Failed to fetch product:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch product:', error);
       toast.error(t('product.loadFailed'));
       router.push('/listings');
     }
@@ -255,7 +255,7 @@ export default function CheckoutPage() {
         setShowAddressForm(true);
       }
     } catch (error) {
-      console.error('Failed to fetch addresses:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch addresses:', error);
       setAddresses([]);
       // On error, show address form so user can still checkout
       setShowAddressForm(true);
@@ -299,7 +299,7 @@ export default function CheckoutPage() {
         toast.error(locale === 'en' ? 'Failed to add address' : 'Adres eklenemedi');
       }
     } catch (error: any) {
-      console.error('Failed to add address:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add address:', error);
       toast.error(error.response?.data?.message || t('checkout.addressAddError'));
     }
   };
@@ -318,15 +318,17 @@ export default function CheckoutPage() {
       // Check if form has all required fields including phone
       const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
       
-      console.log('=== CHECKOUT DEBUG ===');
-      console.log('isAuthenticated:', isAuthenticated);
-      console.log('selectedAddressId:', selectedAddressId);
-      console.log('addresses.length:', addresses.length);
-      console.log('hasSavedAddress:', hasSavedAddress);
-      console.log('newAddress:', JSON.stringify(newAddress, null, 2));
-      console.log('hasFormAddress:', hasFormAddress);
-      console.log('showAddressForm:', showAddressForm);
-      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== CHECKOUT DEBUG ===');
+        console.log('isAuthenticated:', isAuthenticated);
+        console.log('selectedAddressId:', selectedAddressId);
+        console.log('addresses.length:', addresses.length);
+        console.log('hasSavedAddress:', hasSavedAddress);
+        console.log('newAddress:', JSON.stringify(newAddress, null, 2));
+        console.log('hasFormAddress:', hasFormAddress);
+        console.log('showAddressForm:', showAddressForm);
+      }
+
       // Get shipping address - prefer saved address for logged-in users, otherwise use form
       let shippingAddress: any;
       let contactEmail: string;
@@ -503,7 +505,9 @@ export default function CheckoutPage() {
               throw new Error(locale === 'en' ? 'Shipping address not found' : 'Teslimat adresi bulunamadı');
             }
             
-            console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            if (process.env.NODE_ENV === 'development') {
+              console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            }
             orderResponse = await ordersApi.directBuy(payload);
           } else {
             // Guest user: use guest checkout endpoint
@@ -527,17 +531,13 @@ export default function CheckoutPage() {
               },
             };
             
-            console.log('Guest checkout payload:', JSON.stringify(guestPayload, null, 2));
             orderResponse = await ordersApi.createGuest(guestPayload);
           }
         } catch (orderError: any) {
-          console.error('Order creation failed:', orderError);
-          console.error('Full error response:', orderError.response?.data);
-          console.error('Request config:', orderError.config);
-          
-          // Extract error message from various possible locations
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Order creation failed:', orderError);
+          }
           let errorMessage = 'Sipariş oluşturulamadı';
-          
           if (orderError.response?.data) {
             const data = orderError.response.data;
             if (Array.isArray(data.message)) {
@@ -552,8 +552,6 @@ export default function CheckoutPage() {
           } else if (orderError.message) {
             errorMessage = orderError.message;
           }
-          
-          console.error('Extracted error message:', errorMessage);
           toast.error(errorMessage);
           throw orderError;
         }
@@ -594,7 +592,9 @@ export default function CheckoutPage() {
               throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');
             }
           } catch (paymentError: any) {
-            console.error('Payment initiation failed:', paymentError);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Payment initiation failed:', paymentError);
+            }
             toast.error(
               paymentError.response?.data?.message || 
               (locale === 'en' ? 'Failed to initiate payment. Please try again.' : 'Ödeme başlatılamadı. Lütfen tekrar deneyin.')
@@ -617,8 +617,9 @@ export default function CheckoutPage() {
           });
           toast.success(locale === 'en' ? 'Card information saved!' : 'Kart bilgileriniz kaydedildi!');
         } catch (cardError) {
-          console.error('Failed to save card:', cardError);
-          // Don't block checkout for card save failure
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to save card:', cardError);
+          }
         }
       }
 
@@ -634,7 +635,9 @@ export default function CheckoutPage() {
         router.push(`/checkout/success?email=${encodeURIComponent(contactEmail)}`);
       }
     } catch (error: any) {
-      console.error('Checkout failed:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Checkout failed:', error);
+      }
       toast.error(error.response?.data?.message || t('checkout.orderFailed'));
     } finally {
       setIsLoading(false);

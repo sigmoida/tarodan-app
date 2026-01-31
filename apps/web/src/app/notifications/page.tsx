@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -68,10 +69,9 @@ const FILTER_LABELS: Record<FilterType, { tr: string; en: string }> = {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
   const { isAuthenticated } = useAuthStore();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -80,43 +80,40 @@ export default function NotificationsPage() {
       router.push('/login?redirect=/notifications');
       return;
     }
-    loadNotifications();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    try {
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async (): Promise<Notification[]> => {
       const response = await api.get('/notifications', {
         params: { page: 1, limit: 100 },
       });
       const data = response.data.notifications || response.data.data || [];
-      setNotifications(data);
-    } catch (error) {
-      console.error('Notifications load error:', error);
-      toast.error(t('common.operationFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data;
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'notifications' },
+  });
+  const notifications = notificationsQuery.data ?? [];
+  const loading = notificationsQuery.isLoading;
+  const invalidateNotifications = () => queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
   const markAsRead = async (id: string) => {
     try {
       await api.patch(`/notifications/${id}/read`);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
+      await invalidateNotifications();
     } catch (error) {
-      console.error('Failed to mark as read:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to mark as read:', error);
     }
   };
 
   const markAllAsRead = async () => {
     try {
       await api.patch('/notifications/read-all');
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       toast.success(locale === 'en' ? 'All marked as read' : 'Tümü okundu olarak işaretlendi');
+      await invalidateNotifications();
     } catch (error) {
-      console.error('Failed to mark all as read:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to mark all as read:', error);
       toast.error(t('common.operationFailed'));
     }
   };

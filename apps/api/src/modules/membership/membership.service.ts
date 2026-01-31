@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import {
@@ -26,6 +27,8 @@ import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
 
 @Injectable()
 export class MembershipService {
+  private readonly logger = new Logger(MembershipService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
@@ -240,9 +243,7 @@ export class MembershipService {
         tierType: membership.tier.type,
       };
     } catch (error) {
-      // Log error for debugging
-      console.error('Error in getUserLimits for userId:', userId, error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      this.logger.warn('getUserLimits failed');
       // Re-throw known exceptions
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
@@ -663,7 +664,7 @@ export class MembershipService {
         });
         downgradeCount++;
       } catch (error) {
-        console.error(`Failed to downgrade membership ${membership.id}:`, error);
+        this.logger.warn('Failed to downgrade membership');
       }
     }
 

@@ -65,7 +65,7 @@ export default function AdminPaymentStatisticsPage() {
       const response = await adminApi.getPaymentStatistics(params);
       setStatistics(response.data);
     } catch (error: any) {
-      console.error('Statistics load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Statistics load error:', error);
       toast.error(error.response?.data?.message || 'İstatistikler yüklenemedi');
     } finally {
       setLoading(false);
