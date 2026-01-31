@@ -51,19 +51,31 @@ export class AdminService {
    */
   async getCommissionRules() {
     const rules = await this.prisma.commissionRule.findMany({
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      include: { category: { select: { id: true, name: true } } },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     });
 
     return rules.map((r) => ({
       id: r.id,
       name: r.name,
-      percentage: Number(r.percentage),
-      type: r.ruleType,
+      categoryId: r.categoryId,
+      categoryName: r.category?.name || null,
       sellerType: r.sellerType,
-      minAmount: r.minAmount ? Number(r.minAmount) : null,
+      appliesTo: r.appliesTo || 'SELLER',
+      sellerRate: r.sellerRate ? Number(r.sellerRate) : null,
+      buyerRate: r.buyerRate ? Number(r.buyerRate) : null,
+      sellerMin: r.sellerMin ? Number(r.sellerMin) : null,
+      sellerMax: r.sellerMax ? Number(r.sellerMax) : null,
+      buyerMin: r.buyerMin ? Number(r.buyerMin) : null,
+      buyerMax: r.buyerMax ? Number(r.buyerMax) : null,
+      priority: r.priority,
       isActive: r.isActive,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
+      // Legacy fields for backward compatibility
+      percentage: Number(r.percentage),
+      type: r.ruleType,
+      minAmount: r.minAmount ? Number(r.minAmount) : null,
     }));
   }
 
@@ -72,15 +84,48 @@ export class AdminService {
    * Requirement: Commission configuration via admin (project.md)
    */
   async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
+    // Validate appliesTo requirements
+    if (dto.appliesTo === 'SELLER' && !dto.sellerRate) {
+      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
+    }
+    if (dto.appliesTo === 'BUYER' && !dto.buyerRate) {
+      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
+    }
+    if (dto.appliesTo === 'BOTH' && (!dto.sellerRate || !dto.buyerRate)) {
+      throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
+    }
+
+    // Validate min <= max
+    if (dto.sellerMin != null && dto.sellerMax != null && dto.sellerMin > dto.sellerMax) {
+      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
+    }
+    if (dto.buyerMin != null && dto.buyerMax != null && dto.buyerMin > dto.buyerMax) {
+      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
+    }
+
+    // If categoryId is empty string, set to null
+    const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
+
     const rule = await this.prisma.commissionRule.create({
       data: {
         name: dto.name,
-        percentage: dto.percentage,
-        ruleType: dto.type,
+        categoryId,
         sellerType: dto.sellerType,
-        minAmount: dto.minAmount,
+        appliesTo: dto.appliesTo,
+        sellerRate: dto.sellerRate != null ? dto.sellerRate : null,
+        buyerRate: dto.buyerRate != null ? dto.buyerRate : null,
+        sellerMin: dto.sellerMin != null ? dto.sellerMin : null,
+        sellerMax: dto.sellerMax != null ? dto.sellerMax : null,
+        buyerMin: dto.buyerMin != null ? dto.buyerMin : null,
+        buyerMax: dto.buyerMax != null ? dto.buyerMax : null,
+        priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
+        // Legacy fields (for backward compatibility)
+        percentage: dto.percentage ?? (dto.sellerRate || 0),
+        ruleType: dto.type || 'default',
+        minAmount: dto.minAmount,
       },
+      include: { category: { select: { id: true, name: true } } },
     });
 
     // Log action
@@ -89,13 +134,24 @@ export class AdminService {
     return {
       id: rule.id,
       name: rule.name,
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
+      categoryId: rule.categoryId,
+      categoryName: rule.category?.name || null,
       sellerType: rule.sellerType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
+      appliesTo: rule.appliesTo,
+      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
+      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
+      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
+      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
+      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
+      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
+      priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
+      // Legacy fields
+      percentage: Number(rule.percentage),
+      type: rule.ruleType,
+      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
     };
   }
 
@@ -111,16 +167,62 @@ export class AdminService {
       throw new NotFoundException('Komisyon kuralı bulunamadı');
     }
 
+    // Determine final appliesTo value
+    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? 'SELLER';
+
+    // Validate appliesTo requirements
+    if (appliesTo === 'SELLER' && dto.sellerRate === undefined && !existing.sellerRate) {
+      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
+    }
+    if (appliesTo === 'BUYER' && dto.buyerRate === undefined && !existing.buyerRate) {
+      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
+    }
+    if (appliesTo === 'BOTH') {
+      const finalSellerRate = dto.sellerRate !== undefined ? dto.sellerRate : existing.sellerRate;
+      const finalBuyerRate = dto.buyerRate !== undefined ? dto.buyerRate : existing.buyerRate;
+      if (!finalSellerRate || !finalBuyerRate) {
+        throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
+      }
+    }
+
+    // Validate min <= max
+    const sellerMin = dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
+    const sellerMax = dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
+    if (sellerMin != null && sellerMax != null && sellerMin > sellerMax) {
+      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
+    }
+
+    const buyerMin = dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
+    const buyerMax = dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
+    if (buyerMin != null && buyerMax != null && buyerMin > buyerMax) {
+      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.categoryId !== undefined) {
+      updateData.categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
+    }
+    if (dto.sellerType !== undefined) updateData.sellerType = dto.sellerType;
+    if (dto.appliesTo !== undefined) updateData.appliesTo = dto.appliesTo;
+    if (dto.sellerRate !== undefined) updateData.sellerRate = dto.sellerRate;
+    if (dto.buyerRate !== undefined) updateData.buyerRate = dto.buyerRate;
+    if (dto.sellerMin !== undefined) updateData.sellerMin = dto.sellerMin;
+    if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
+    if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
+    if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
+    if (dto.priority !== undefined) updateData.priority = dto.priority;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    // Legacy fields
+    if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
+    if (dto.type !== undefined) updateData.ruleType = dto.type;
+    if (dto.minAmount !== undefined) updateData.minAmount = dto.minAmount;
+
     const rule = await this.prisma.commissionRule.update({
       where: { id: ruleId },
-      data: {
-        name: dto.name,
-        percentage: dto.percentage,
-        ruleType: dto.type,
-        sellerType: dto.sellerType,
-        minAmount: dto.minAmount,
-        isActive: dto.isActive,
-      },
+      data: updateData,
+      include: { category: { select: { id: true, name: true } } },
     });
 
     await this.createAuditLog(adminId, 'commission_rule_update', 'CommissionRule', rule.id, existing, rule);
@@ -128,13 +230,24 @@ export class AdminService {
     return {
       id: rule.id,
       name: rule.name,
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
+      categoryId: rule.categoryId,
+      categoryName: rule.category?.name || null,
       sellerType: rule.sellerType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
+      appliesTo: rule.appliesTo,
+      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
+      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
+      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
+      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
+      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
+      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
+      priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
+      // Legacy fields
+      percentage: Number(rule.percentage),
+      type: rule.ruleType,
+      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
     };
   }
 

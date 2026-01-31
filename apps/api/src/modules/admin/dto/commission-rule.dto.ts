@@ -1,7 +1,7 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsBoolean, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsBoolean, Min, Max, ValidateIf, Validate } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { CommissionRuleType, SellerType } from '@prisma/client';
+import { CommissionRuleType, CommissionAppliesTo, CommissionSellerType } from '@prisma/client';
 
 export class CreateCommissionRuleDto {
   @ApiProperty({
@@ -11,42 +11,100 @@ export class CreateCommissionRuleDto {
   @IsString()
   name: string;
 
-  @ApiProperty({
-    example: 5.0,
-    description: 'Commission percentage',
+  @ApiPropertyOptional({
+    example: 'category-uuid',
+    description: 'Category ID (null for all categories)',
   })
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(50)
-  percentage: number;
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
 
   @ApiProperty({
-    enum: CommissionRuleType,
-    example: 'seller',
+    enum: CommissionSellerType,
+    example: 'ALL',
+    description: 'Applicable seller type',
+  })
+  @IsEnum(CommissionSellerType)
+  sellerType: CommissionSellerType;
+
+  @ApiProperty({
+    enum: CommissionAppliesTo,
+    example: 'SELLER',
     description: 'Who pays the commission',
   })
-  @IsEnum(CommissionRuleType)
-  type: CommissionRuleType;
+  @IsEnum(CommissionAppliesTo)
+  appliesTo: CommissionAppliesTo;
 
   @ApiPropertyOptional({
-    enum: SellerType,
-    example: 'individual',
-    description: 'Applicable seller type (null for all)',
+    example: 5.0,
+    description: 'Seller commission rate (%) - Required if appliesTo is SELLER or BOTH',
   })
-  @IsOptional()
-  @IsEnum(SellerType)
-  sellerType?: SellerType;
+  @ValidateIf((o) => o.appliesTo === 'SELLER' || o.appliesTo === 'BOTH')
+  @IsNumber({}, { message: 'sellerRate is required when appliesTo is SELLER or BOTH' })
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerRate?: number;
 
   @ApiPropertyOptional({
-    example: 100,
-    description: 'Minimum order amount for this rule',
+    example: 2.0,
+    description: 'Buyer commission rate (%) - Required if appliesTo is BUYER or BOTH',
+  })
+  @ValidateIf((o) => o.appliesTo === 'BUYER' || o.appliesTo === 'BOTH')
+  @IsNumber({}, { message: 'buyerRate is required when appliesTo is BUYER or BOTH' })
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerRate?: number;
+
+  @ApiPropertyOptional({
+    example: 5.0,
+    description: 'Seller minimum commission (TRY)',
   })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   @Min(0)
-  minAmount?: number;
+  sellerMin?: number;
+
+  @ApiPropertyOptional({
+    example: 100.0,
+    description: 'Seller maximum commission (TRY)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerMax?: number;
+
+  @ApiPropertyOptional({
+    example: 0.0,
+    description: 'Buyer minimum commission (TRY)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMin?: number;
+
+  @ApiPropertyOptional({
+    example: 50.0,
+    description: 'Buyer maximum commission (TRY)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMax?: number;
+
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Priority (higher = more important)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  priority?: number;
 
   @ApiPropertyOptional({
     example: true,
@@ -55,6 +113,37 @@ export class CreateCommissionRuleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Legacy fields (optional for backward compatibility)
+  @ApiPropertyOptional({
+    example: 5.0,
+    description: 'Legacy commission percentage',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(50)
+  percentage?: number;
+
+  @ApiPropertyOptional({
+    enum: CommissionRuleType,
+    example: 'default',
+    description: 'Legacy rule type',
+  })
+  @IsOptional()
+  @IsEnum(CommissionRuleType)
+  type?: CommissionRuleType;
+
+  @ApiPropertyOptional({
+    example: 100,
+    description: 'Legacy minimum order amount',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  minAmount?: number;
 }
 
 export class UpdateCommissionRuleDto {
@@ -63,6 +152,86 @@ export class UpdateCommissionRuleDto {
   @IsString()
   name?: string;
 
+  @ApiPropertyOptional({
+    example: 'category-uuid',
+    description: 'Category ID (null for all categories)',
+  })
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @ApiPropertyOptional({
+    enum: CommissionSellerType,
+    example: 'PREMIUM',
+  })
+  @IsOptional()
+  @IsEnum(CommissionSellerType)
+  sellerType?: CommissionSellerType;
+
+  @ApiPropertyOptional({
+    enum: CommissionAppliesTo,
+    example: 'BOTH',
+  })
+  @IsOptional()
+  @IsEnum(CommissionAppliesTo)
+  appliesTo?: CommissionAppliesTo;
+
+  @ApiPropertyOptional({ example: 5.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerRate?: number;
+
+  @ApiPropertyOptional({ example: 2.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerRate?: number;
+
+  @ApiPropertyOptional({ example: 5.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerMin?: number;
+
+  @ApiPropertyOptional({ example: 100.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerMax?: number;
+
+  @ApiPropertyOptional({ example: 0.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMin?: number;
+
+  @ApiPropertyOptional({ example: 50.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMax?: number;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  priority?: number;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  // Legacy fields
   @ApiPropertyOptional({ example: 3.5 })
   @IsOptional()
   @IsNumber()
@@ -76,22 +245,12 @@ export class UpdateCommissionRuleDto {
   @IsEnum(CommissionRuleType)
   type?: CommissionRuleType;
 
-  @ApiPropertyOptional({ enum: SellerType })
-  @IsOptional()
-  @IsEnum(SellerType)
-  sellerType?: SellerType;
-
   @ApiPropertyOptional({ example: 500 })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   @Min(0)
   minAmount?: number;
-
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }
 
 export class CommissionRuleResponseDto {
@@ -101,17 +260,38 @@ export class CommissionRuleResponseDto {
   @ApiProperty({ example: 'Standart Komisyon' })
   name: string;
 
-  @ApiProperty({ example: 5.0 })
-  percentage: number;
+  @ApiPropertyOptional({ example: 'category-uuid' })
+  categoryId?: string | null;
 
-  @ApiProperty({ example: 'seller' })
-  type: string;
+  @ApiPropertyOptional({ example: 'Kategori Adı' })
+  categoryName?: string | null;
 
-  @ApiPropertyOptional({ example: 'individual' })
-  sellerType?: string;
+  @ApiProperty({ enum: CommissionSellerType, example: 'ALL' })
+  sellerType: CommissionSellerType | null;
 
-  @ApiPropertyOptional({ example: 100 })
-  minAmount?: number;
+  @ApiProperty({ enum: CommissionAppliesTo, example: 'SELLER' })
+  appliesTo: CommissionAppliesTo;
+
+  @ApiPropertyOptional({ example: 5.0 })
+  sellerRate?: number | null;
+
+  @ApiPropertyOptional({ example: 2.0 })
+  buyerRate?: number | null;
+
+  @ApiPropertyOptional({ example: 5.0 })
+  sellerMin?: number | null;
+
+  @ApiPropertyOptional({ example: 100.0 })
+  sellerMax?: number | null;
+
+  @ApiPropertyOptional({ example: 0.0 })
+  buyerMin?: number | null;
+
+  @ApiPropertyOptional({ example: 50.0 })
+  buyerMax?: number | null;
+
+  @ApiProperty({ example: 0 })
+  priority: number;
 
   @ApiProperty({ example: true })
   isActive: boolean;
@@ -121,4 +301,14 @@ export class CommissionRuleResponseDto {
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   updatedAt: Date;
+
+  // Legacy fields (for backward compatibility)
+  @ApiPropertyOptional({ example: 5.0 })
+  percentage?: number;
+
+  @ApiPropertyOptional({ example: 'default' })
+  type?: string;
+
+  @ApiPropertyOptional({ example: 100 })
+  minAmount?: number | null;
 }

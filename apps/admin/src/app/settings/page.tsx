@@ -17,15 +17,6 @@ interface Settings {
   requireMessageApproval: boolean;
 }
 
-interface CommissionRule {
-  id: string;
-  name: string;
-  type: string;
-  buyerRate: number;
-  sellerRate: number;
-  isActive: boolean;
-}
-
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
     commissionRate: 5,
@@ -38,10 +29,9 @@ export default function SettingsPage() {
     requireProductApproval: true,
     requireMessageApproval: true,
   });
-  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'commission' | 'trade'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'trade'>('general');
 
   useEffect(() => {
     loadSettings();
@@ -49,19 +39,7 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const [rulesResponse, settingsResponse] = await Promise.all([
-        adminApi.getCommissionRules(),
-        adminApi.getSettings(),
-      ]);
-      const rules = rulesResponse.data.data || rulesResponse.data || [];
-      setCommissionRules(rules.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        type: r.type,
-        buyerRate: 0,
-        sellerRate: r.percentage,
-        isActive: r.isActive,
-      })));
+      const settingsResponse = await adminApi.getSettings();
       const settingsData = settingsResponse.data.data || settingsResponse.data || [];
       const settingsObj: Record<string, any> = {};
       settingsData.forEach((s: any) => {
@@ -88,19 +66,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleToggleCommissionRule = async (ruleId: string, isActive: boolean) => {
-    try {
-      await adminApi.updateCommissionRule(ruleId, { isActive: !isActive });
-      setCommissionRules((prev) =>
-        prev.map((rule) =>
-          rule.id === ruleId ? { ...rule, isActive: !isActive } : rule
-        )
-      );
-      toast.success('Komisyon kuralı güncellendi');
-    } catch (error) {
-      toast.error('Kural güncellenemedi');
-    }
-  };
 
   if (loading) {
     return (
@@ -124,7 +89,6 @@ export default function SettingsPage() {
         <div className="flex gap-2 border-b border-dark-700 pb-2">
           {[
             { id: 'general', label: 'Genel' },
-            { id: 'commission', label: 'Komisyon' },
             { id: 'trade', label: 'Takas' },
           ].map((tab) => (
             <button
@@ -216,59 +180,6 @@ export default function SettingsPage() {
                   Şüpheli mesajları onayla
                 </label>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Commission Settings */}
-        {activeTab === 'commission' && (
-          <div className="space-y-6">
-            <div className="admin-card">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-white">Komisyon Kuralları</h2>
-                <button className="btn-primary text-sm">+ Yeni Kural</button>
-              </div>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Kural</th>
-                    <th>Tip</th>
-                    <th>Alıcı Oranı</th>
-                    <th>Satıcı Oranı</th>
-                    <th>Durum</th>
-                    <th>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {commissionRules.map((rule) => (
-                    <tr key={rule.id}>
-                      <td className="font-medium">{rule.name}</td>
-                      <td>
-                        <span className="badge badge-gray">{rule.type}</span>
-                      </td>
-                      <td>%{rule.buyerRate}</td>
-                      <td>%{rule.sellerRate}</td>
-                      <td>
-                        <button
-                          onClick={() => handleToggleCommissionRule(rule.id, rule.isActive)}
-                          className={`px-3 py-1 rounded-full text-xs ${
-                            rule.isActive
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-gray-600 text-gray-400'
-                          }`}
-                        >
-                          {rule.isActive ? 'Aktif' : 'Pasif'}
-                        </button>
-                      </td>
-                      <td>
-                        <button className="text-primary-400 hover:text-primary-300 text-sm">
-                          Düzenle
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
