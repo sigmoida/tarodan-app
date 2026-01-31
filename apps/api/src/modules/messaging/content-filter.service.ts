@@ -22,7 +22,6 @@ export interface ContentFilterRule {
 
 @Injectable()
 export class ContentFilterService implements OnModuleInit {
-  private readonly logger = new Logger(ContentFilterService.name);
   private filters: ContentFilterRule[] = [];
 
   constructor(private readonly prisma: PrismaService) {}
@@ -51,6 +50,7 @@ export class ContentFilterService implements OnModuleInit {
       regex: new RegExp(f.pattern, 'gi'),
     }));
 
+    console.log(`📋 Loaded ${this.filters.length} content filters`);
     this.logger.log('Content filters loaded');
   }
 
@@ -133,7 +133,6 @@ export class ContentFilterService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.warn('AI moderation failed');
-      // Fall back to regex result
     }
     */
 
