@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -22,8 +22,45 @@ export default function PricingPage() {
   const { isAuthenticated, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [listingLimits, setListingLimits] = useState<{
+    free_listing_limit?: number;
+    premium_listing_limit?: number;
+    business_listing_limit?: number;
+  }>({});
 
-  const MEMBERSHIP_TIERS = [
+  // Fetch listing limits from platform settings
+  useEffect(() => {
+    const fetchListingLimits = async () => {
+      try {
+        const response = await api.get('/admin/settings/public');
+        setListingLimits(response.data || {});
+      } catch (error) {
+        console.error('Failed to fetch listing limits:', error);
+        // Use defaults if API fails
+        setListingLimits({
+          free_listing_limit: 5,
+          premium_listing_limit: -1,
+          business_listing_limit: 1000,
+        });
+      }
+    };
+    fetchListingLimits();
+  }, []);
+
+  const getListingLimitText = (tierId: string) => {
+    const limit = tierId === 'free' 
+      ? listingLimits.free_listing_limit ?? 5
+      : tierId === 'premium'
+      ? listingLimits.premium_listing_limit ?? -1
+      : listingLimits.business_listing_limit ?? 1000;
+    
+    if (limit === -1) {
+      return `${t('membership.unlimited')} ${t('membership.listingsLimit')}`;
+    }
+    return `${limit} ${t('membership.listingsLimit')}`;
+  };
+
+  const MEMBERSHIP_TIERS = useMemo(() => [
     {
       id: 'free',
       name: t('membership.free'),
@@ -31,7 +68,7 @@ export default function PricingPage() {
       period: t('membership.perMonth'),
       description: t('membership.subtitle'),
       features: [
-        { text: `5 ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('free'), included: true },
         { text: t('search.search'), included: true },
         { text: t('message.messages'), included: true },
         { text: t('nav.trades'), included: false },
@@ -48,7 +85,7 @@ export default function PricingPage() {
       period: t('membership.perMonth'),
       description: t('membership.mostPopular'),
       features: [
-        { text: `${t('membership.unlimited')} ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('premium'), included: true },
         { text: '15 resim/ilan', included: true },
         { text: t('nav.trades'), included: true },
         { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
@@ -65,7 +102,7 @@ export default function PricingPage() {
       period: t('membership.perMonth'),
       description: t('membership.business'),
       features: [
-        { text: `1000 ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('business'), included: true },
         { text: t('search.search'), included: true },
         { text: t('message.messages'), included: true },
         { text: t('nav.trades'), included: true },
@@ -77,7 +114,7 @@ export default function PricingPage() {
       popular: false,
       color: 'gold',
     },
-  ];
+  ], [listingLimits, t]);
 
   useEffect(() => {
     const tier = searchParams.get('tier');

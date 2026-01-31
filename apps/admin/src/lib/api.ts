@@ -143,6 +143,7 @@ export const adminApi = {
   // Settings
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.patch('/admin/settings', data),
+  updateSetting: (key: string, value: string) => api.patch(`/admin/settings/${key}`, { value }),
   getCommissionRules: () => api.get('/admin/commission-rules'),
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),

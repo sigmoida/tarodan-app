@@ -329,6 +329,29 @@ export class AdminService {
   }
 
   /**
+   * Get public platform settings (listing limits only)
+   */
+  async getPublicSettings() {
+    const settings = await this.prisma.platformSetting.findMany({
+      where: {
+        settingKey: {
+          in: ['free_listing_limit', 'premium_listing_limit', 'business_listing_limit'],
+        },
+      },
+    });
+
+    const result: Record<string, number> = {};
+    settings.forEach((setting) => {
+      const value = parseInt(setting.settingValue, 10);
+      if (!isNaN(value)) {
+        result[setting.settingKey] = value;
+      }
+    });
+
+    return result;
+  }
+
+  /**
    * Update platform setting
    */
   async updatePlatformSetting(adminId: string, dto: UpdatePlatformSettingDto) {
@@ -350,7 +373,15 @@ export class AdminService {
       },
     });
 
-    await this.createAuditLog(adminId, 'setting_update', 'PlatformSetting', setting.id, existing, setting);
+    // Get AdminUser ID from User ID
+    const adminUser = await this.prisma.adminUser.findFirst({
+      where: { userId: adminId, isActive: true },
+      select: { id: true },
+    });
+
+    if (adminUser) {
+      await this.createAuditLog(adminUser.id, 'setting_update', 'PlatformSetting', setting.id, existing, setting);
+    }
 
     return setting;
   }

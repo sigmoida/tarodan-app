@@ -6,32 +6,30 @@ import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface Settings {
-  commissionRate: number;
   freeListingLimit: number;
+  premiumListingLimit: number;
+  businessListingLimit: number;
   tradeResponseHours: number;
   tradeShippingDays: number;
   tradeConfirmationDays: number;
   minProductPrice: number;
   maxProductPrice: number;
-  requireProductApproval: boolean;
-  requireMessageApproval: boolean;
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    commissionRate: 5,
     freeListingLimit: 10,
+    premiumListingLimit: -1, // -1 means unlimited
+    businessListingLimit: -1, // -1 means unlimited
     tradeResponseHours: 72,
     tradeShippingDays: 7,
     tradeConfirmationDays: 3,
     minProductPrice: 10,
     maxProductPrice: 100000,
-    requireProductApproval: true,
-    requireMessageApproval: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'trade'>('general');
+  const [activeTab, setActiveTab] = useState<'listing' | 'trade'>('listing');
 
   useEffect(() => {
     loadSettings();
@@ -40,12 +38,39 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     try {
       const settingsResponse = await adminApi.getSettings();
-      const settingsData = settingsResponse.data.data || settingsResponse.data || [];
+      // API response format: { data: { data: [...] } } or { data: [...] }
+      const settingsData = settingsResponse.data?.data || settingsResponse.data || [];
       const settingsObj: Record<string, any> = {};
-      settingsData.forEach((s: any) => {
-        settingsObj[s.key] = s.value;
+      
+      // Handle both array and object formats
+      // Backend returns Prisma model with settingKey and settingValue fields
+      if (Array.isArray(settingsData)) {
+        settingsData.forEach((s: any) => {
+          const key = s.settingKey || s.key;
+          const value = s.settingValue || s.value;
+          if (key) {
+            settingsObj[key] = value;
+          }
+        });
+      } else if (typeof settingsData === 'object') {
+        Object.keys(settingsData).forEach((key) => {
+          settingsObj[key] = settingsData[key];
+        });
+      }
+      
+      console.log('Loaded settings:', settingsObj); // Debug log
+      
+      // Map platform setting keys to local settings
+      setSettings({
+        freeListingLimit: settingsObj.free_listing_limit ? Number(settingsObj.free_listing_limit) : 10,
+        premiumListingLimit: settingsObj.premium_listing_limit ? Number(settingsObj.premium_listing_limit) : -1,
+        businessListingLimit: settingsObj.business_listing_limit ? Number(settingsObj.business_listing_limit) : -1,
+        minProductPrice: settingsObj.min_product_price ? Number(settingsObj.min_product_price) : 10,
+        maxProductPrice: settingsObj.max_product_price ? Number(settingsObj.max_product_price) : 100000,
+        tradeResponseHours: settingsObj.trade_response_deadline_hours ? Number(settingsObj.trade_response_deadline_hours) : 72,
+        tradeShippingDays: settingsObj.trade_shipping_deadline_days ? Number(settingsObj.trade_shipping_deadline_days) : 7,
+        tradeConfirmationDays: settingsObj.trade_confirmation_deadline_days ? Number(settingsObj.trade_confirmation_deadline_days) : 3,
       });
-      setSettings(settingsObj);
     } catch (error) {
       console.error('Settings load error:', error);
       toast.error('Ayarlar yüklenemedi');
@@ -57,9 +82,31 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await adminApi.updateSettings(settings);
+      // Save each setting individually with correct keys
+      const settingsToSave = [];
+      
+      if (activeTab === 'listing') {
+        settingsToSave.push(
+          adminApi.updateSetting('free_listing_limit', settings.freeListingLimit.toString()),
+          adminApi.updateSetting('premium_listing_limit', settings.premiumListingLimit.toString()),
+          adminApi.updateSetting('business_listing_limit', settings.businessListingLimit.toString()),
+          adminApi.updateSetting('min_product_price', settings.minProductPrice.toString()),
+          adminApi.updateSetting('max_product_price', settings.maxProductPrice.toString())
+        );
+      } else if (activeTab === 'trade') {
+        settingsToSave.push(
+          adminApi.updateSetting('trade_response_deadline_hours', settings.tradeResponseHours.toString()),
+          adminApi.updateSetting('trade_shipping_deadline_days', settings.tradeShippingDays.toString()),
+          adminApi.updateSetting('trade_confirmation_deadline_days', settings.tradeConfirmationDays.toString())
+        );
+      }
+      
+      await Promise.all(settingsToSave);
       toast.success('Ayarlar kaydedildi');
+      // Reload settings after save to reflect changes
+      await loadSettings();
     } catch (error) {
+      console.error('Settings save error:', error);
       toast.error('Ayarlar kaydedilemedi');
     } finally {
       setSaving(false);
@@ -88,7 +135,7 @@ export default function SettingsPage() {
         {/* Tabs */}
         <div className="flex gap-2 border-b border-dark-700 pb-2">
           {[
-            { id: 'general', label: 'Genel' },
+            { id: 'listing', label: 'İlan' },
             { id: 'trade', label: 'Takas' },
           ].map((tab) => (
             <button
@@ -105,10 +152,10 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* General Settings */}
-        {activeTab === 'general' && (
+        {/* Listing Settings */}
+        {activeTab === 'listing' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Genel Ayarlar</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">İlan Ayarları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
@@ -116,6 +163,7 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   value={settings.freeListingLimit}
                   onChange={(e) =>
                     setSettings({ ...settings, freeListingLimit: Number(e.target.value) })
@@ -123,7 +171,41 @@ export default function SettingsPage() {
                   className="admin-input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Ücretsiz üyelerin aylık ilan limiti
+                  Ücretsiz üyelerin ilan limiti
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Premium İlan Limiti
+                </label>
+                <input
+                  type="number"
+                  min="-1"
+                  value={settings.premiumListingLimit}
+                  onChange={(e) =>
+                    setSettings({ ...settings, premiumListingLimit: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Premium üyelerin ilan limiti (-1 = sınırsız)
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Business İlan Limiti
+                </label>
+                <input
+                  type="number"
+                  min="-1"
+                  value={settings.businessListingLimit}
+                  onChange={(e) =>
+                    setSettings({ ...settings, businessListingLimit: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Business üyelerin ilan limiti (-1 = sınırsız)
                 </p>
               </div>
               <div>
@@ -132,12 +214,17 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={settings.minProductPrice}
                   onChange={(e) =>
                     setSettings({ ...settings, minProductPrice: Number(e.target.value) })
                   }
                   className="admin-input"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)
+                </p>
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
@@ -145,40 +232,17 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={settings.maxProductPrice}
                   onChange={(e) =>
                     setSettings({ ...settings, maxProductPrice: Number(e.target.value) })
                   }
                   className="admin-input"
                 />
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="requireProductApproval"
-                  checked={settings.requireProductApproval}
-                  onChange={(e) =>
-                    setSettings({ ...settings, requireProductApproval: e.target.checked })
-                  }
-                  className="w-5 h-5 rounded"
-                />
-                <label htmlFor="requireProductApproval" className="text-gray-300">
-                  Ürün onayı gerekli
-                </label>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="requireMessageApproval"
-                  checked={settings.requireMessageApproval}
-                  onChange={(e) =>
-                    setSettings({ ...settings, requireMessageApproval: e.target.checked })
-                  }
-                  className="w-5 h-5 rounded"
-                />
-                <label htmlFor="requireMessageApproval" className="text-gray-300">
-                  Şüpheli mesajları onayla
-                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)
+                </p>
               </div>
             </div>
           </div>

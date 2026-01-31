@@ -61,7 +61,7 @@ interface ListingLimits {
 export default function NewListingPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, limits, canCreateListing, getRemainingListings, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const CONDITIONS = getConditions(locale);
   const OTHER_LABEL = getOtherLabel(locale);
@@ -125,17 +125,23 @@ export default function NewListingPage() {
   }, [formData]);
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking authentication
+    if (authLoading) {
+      return;
+    }
+    
     if (!isAuthenticated) {
       toast.error(locale === 'en' ? 'Please login to create a listing' : 'İlan oluşturmak için giriş yapmalısınız');
       router.push('/login?redirect=/listings/new');
       return;
     }
+    
     fetchCategories();
     // Refresh user data first, then update limits
     refreshUser().then(() => {
       updateListingLimits();
     });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   // Update limits whenever user or limits change
   useEffect(() => {
@@ -207,8 +213,10 @@ export default function NewListingPage() {
         membershipTier: tierName,
         remainingListings: remaining,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update listing limits:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       // Fallback to auth store data
       const membershipTier = user?.membershipTier || 'free';
       const currentCount = user?.listingCount || 0;
@@ -360,6 +368,20 @@ export default function NewListingPage() {
 
   const flatCategories = filterCategoryDuplicates(flattenCategories(categories));
 
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated (this should be handled by useEffect, but just in case)
+  if (!isAuthenticated) {
+    return null; // useEffect will handle redirect
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -411,7 +433,7 @@ export default function NewListingPage() {
                       ? 'text-yellow-600' 
                       : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {listingLimits.membershipTier} üyelik
+                    {listingLimits.membershipTier}
                     {listingLimits.isPremium && ' ⭐'}
                   </p>
                   {listingLimits.remainingListings !== -1 && (

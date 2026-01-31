@@ -16,7 +16,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
-import { ProductStatus, Prisma } from '@prisma/client';
+import { ProductStatus, Prisma, MembershipTierType } from '@prisma/client';
 
 @Injectable()
 export class ProductService {
@@ -98,6 +98,35 @@ export class ProductService {
 
     if (!category || !category.isActive) {
       throw new BadRequestException('Geçersiz kategori');
+    }
+
+    // ========================================================================
+    // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
+    // ========================================================================
+    const minPriceSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'min_product_price' },
+    });
+    const maxPriceSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'max_product_price' },
+    });
+
+    const minPrice = minPriceSetting?.settingValue 
+      ? parseFloat(minPriceSetting.settingValue) 
+      : null;
+    const maxPrice = maxPriceSetting?.settingValue 
+      ? parseFloat(maxPriceSetting.settingValue) 
+      : null;
+
+    if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
+      throw new BadRequestException(
+        `Ürün fiyatı minimum ${minPrice} TL olmalıdır.`
+      );
+    }
+
+    if (maxPrice != null && !isNaN(maxPrice) && dto.price > maxPrice) {
+      throw new BadRequestException(
+        `Ürün fiyatı maksimum ${maxPrice} TL olabilir.`
+      );
     }
 
     // Create product with images
@@ -1310,8 +1339,13 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
    * Returns counts by status and membership limit info
    */
   async getSellerListingStats(sellerId: string) {
-    // Get all listing counts by status (exclude inactive and draft)
-    const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
+    try {
+      if (!sellerId) {
+        throw new BadRequestException('Satıcı kimliği bulunamadı');
+      }
+
+      // Get all listing counts by status (exclude inactive and draft)
+      const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
       this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
@@ -1332,6 +1366,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     // Get membership limits
     const limits = await this.membershipService.getUserLimits(sellerId);
+
+    // For free tier, use maxFreeListings (which includes platform setting override)
+    // For other tiers, use maxTotalListings
+    const maxLimit = limits.tierType === MembershipTierType.free ? limits.maxFreeListings : limits.maxTotalListings;
+    const remainingLimit = limits.tierType === MembershipTierType.free ? limits.remainingFreeListings : limits.remainingTotalListings;
 
     return {
       // Counts by status
@@ -1362,13 +1401,20 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       // Quick summary for UI
       summary: {
         used: activeListings,
-        max: limits.maxTotalListings,                  // Real tier limit
-        remaining: limits.remainingTotalListings,
+        max: maxLimit,                  // Use maxFreeListings for free tier, maxTotalListings for others
+        remaining: remainingLimit,
         canCreate: limits.canCreateListing,
-        percentUsed: limits.maxTotalListings > 0 
-          ? Math.round((activeListings / limits.maxTotalListings) * 100) 
+        percentUsed: maxLimit > 0 
+          ? Math.round((activeListings / maxLimit) * 100) 
           : 0,
       },
     };
+    } catch (error) {
+      this.logger.error(`Error in getSellerListingStats for sellerId ${sellerId}:`, error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    }
   }
 }

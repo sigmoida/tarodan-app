@@ -10,6 +10,8 @@ import {
   UseGuards,
   ParseUUIDPipe,
   BadRequestException,
+  NotFoundException,
+  ForbiddenException,
   Ip,
   Headers,
   Req,
@@ -74,34 +76,9 @@ export class ProductController {
   }
 
   /**
-   * GET /products/my/:id
-   * Get seller's own single product (any status)
-   */
-  @Get('my/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kendi ürün detayım' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Satıcının kendi ürün detayı',
-    type: ProductResponseDto,
-  })
-  @ApiResponse({ status: 403, description: 'Bu ürün size ait değil' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
-  async findMyProductById(
-    @CurrentUser('id') sellerId: string,
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-  ) {
-    return this.productService.findSellerProductById(sellerId, id);
-  }
-
-  /**
    * GET /products/my/stats
    * Get seller's listing statistics and membership limits
+   * IMPORTANT: This route must be defined BEFORE 'my/:id' to avoid route conflicts
    */
   @Get('my/stats')
   @UseGuards(JwtAuthGuard)
@@ -152,7 +129,26 @@ export class ProductController {
     },
   })
   async getMyListingStats(@CurrentUser('id') sellerId: string) {
-    return this.productService.getSellerListingStats(sellerId);
+    console.log('[getMyListingStats] Called with sellerId:', sellerId);
+    if (!sellerId) {
+      throw new BadRequestException('Kullanıcı kimliği bulunamadı');
+    }
+    try {
+      console.log('[getMyListingStats] Calling getSellerListingStats for sellerId:', sellerId);
+      const result = await this.productService.getSellerListingStats(sellerId);
+      console.log('[getMyListingStats] Success, returning result');
+      return result;
+    } catch (error) {
+      console.error('[getMyListingStats] Error for sellerId:', sellerId, error);
+      console.error('[getMyListingStats] Error details:', error instanceof Error ? error.message : String(error));
+      console.error('[getMyListingStats] Error stack:', error instanceof Error ? error.stack : 'No stack');
+      // Re-throw known exceptions
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      // Wrap unknown errors with more context
+      throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    }
   }
 
   /**
