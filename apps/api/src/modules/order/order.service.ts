@@ -143,8 +143,8 @@ export class OrderService {
 
     // Map User.sellerType to CommissionSellerType
     const commissionSellerType = this.mapSellerTypeForCommission(
-      seller?.sellerType,
-      seller?.membership?.tier?.type
+      seller?.sellerType ?? null,
+      seller?.membership?.tier?.type ?? null
     );
 
     // Fetch all active commission rules
@@ -712,7 +712,7 @@ export class OrderService {
       const orderNumber = await this.generateOrderNumber();
 
       // Buyer fee is added to order total
-      const totalAmount = offer.amount + commissionResult.buyerFeeAmount;
+      const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount;
 
       // Create order
       const order = await tx.order.create({
