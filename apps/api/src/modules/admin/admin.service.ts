@@ -329,24 +329,45 @@ export class AdminService {
   }
 
   /**
-   * Get public platform settings (listing limits only)
+   * Get public platform settings (listing limits, message settings, and membership prices)
    */
   async getPublicSettings() {
     const settings = await this.prisma.platformSetting.findMany({
       where: {
         settingKey: {
-          in: ['free_listing_limit', 'premium_listing_limit', 'business_listing_limit'],
+          in: [
+            'free_listing_limit',
+            'premium_listing_limit',
+            'business_listing_limit',
+            'max_message_length',
+            'premium_monthly_price',
+            'business_monthly_price',
+            'yearly_discount_percentage',
+          ],
         },
       },
     });
 
     const result: Record<string, number> = {};
     settings.forEach((setting) => {
-      const value = parseInt(setting.settingValue, 10);
+      // For prices and percentages, use parseFloat; for limits, use parseInt
+      const isPriceOrPercentage = setting.settingKey.includes('_price') || setting.settingKey.includes('_percentage');
+      const value = isPriceOrPercentage 
+        ? parseFloat(setting.settingValue)
+        : parseInt(setting.settingValue, 10);
       if (!isNaN(value)) {
         result[setting.settingKey] = value;
       }
     });
+
+    // Calculate yearly prices from monthly prices and discount
+    const discountPercentage = result.yearly_discount_percentage ?? 20;
+    if (result.premium_monthly_price) {
+      result.premium_yearly_price = result.premium_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
+    if (result.business_monthly_price) {
+      result.business_yearly_price = result.business_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
 
     return result;
   }
@@ -372,6 +393,80 @@ export class AdminService {
         description: dto.description,
       },
     });
+
+    // If this is a membership price setting, also update the MembershipTier
+    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' || 
+        dto.key === 'yearly_discount_percentage') {
+      try {
+        // Get discount percentage
+        const discountSetting = await this.prisma.platformSetting.findUnique({
+          where: { settingKey: 'yearly_discount_percentage' },
+        });
+        const discountPercentage = discountSetting 
+          ? parseFloat(discountSetting.settingValue) 
+          : (dto.key === 'yearly_discount_percentage' ? parseFloat(dto.value) : 20);
+        const finalDiscount = isNaN(discountPercentage) ? 20 : discountPercentage;
+
+        if (dto.key === 'premium_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update premium tier
+          const premiumMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'premium_monthly_price' },
+          });
+          const premiumMonthly = premiumMonthlySetting 
+            ? parseFloat(premiumMonthlySetting.settingValue)
+            : (dto.key === 'premium_monthly_price' ? parseFloat(dto.value) : null);
+          
+          if (premiumMonthly !== null && !isNaN(premiumMonthly)) {
+            const premiumYearly = premiumMonthly * 12 * (1 - finalDiscount / 100);
+            const premiumTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'premium' },
+            });
+            
+            if (premiumTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: premiumTier.id },
+                data: {
+                  monthlyPrice: premiumMonthly,
+                  yearlyPrice: premiumYearly,
+                },
+              });
+              this.logger.log(`Updated premium tier: monthly=${premiumMonthly}, yearly=${premiumYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
+
+        if (dto.key === 'business_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update business tier
+          const businessMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'business_monthly_price' },
+          });
+          const businessMonthly = businessMonthlySetting 
+            ? parseFloat(businessMonthlySetting.settingValue)
+            : (dto.key === 'business_monthly_price' ? parseFloat(dto.value) : null);
+          
+          if (businessMonthly !== null && !isNaN(businessMonthly)) {
+            const businessYearly = businessMonthly * 12 * (1 - finalDiscount / 100);
+            const businessTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'business' },
+            });
+            
+            if (businessTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: businessTier.id },
+                data: {
+                  monthlyPrice: businessMonthly,
+                  yearlyPrice: businessYearly,
+                },
+              });
+              this.logger.log(`Updated business tier: monthly=${businessMonthly}, yearly=${businessYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Failed to update membership tier price for ${dto.key}:`, error);
+        // Don't throw - platform setting update succeeded, tier update is secondary
+      }
+    }
 
     // Get AdminUser ID from User ID
     const adminUser = await this.prisma.adminUser.findFirst({

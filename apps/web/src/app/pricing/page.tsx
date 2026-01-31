@@ -27,24 +27,49 @@ export default function PricingPage() {
     premium_listing_limit?: number;
     business_listing_limit?: number;
   }>({});
+  const [membershipPrices, setMembershipPrices] = useState<{
+    premium_monthly_price?: number;
+    premium_yearly_price?: number;
+    business_monthly_price?: number;
+    business_yearly_price?: number;
+    yearly_discount_percentage?: number;
+  }>({});
 
-  // Fetch listing limits from platform settings
+  // Fetch listing limits and membership prices from platform settings
   useEffect(() => {
-    const fetchListingLimits = async () => {
+    const fetchSettings = async () => {
       try {
         const response = await api.get('/admin/settings/public');
-        setListingLimits(response.data || {});
+        const settings = response.data || {};
+        setListingLimits({
+          free_listing_limit: settings.free_listing_limit,
+          premium_listing_limit: settings.premium_listing_limit,
+          business_listing_limit: settings.business_listing_limit,
+        });
+        setMembershipPrices({
+          premium_monthly_price: settings.premium_monthly_price,
+          premium_yearly_price: settings.premium_yearly_price,
+          business_monthly_price: settings.business_monthly_price,
+          business_yearly_price: settings.business_yearly_price,
+          yearly_discount_percentage: settings.yearly_discount_percentage,
+        });
       } catch (error) {
-        console.error('Failed to fetch listing limits:', error);
+        console.error('Failed to fetch settings:', error);
         // Use defaults if API fails
         setListingLimits({
           free_listing_limit: 5,
           premium_listing_limit: -1,
           business_listing_limit: 1000,
         });
+        setMembershipPrices({
+          premium_monthly_price: 99,
+          premium_yearly_price: 960,
+          business_monthly_price: 499,
+          business_yearly_price: 4790,
+        });
       }
     };
-    fetchListingLimits();
+    fetchSettings();
   }, []);
 
   const getListingLimitText = (tierId: string) => {
@@ -81,7 +106,7 @@ export default function PricingPage() {
     {
       id: 'premium',
       name: t('membership.premium'),
-      price: 99,
+      price: membershipPrices.premium_monthly_price ?? 99,
       period: t('membership.perMonth'),
       description: t('membership.mostPopular'),
       features: [
@@ -98,7 +123,7 @@ export default function PricingPage() {
     {
       id: 'business',
       name: t('membership.business'),
-      price: 499,
+      price: membershipPrices.business_monthly_price ?? 499,
       period: t('membership.perMonth'),
       description: t('membership.business'),
       features: [
@@ -114,7 +139,7 @@ export default function PricingPage() {
       popular: false,
       color: 'gold',
     },
-  ], [listingLimits, t]);
+  ], [listingLimits, membershipPrices, t]);
 
   useEffect(() => {
     const tier = searchParams.get('tier');
@@ -214,9 +239,18 @@ export default function PricingPage() {
         <div className="flex justify-center mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
           {MEMBERSHIP_TIERS.map((tier, index) => {
-            const displayPrice = selectedPeriod === 'yearly' && tier.price > 0
-              ? Math.round(tier.price * 12 * 0.8)
-              : tier.price;
+            let displayPrice = tier.price;
+            if (selectedPeriod === 'yearly' && tier.price > 0) {
+              const discountPercentage = membershipPrices.yearly_discount_percentage ?? 20;
+              if (tier.id === 'premium' && membershipPrices.premium_yearly_price) {
+                displayPrice = membershipPrices.premium_yearly_price;
+              } else if (tier.id === 'business' && membershipPrices.business_yearly_price) {
+                displayPrice = membershipPrices.business_yearly_price;
+              } else {
+                // Fallback: calculate from monthly price with discount percentage
+                displayPrice = Math.round(tier.price * 12 * (1 - discountPercentage / 100) * 100) / 100;
+              }
+            }
             
             const isSelected = selectedTier === tier.id;
             const isCurrent = currentTier === tier.id;
@@ -282,6 +316,21 @@ export default function PricingPage() {
                     {selectedPeriod === 'yearly' && tier.price > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
                         Ayda {Math.round(displayPrice / 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        {tier.id === 'premium' && membershipPrices.premium_monthly_price && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            (Normal: {membershipPrices.premium_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
+                          </span>
+                        )}
+                        {tier.id === 'business' && membershipPrices.business_monthly_price && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            (Normal: {membershipPrices.business_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
+                          </span>
+                        )}
+                        {membershipPrices.yearly_discount_percentage && (
+                          <span className="text-xs text-green-500 ml-1">
+                            (%{membershipPrices.yearly_discount_percentage} indirim)
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>

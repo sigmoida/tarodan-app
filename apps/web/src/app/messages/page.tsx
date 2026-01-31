@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { messagesApi, listingsApi } from '@/lib/api';
+import { messagesApi, listingsApi, api } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 interface MessageThread {
@@ -78,6 +78,7 @@ export default function MessagesPage() {
   const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [maxMessageLength, setMaxMessageLength] = useState<number>(1000);
 
   // URL params for product-specific messaging
   const sellerId = searchParams.get('user');
@@ -89,7 +90,20 @@ export default function MessagesPage() {
       return;
     }
     loadThreads();
+    loadMessageSettings();
   }, [isAuthenticated]);
+
+  const loadMessageSettings = async () => {
+    try {
+      const response = await api.get('/admin/settings/public');
+      const settings = response.data || {};
+      if (settings.max_message_length) {
+        setMaxMessageLength(settings.max_message_length);
+      }
+    } catch (error) {
+      console.error('Failed to load message settings:', error);
+    }
+  };
 
   // Handle creating a new thread when coming from a product page
   useEffect(() => {
@@ -271,6 +285,16 @@ export default function MessagesPage() {
 
   const sendMessage = async () => {
     if (!selectedThread || !newMessage.trim() || sending) return;
+
+    // Check message length
+    if (newMessage.length > maxMessageLength) {
+      toast.error(
+        locale === 'en'
+          ? `Message cannot exceed ${maxMessageLength} characters. Current: ${newMessage.length}`
+          : `Mesaj ${maxMessageLength} karakteri aşamaz. Mevcut: ${newMessage.length}`
+      );
+      return;
+    }
 
     // Final content filter check
     const filterResult = checkContentFilter(newMessage, locale);
@@ -466,8 +490,13 @@ export default function MessagesPage() {
                     onChange={(e) => handleMessageChange(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                     placeholder={t('message.typeMessage')}
+                    maxLength={maxMessageLength}
                     className={`flex-1 px-4 py-2 bg-gray-700 rounded-lg text-white placeholder-gray-400 ${
                       contentWarning ? 'border border-yellow-500' : ''
+                    } ${
+                      newMessage.length > maxMessageLength * 0.9
+                        ? 'border border-orange-500'
+                        : ''
                     }`}
                   />
                   <button
@@ -478,9 +507,20 @@ export default function MessagesPage() {
                     {sending ? '...' : t('common.send')}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  ℹ️ {t('message.blockedContent')}
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-gray-500">
+                    ℹ️ {t('message.blockedContent')}
+                  </p>
+                  <p className={`text-xs ${
+                    newMessage.length > maxMessageLength
+                      ? 'text-red-400'
+                      : newMessage.length > maxMessageLength * 0.9
+                      ? 'text-orange-400'
+                      : 'text-gray-500'
+                  }`}>
+                    {newMessage.length} / {maxMessageLength}
+                  </p>
+                </div>
               </div>
             </>
           ) : (

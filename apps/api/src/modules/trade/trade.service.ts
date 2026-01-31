@@ -947,6 +947,19 @@ export class TradeService {
     // Generate tracking number (in real system, this would come from shipping provider)
     const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+    // Get confirmation deadline setting if both parties have shipped
+    let confirmationDeadline: Date | null = null;
+    if (newStatus === TradeStatus.both_shipped) {
+      const confirmationDaysSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'trade_confirmation_deadline_days' },
+      });
+      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+      
+      const now = new Date();
+      confirmationDeadline = new Date(now);
+      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       // Create shipment
       await tx.tradeShipment.create({
@@ -966,6 +979,7 @@ export class TradeService {
         where: { id: tradeId, version: trade.version },
         data: {
           status: newStatus,
+          confirmationDeadline,
           version: { increment: 1 },
         },
       });
@@ -1017,6 +1031,11 @@ export class TradeService {
 
     if (shipment.confirmedAt) {
       throw new BadRequestException('Bu gönderim zaten onaylandı');
+    }
+
+    // Check confirmation deadline if trade has one
+    if (trade.confirmationDeadline && new Date() > trade.confirmationDeadline) {
+      throw new BadRequestException('Onay süresi dolmuş');
     }
 
     // Determine new status

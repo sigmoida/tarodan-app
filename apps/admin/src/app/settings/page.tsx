@@ -10,10 +10,15 @@ interface Settings {
   premiumListingLimit: number;
   businessListingLimit: number;
   tradeResponseHours: number;
+  tradePaymentHours: number;
   tradeShippingDays: number;
   tradeConfirmationDays: number;
   minProductPrice: number;
   maxProductPrice: number;
+  maxMessageLength: number;
+  premiumMonthlyPrice: number;
+  businessMonthlyPrice: number;
+  yearlyDiscountPercentage: number;
 }
 
 export default function SettingsPage() {
@@ -22,14 +27,19 @@ export default function SettingsPage() {
     premiumListingLimit: -1, // -1 means unlimited
     businessListingLimit: -1, // -1 means unlimited
     tradeResponseHours: 72,
+    tradePaymentHours: 48,
     tradeShippingDays: 7,
     tradeConfirmationDays: 3,
     minProductPrice: 10,
     maxProductPrice: 100000,
+    maxMessageLength: 1000,
+    premiumMonthlyPrice: 99,
+    businessMonthlyPrice: 499,
+    yearlyDiscountPercentage: 20,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'listing' | 'trade'>('listing');
+  const [activeTab, setActiveTab] = useState<'listing' | 'trade' | 'message' | 'membership'>('listing');
 
   useEffect(() => {
     loadSettings();
@@ -60,6 +70,42 @@ export default function SettingsPage() {
       
       console.log('Loaded settings:', settingsObj); // Debug log
       
+      // Load membership tier prices if not in platform settings
+      let premiumMonthlyPrice = settingsObj.premium_monthly_price ? Number(settingsObj.premium_monthly_price) : null;
+      let businessMonthlyPrice = settingsObj.business_monthly_price ? Number(settingsObj.business_monthly_price) : null;
+      let yearlyDiscountPercentage = settingsObj.yearly_discount_percentage ? Number(settingsObj.yearly_discount_percentage) : null;
+
+      if (premiumMonthlyPrice === null || businessMonthlyPrice === null || yearlyDiscountPercentage === null) {
+        try {
+          const tiersResponse = await adminApi.getMembershipTiers();
+          const tiers = tiersResponse.data?.tiers || tiersResponse.data || [];
+          
+          const premiumTier = tiers.find((t: any) => t.type === 'premium');
+          const businessTier = tiers.find((t: any) => t.type === 'business');
+          
+          if (premiumMonthlyPrice === null && premiumTier) {
+            premiumMonthlyPrice = Number(premiumTier.monthlyPrice) || 99;
+          }
+          if (businessMonthlyPrice === null && businessTier) {
+            businessMonthlyPrice = Number(businessTier.monthlyPrice) || 499;
+          }
+          // Calculate discount percentage from existing prices if available
+          if (yearlyDiscountPercentage === null && premiumTier) {
+            const monthly = Number(premiumTier.monthlyPrice) || 99;
+            const yearly = Number(premiumTier.yearlyPrice) || 960;
+            if (monthly > 0 && yearly > 0) {
+              // Calculate: yearly = monthly * 12 * (1 - discount/100)
+              // discount = (1 - yearly/(monthly*12)) * 100
+              yearlyDiscountPercentage = Math.round((1 - yearly / (monthly * 12)) * 100);
+            } else {
+              yearlyDiscountPercentage = 20; // Default
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load membership tiers:', error);
+        }
+      }
+      
       // Map platform setting keys to local settings
       setSettings({
         freeListingLimit: settingsObj.free_listing_limit ? Number(settingsObj.free_listing_limit) : 10,
@@ -68,8 +114,13 @@ export default function SettingsPage() {
         minProductPrice: settingsObj.min_product_price ? Number(settingsObj.min_product_price) : 10,
         maxProductPrice: settingsObj.max_product_price ? Number(settingsObj.max_product_price) : 100000,
         tradeResponseHours: settingsObj.trade_response_deadline_hours ? Number(settingsObj.trade_response_deadline_hours) : 72,
+        tradePaymentHours: settingsObj.trade_payment_deadline_hours ? Number(settingsObj.trade_payment_deadline_hours) : 48,
         tradeShippingDays: settingsObj.trade_shipping_deadline_days ? Number(settingsObj.trade_shipping_deadline_days) : 7,
         tradeConfirmationDays: settingsObj.trade_confirmation_deadline_days ? Number(settingsObj.trade_confirmation_deadline_days) : 3,
+        maxMessageLength: settingsObj.max_message_length ? Number(settingsObj.max_message_length) : 1000,
+        premiumMonthlyPrice: premiumMonthlyPrice ?? 99,
+        businessMonthlyPrice: businessMonthlyPrice ?? 499,
+        yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
       });
     } catch (error) {
       console.error('Settings load error:', error);
@@ -96,8 +147,19 @@ export default function SettingsPage() {
       } else if (activeTab === 'trade') {
         settingsToSave.push(
           adminApi.updateSetting('trade_response_deadline_hours', settings.tradeResponseHours.toString()),
+          adminApi.updateSetting('trade_payment_deadline_hours', settings.tradePaymentHours.toString()),
           adminApi.updateSetting('trade_shipping_deadline_days', settings.tradeShippingDays.toString()),
           adminApi.updateSetting('trade_confirmation_deadline_days', settings.tradeConfirmationDays.toString())
+        );
+      } else if (activeTab === 'message') {
+        settingsToSave.push(
+          adminApi.updateSetting('max_message_length', settings.maxMessageLength.toString())
+        );
+      } else if (activeTab === 'membership') {
+        settingsToSave.push(
+          adminApi.updateSetting('premium_monthly_price', settings.premiumMonthlyPrice.toString()),
+          adminApi.updateSetting('business_monthly_price', settings.businessMonthlyPrice.toString()),
+          adminApi.updateSetting('yearly_discount_percentage', settings.yearlyDiscountPercentage.toString())
         );
       }
       
@@ -137,6 +199,8 @@ export default function SettingsPage() {
           {[
             { id: 'listing', label: 'İlan' },
             { id: 'trade', label: 'Takas' },
+            { id: 'message', label: 'Mesaj' },
+            { id: 'membership', label: 'Üyelik' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -271,6 +335,22 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
+                  Ödeme Süresi (Saat)
+                </label>
+                <input
+                  type="number"
+                  value={settings.tradePaymentHours}
+                  onChange={(e) =>
+                    setSettings({ ...settings, tradePaymentHours: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kabul sonrası ödeme süresi (nakit takaslar için)
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
                   Kargo Süresi (Gün)
                 </label>
                 <input
@@ -300,6 +380,141 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Teslim sonrası onay süresi
                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Message Settings */}
+        {activeTab === 'message' && (
+          <div className="admin-card">
+            <h2 className="text-lg font-semibold text-white mb-4">Mesaj Ayarları</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Maksimum Mesaj Uzunluğu
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={settings.maxMessageLength}
+                  onChange={(e) =>
+                    setSettings({ ...settings, maxMessageLength: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Bir mesajın maksimum karakter uzunluğu
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Membership Settings */}
+        {activeTab === 'membership' && (
+          <div className="admin-card">
+            <h2 className="text-lg font-semibold text-white mb-4">Üyelik Fiyatları</h2>
+            <div className="space-y-6">
+              {/* Discount Percentage */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Yıllık İndirim Oranı</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      İndirim Yüzdesi (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={settings.yearlyDiscountPercentage}
+                      onChange={(e) =>
+                        setSettings({ ...settings, yearlyDiscountPercentage: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık üyelik için uygulanacak indirim yüzdesi
+                    </p>
+                    <p className="text-xs text-blue-400 mt-2">
+                      Yıllık fiyat = (Aylık Fiyat × 12) × (1 - İndirim%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Premium Tier */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Premium Üyelik</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Aylık Fiyat (₺)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.premiumMonthlyPrice}
+                      onChange={(e) =>
+                        setSettings({ ...settings, premiumMonthlyPrice: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Premium üyeliğin aylık fiyatı
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
+                    </label>
+                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                      {Math.round((settings.premiumMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık fiyat otomatik hesaplanır: {settings.premiumMonthlyPrice} × 12 × (1 - {settings.yearlyDiscountPercentage}%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Tier */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Business Üyelik</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Aylık Fiyat (₺)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.businessMonthlyPrice}
+                      onChange={(e) =>
+                        setSettings({ ...settings, businessMonthlyPrice: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Business üyeliğin aylık fiyatı
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
+                    </label>
+                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                      {Math.round((settings.businessMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık fiyat otomatik hesaplanır: {settings.businessMonthlyPrice} × 12 × (1 - {settings.yearlyDiscountPercentage}%)
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
