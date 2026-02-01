@@ -283,7 +283,6 @@ export default function CheckoutPage() {
 
     try {
       const response = await addressesApi.create({
-        title: newAddress.title || (locale === 'en' ? 'Home' : 'Ev'),
         fullName: newAddress.fullName,
         phone: newAddress.phone,
         city: newAddress.city,

@@ -373,7 +373,7 @@ export default function TradeDetailPage() {
       }));
       
       // Combine current receiver products with other available products
-      const allReceiverProducts = [...currentReceiverProducts, ...tradeableProducts.filter(p => 
+      const allReceiverProducts = [...currentReceiverProducts, ...tradeableProducts.filter((p: { id: string }) => 
         !trade.receiverItems.some((item: TradeItem) => item.productId === p.id)
       )];
       setCounterProducts(allReceiverProducts);

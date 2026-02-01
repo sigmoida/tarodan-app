@@ -96,7 +96,7 @@ export default function MembershipManagePage() {
       setMembership({
         tier,
         tierName: tierNames[tier] || 'Ücretsiz Üyelik',
-        startDate: user?.createdAt || new Date().toISOString(),
+        startDate: user?.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString()) : new Date().toISOString(),
         endDate: tier === 'free' ? '' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         autoRenew: false,
         nextBillingDate: tier !== 'free' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,

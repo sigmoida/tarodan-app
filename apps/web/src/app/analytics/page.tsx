@@ -101,8 +101,7 @@ export default function AnalyticsPage() {
 
   // Allow analytics for all authenticated users (with limited features for free)
   const canAccessAnalytics = isAuthenticated;
-  const isPremium = limits?.canAccessAnalytics ?? 
-    (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  const isPremium = user?.membershipTier === 'premium' || user?.membershipTier === 'business';
 
   useEffect(() => {
     if (!isAuthenticated) {

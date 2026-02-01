@@ -308,7 +308,7 @@ export default function OrderDetailPage() {
                   {locale === 'en' ? 'Please enter tracking number when shipped.' : 'Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir.'}
                 </p>
                 <button
-                  onClick={() => toast.info(locale === 'en' ? 'Shipping info feature is under development...' : 'Kargo bilgisi girme özelliği geliştiriliyor...')}
+                  onClick={() => toast(locale === 'en' ? 'Shipping info feature is under development...' : 'Kargo bilgisi girme özelliği geliştiriliyor...')}
                   className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                   {locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}

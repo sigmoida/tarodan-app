@@ -29,6 +29,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface MembershipTier {
   type: string;
@@ -81,13 +82,14 @@ export default function ProfilePage() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, logout, refreshUserData } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ offers: 0, trades: 0 });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -96,7 +98,7 @@ export default function ProfilePage() {
       setProfileFromAuthStore();
     }
     loadProfile();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   // Refresh profile when pathname changes (e.g., returning from edit/delete page)
   useEffect(() => {
@@ -256,6 +258,7 @@ export default function ProfilePage() {
     router.push('/');
   };
 
+  if (authLoading) return <AuthLoadingScreen />;
   if (!isAuthenticated) return null;
 
   const tierColors = {

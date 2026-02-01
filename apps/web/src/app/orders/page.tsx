@@ -7,6 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api, ratingsApi } from '@/lib/api';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
@@ -62,7 +63,7 @@ export default function OrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
   
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -91,11 +92,11 @@ export default function OrdersPage() {
   const [sellerReviewText, setSellerReviewText] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
-      return;
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', filter],
@@ -105,7 +106,7 @@ export default function OrdersPage() {
       });
       return response.data.orders || response.data.data || [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'orders' },
   });
   const orders = ordersQuery.data ?? [];
@@ -160,7 +161,7 @@ export default function OrdersPage() {
 
       toast.success(t('review.reviewSubmitted'));
       setShowReviewModal(false);
-      setReviewedOrders(prev => new Set([...prev, reviewingOrder.id]));
+      setReviewedOrders(prev => new Set([...Array.from(prev), reviewingOrder.id]));
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Review submit error:', error);
@@ -179,9 +180,8 @@ export default function OrdersPage() {
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

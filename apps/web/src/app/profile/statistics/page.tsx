@@ -148,7 +148,7 @@ export default function StatisticsPage() {
         reviewsCount: 0,
         totalRevenue: 0,
         totalSpent: 0,
-        memberSince: user?.createdAt || new Date().toISOString(),
+        memberSince: user?.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString()) : new Date().toISOString(),
         membershipTier: user?.membershipTier || 'free',
       });
     } finally {

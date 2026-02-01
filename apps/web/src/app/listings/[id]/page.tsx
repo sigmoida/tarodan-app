@@ -1177,9 +1177,9 @@ export default function ListingDetailPage() {
                         <div className="flex items-center">
                           <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
                           {listing.seller.rating.toFixed(1)}
-                          {listing.seller.totalRatings > 0 && (
+                          {(listing.seller as { totalRatings?: number }).totalRatings != null && (listing.seller as { totalRatings?: number }).totalRatings! > 0 && (
                             <span className="ml-1 text-gray-400">
-                              ({listing.seller.totalRatings})
+                              ({(listing.seller as { totalRatings?: number }).totalRatings})
                             </span>
                           )}
                         </div>

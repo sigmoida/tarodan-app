@@ -78,6 +78,13 @@ export default function Navbar() {
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  // Defer auth-dependent UI until after mount so server and first client render match (avoids hydration error).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const showAuthUI = mounted && isAuthenticated;
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
@@ -457,8 +464,8 @@ export default function Navbar() {
           {/* Nav Links - Desktop */}
           <div className="hidden lg:flex items-center gap-6 mr-12">
             {NAV_LINKS.map((link) => {
-              // Takaslar link requires auth for guests
-              if (link.href === '/trades' && !isAuthenticated) {
+              // Takaslar link requires auth for guests (use showAuthUI so server/client match until mounted)
+              if (link.href === '/trades' && !showAuthUI) {
                 return (
                   <button
                     key={link.href}
@@ -498,7 +505,7 @@ export default function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-4 ml-8">
-            {isAuthenticated ? (
+            {showAuthUI ? (
               <>
                 {/* Yeni İlan Ekle Butonu - Desktop */}
                 <Link
@@ -773,8 +780,8 @@ export default function Navbar() {
 
               {/* Mobile Nav Links */}
               {NAV_LINKS.map((link) => {
-                // Takaslar link requires auth for guests
-                if (link.href === '/trades' && !isAuthenticated) {
+                // Takaslar link requires auth for guests (use showAuthUI for hydration safety)
+                if (link.href === '/trades' && !showAuthUI) {
                   return (
                     <button
                       key={link.href}
@@ -802,7 +809,7 @@ export default function Navbar() {
               
               {/* Mobile Auth Links */}
               <div className="border-t border-orange-600 pt-4 mt-4">
-                {isAuthenticated ? (
+                {showAuthUI ? (
                   <div className="space-y-2">
                     {/* Yeni İlan Ekle Butonu - Mobile */}
                     <Link

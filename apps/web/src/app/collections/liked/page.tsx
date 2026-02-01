@@ -112,7 +112,7 @@ export default function LikedCollectionsPage() {
           <div className="text-center py-12">
             <p className="text-red-400">{error}</p>
             <button
-              onClick={loadLikedCollections}
+              onClick={() => likedQuery.refetch()}
               className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
             >
               {t('collection.tryAgain')}

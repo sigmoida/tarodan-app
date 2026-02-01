@@ -336,7 +336,7 @@ function SearchContent() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product) => (
+                  {products.map((product: { id: string; title: string; images?: string[]; price?: number; isTradeEnabled?: boolean; condition?: string; category?: { name: string } }) => (
                     <Link
                       key={product.id}
                       href={`/listings/${product.id}`}
@@ -370,7 +370,7 @@ function SearchContent() {
                             {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </span>
                           <span className="text-xs text-gray-600">
-                            {getConditionLabel(product.condition)}
+                            {getConditionLabel(product.condition ?? '')}
                           </span>
                         </div>
                         {product.category && (

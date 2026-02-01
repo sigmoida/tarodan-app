@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { wishlistApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface WishlistItem {
   id: string;
@@ -28,16 +29,16 @@ interface WishlistItem {
 export default function FavoritesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t } = useTranslation();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       toast.error(t('favorites.loginRequired'));
       router.push('/login?redirect=/favorites');
-      return;
     }
-  }, [isAuthenticated, router, t]);
+  }, [isAuthenticated, authLoading, router, t]);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -49,7 +50,7 @@ export default function FavoritesPage() {
       );
       return validItems;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'favorites' },
   });
   const items = wishlistQuery.data ?? [];
@@ -75,6 +76,14 @@ export default function FavoritesPage() {
     }
     return productImage;
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (isLoading) {
     return (

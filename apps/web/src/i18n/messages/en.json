@@ -285,6 +285,7 @@
     "deactivate": "Deactivate",
     "activate": "Activate",
     "deactivateDesc": "Deactivated listings are not visible in search but are not deleted.",
+    "deactivatedDesc": "Deactivated listings are not visible in search but are not deleted.",
     "activateDesc": "Active listings are visible in search.",
     "searchProducts": "Search products, brands, categories...",
     "allCategories": "All Categories",

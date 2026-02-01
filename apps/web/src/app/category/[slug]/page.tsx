@@ -136,7 +136,7 @@ export default function CategoryPage() {
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-white mb-4">Alt Kategoriler</h2>
             <div className="flex flex-wrap gap-3">
-              {category.children.map((child) => (
+              {category.children.map((child: Category) => (
                 <Link
                   key={child.id}
                   href={`/category/${child.slug}`}
@@ -299,7 +299,7 @@ export default function CategoryPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map((product) => (
+                {products.map((product: Product) => (
                   <Link
                     key={product.id}
                     href={`/listings/${product.id}`}
@@ -342,7 +342,7 @@ export default function CategoryPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {products.map((product) => (
+                {products.map((product: Product) => (
                   <Link
                     key={product.id}
                     href={`/listings/${product.id}`}
