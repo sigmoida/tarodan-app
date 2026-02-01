@@ -87,7 +87,7 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const statusLabels = getStatusLabels(locale);
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -96,20 +96,14 @@ export default function OrderDetailPage() {
 
   const orderId = params?.id as string;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/orders/${orderId}`)}`);
-      return;
-    }
-  }, [isAuthenticated, router, orderId]);
-
+  // No programmatic redirect to login (like cart page). Auth done: show order or "please log in" with link.
   const orderQuery = useQuery({
     queryKey: ['order', orderId],
     queryFn: async (): Promise<OrderDetail> => {
       const response = await api.get(`/orders/${orderId}`);
       return response.data;
     },
-    enabled: !!orderId && isAuthenticated,
+    enabled: !!orderId && !authLoading && !!isAuthenticated,
     meta: { page: 'order-detail' },
     retry: false,
   });
@@ -153,7 +147,7 @@ export default function OrderDetailPage() {
     }
   };
 
-  if (!isAuthenticated || loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
@@ -161,10 +155,27 @@ export default function OrderDetailPage() {
     );
   }
 
+  // Not logged in: show message + link (no redirect – like cart page; avoids flash to login then home)
+  if (!authLoading && !isAuthenticated) {
+    const loginUrl = `/login?redirect=${encodeURIComponent(`/orders/${orderId}`)}`;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <p className="text-gray-600 mb-4">
+            {locale === 'en' ? 'Please log in to view this order.' : 'Bu siparişi görüntülemek için giriş yapın.'}
+          </p>
+          <Link href={loginUrl} className="btn-primary inline-block">
+            {locale === 'en' ? 'Log in' : 'Giriş yap'}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!order) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Sipariş bulunamadı</p>
+        <p className="text-gray-500">{locale === 'en' ? 'Order not found' : 'Sipariş bulunamadı'}</p>
       </div>
     );
   }

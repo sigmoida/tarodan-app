@@ -69,7 +69,7 @@ export class PaymentWorker {
           }),
           this.prisma.order.update({
             where: { id: payment.orderId },
-            data: { status: OrderStatus.paid },
+            data: { status: OrderStatus.preparing },
           }),
         ]);
         this.logger.log(`Payment ${payment.id} marked as completed`);

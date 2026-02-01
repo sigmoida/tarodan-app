@@ -1238,6 +1238,7 @@ export class OrderService {
     const allowedTransitions: Record<OrderStatus, { nextStatuses: OrderStatus[]; allowedBy: 'buyer' | 'seller' | 'system' }[]> = {
       [OrderStatus.pending_payment]: [
         { nextStatuses: [OrderStatus.paid], allowedBy: 'system' },
+        { nextStatuses: [OrderStatus.preparing], allowedBy: 'system' }, // Payment success → preparing (first state after purchase)
         { nextStatuses: [OrderStatus.cancelled], allowedBy: 'buyer' },
       ],
       [OrderStatus.paid]: [
