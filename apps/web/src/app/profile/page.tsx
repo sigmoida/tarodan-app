@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   UserCircleIcon,
@@ -27,7 +28,7 @@ import {
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
-import { api, userApi, tradesApi, collectionsApi } from '@/lib/api';
+import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
@@ -87,6 +88,19 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ offers: 0, trades: 0 });
+
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: async () => {
+      const res = await wishlistApi.get();
+      const data = res.data;
+      const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+      return Array.isArray(items) ? items : [];
+    },
+    enabled: !!isAuthenticated,
+    meta: { page: 'profile-wishlist-count' },
+  });
+  const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   useEffect(() => {
     if (authLoading) return;
@@ -432,7 +446,7 @@ export default function ProfilePage() {
                   <p className="text-2xl font-bold text-gray-900">
                     {action.label === t('nav.myListings') && (profile?.stats?.productsCount ?? 0)}
                     {action.label === t('order.myOrders') && (profile?.stats?.ordersCount ?? 0)}
-                    {action.label === t('nav.favorites') && '—'}
+                    {action.label === t('nav.favorites') && wishlistCount}
                     {action.label === t('nav.messages') && '—'}
                   </p>
                   <p className="text-sm text-gray-500">{action.label}</p>

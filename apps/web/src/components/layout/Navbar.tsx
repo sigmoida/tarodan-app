@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bars3Icon,
@@ -27,7 +28,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
-import { messagesApi, api } from '@/lib/api';
+import { messagesApi, api, wishlistApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -85,6 +86,19 @@ export default function Navbar() {
   }, []);
 
   const showAuthUI = mounted && isAuthenticated;
+
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: async () => {
+      const res = await wishlistApi.get();
+      const data = res.data;
+      const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+      return Array.isArray(items) ? items : [];
+    },
+    enabled: showAuthUI,
+    meta: { page: 'navbar-wishlist-count' },
+  });
+  const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
@@ -528,9 +542,14 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/favorites"
-                  className="p-2 text-white hover:text-orange-100 transition-colors hidden sm:block"
+                  className="p-2 text-white hover:text-orange-100 transition-colors relative hidden sm:block"
                 >
                   <HeartIcon className="w-6 h-6" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                      {wishlistCount > 9 ? '9+' : wishlistCount}
+                    </span>
+                  )}
                 </Link>
                 <NotificationBell />
                 <Link

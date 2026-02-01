@@ -459,6 +459,7 @@ export default function ListingDetailPage() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['wishlist-check', id] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
         queryClient.invalidateQueries({ queryKey: ['listing', id] }),
       ]);
     } catch (error: any) {
