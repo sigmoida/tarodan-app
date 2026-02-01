@@ -500,39 +500,39 @@ export default function CheckoutPage() {
             } else if (!billingSameAsShipping && selectedBillingAddressId && selectedBillingAddressId !== validAddressId) {
               payload.billingAddressId = selectedBillingAddressId;
             }
-            if (!validAddressId && shippingAddress) {
-              // Validate all required fields are not empty
-              if (!shippingAddress.fullName?.trim()) {
-                throw new Error('Teslimat adresi için ad soyad gereklidir');
+            if (!validAddressId) {
+              // Use shippingAddress from above, or fallback to newAddress if form was filled (edge case)
+              const addr = shippingAddress || (hasFormAddress && newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address
+                ? {
+                    fullName: newAddress.fullName,
+                    phone: newAddress.phone || user?.phone || '',
+                    city: newAddress.city,
+                    district: newAddress.district,
+                    address: newAddress.address,
+                    zipCode: newAddress.zipCode,
+                  }
+                : null);
+              if (addr) {
+                if (!addr.fullName?.trim()) throw new Error('Teslimat adresi için ad soyad gereklidir');
+                if (!addr.phone?.trim()) throw new Error('Teslimat adresi için telefon gereklidir');
+                if (!addr.city?.trim()) throw new Error('Teslimat adresi için şehir gereklidir');
+                if (!addr.district?.trim()) throw new Error('Teslimat adresi için ilçe gereklidir');
+                if (!addr.address?.trim()) throw new Error('Teslimat adresi için açık adres gereklidir');
+                const cleanPhone = addr.phone.replace(/\s/g, '');
+                const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
+                payload.shippingAddress = {
+                  fullName: addr.fullName.trim(),
+                  phone: formattedPhone,
+                  city: addr.city.trim(),
+                  district: addr.district.trim(),
+                  address: addr.address.trim(),
+                  zipCode: addr.zipCode?.trim() || undefined,
+                };
+              } else {
+                toast.error(locale === 'en' ? 'Please select or enter a shipping address' : 'Lütfen bir teslimat adresi seçin veya girin');
+                setIsLoading(false);
+                return;
               }
-              if (!shippingAddress.phone?.trim()) {
-                throw new Error('Teslimat adresi için telefon gereklidir');
-              }
-              if (!shippingAddress.city?.trim()) {
-                throw new Error('Teslimat adresi için şehir gereklidir');
-              }
-              if (!shippingAddress.district?.trim()) {
-                throw new Error('Teslimat adresi için ilçe gereklidir');
-              }
-              if (!shippingAddress.address?.trim()) {
-                throw new Error('Teslimat adresi için açık adres gereklidir');
-              }
-              // Remove spaces from phone number for API
-              const cleanPhone = shippingAddress.phone.replace(/\s/g, '');
-              // Add +90 prefix if not present
-              const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : 
-                                     cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
-              
-              payload.shippingAddress = {
-                fullName: shippingAddress.fullName.trim(),
-                phone: formattedPhone,
-                city: shippingAddress.city.trim(),
-                district: shippingAddress.district.trim(),
-                address: shippingAddress.address.trim(),
-                zipCode: shippingAddress.zipCode?.trim() || undefined,
-              };
-            } else {
-              throw new Error(locale === 'en' ? 'Shipping address not found' : 'Teslimat adresi bulunamadı');
             }
             
             if (process.env.NODE_ENV === 'development') {

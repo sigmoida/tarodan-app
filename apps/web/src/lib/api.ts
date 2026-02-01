@@ -58,15 +58,24 @@ api.interceptors.response.use(
             localStorage.removeItem('auth_token');
             localStorage.removeItem('refresh_token');
             
-            // Only auto-redirect for expired sessions, not for guest access attempts
+            // Only auto-redirect for expired sessions; never redirect on public/guest pages
             if (hadToken) {
-              // Check if we're on a page that requires auth
-              const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-              const currentPath = window.location.pathname;
-              const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-              
-              if (isProtectedPath) {
-                window.location.href = '/login?expired=true';
+              const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
+              const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
+              const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
+              if (isPublicPath) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.debug('[api] 401 after refresh failed – on public path, not redirecting', { currentPath });
+                }
+              } else {
+                const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+                const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+                if (process.env.NODE_ENV === 'development') {
+                  console.debug('[api] 401 after refresh failed', { currentPath, isProtectedPath, hadToken });
+                }
+                if (isProtectedPath) {
+                  window.location.href = '/login?expired=true';
+                }
               }
             }
             
@@ -78,15 +87,24 @@ api.interceptors.response.use(
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
           
-          // Only auto-redirect for expired sessions, not for guest access attempts
+          // Only auto-redirect for expired sessions; never redirect on public/guest pages
           if (hadToken) {
-            // Check if we're on a page that requires auth
-            const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-            const currentPath = window.location.pathname;
-            const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-            
-            if (isProtectedPath) {
-              window.location.href = '/login?expired=true';
+            const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
+            const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
+            const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
+            if (isPublicPath) {
+              if (process.env.NODE_ENV === 'development') {
+                console.debug('[api] 401 no refresh – on public path, not redirecting', { currentPath });
+              }
+            } else {
+              const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+              const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+              if (process.env.NODE_ENV === 'development') {
+                console.debug('[api] 401 no refresh', { currentPath, isProtectedPath, hadToken });
+              }
+              if (isProtectedPath) {
+                window.location.href = '/login?expired=true';
+              }
             }
           }
           // For guests trying to access protected API endpoints, just reject the promise
@@ -228,6 +246,8 @@ export const ordersApi = {
     api.post(`/orders/${id}/cancel`, { reason }),
   confirm: (id: string | number) =>
     api.post(`/orders/${id}/confirm`),
+  trackGuest: (data: { orderNumber: string; email: string }) =>
+    api.post('/orders/guest/track', data),
 };
 
 // Payments

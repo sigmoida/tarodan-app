@@ -28,8 +28,8 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // Allow access for authenticated users OR guest checkout
-    if (!isAuthenticated && !isGuestCheckout) {
+    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }
@@ -40,9 +40,8 @@ export default function PaymentPage() {
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
-      // Use lightweight status endpoint for polling
-      // Use guest endpoint if guest checkout
-      const response = isGuestCheckout 
+      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
         : await paymentsApi.getStatusLight(paymentId);
       const paymentData = response.data;

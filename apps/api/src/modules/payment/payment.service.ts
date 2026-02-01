@@ -165,7 +165,7 @@ export class PaymentService {
       // Return existing payment URL if still valid
       return {
         paymentId: existingPayment.id,
-        paymentUrl: `${this.configService.get('FRONTEND_URL')}/payment/${existingPayment.id}`,
+        paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
         provider: existingPayment.provider,
         expiresIn: 300,
       };
@@ -218,7 +218,7 @@ export class PaymentService {
    */
   private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
     try {
-      const callbackUrl = `${this.configService.get('FRONTEND_URL')}/api/payment/callback/iyzico?paymentId=${payment.id}`;
+      const callbackUrl = `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/api/payment/callback/iyzico?paymentId=${payment.id}`;
       const shippingAddress = order.shippingAddress as any;
 
       // Check if this is a guest order
@@ -344,7 +344,7 @@ export class PaymentService {
         };
       } else if (result.checkoutFormContent) {
         return {
-          paymentUrl: `${this.configService.get('FRONTEND_URL')}/payment/iyzico/${payment.id}`,
+          paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/iyzico/${payment.id}`,
           paymentHtml: result.checkoutFormContent,
         };
       } else {
@@ -991,6 +991,8 @@ export class PaymentService {
             district: shippingAddressData?.district || '',
             zipCode: shippingAddressData?.zipCode || '',
           },
+          isGuestOrder,
+          buyerSystemEmail: result.buyer.email || '',
         });
 
         this.logger.log(`order.paid event emitted for order ${result.orderNumber}`);

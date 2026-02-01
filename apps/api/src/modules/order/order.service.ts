@@ -582,7 +582,7 @@ export class OrderService {
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: shippingAddressId,
-          shippingAddress: shippingAddressJson,
+          shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
         },
         include: {
           product: {
@@ -611,20 +611,21 @@ export class OrderService {
       // Emit order.created event (outside transaction but still in the method)
       // This sends notification emails and push notifications
       try {
+        const createdOrder = order as typeof order & { product: { title: string }; buyer: { email: string; displayName: string | null }; seller: { email: string | null; displayName: string | null } };
         await this.eventService.emitOrderCreated({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          buyerId: order.buyerId,
-          sellerId: order.sellerId,
-          productId: order.productId,
-          productTitle: order.product.title,
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+          buyerId: createdOrder.buyerId,
+          sellerId: createdOrder.sellerId,
+          productId: createdOrder.productId,
+          productTitle: createdOrder.product.title,
           totalAmount,
-          buyerEmail: order.buyer.email,
-          buyerName: order.buyer.displayName || order.buyer.email,
-          sellerEmail: order.seller.email || '',
-          sellerName: order.seller.displayName || 'Satıcı',
+          buyerEmail: createdOrder.buyer.email,
+          buyerName: createdOrder.buyer.displayName || createdOrder.buyer.email,
+          sellerEmail: createdOrder.seller.email || '',
+          sellerName: createdOrder.seller.displayName || 'Satıcı',
         });
-        this.logger.log(`order.created event emitted for order ${order.orderNumber}`);
+        this.logger.log(`order.created event emitted for order ${createdOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail the order creation
         this.logger.error(`Failed to emit order.created event: ${error}`);
@@ -1000,7 +1001,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
-          shippingAddress: guestShippingJson,
+          shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {
           product: {

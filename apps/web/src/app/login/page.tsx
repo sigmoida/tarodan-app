@@ -41,8 +41,8 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast.success(t('auth.loginSuccess'));
-      // Use window.location for reliable redirect
-      window.location.href = '/';
+      const redirect = new URLSearchParams(window.location.search).get('redirect');
+      window.location.href = redirect && redirect.startsWith('/') ? redirect : '/';
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
         console.error('[Login] Login error:', error);

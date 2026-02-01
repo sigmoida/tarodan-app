@@ -237,7 +237,8 @@ export class InvoiceService {
 
       // Check if this is a guest order - get actual email from shippingAddress
       const shippingAddressData = order.shippingAddress as any;
-      const isGuestOrder = order.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+      const buyerIsSystemGuest = !order.buyer.email || order.buyer.email === 'guest@tarodan.system' || (order.buyer.email && order.buyer.email.toLowerCase().includes('guest@tarodan'));
+      const isGuestOrder = buyerIsSystemGuest || shippingAddressData?.isGuestOrder === true;
       
       // Get actual buyer email and name for guest orders
       const buyerEmail = isGuestOrder 
@@ -250,7 +251,11 @@ export class InvoiceService {
       const sellerName = order.seller.displayName || order.seller.email.split('@')[0];
       
       this.logger.log(`Invoice will be sent to buyer: ${buyerEmail} (isGuest: ${isGuestOrder})`);
-      const frontendUrl = this.configService.get('FRONTEND_URL', 'https://tarodan.com');
+      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
+      const buyerOrderUrl = isGuestOrder && (buyerEmail || order.buyer.email)
+        ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent((buyerEmail || order.buyer.email || '').trim().toLowerCase())}`
+        : `${frontendUrl}/orders/${orderId}`;
 
       // Send invoice email to BUYER
       const buyerEmailHtml = this.generateInvoiceEmailHtml({
@@ -260,7 +265,7 @@ export class InvoiceService {
         productTitle: order.product.title,
         totalAmount: Number(order.totalAmount),
         sellerName,
-        invoiceUrl: `${frontendUrl}/orders/${orderId}`,
+        invoiceUrl: buyerOrderUrl,
         orderId,
         frontendUrl,
       });
@@ -424,13 +429,13 @@ export class InvoiceService {
                 </p>
               </div>
 
-              <!-- CTA Button -->
+              <!-- CTA Button (invoiceUrl is track page for guest, orders/[id] for member) -->
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 10px 0;">
-                    <a href="${data.frontendUrl}/orders/${data.orderId}" 
+                    <a href="${data.invoiceUrl}" 
                        style="display: inline-block; background-color: #e63946; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                      Siparişi Görüntüle
+                      Siparişi Takip Et
                     </a>
                   </td>
                 </tr>

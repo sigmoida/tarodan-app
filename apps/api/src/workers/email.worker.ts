@@ -179,6 +179,14 @@ export class EmailWorker {
       border: 1px solid #e2e8f0;
     `;
 
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+    // Guest: link with orderNumber + email so one click opens track page with order details
+    const isGuest = data?.isGuestOrder === true || data?.buyerSystemEmail === 'guest@tarodan.system';
+    const guestEmail = (data?.buyerEmail || '').trim().toLowerCase();
+    const orderPaidTrackUrl = isGuest && data?.orderNumber
+      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ''}`
+      : `${frontendUrl}/orders/${data?.orderId || ''}`;
+
     // Email templates (Turkish)
     const templates: Record<string, string> = {
       welcome: `
@@ -186,7 +194,7 @@ export class EmailWorker {
           <h1 style="${headerStyle}">Tarodan'a Hoş Geldiniz!</h1>
           <p>Merhaba ${data?.name || 'Değerli Üye'},</p>
           <p>Tarodan koleksiyoner oyuncak platformuna hoş geldiniz. Artık binlerce koleksiyoner ürüne göz atabilir, alım satım yapabilirsiniz.</p>
-          <a href="${data?.verifyUrl || 'https://tarodan.com'}" style="${buttonStyle}">E-postamı Doğrula</a>
+          <a href="${data?.verifyUrl || frontendUrl}" style="${buttonStyle}">E-postamı Doğrula</a>
           <p style="margin-top: 20px;">İyi alışverişler dileriz!</p>
           <p>Tarodan Ekibi</p>
         </div>
@@ -200,7 +208,7 @@ export class EmailWorker {
             <p><strong>Sipariş No:</strong> ${data?.orderNumber || data?.orderId || ''}</p>
             <p><strong>Toplam:</strong> ${this.formatPrice(data?.total || data?.totalAmount || 0)} TL</p>
           </div>
-          <a href="https://tarodan.com/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
+          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
         </div>
       `,
       'order-created-buyer': `
@@ -213,7 +221,7 @@ export class EmailWorker {
             <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
             <p style="margin: 8px 0;"><strong>Tutar:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
           </div>
-          <a href="https://tarodan.com/orders/${data?.orderId || ''}" style="${buttonStyle}">Ödeme Yap</a>
+          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Ödeme Yap</a>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Ödeme için siparişinizin 30 dakika içinde tamamlanması gerekmektedir.
           </p>
@@ -230,7 +238,7 @@ export class EmailWorker {
             <p style="margin: 8px 0;"><strong>Tutar:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
           </div>
           <p>Ödeme onaylandıktan sonra ürünü kargoya hazırlamanız için bilgilendirileceksiniz.</p>
-          <a href="https://tarodan.com/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
+          <a href="${frontendUrl}/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
         </div>
       `,
       'order-paid': `
@@ -255,7 +263,7 @@ export class EmailWorker {
             <p style="margin: 4px 0;">Tel: ${data.shippingAddress.phone || ''}</p>
           </div>
           ` : ''}
-          <a href="https://tarodan.com/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Takip Et</a>
+          <a href="${orderPaidTrackUrl}" style="${buttonStyle}">Siparişi Takip Et</a>
         </div>
       `,
       'order-paid-seller': `
@@ -280,7 +288,7 @@ export class EmailWorker {
             <p style="margin: 4px 0;">Tel: ${data.shippingAddress.phone || ''}</p>
           </div>
           ` : ''}
-          <a href="https://tarodan.com/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Kargo Bilgisi Gir</a>
+          <a href="${frontendUrl}/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Kargo Bilgisi Gir</a>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
           </p>
@@ -311,7 +319,7 @@ export class EmailWorker {
             <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
           </div>
           <p>Lütfen ürünü kontrol edin ve sipariş durumunu onaylayın. Onaylamanızın ardından satıcıya ödeme aktarılacaktır.</p>
-          <a href="https://tarodan.com/orders/${data?.orderId || ''}" style="${buttonStyle}">Teslimatı Onayla</a>
+          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Teslimatı Onayla</a>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Not: 7 gün içinde onay vermezseniz, teslimat otomatik olarak onaylanacaktır.
           </p>
@@ -341,7 +349,7 @@ export class EmailWorker {
             ⏰ Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString('tr-TR') : '24 saat içinde'} dolacak.
           </p>
           <div style="margin-top: 20px;">
-            <a href="https://tarodan.com/seller/offers/${data?.offerId || ''}" style="${buttonStyle}">Teklifi İncele</a>
+            <a href="${frontendUrl}/seller/offers/${data?.offerId || ''}" style="${buttonStyle}">Teklifi İncele</a>
           </div>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Teklifi kabul etmek, reddetmek veya karşı teklif vermek için yukarıdaki butona tıklayın.
@@ -363,7 +371,7 @@ export class EmailWorker {
             ⚠️ Siparişinizi tamamlamak için ödeme yapmanız gerekmektedir.
           </p>
           <div style="margin-top: 20px;">
-            <a href="https://tarodan.com/orders/${data?.orderId || ''}/payment" style="${buttonStyle}">Ödeme Yap</a>
+            <a href="${frontendUrl}/orders/${data?.orderId || ''}/payment" style="${buttonStyle}">Ödeme Yap</a>
           </div>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Not: Ödeme işlemi 30 dakika içinde tamamlanmazsa sipariş iptal edilebilir ve ürün tekrar satışa çıkarılabilir.
@@ -394,7 +402,7 @@ export class EmailWorker {
             ⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.
           </p>
           `}
-          <a href="${data?.productUrl || 'https://tarodan.com'}" style="${buttonStyle}">Ürünü Görüntüle</a>
+          <a href="${data?.productUrl || frontendUrl}" style="${buttonStyle}">Ürünü Görüntüle</a>
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
             Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
           </p>
@@ -418,7 +426,7 @@ export class EmailWorker {
           </div>
           ` : '<p>Bu hafta öne çıkan ürün bulunmamaktadır.</p>'}
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            <a href="${data?.unsubscribeUrl || 'https://tarodan.com/profile/settings'}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
+            <a href="${data?.unsubscribeUrl || `${frontendUrl}/profile/settings`}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
           </p>
         </div>
       `,
@@ -440,7 +448,7 @@ export class EmailWorker {
           </div>
           ` : '<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>'}
           <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            <a href="${data?.unsubscribeUrl || 'https://tarodan.com/profile/settings'}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
+            <a href="${data?.unsubscribeUrl || `${frontendUrl}/profile/settings`}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
           </p>
         </div>
       `,

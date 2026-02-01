@@ -98,10 +98,10 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push(`/login?redirect=${encodeURIComponent(`/orders/${orderId}`)}`);
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, orderId]);
 
   const orderQuery = useQuery({
     queryKey: ['order', orderId],
