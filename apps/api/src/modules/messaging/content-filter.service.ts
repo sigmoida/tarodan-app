@@ -22,6 +22,7 @@ export interface ContentFilterRule {
 
 @Injectable()
 export class ContentFilterService implements OnModuleInit {
+  private readonly logger = new Logger(ContentFilterService.name);
   private filters: ContentFilterRule[] = [];
 
   constructor(private readonly prisma: PrismaService) {}

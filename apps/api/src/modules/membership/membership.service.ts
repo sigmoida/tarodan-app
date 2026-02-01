@@ -665,6 +665,8 @@ export class MembershipService {
         downgradeCount++;
       } catch (error) {
         this.logger.warn('Failed to downgrade membership');
+      }
+    }
 
     return downgradeCount;
   }
