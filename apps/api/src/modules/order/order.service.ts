@@ -487,13 +487,24 @@ export class OrderService {
         throw new BadRequestException('Teslimat adresi gereklidir');
       }
 
-      // Validate billing address if provided
+      // Resolve billing address: inline object > saved address ID > same as shipping
       let billingAddress = shippingAddress;
-      if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
+      if (dto.billingAddress && dto.billingAddress.fullName?.trim() && dto.billingAddress.city?.trim() && dto.billingAddress.address?.trim()) {
+        // Inline billing address (no need to save in profile)
+        billingAddress = {
+          id: '',
+          title: 'Fatura Adresi',
+          fullName: dto.billingAddress.fullName.trim(),
+          phone: (dto.billingAddress.phone || shippingAddress.phone || '').trim(),
+          city: dto.billingAddress.city.trim(),
+          district: (dto.billingAddress.district || '').trim(),
+          address: dto.billingAddress.address.trim(),
+          zipCode: dto.billingAddress.zipCode?.trim() || null,
+        };
+      } else if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
         const billing = await tx.address.findUnique({
           where: { id: dto.billingAddressId },
         });
-
         if (!billing || billing.userId !== buyerId) {
           throw new BadRequestException('Geçersiz fatura adresi');
         }
@@ -535,6 +546,28 @@ export class OrderService {
         data: updateData,
       });
 
+      // Build shippingAddress JSON; add billing snapshot when different from shipping
+      const shippingAddressJson: Record<string, unknown> = {
+        id: shippingAddress.id,
+        title: shippingAddress.title || 'Teslimat Adresi',
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        city: shippingAddress.city,
+        district: shippingAddress.district,
+        address: shippingAddress.address,
+        zipCode: shippingAddress.zipCode,
+      };
+      if (billingAddress !== shippingAddress) {
+        (shippingAddressJson as any).billingAddress = {
+          fullName: billingAddress.fullName,
+          phone: billingAddress.phone,
+          city: billingAddress.city,
+          district: billingAddress.district,
+          address: billingAddress.address,
+          zipCode: billingAddress.zipCode,
+        };
+      }
+
       // Create order
       const order = await tx.order.create({
         data: {
@@ -549,16 +582,7 @@ export class OrderService {
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: shippingAddressId,
-          shippingAddress: {
-            id: shippingAddress.id,
-            title: shippingAddress.title || 'Teslimat Adresi',
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
-          },
+          shippingAddress: shippingAddressJson,
         },
         include: {
           product: {
@@ -938,6 +962,30 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      // Build guest shippingAddress JSON; add billing when provided and different
+      const guestShippingJson: Record<string, unknown> = {
+        guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
+        guestEmail: dto.email?.trim(),
+        guestPhone: dto.phone?.trim(),
+        fullName: dto.shippingAddress.fullName.trim(),
+        phone: dto.shippingAddress.phone.trim(),
+        city: dto.shippingAddress.city.trim(),
+        district: dto.shippingAddress.district.trim(),
+        address: dto.shippingAddress.address.trim(),
+        zipCode: dto.shippingAddress.zipCode?.trim() || null,
+        isGuestOrder: true,
+      };
+      if (dto.billingAddress?.fullName?.trim() && dto.billingAddress?.city?.trim() && dto.billingAddress?.address?.trim()) {
+        (guestShippingJson as any).billingAddress = {
+          fullName: dto.billingAddress.fullName.trim(),
+          phone: dto.billingAddress.phone?.trim() || dto.shippingAddress.phone.trim(),
+          city: dto.billingAddress.city.trim(),
+          district: dto.billingAddress.district?.trim() || '',
+          address: dto.billingAddress.address.trim(),
+          zipCode: dto.billingAddress.zipCode?.trim() || null,
+        };
+      }
+
       // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
         data: {
@@ -952,21 +1000,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
-          shippingAddress: {
-            // Guest contact info
-            guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
-            guestEmail: dto.email?.trim(),
-            guestPhone: dto.phone?.trim(),
-            // Shipping address
-            fullName: dto.shippingAddress.fullName.trim(),
-            phone: dto.shippingAddress.phone.trim(),
-            city: dto.shippingAddress.city.trim(),
-            district: dto.shippingAddress.district.trim(),
-            address: dto.shippingAddress.address.trim(),
-            zipCode: dto.shippingAddress.zipCode?.trim() || null,
-            // Mark as guest order
-            isGuestOrder: true,
-          },
+          shippingAddress: guestShippingJson,
         },
         include: {
           product: {

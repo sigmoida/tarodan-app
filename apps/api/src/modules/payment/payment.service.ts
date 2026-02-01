@@ -260,7 +260,7 @@ export class PaymentService {
         price: Number(order.totalAmount).toFixed(2),
       }];
 
-      // Prepare addresses - ensure no empty values
+      // Prepare shipping address
       const addressLine = shippingAddress?.address || 'Türkiye';
       const cityName = shippingAddress?.city || 'İstanbul';
       const contactName = shippingAddress?.fullName || `${buyerFirstName} ${buyerLastName}`;
@@ -271,6 +271,16 @@ export class PaymentService {
         country: 'Turkey',
         address: addressLine.length > 0 ? addressLine : 'Türkiye',
         zipCode: shippingAddress?.zipCode || '34000',
+      };
+
+      // Billing: use separate billing address when stored, otherwise same as shipping
+      const billingSource = (shippingAddress as any)?.billingAddress || shippingAddress;
+      const billingAddr = {
+        contactName: billingSource?.fullName || contactName,
+        city: billingSource?.city || cityName,
+        country: 'Turkey',
+        address: (billingSource?.address || addressLine).length > 0 ? (billingSource?.address || addressLine) : 'Türkiye',
+        zipCode: billingSource?.zipCode || '34000',
       };
 
       // Initialize checkout form
@@ -297,7 +307,7 @@ export class PaymentService {
           country: 'Turkey',
         },
         shippingAddress: shippingAddr,
-        billingAddress: shippingAddr,
+        billingAddress: billingAddr,
         basketItems,
       };
 

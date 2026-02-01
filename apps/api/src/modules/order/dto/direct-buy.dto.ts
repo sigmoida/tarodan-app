@@ -59,12 +59,20 @@ export class DirectBuyDto {
 
   @ApiPropertyOptional({
     example: 'uuid-billing-address-id',
-    description: 'Billing address ID (defaults to shipping address if not provided)',
+    description: 'Billing address ID (use either this or billingAddress object)',
   })
   @IsOptional()
   @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
   billingAddressId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Billing address object (use when different from shipping, no need to save in profile)',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShippingAddressDto)
+  billingAddress?: ShippingAddressDto;
 }
 
 /**

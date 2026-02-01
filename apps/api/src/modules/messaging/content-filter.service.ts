@@ -51,8 +51,7 @@ export class ContentFilterService implements OnModuleInit {
       regex: new RegExp(f.pattern, 'gi'),
     }));
 
-    console.log(`📋 Loaded ${this.filters.length} content filters`);
-    this.logger.log('Content filters loaded');
+    this.logger.log(`Loaded ${this.filters.length} content filters`);
   }
 
   /**

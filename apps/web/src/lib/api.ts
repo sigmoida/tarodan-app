@@ -190,6 +190,15 @@ export const ordersApi = {
       address: string;
       zipCode?: string;
     };
+    billingAddressId?: string;
+    billingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
   }) => api.post('/orders/buy', data),
   createGuest: (data: {
     productId: string;

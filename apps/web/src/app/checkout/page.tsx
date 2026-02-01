@@ -79,6 +79,19 @@ export default function CheckoutPage() {
     zipCode: '',
   });
 
+  // Billing address: same as shipping (default) or different
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<string | null>(null);
+  const [newBillingAddress, setNewBillingAddress] = useState<Omit<Address, 'id'>>({
+    title: '',
+    fullName: '',
+    phone: '',
+    city: '',
+    district: '',
+    address: '',
+    zipCode: '',
+  });
+
   // Shipping cost state
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -464,13 +477,30 @@ export default function CheckoutPage() {
               productId: string;
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
+              billingAddressId?: string;
+              billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
             } = {
               productId: item.productId,
             };
             
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;
-            } else if (shippingAddress) {
+            }
+            if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
+              const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
+              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              payload.billingAddress = {
+                fullName: newBillingAddress.fullName.trim(),
+                phone: formattedBillingPhone,
+                city: newBillingAddress.city.trim(),
+                district: newBillingAddress.district.trim(),
+                address: newBillingAddress.address.trim(),
+                zipCode: newBillingAddress.zipCode?.trim() || undefined,
+              };
+            } else if (!billingSameAsShipping && selectedBillingAddressId && selectedBillingAddressId !== validAddressId) {
+              payload.billingAddressId = selectedBillingAddressId;
+            }
+            if (!validAddressId && shippingAddress) {
               // Validate all required fields are not empty
               if (!shippingAddress.fullName?.trim()) {
                 throw new Error('Teslimat adresi için ad soyad gereklidir');
@@ -520,7 +550,14 @@ export default function CheckoutPage() {
             const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone : 
                                        cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
             
-            const guestPayload = {
+            const guestPayload: {
+              productId: string;
+              email: string;
+              phone: string;
+              guestName: string;
+              shippingAddress: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
+              billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
+            } = {
               productId: item.productId,
               email: contactEmail,
               phone: formattedContactPhone,
@@ -530,6 +567,18 @@ export default function CheckoutPage() {
                 phone: formattedAddrPhone,
               },
             };
+            if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
+              const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
+              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              guestPayload.billingAddress = {
+                fullName: newBillingAddress.fullName.trim(),
+                phone: formattedBillingPhone,
+                city: newBillingAddress.city.trim(),
+                district: newBillingAddress.district.trim(),
+                address: newBillingAddress.address.trim(),
+                zipCode: newBillingAddress.zipCode?.trim() || undefined,
+              };
+            }
             
             orderResponse = await ordersApi.createGuest(guestPayload);
           }
@@ -918,13 +967,87 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Billing address: same as shipping or different */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
+                    {t('checkout.billingAddress')}
+                  </h3>
+                  <label className="flex items-center gap-2 cursor-pointer mb-3">
+                    <input
+                      type="radio"
+                      name="billingSame"
+                      checked={billingSameAsShipping}
+                      onChange={() => {
+                        setBillingSameAsShipping(true);
+                        setSelectedBillingAddressId(null);
+                      }}
+                      className="text-primary-500"
+                    />
+                    <span>{t('checkout.billingSameAsShippingLabel')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingSame"
+                      checked={!billingSameAsShipping}
+                      onChange={() => setBillingSameAsShipping(false)}
+                      className="text-primary-500"
+                    />
+                    <span>{t('checkout.differentBilling')}</span>
+                  </label>
+
+                  {!billingSameAsShipping && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-4">
+                      <p className="text-sm text-gray-600">{t('checkout.enterBillingAddress')}</p>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder={t('checkout.fullName') + ' *'}
+                          value={newBillingAddress.fullName}
+                          onChange={(e) => setNewBillingAddress(prev => ({ ...prev, fullName: e.target.value }))}
+                          className="input"
+                        />
+                        <div className="flex">
+                          <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm">+90</span>
+                          <input
+                            type="tel"
+                            placeholder="5XX XXX XX XX"
+                            value={newBillingAddress.phone}
+                            onChange={(e) => setNewBillingAddress(prev => ({ ...prev, phone: handlePhoneChange(e.target.value) }))}
+                            maxLength={13}
+                            className="input rounded-l-none flex-1"
+                          />
+                        </div>
+                      </div>
+                      <CityDistrictSelector
+                        city={newBillingAddress.city}
+                        district={newBillingAddress.district}
+                        onCityChange={(city) => setNewBillingAddress(prev => ({ ...prev, city, district: '' }))}
+                        onDistrictChange={(district) => setNewBillingAddress(prev => ({ ...prev, district }))}
+                        cityPlaceholder={t('common.selectCity')}
+                        districtPlaceholder={t('common.selectDistrict')}
+                      />
+                      <textarea
+                        placeholder={t('common.openAddress') + ' *'}
+                        rows={2}
+                        value={newBillingAddress.address}
+                        onChange={(e) => setNewBillingAddress(prev => ({ ...prev, address: e.target.value }))}
+                        className="input"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setStep(2)}
                     disabled={
-                      isAuthenticated 
-                        ? !selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)
-                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address)
+                      isAuthenticated
+                        ? (!selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)) ||
+                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
+                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address) ||
+                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
                     }
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
