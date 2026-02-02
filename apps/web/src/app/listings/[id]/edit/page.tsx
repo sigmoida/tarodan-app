@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, TagIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api, userApi, mediaApi } from '@/lib/api';
+import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface Category {
@@ -72,6 +72,14 @@ export default function EditListingPage() {
   });
   const [uploadingImages, setUploadingImages] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDiscountSection, setShowDiscountSection] = useState(false);
+  const [productDiscounts, setProductDiscounts] = useState<any[]>([]);
+  const [saleData, setSaleData] = useState({
+    originalPrice: '',
+    salePrice: '',
+    saleStartDate: new Date().toISOString().split('T')[0],
+    saleEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  });
 
   // Load saved form data from localStorage on mount (before fetching from API)
   // This runs FIRST, before fetchListing
@@ -195,7 +203,22 @@ export default function EditListingPage() {
     // Then fetch from API (will merge with localStorage data in fetchListing)
     fetchListing();
     fetchCategories();
+    fetchProductDiscounts();
   }, [id, isAuthenticated]);
+
+  const fetchProductDiscounts = async () => {
+    try {
+      const response = await discountsApi.getAll({ limit: 100 });
+      const allDiscounts = response.data?.items || response.data || [];
+      // Filter discounts that target this product
+      const relevantDiscounts = allDiscounts.filter((d: any) => 
+        d.scope === 'product' && d.targetProductIds?.includes(id)
+      );
+      setProductDiscounts(relevantDiscounts);
+    } catch (error) {
+      console.error('Failed to fetch product discounts:', error);
+    }
+  };
 
   const fetchListing = async () => {
     setIsFetching(true);
@@ -343,6 +366,19 @@ export default function EditListingPage() {
         
         return newFormData;
       });
+
+      // A+oldPrice: form'da Eski fiyat = oldPrice (veya legacy originalPrice), İndirimli fiyat = price (A)
+      const orig = (listing as any).oldPrice != null ? Number((listing as any).oldPrice) : (listing.originalPrice != null ? Number(listing.originalPrice) : null);
+      const onSale = (listing as any).oldPrice != null && listing.price != null || (listing as any).isOnSale === true;
+      const sale = onSale ? Number(listing.price) : (listing.salePrice != null ? Number(listing.salePrice) : null);
+      const start = listing.saleStartDate ? (typeof listing.saleStartDate === 'string' ? listing.saleStartDate.split('T')[0] : new Date(listing.saleStartDate).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
+      const end = listing.saleEndDate ? (typeof listing.saleEndDate === 'string' ? listing.saleEndDate.split('T')[0] : new Date(listing.saleEndDate).toISOString().split('T')[0]) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      setSaleData({
+        originalPrice: orig != null ? String(orig) : '',
+        salePrice: sale != null ? String(sale) : '',
+        saleStartDate: start,
+        saleEndDate: end,
+      });
     } catch (error: any) {
       console.error('Failed to fetch listing:', error);
       toast.error(error.response?.data?.message || 'İlan yüklenemedi');
@@ -425,7 +461,10 @@ export default function EditListingPage() {
 
     setIsLoading(true);
     try {
-      const payload = {
+      const orig = saleData.originalPrice ? Number(saleData.originalPrice) : Number(formData.price);
+      const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
+      const hasSale = sale > 0 && orig > sale;
+      const payload: Record<string, unknown> = {
         title: formData.title,
         description: formData.description || undefined,
         price: Number(formData.price),
@@ -434,12 +473,22 @@ export default function EditListingPage() {
         brand: formData.brand || undefined,
         scale: formData.scale || undefined,
         isTradeEnabled: formData.isTradeEnabled,
-        // CRITICAL: Send null for unlimited stock (empty string), number for limited stock
-        // Backend expects: null = unlimited, number = limited, undefined = don't update
         quantity: formData.quantity && formData.quantity !== '' ? Number(formData.quantity) : null,
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
         status: formData.status,
       };
+      // Sale/discount fields: send to backend so listing shows updated price
+      if (hasSale) {
+        payload.originalPrice = orig;
+        payload.salePrice = sale;
+        payload.saleStartDate = saleData.saleStartDate ? new Date(saleData.saleStartDate).toISOString() : null;
+        payload.saleEndDate = saleData.saleEndDate ? new Date(saleData.saleEndDate).toISOString() : null;
+      } else {
+        payload.originalPrice = null;
+        payload.salePrice = null;
+        payload.saleStartDate = null;
+        payload.saleEndDate = null;
+      }
       
       console.log('[EDIT] handleSubmit - Payload quantity:', payload.quantity, 'from formData.quantity:', formData.quantity);
 
@@ -733,6 +782,150 @@ export default function EditListingPage() {
                   min={1}
                 />
               </div>
+            </div>
+
+            {/* Discount Section */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowDiscountSection(!showDiscountSection)}
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ReceiptPercentIcon className="w-5 h-5 text-orange-600" />
+                  <span className="font-medium text-gray-900">İndirim & Kampanya</span>
+                  {productDiscounts.length > 0 && (
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                      {productDiscounts.length} aktif
+                    </span>
+                  )}
+                </div>
+                {showDiscountSection ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+              
+              {showDiscountSection && (
+                <div className="p-4 space-y-4 bg-white">
+                  {/* Quick Sale Price */}
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <TagIcon className="w-4 h-4 text-orange-600" />
+                      Hızlı İndirim
+                    </h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün sayfasında üstü çizili fiyat olarak görünecektir.
+                    </p>
+                    
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Orijinal Fiyat (₺)
+                        </label>
+                        <input
+                          type="number"
+                          value={saleData.originalPrice || formData.price}
+                          onChange={(e) => setSaleData({ ...saleData, originalPrice: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                          placeholder={formData.price || 'Orijinal fiyat'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          İndirimli Fiyat (₺)
+                        </label>
+                        <input
+                          type="number"
+                          value={saleData.salePrice}
+                          onChange={(e) => setSaleData({ ...saleData, salePrice: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                          placeholder="İndirimli fiyat"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Başlangıç
+                        </label>
+                        <input
+                          type="date"
+                          value={saleData.saleStartDate}
+                          onChange={(e) => setSaleData({ ...saleData, saleStartDate: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Bitiş
+                        </label>
+                        <input
+                          type="date"
+                          value={saleData.saleEndDate}
+                          onChange={(e) => setSaleData({ ...saleData, saleEndDate: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    {saleData.salePrice && saleData.originalPrice && (
+                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded-lg mb-4">
+                        <span>
+                          %{Math.round((1 - Number(saleData.salePrice) / Number(saleData.originalPrice)) * 100)} indirim
+                        </span>
+                        <span className="text-gray-500">
+                          ({Number(saleData.originalPrice).toLocaleString('tr-TR')} ₺ → {Number(saleData.salePrice).toLocaleString('tr-TR')} ₺)
+                        </span>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-gray-500">
+                      * Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.
+                    </p>
+                  </div>
+                  
+                  {/* Existing Discounts */}
+                  {productDiscounts.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-3">Bu Ürüne Uygulanan İndirimler</h4>
+                      <div className="space-y-2">
+                        {productDiscounts.map((discount: any) => (
+                          <div key={discount.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-gray-900">{discount.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {discount.type === 'percentage' ? `%${discount.value}` : `${discount.value} TL`}
+                                {discount.code && <span className="ml-2">Kod: {discount.code}</span>}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              discount.isCurrentlyValid 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {discount.isCurrentlyValid ? 'Aktif' : 'Pasif'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Link to full discount management */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <Link
+                      href="/profile/discounts"
+                      className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 text-sm font-medium"
+                    >
+                      <ReceiptPercentIcon className="w-4 h-4" />
+                      Tüm İndirimlerimi Yönet →
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Images */}

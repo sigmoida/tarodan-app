@@ -10,16 +10,16 @@ import { useCartStore } from '@/stores/cartStore';
 import { useTranslation } from '@/i18n';
 
 export default function CartPage() {
-  const { items, total, isLoading, fetchCart, removeFromCart } = useCartStore();
+  const { items, subtotal, grandTotal, isLoading, fetchCart, removeFromCart } = useCartStore();
   const { t } = useTranslation();
 
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
 
-  const handleRemove = async (itemId: string) => {
+  const handleRemove = async (productId: string) => {
     try {
-      await removeFromCart(itemId);
+      await removeFromCart(productId);
       toast.success(t('product.removedFromCart'));
     } catch (error) {
       toast.error(t('product.removeFromCartFailed'));
@@ -62,8 +62,8 @@ export default function CartPage() {
     );
   }
 
-  const shippingCost = 49.90;
-  const grandTotal = total + shippingCost;
+  const shippingCost = apiShippingCost != null ? Number(apiShippingCost) : (subtotal >= 500 ? 0 : 49.90);
+  const displayGrandTotal = grandTotal > 0 ? grandTotal : Math.max(0, subtotal - (totalDiscount ?? 0) + shippingCost);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -71,7 +71,7 @@ export default function CartPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('cart.myCart')}</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
+          {/* Cart Items - API: productTitle, effectivePrice, productImage, sellerName */}
           <div className="lg:col-span-2 space-y-4">
             {items.map((item, index) => (
               <motion.div
@@ -84,8 +84,8 @@ export default function CartPage() {
                 <Link href={`/listings/${item.productId}`}>
                   <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                     <Image
-                      src={item.imageUrl || 'https://via.placeholder.com/96'}
-                      alt={item.title}
+                      src={item.productImage || 'https://via.placeholder.com/96'}
+                      alt={item.productTitle}
                       width={96}
                       height={96}
                       className="object-cover w-full h-full"
@@ -95,18 +95,25 @@ export default function CartPage() {
                 <div className="flex-1">
                   <Link href={`/listings/${item.productId}`}>
                     <h3 className="font-semibold text-gray-900 hover:text-primary-500 line-clamp-2">
-                      {item.title}
+                      {item.productTitle}
                     </h3>
                   </Link>
                   <p className="text-sm text-gray-500 mt-1">
-                    {t('product.seller')}: @{item.seller.displayName}
+                    {t('product.seller')}: @{item.sellerName}
                   </p>
-                  <p className="text-lg font-bold text-primary-500 mt-2">
-                    {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                  </p>
+                  <div className="mt-2">
+                    {item.originalPrice != null && item.originalPrice > (item.effectivePrice ?? 0) && (
+                      <p className="text-sm text-gray-400 line-through">
+                        {(item.originalPrice ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                      </p>
+                    )}
+                    <p className="text-lg font-bold text-primary-500">
+                      {(item.effectivePrice ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                    </p>
+                  </div>
                 </div>
                 <button
-                  onClick={() => handleRemove(item.id)}
+                  onClick={() => handleRemove(item.productId)}
                   className="p-2 text-gray-400 hover:text-red-500 transition-colors self-start"
                 >
                   <TrashIcon className="w-5 h-5" />
@@ -123,8 +130,28 @@ export default function CartPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('checkout.subtotal')}</span>
-                  <span className="font-medium">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                  <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
+                {appliedDiscounts && appliedDiscounts.length > 0 && (
+                  <>
+                    {appliedCouponCode && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Kupon ({appliedCouponCode})</span>
+                        <span className="font-medium">-</span>
+                      </div>
+                    )}
+                    {appliedDiscounts.map((d) => (
+                      <div key={d.discountId} className="flex justify-between text-green-600">
+                        <span>{d.discountName}</span>
+                        <span className="font-medium">-{(Number(d.appliedAmount)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-gray-600">
+                      <span>Toplam indirim</span>
+                      <span className="font-medium">-{(Number(totalDiscount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('checkout.shipping')}</span>
                   <span className="font-medium">₺{shippingCost.toFixed(2)}</span>
@@ -133,7 +160,7 @@ export default function CartPage() {
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{t('checkout.total')}</span>
                   <span className="font-bold text-primary-500">
-                    ₺{grandTotal.toFixed(2)}
+                    ₺{(displayGrandTotal ?? 0).toFixed(2)}
                   </span>
                 </div>
               </div>

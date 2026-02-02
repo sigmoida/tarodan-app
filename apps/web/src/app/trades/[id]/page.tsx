@@ -20,6 +20,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { tradesApi, listingsApi, userApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface TradeItem {
@@ -628,7 +629,7 @@ export default function TradeDetailPage() {
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-orange-500">
-                                {Number(product.price || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </button>
@@ -690,7 +691,7 @@ export default function TradeDetailPage() {
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-orange-500">
-                                {Number(product.price || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
                           </button>

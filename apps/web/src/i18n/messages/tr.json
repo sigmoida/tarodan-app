@@ -303,7 +303,12 @@
     "beFirstToReview": "Bu ürünü satın alan ilk kişi olun ve deneyiminizi paylaşın!",
     "listingNotFound": "İlan bulunamadı",
     "productPrice": "Ürün Fiyatı",
-    "sendOffer": "Teklif Gönder"
+    "sendOffer": "Teklif Gönder",
+    "onSale": "İndirimdekiler",
+    "discount": "İndirim",
+    "originalPrice": "Orijinal Fiyat",
+    "discountedPrice": "İndirimli Fiyat",
+    "discountAmount": "İndirim Tutarı"
   },
   "cart": {
     "myCart": "Sepetim",

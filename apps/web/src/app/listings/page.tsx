@@ -12,9 +12,11 @@ import {
   XMarkIcon,
   ClockIcon,
   StarIcon,
+  TagIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, searchApi } from '@/lib/api';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
@@ -23,6 +25,12 @@ interface Listing {
   id: string | number;
   title: string;
   price: number;
+  originalPrice?: number | null;  // For strike-through price display
+  salePrice?: number | null;      // Discounted price
+  saleStartDate?: string | null;
+  saleEndDate?: string | null;
+  discountPercent?: number | null; // Calculated discount percentage
+  isOnSale?: boolean;              // Flag for sale status (computed by API)
   images: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
   brand?: string;
   scale?: string;
@@ -58,7 +66,6 @@ export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [showFilters, setShowFilters] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -74,12 +81,14 @@ export default function ListingsPage() {
     minPrice: '',
     maxPrice: '',
     tradeOnly: false,
+    discountOnly: searchParams.get('discountOnly') === 'true',
     sortBy: 'created_desc', // Varsayılan: En Yeni
   });
 
   useEffect(() => {
     const urlSearch = searchParams.get('search');
     const urlTradeOnly = searchParams.get('tradeOnly');
+    const urlDiscountOnly = searchParams.get('discountOnly');
     const urlBrand = searchParams.get('brand');
     const urlScale = searchParams.get('scale');
     const urlCondition = searchParams.get('condition');
@@ -92,11 +101,11 @@ export default function ListingsPage() {
     if (urlSearch) {
       setSearchQuery(urlSearch);
     }
-
     // Update filters from URL params
     setFilters(prev => ({
       ...prev,
       tradeOnly: urlTradeOnly === 'true',
+      discountOnly: urlDiscountOnly === 'true',
       brand: urlBrand || '',
       scale: urlScale || '',
       condition: urlCondition || '',
@@ -139,14 +148,32 @@ export default function ListingsPage() {
         'price_desc': 'price_desc',
       };
 
-      // Use Elasticsearch when there's a search query
-      if (searchQuery && searchQuery.trim()) {
+      // İndirimdekiler açıksa her zaman DB kullan (oldPrice/discountPercent API'den gelsin)
+      const useDbOnly = filters.discountOnly === true;
+      const buildListParams = (): Record<string, any> => {
+        const p: Record<string, any> = { limit: 100, page: 1 };
+        if (urlCategoryId) p.categoryId = urlCategoryId;
+        if (mappedCondition) p.condition = mappedCondition;
+        if (filters.minPrice) p.minPrice = Number(filters.minPrice);
+        if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
+        if (filters.brand) p.brand = filters.brand;
+        if (filters.scale) p.scale = filters.scale;
+        if (filters.tradeOnly) p.tradeOnly = true;
+        if (filters.discountOnly) p.discountOnly = true;
+        if (filters.sortBy) p.sortBy = filters.sortBy;
+        if (searchQuery?.trim()) p.search = searchQuery.trim();
+        return p;
+      };
+
+      if (useDbOnly) {
+        const response = await listingsApi.getAll(buildListParams());
+        setListings(response.data.data || response.data.products || []);
+      } else if (searchQuery && searchQuery.trim()) {
         try {
           const esParams: Record<string, any> = {
             pageSize: 100,
             page: 1,
           };
-          
           if (urlCategoryId) esParams.categoryId = urlCategoryId;
           if (mappedCondition) esParams.condition = mappedCondition;
           if (filters.minPrice) esParams.minPrice = Number(filters.minPrice);
@@ -155,80 +182,35 @@ export default function ListingsPage() {
 
           const response = await searchApi.products(searchQuery.trim(), esParams);
           const results = response.data.results || response.data.data || [];
-          
           if (results.length > 0) {
-            // Map ES results to listing format
             setListings(results.map((r: any) => ({
               id: r.id,
               title: r.title,
               price: r.price,
+              oldPrice: r.oldPrice ?? undefined,
+              originalPrice: r.originalPrice ?? r.oldPrice ?? undefined,
+              salePrice: r.salePrice ?? undefined,
+              isOnSale: r.isOnSale ?? undefined,
+              discountPercent: r.discountPercent ?? undefined,
               description: r.description,
               condition: r.condition,
               images: r.imageUrl ? [{ url: r.imageUrl }] : (r.images || []),
               seller: r.seller || { displayName: r.sellerName },
               category: { name: r.categoryName },
               isTradeEnabled: r.isTradeEnabled || r.trade_available || false,
-              rating: r.rating || (r.averageRating ? {
-                average: r.averageRating,
-                count: r.ratingCount || 0,
-              } : undefined),
+              rating: r.rating || (r.averageRating ? { average: r.averageRating, count: r.ratingCount || 0 } : undefined),
             })));
           } else {
-            // Fallback to database search if ES returns empty
-            const dbParams: Record<string, any> = {
-              limit: 100,
-              page: 1,
-              search: searchQuery.trim(),
-            };
-            if (urlCategoryId) dbParams.categoryId = urlCategoryId;
-            if (mappedCondition) dbParams.condition = mappedCondition;
-            if (filters.minPrice) dbParams.minPrice = Number(filters.minPrice);
-            if (filters.maxPrice) dbParams.maxPrice = Number(filters.maxPrice);
-            if (filters.brand) dbParams.brand = filters.brand;
-            if (filters.scale) dbParams.scale = filters.scale;
-            if (filters.tradeOnly) dbParams.tradeOnly = true;
-            if (filters.sortBy) dbParams.sortBy = filters.sortBy;
-
-            const dbResponse = await listingsApi.getAll(dbParams);
+            const dbResponse = await listingsApi.getAll(buildListParams());
             setListings(dbResponse.data.data || dbResponse.data.products || []);
           }
         } catch (esError) {
           console.error('ES search failed, falling back to DB:', esError);
-          // Fallback to database search on ES error
-          const dbParams: Record<string, any> = {
-            limit: 100,
-            page: 1,
-            search: searchQuery.trim(),
-          };
-          if (urlCategoryId) dbParams.categoryId = urlCategoryId;
-          if (mappedCondition) dbParams.condition = mappedCondition;
-          if (filters.minPrice) dbParams.minPrice = Number(filters.minPrice);
-          if (filters.maxPrice) dbParams.maxPrice = Number(filters.maxPrice);
-          if (filters.brand) dbParams.brand = filters.brand;
-          if (filters.scale) dbParams.scale = filters.scale;
-          if (filters.tradeOnly) dbParams.tradeOnly = true;
-          if (filters.sortBy) dbParams.sortBy = filters.sortBy;
-
-          const dbResponse = await listingsApi.getAll(dbParams);
+          const dbResponse = await listingsApi.getAll(buildListParams());
           setListings(dbResponse.data.data || dbResponse.data.products || []);
         }
       } else {
-        // Use regular products API when no search query
-        const params: Record<string, any> = {
-          limit: 100,
-          page: 1,
-        };
-        
-        if (urlCategoryId) params.categoryId = urlCategoryId;
-        if (mappedCondition) params.condition = mappedCondition;
-        if (filters.minPrice) params.minPrice = Number(filters.minPrice);
-        if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice);
-        if (filters.brand) params.brand = filters.brand;
-        if (filters.scale) params.scale = filters.scale;
-        if (filters.tradeOnly) params.tradeOnly = true;
-        if (filters.sortBy) params.sortBy = filters.sortBy;
-
-        const response = await listingsApi.getAll(params);
+        const response = await listingsApi.getAll(buildListParams());
         setListings(response.data.data || response.data.products || []);
       }
     } catch (error) {
@@ -284,6 +266,7 @@ export default function ListingsPage() {
       minPrice: '',
       maxPrice: '',
       tradeOnly: false,
+      discountOnly: false,
       sortBy: 'created_desc',
     });
   };
@@ -300,211 +283,242 @@ export default function ListingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            {/* Search with Recent Searches */}
-            <form onSubmit={handleSearch} className="flex-1 w-full relative">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={t('nav.searchPlaceholderMobile')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowRecentSearches(true)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-              </div>
-              
-              {/* Recent Searches Dropdown */}
-              {showRecentSearches && recentSearches.length > 0 && (
-                <div 
-                  ref={recentSearchesRef}
-                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
-                >
-                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <ClockIcon className="w-4 h-4" />
-                      {t('search.recentSearches')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        clearSearches();
-                      }}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      {t('search.clearAll')}
-                    </button>
-                  </div>
-                  <ul>
-                    {recentSearches.map((query, index) => (
-                      <li key={index}>
-                        <button
-                          type="button"
-                          onClick={() => handleRecentSearchClick(query)}
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center justify-between group"
-                        >
-                          <span className="flex items-center gap-2">
-                            <ClockIcon className="w-4 h-4 text-gray-400" />
-                            {query}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeSearch(query);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
-                          >
-                            <XMarkIcon className="w-4 h-4" />
-                          </button>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </form>
-
-            {/* Layout Selector */}
-            <ProductLayoutSelector
-              layout={productLayout}
-              onLayoutChange={setProductLayout}
-              storageKey="listings-product-layout"
-            />
-
-            {/* Sort Dropdown */}
-            <select
-              value={filters.sortBy}
-              onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-              className="px-4 py-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-primary-500 transition-colors cursor-pointer"
-            >
-              <option value="created_desc">{t('product.sortNewest')}</option>
-              <option value="created_asc">{t('product.sortOldest')}</option>
-              <option value="price_asc">{t('product.sortPriceLow')}</option>
-              <option value="price_desc">{t('product.sortPriceHigh')}</option>
-              <option value="title_asc">A-Z</option>
-              <option value="title_desc">Z-A</option>
-            </select>
-
-            {/* Filter Button */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-3 border rounded-xl transition-colors ${
-                showFilters
-                  ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
-                  : 'bg-white border-gray-200 hover:border-primary-500'
-              }`}
-            >
-              <FunnelIcon className="w-5 h-5" />
-              <span>{t('product.filters')}</span>
-              {activeFilterCount > 0 && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  showFilters
-                    ? 'bg-white text-orange-500'
-                    : 'bg-primary-500 text-white'
-                }`}>
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="flex-1 flex min-h-0 max-w-7xl mx-auto w-full shadow-lg rounded-none sm:rounded-lg overflow-hidden bg-white mt-0 sm:mt-4 mb-4 flex-col lg:flex-row">
+        {/* Sol panel: Filtreler (e-ticaret tarzı, mesajlar sayfasına uyumlu) */}
+        <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col min-h-0 bg-white border-b lg:border-b-0 lg:border-r border-gray-200">
+          <div className="flex-shrink-0 px-4 py-4 border-b border-gray-200 bg-white">
+            <h1 className="text-xl font-bold text-gray-900">
+              {t('nav.listings')}
+            </h1>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="mt-2 text-sm text-primary-500 hover:text-primary-600 flex items-center gap-1"
+              >
+                <XMarkIcon className="w-4 h-4" />
+                {t('product.clearFilters')}
+              </button>
+            )}
           </div>
-
-          {/* Filters Panel */}
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 pt-4 border-t border-gray-100"
-            >
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {/* Brand */}
-                <select
-                  value={filters.brand}
-                  onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
-                  className="input"
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            {/* İndirimdekiler – belirgin, kategorilerin üstünde */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setFilters({ ...filters, discountOnly: !filters.discountOnly })}
+                className={`w-full text-left px-4 py-3 rounded-xl font-semibold text-base transition-all flex items-center gap-3 border-2 ${
+                  filters.discountOnly
+                    ? 'bg-amber-500 text-white border-amber-500 shadow-md'
+                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+                }`}
+              >
+                <TagIcon className="w-6 h-6 flex-shrink-0" />
+                <span>{t('product.onSale')}</span>
+              </button>
+            </div>
+            {/* Kategoriler – hepsi açık, tıklanabilir */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('product.allCategories')}</label>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, brand: '' })}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filters.brand === '' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="">{t('product.allCategories')}</option>
-                  {BRANDS.map((brand) => (
-                    <option key={brand} value={brand}>{brand}</option>
-                  ))}
-                </select>
-
-                {/* Scale */}
-                <select
-                  value={filters.scale}
-                  onChange={(e) => setFilters({ ...filters, scale: e.target.value })}
-                  className="input"
+                  {t('product.allCategories')}
+                </button>
+                {BRANDS.map((brand) => (
+                  <button
+                    key={brand}
+                    type="button"
+                    onClick={() => setFilters({ ...filters, brand })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filters.brand === brand ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Ölçek – hepsi açık, tıklanabilir */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('product.scale')}</label>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, scale: '' })}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filters.scale === '' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="">{t('product.scale')}</option>
-                  {SCALES.map((scale) => (
-                    <option key={scale} value={scale}>{scale}</option>
-                  ))}
-                </select>
-
-                {/* Condition */}
-                <select
-                  value={filters.condition}
-                  onChange={(e) => setFilters({ ...filters, condition: e.target.value })}
-                  className="input"
+                  {t('common.all')}
+                </button>
+                {SCALES.map((scale) => (
+                  <button
+                    key={scale}
+                    type="button"
+                    onClick={() => setFilters({ ...filters, scale })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filters.scale === scale ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {scale}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Durum – hepsi açık, tıklanabilir */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('product.condition')}</label>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, condition: '' })}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filters.condition === '' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="">{t('product.condition')}</option>
-                  {CONDITIONS.map((condition) => (
-                    <option key={condition.value} value={condition.value}>{condition.label}</option>
-                  ))}
-                </select>
-
-                {/* Price Range */}
+                  {t('common.all')}
+                </button>
+                {CONDITIONS.map((condition) => (
+                  <button
+                    key={condition.value}
+                    type="button"
+                    onClick={() => setFilters({ ...filters, condition: condition.value })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filters.condition === condition.value ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {condition.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Fiyat (₺)</label>
+              <div className="flex gap-2">
                 <input
                   type="number"
-                  placeholder="Min ₺"
+                  placeholder="Min"
                   value={filters.minPrice}
                   onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm transition-all"
                 />
                 <input
                   type="number"
-                  placeholder="Max ₺"
+                  placeholder="Max"
                   value={filters.maxPrice}
                   onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm transition-all"
                 />
-
-                {/* Trade Only */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filters.tradeOnly}
-                    onChange={(e) => setFilters({ ...filters, tradeOnly: e.target.checked })}
-                    className="w-5 h-5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  />
-                  <span className="text-sm">{t('product.tradeAvailable')}</span>
-                </label>
               </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={filters.tradeOnly}
+                onChange={(e) => setFilters({ ...filters, tradeOnly: e.target.checked })}
+                className="w-5 h-5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-gray-700">{t('product.tradeAvailable')}</span>
+            </label>
+          </div>
+        </aside>
 
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 text-sm text-primary-500 hover:text-primary-600 flex items-center gap-1"
-                >
-                  <XMarkIcon className="w-4 h-4" />
-                  {t('product.clearFilters')}
-                </button>
-              )}
-            </motion.div>
-          )}
-        </div>
-      </div>
+        {/* Sağ panel: Arama + sıralama + ilan listesi */}
+        <div className="flex-1 flex flex-col min-h-0 bg-gray-50 min-w-0">
+          {/* Üst bar: Arama, layout, sıralama */}
+          <div className="flex-shrink-0 px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
+              <form onSubmit={handleSearch} className="flex-1 w-full relative min-w-0">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder={t('nav.searchPlaceholderMobile')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowRecentSearches(true)}
+                    className="w-full pl-12 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all text-sm"
+                  />
+                </div>
+                {showRecentSearches && recentSearches.length > 0 && (
+                  <div
+                    ref={recentSearchesRef}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                        <ClockIcon className="w-4 h-4" />
+                        {t('search.recentSearches')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          clearSearches();
+                        }}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        {t('search.clearAll')}
+                      </button>
+                    </div>
+                    <ul>
+                      {recentSearches.map((query, index) => (
+                        <li key={index}>
+                          <button
+                            type="button"
+                            onClick={() => handleRecentSearchClick(query)}
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-primary-50 flex items-center justify-between group transition-colors"
+                          >
+                            <span className="flex items-center gap-2">
+                              <ClockIcon className="w-4 h-4 text-gray-400" />
+                              {query}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeSearch(query);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+                            >
+                              <XMarkIcon className="w-4 h-4" />
+                            </button>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </form>
+              <ProductLayoutSelector
+                layout={productLayout}
+                onLayoutChange={setProductLayout}
+                storageKey="listings-product-layout"
+              />
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                className="px-4 py-2.5 sm:py-3 border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all cursor-pointer text-sm"
+              >
+                <option value="created_desc">{t('product.sortNewest')}</option>
+                <option value="created_asc">{t('product.sortOldest')}</option>
+                <option value="price_asc">{t('product.sortPriceLow')}</option>
+                <option value="price_desc">{t('product.sortPriceHigh')}</option>
+                <option value="title_asc">A-Z</option>
+                <option value="title_desc">Z-A</option>
+              </select>
+            </div>
+          </div>
 
-      {/* Listings Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* İçerik alanı */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
         {isLoading ? (
           <div className={
             productLayout === 'grid-3'
@@ -514,9 +528,9 @@ export default function ListingsPage() {
               : 'space-y-4'
           }>
             {[...Array(12)].map((_, i) => (
-              <div key={i} className={productLayout === 'list' ? 'card animate-pulse flex gap-4' : 'card animate-pulse'}>
-                <div className={productLayout === 'list' ? 'w-32 h-32 bg-gray-200 rounded-lg flex-shrink-0' : 'aspect-square bg-gray-200'} />
-                <div className={productLayout === 'list' ? 'flex-1 space-y-2' : 'p-4 space-y-2'}>
+              <div key={i} className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse ${productLayout === 'list' ? 'flex gap-4 p-4' : ''}`}>
+                <div className={productLayout === 'list' ? 'w-24 h-24 bg-gray-200 rounded-xl flex-shrink-0' : 'aspect-square bg-gray-200'} />
+                <div className={productLayout === 'list' ? 'flex-1 space-y-2 py-1' : 'p-4 space-y-2'}>
                   <div className="h-4 bg-gray-200 rounded w-3/4" />
                   <div className="h-3 bg-gray-200 rounded w-1/2" />
                   <div className="h-5 bg-gray-200 rounded w-1/3" />
@@ -525,8 +539,19 @@ export default function ListingsPage() {
             ))}
           </div>
         ) : listings.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg">{t('product.noListings')}</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-2xl border border-gray-100 shadow-sm text-center">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-4">
+              <MagnifyingGlassIcon className="w-8 h-8" />
+            </div>
+            <p className="text-gray-600 font-medium text-lg mb-1">{t('product.noListings')}</p>
+            <p className="text-sm text-gray-500 mb-6">Arama veya filtreleri değiştirmeyi deneyin.</p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="px-6 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors text-sm font-medium"
+            >
+              {t('product.clearFilters')}
+            </button>
           </div>
         ) : productLayout === 'list' ? (
           <div className="space-y-3">
@@ -537,9 +562,9 @@ export default function ListingsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Link href={`/listings/${listing.id}`}>
-                  <div className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-md transition-all flex gap-4 p-4">
-                    <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                <Link href={`/listings/${listing.id}`} className="group block">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 flex gap-4 p-4">
+                    <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
                       <Image
                         src={getImageUrl(listing.images?.[0])}
                         alt={listing.title}
@@ -551,14 +576,14 @@ export default function ListingsPage() {
                         }}
                       />
                       {(listing.trade_available || listing.isTradeEnabled) && (
-                        <div className="absolute top-1 right-1 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <div className="absolute top-1 right-1 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-lg flex items-center gap-0.5 shadow-sm">
                           <ArrowsRightLeftIcon className="w-3 h-3" />
                         </div>
                       )}
                     </div>
                     <div className="flex-1 flex items-center justify-between min-w-0">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">
+                        <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1 group-hover:text-primary-500 transition-colors">
                           {listing.title}
                         </h3>
                         <p className="text-sm text-gray-500 mb-1">
@@ -577,12 +602,24 @@ export default function ListingsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-4 ml-4">
-                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
                           {listing.condition}
                         </span>
-                        <p className="text-lg font-bold text-primary-500 whitespace-nowrap">
-                          {listing.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </p>
+                                      <div className="flex items-center gap-2">
+                                          {isProductOnSaleDisplay(listing) && (
+                                            <>
+                                              <span className="text-sm text-gray-400 line-through">
+                                                {getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                                              </span>
+                                              <span className="text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                                                %{listing.discountPercent ?? (isProductOnSaleDisplay(listing) ? Math.round((1 - getProductEffectivePrice(listing) / getProductOriginalPriceForDisplay(listing)) * 100) : 0)}
+                                              </span>
+                                            </>
+                                          )}
+                                          <p className="text-lg font-bold text-primary-500 whitespace-nowrap">
+                                            {getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                                          </p>
+                                        </div>
                       </div>
                     </div>
                   </div>
@@ -593,8 +630,8 @@ export default function ListingsPage() {
         ) : (
           <div className={
             productLayout === 'grid-3'
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
-              : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch'
+              : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 items-stretch'
           }>
             {listings.map((listing, index) => (
               <motion.div
@@ -602,53 +639,76 @@ export default function ListingsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
+                className="flex min-h-0"
               >
-                <Link href={`/listings/${listing.id}`}>
-                  <div className="card overflow-hidden card-hover">
-                    <div className="relative aspect-square bg-gray-100">
+                <Link href={`/listings/${listing.id}`} className="group block w-full min-h-0 flex flex-col">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 card-hover h-full flex flex-col min-h-[380px]">
+                    <div className="relative aspect-square bg-gray-100 flex-shrink-0">
                       <Image
                         src={getImageUrl(listing.images?.[0])}
                         alt={listing.title}
                         fill
-                        className="object-cover"
+                        className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                         unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
                         }}
                       />
+                      {/* Trade Badge */}
                       {(listing.trade_available || listing.isTradeEnabled) && (
-                        <div className="absolute top-3 left-3 badge badge-trade">
+                        <div className="absolute top-3 left-3 badge badge-trade shadow-sm">
                           <ArrowsRightLeftIcon className="w-4 h-4 mr-1" />
                           {t('nav.trades')}
                         </div>
                       )}
+                                      {/* Discount Badge */}
+                                      {isProductOnSaleDisplay(listing) && (
+                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-sm">
+                                          %{listing.discountPercent ?? (isProductOnSaleDisplay(listing) ? Math.round((1 - getProductEffectivePrice(listing) / getProductOriginalPriceForDisplay(listing)) * 100) : 0)} {t('product.discount') || 'İndirim'}
+                                        </div>
+                                      )}
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
+                    <div className="p-3 sm:p-4 flex-1 flex flex-col min-h-[140px]">
+                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1 group-hover:text-primary-500 transition-colors text-sm leading-snug break-words">
                         {listing.title}
                       </h3>
-                      <p className="text-sm text-gray-500 mb-2">
-                        {listing.brand} • {listing.scale}
-                      </p>
-                      {/* Rating */}
-                      {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
-                        <div className="flex items-center gap-1 mb-2">
-                          <StarIconSolid className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm font-semibold text-gray-900">
-                            {listing.rating.average.toFixed(1)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ({listing.rating.count})
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <p className="text-xl font-bold text-primary-500">
-                          {listing.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                      {([listing.brand, listing.scale].filter(Boolean).join(' • ') || '').length > 0 && (
+                        <p className="text-xs text-gray-500 mb-1 truncate">
+                          {[listing.brand, listing.scale].filter(Boolean).join(' • ')}
                         </p>
-                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                      )}
+                      <div className="min-h-[1.25rem] flex items-center gap-1 mb-2">
+                        {listing.rating && listing.rating.average !== null && listing.rating.count > 0 ? (
+                          <>
+                            <StarIconSolid className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-gray-900">
+                              {listing.rating.average.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({listing.rating.count})
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                      <div className="mt-auto pt-2 border-t border-gray-100 space-y-1.5">
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg inline-block truncate max-w-[80px] sm:max-w-[100px]" title={listing.condition}>
                           {listing.condition}
                         </span>
+                        <div className="flex flex-col">
+                                          {isProductOnSaleDisplay(listing) && (
+                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                              <span className="text-xs text-gray-400 line-through">
+                                                {getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                                              </span>
+                                              <span className="text-xs font-semibold text-red-500 bg-red-50 px-1 py-0.5 rounded">
+                                                %{listing.discountPercent ?? (isProductOnSaleDisplay(listing) ? Math.round((1 - getProductEffectivePrice(listing) / getProductOriginalPriceForDisplay(listing)) * 100) : 0)}
+                                              </span>
+                                            </div>
+                                          )}
+                                          <p className="text-base sm:text-lg font-bold text-primary-500 whitespace-nowrap">
+                                            {getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                                          </p>
+                                        </div>
                       </div>
                     </div>
                   </div>
@@ -657,6 +717,8 @@ export default function ListingsPage() {
             ))}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

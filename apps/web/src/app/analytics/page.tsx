@@ -32,6 +32,7 @@ import { HeartIcon as HeartSolidIcon, StarIcon as StarSolidIcon } from '@heroico
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
 
 interface AnalyticsData {
@@ -637,7 +638,7 @@ export default function AnalyticsPage() {
                             {product.favorites}
                           </span>
                           <span className="text-orange-600 font-medium">
-                            {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </span>
                         </div>
                       </div>

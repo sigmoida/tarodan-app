@@ -9,12 +9,16 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { listingsApi, userApi } from '@/lib/api';
 import api from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   images?: Array<{ url: string } | string>;
   isTradeEnabled?: boolean;
   status?: string;
@@ -125,7 +129,7 @@ export default function NewTradePage() {
   const calculateTotal = () => {
     const productsTotal = myProducts
       .filter(p => selectedProducts.includes(p.id))
-      .reduce((sum, p) => sum + Number(p.price), 0);
+      .reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
     const cash = parseFloat(cashAmount) || 0;
     return productsTotal + cash;
   };
@@ -255,7 +259,7 @@ export default function NewTradePage() {
                   {targetProduct.title}
                 </h3>
                 <p className="text-xl font-bold text-primary-500">
-                  {Number(targetProduct.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  {getProductEffectivePrice(targetProduct).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
               </div>
             </div>
@@ -319,7 +323,7 @@ export default function NewTradePage() {
                           {product.title}
                         </p>
                         <p className="text-xs font-bold text-primary-500">
-                          {Number(product.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                       </div>
                     </button>
@@ -422,7 +426,7 @@ export default function NewTradePage() {
               <span className="font-medium">
                 ₺{myProducts
                   .filter(p => selectedProducts.includes(p.id))
-                  .reduce((sum, p) => sum + Number(p.price), 0)
+                  .reduce((sum, p) => sum + getProductEffectivePrice(p), 0)
                   .toLocaleString('tr-TR')}
               </span>
             </div>
@@ -440,7 +444,7 @@ export default function NewTradePage() {
             </div>
             <div className="flex justify-between text-gray-600">
               <span>{locale === 'en' ? 'Requested Product:' : 'İstenen Ürün:'}</span>
-              <span className="font-medium">{Number(targetProduct.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+              <span className="font-medium">{getProductEffectivePrice(targetProduct).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
             </div>
           </div>
         </div>

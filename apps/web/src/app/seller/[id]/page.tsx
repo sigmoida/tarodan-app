@@ -27,6 +27,7 @@ import {
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
 import ReportModal from '@/components/ReportModal';
@@ -531,7 +532,7 @@ export default function SellerProfilePage() {
                           </h3>
                           <div className="flex items-center justify-between">
                             <p className="text-orange-600 font-bold">
-                              ₺{product.price.toLocaleString('tr-TR')}
+                              ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
                             </p>
                             {(product.viewCount || 0) > 0 && (
                               <span className="flex items-center gap-1 text-xs text-gray-400">

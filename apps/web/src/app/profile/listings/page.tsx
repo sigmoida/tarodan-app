@@ -17,11 +17,16 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { userApi, api } from '@/lib/api';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 
 interface Listing {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
+  discountPercent?: number | null;
   status: string;
   images?: Array<{ url: string } | string>;
   createdAt: string;
@@ -300,9 +305,19 @@ export default function ProfileListingsPage() {
                     <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
                       {listing.title}
                     </h3>
-                    <p className="text-xl font-bold text-primary-500 mb-3">
-                      {Number(listing.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                    </p>
+                    <div className="mb-3">
+                      {isProductOnSaleDisplay(listing) && (
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm text-gray-400 line-through">
+                            {getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          </span>
+                          <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">İndirim</span>
+                        </div>
+                      )}
+                      <p className="text-xl font-bold text-primary-500">
+                        {getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                      </p>
+                    </div>
                     
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
                       <span>{new Date(listing.createdAt).toLocaleDateString('tr-TR')}</span>

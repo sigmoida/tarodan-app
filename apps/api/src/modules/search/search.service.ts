@@ -738,18 +738,29 @@ export class SearchService implements OnModuleInit {
     ]);
 
     return {
-      results: products.map((p) => ({
-        id: p.id,
-        title: p.title,
-        description: p.description || undefined,
-        price: parseFloat(p.price.toString()),
-        condition: p.condition,
-        status: p.status,
-        categoryName: p.category.name,
-        sellerName: p.seller.displayName,
-        imageUrl: p.images[0]?.url,
-        score: 0,
-      })),
+      results: products.map((p) => {
+        const priceA = parseFloat(p.price.toString());
+        const oldPriceDb = p.oldPrice != null ? parseFloat(p.oldPrice.toString()) : null;
+        const isOnSale = oldPriceDb != null && oldPriceDb > priceA;
+        const discountPercent = isOnSale && oldPriceDb ? Math.round(((oldPriceDb - priceA) / oldPriceDb) * 100) : null;
+        return {
+          id: p.id,
+          title: p.title,
+          description: p.description || undefined,
+          price: priceA,
+          oldPrice: isOnSale ? oldPriceDb : null,
+          originalPrice: isOnSale ? oldPriceDb : null,
+          salePrice: isOnSale ? priceA : null,
+          isOnSale: isOnSale || undefined,
+          discountPercent: discountPercent ?? undefined,
+          condition: p.condition,
+          status: p.status,
+          categoryName: p.category.name,
+          sellerName: p.seller.displayName,
+          imageUrl: p.images[0]?.url,
+          score: 0,
+        };
+      }),
       total,
       page,
       pageSize,

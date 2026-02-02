@@ -6,6 +6,7 @@ import { MembershipModule } from '../membership/membership.module';
 import { SearchModule } from '../search/search.module';
 import { WishlistModule } from '../wishlist/wishlist.module';
 import { NotificationModule } from '../notification/notification.module';
+import { DiscountModule } from '../discount/discount.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { NotificationModule } from '../notification/notification.module';
     SearchModule,
     WishlistModule,
     forwardRef(() => NotificationModule),
+    DiscountModule,
   ],
   controllers: [ProductController],
   providers: [ProductService, ProductSchedulerService],

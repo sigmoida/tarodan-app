@@ -77,7 +77,14 @@ export default function MessagesPage() {
   const [sending, setSending] = useState(false);
   const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
+  const [threadsExpanded, setThreadsExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+
+  const INITIAL_THREADS = 6;
+  const visibleThreads = threadsExpanded ? threads : threads.slice(0, INITIAL_THREADS);
+  const hasMoreThreads = threads.length > INITIAL_THREADS && !threadsExpanded;
+  const remainingCount = threads.length - INITIAL_THREADS;
 
   // URL params for product-specific messaging
   const sellerId = searchParams.get('user');
@@ -195,6 +202,20 @@ export default function MessagesPage() {
     }
   }, [selectedThread]);
 
+  // Sadece sohbet alanını en alta kaydır (sayfa kaymasın); mesajlar yüklendiğinde / yeni mesajda
+  const scrollChatToBottom = () => {
+    requestAnimationFrame(() => {
+      const el = messagesScrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
+  useEffect(() => {
+    if (selectedThread && messages.length >= 0) {
+      const t = setTimeout(scrollChatToBottom, 80);
+      return () => clearTimeout(t);
+    }
+  }, [messages.length, selectedThread?.id]);
+
   const loadThreads = async () => {
     try {
       const response = await messagesApi.getThreads();
@@ -298,10 +319,7 @@ export default function MessagesPage() {
       setContentWarning(null);
       loadThreads(); // Refresh threads to update last message
       
-      // Scroll to bottom after sending new message
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      setTimeout(scrollChatToBottom, 80);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
         toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
@@ -320,172 +338,201 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-
-      <div className="flex-1 flex max-w-7xl mx-auto w-full">
-        {/* Thread List */}
-        <div className="w-80 border-r border-gray-700 flex flex-col">
-          <div className="p-4 border-b border-gray-700">
-            <h1 className="text-xl font-semibold">{t('message.messages')}</h1>
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="flex-1 flex min-h-0 max-w-4xl mx-auto w-full shadow-lg rounded-none sm:rounded-lg overflow-hidden bg-white mt-0 sm:mt-4 mb-4">
+        {/* Sol panel: Konuşma listesi (e-ticaret tarzı) */}
+        <div className="w-full sm:w-80 flex flex-col min-h-0 bg-white border-r border-gray-200">
+          <div className="flex-shrink-0 px-4 py-4 border-b border-gray-200 bg-white">
+            <h1 className="text-lg font-semibold text-gray-900">{t('message.messages')}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {locale === 'en' ? 'Select a conversation' : 'Bir sohbet seçin'}
+            </p>
           </div>
 
           {loading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+            <div className="flex-1 flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
             </div>
           ) : threads.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-gray-400 p-4 text-center">
+            <div className="flex-1 flex items-center justify-center text-gray-500 p-6 text-center text-sm">
               {t('message.noMessages')}
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto">
-              {threads.map((thread) => (
-                <button
-                  key={thread.id}
-                  onClick={() => setSelectedThread(thread)}
-                  className={`w-full p-4 text-left hover:bg-gray-800 transition-colors border-b border-gray-700 ${
-                    selectedThread?.id === thread.id ? 'bg-gray-800' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                      {thread.otherUser?.avatarUrl ? (
-                        <img
-                          src={thread.otherUser.avatarUrl}
-                          alt=""
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        (thread.otherUser?.displayName || 'K').charAt(0)
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium truncate">
-                          {thread.otherUser?.displayName || 'Kullanıcı'}
-                        </p>
+            <div className={`flex-1 overflow-y-auto ${threadsExpanded ? '' : 'flex flex-col'}`}>
+              {visibleThreads.map((thread) => {
+                const isSelected = selectedThread?.id === thread.id;
+                return (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => setSelectedThread(thread)}
+                    className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-gray-100 last:border-b-0 ${
+                      isSelected
+                        ? 'border-l-primary-500 bg-primary-50/60'
+                        : 'border-l-transparent hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm overflow-hidden">
+                          {thread.otherUser?.avatarUrl ? (
+                            <img
+                              src={thread.otherUser.avatarUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            (thread.otherUser?.displayName || '?').charAt(0).toUpperCase()
+                          )}
+                        </div>
                         {thread.unreadCount > 0 && (
-                          <span className="bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full">
-                            {thread.unreadCount}
-                          </span>
+                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-500 rounded-full border-2 border-white" />
                         )}
                       </div>
-                      {thread.lastMessage && (
-                        <p className="text-sm text-gray-400 truncate">
-                          {thread.lastMessage.isFromMe ? 'Sen: ' : ''}
-                          {thread.lastMessage.content}
-                        </p>
-                      )}
-                      {thread.product && (
-                        <p className="text-xs text-primary-400 truncate">
-                          📦 {thread.product.title}
-                        </p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-gray-900 truncate text-sm">
+                            {thread.otherUser?.displayName || 'Kullanıcı'}
+                          </span>
+                          {thread.unreadCount > 0 && (
+                            <span className="flex-shrink-0 text-xs font-medium text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded">
+                              {thread.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        {thread.lastMessage && (
+                          <p className="text-sm text-gray-500 truncate mt-0.5">
+                            {thread.lastMessage.isFromMe ? (locale === 'en' ? 'You: ' : 'Sen: ') : ''}
+                            {thread.lastMessage.content}
+                          </p>
+                        )}
+                        {thread.product && (
+                          <p className="text-xs text-primary-600 truncate mt-0.5">📦 {thread.product.title}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
+              {hasMoreThreads && (
+                <div className="flex-shrink-0 p-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setThreadsExpanded(true)}
+                    className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                  >
+                    {locale === 'en' ? `More (${remainingCount})` : `Daha fazla (${remainingCount})`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        {/* Sağ panel: Sohbet alanı */}
+        <div className="flex-1 flex flex-col min-h-0 bg-gray-50 min-w-0">
           {selectedThread ? (
             <>
-              {/* Chat Header */}
-              <div className="p-4 border-b border-gray-700 flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
-                  {(selectedThread.otherUser?.displayName || 'K').charAt(0)}
+              {/* Sohbet başlığı (sabit) */}
+              <div className="flex-shrink-0 px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                  {(selectedThread.otherUser?.displayName || '?').charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <p className="font-medium">{selectedThread.otherUser?.displayName || 'Kullanıcı'}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {selectedThread.otherUser?.displayName || 'Kullanıcı'}
+                  </p>
                   {selectedThread.product && (
-                    <p className="text-sm text-primary-400">
-                      {selectedThread.product.title}
-                    </p>
+                    <p className="text-xs text-primary-600 truncate">📦 {selectedThread.product.title}</p>
                   )}
                 </div>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => {
-                  const isFromMe = message.senderId === user?.id;
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
-                    >
+              {/* Mesajlar + yazma kutusu (son mesajın hemen altında, tek kaydırma alanı) */}
+              <div
+                ref={messagesScrollRef}
+                className="flex-1 min-h-0 overflow-y-auto"
+              >
+                <div className="p-4 space-y-3">
+                  {messages.map((message) => {
+                    const isFromMe = message.senderId === user?.id;
+                    return (
                       <div
-                        className={`max-w-[70%] px-4 py-2 rounded-2xl ${
-                          isFromMe
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-gray-700 text-white'
-                        } ${
-                          message.status === 'pending'
-                            ? 'opacity-50'
-                            : message.status === 'rejected'
-                            ? 'bg-red-900/50'
-                            : ''
-                        }`}
+                        key={message.id}
+                        className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
                       >
-                        <p>{message.content}</p>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <span className="text-xs opacity-70">
-                            {new Date(message.createdAt).toLocaleTimeString('tr-TR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          {message.status === 'pending' && (
-                            <span className="text-xs">⏳</span>
-                          )}
-                          {message.status === 'rejected' && (
-                            <span className="text-xs">❌</span>
-                          )}
+                        <div
+                          className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl shadow-sm ${
+                            isFromMe
+                              ? 'bg-primary-500 text-white rounded-br-md'
+                              : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                          } ${
+                            message.status === 'pending'
+                              ? 'opacity-60'
+                              : message.status === 'rejected'
+                              ? 'ring-1 ring-red-200 bg-red-50/50'
+                              : ''
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                          <div className="flex items-center justify-end gap-1.5 mt-1">
+                            <span
+                              className={`text-xs ${isFromMe ? 'text-white/80' : 'text-gray-400'}`}
+                            >
+                              {new Date(message.createdAt).toLocaleTimeString('tr-TR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            {message.status === 'pending' && <span className="text-xs">⏳</span>}
+                            {message.status === 'rejected' && <span className="text-xs">❌</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Message Input */}
-              <div className="p-4 border-t border-gray-700">
-                {contentWarning && (
-                  <div className="mb-2 p-2 bg-yellow-900/50 border border-yellow-600 rounded-lg text-yellow-300 text-sm">
-                    ⚠️ {contentWarning}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => handleMessageChange(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder={t('message.typeMessage')}
-                    className={`flex-1 px-4 py-2 bg-gray-700 rounded-lg text-white placeholder-gray-400 ${
-                      contentWarning ? 'border border-yellow-500' : ''
-                    }`}
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || sending}
-                    className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {sending ? '...' : t('common.send')}
-                  </button>
+                    );
+                  })}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  ℹ️ {t('message.blockedContent')}
-                </p>
+                <div ref={messagesEndRef} />
+                {/* Mesaj yazma kutusu: son mesajın hemen altında; kısa sohbette kaydırmaya gerek kalmaz */}
+                <div className="p-4 pt-2 bg-white border-t border-gray-200">
+                  {contentWarning && (
+                    <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                      ⚠️ {contentWarning}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => handleMessageChange(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      placeholder={t('message.typeMessage')}
+                      className={`flex-1 px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
+                        contentWarning ? 'border-amber-400 ring-1 ring-amber-200' : ''
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || sending}
+                      className="flex-shrink-0 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+                    >
+                      {sending ? '...' : t('common.send')}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">ℹ️ {t('message.blockedContent')}</p>
+                </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              {t('message.selectConversation')}
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 mb-4">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <p className="font-medium text-gray-600">{t('message.selectConversation')}</p>
+              <p className="text-sm mt-1">{locale === 'en' ? 'Choose a thread from the list' : 'Listeden bir sohbet seçin'}</p>
             </div>
           )}
         </div>

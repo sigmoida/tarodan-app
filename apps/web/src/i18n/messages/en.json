@@ -303,7 +303,12 @@
     "beFirstToReview": "Be the first to buy this product and share your experience!",
     "listingNotFound": "Listing not found",
     "productPrice": "Product Price",
-    "sendOffer": "Send Offer"
+    "sendOffer": "Send Offer",
+    "onSale": "On Sale",
+    "discount": "Off",
+    "originalPrice": "Original Price",
+    "discountedPrice": "Discounted Price",
+    "discountAmount": "Discount Amount"
   },
   "cart": {
     "myCart": "My Cart",

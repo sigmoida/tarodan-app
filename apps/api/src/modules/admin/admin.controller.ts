@@ -27,6 +27,8 @@ import { AdminService } from './admin.service';
 import { AdvertisementService } from '../advertisement/advertisement.service';
 import { MediaService } from '../media/media.service';
 import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
+import { DiscountService } from '../discount/discount.service';
+import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -64,6 +66,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly advertisementService: AdvertisementService,
     private readonly mediaService: MediaService,
+    private readonly discountService: DiscountService,
   ) {}
 
   // ==================== COMMISSION RULES ====================
@@ -182,6 +185,72 @@ export class AdminController {
   @ApiOperation({ summary: 'Get products with filters' })
   async getProducts(@Query() query: AdminProductQueryDto) {
     return this.adminService.getProducts(query);
+  }
+
+  @Get('products/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get single product' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  async getProduct(@Param('id') id: string) {
+    return this.adminService.getProduct(id);
+  }
+
+  // ==================== DISCOUNT MANAGEMENT (admin token) ====================
+
+  @Get('discounts')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'List discounts (admin)' })
+  async getDiscounts(
+    @CurrentUser('id') adminId: string,
+    @Query() query: DiscountQueryDto,
+  ) {
+    return this.discountService.findAll(query, adminId, true);
+  }
+
+  @Post('discounts')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Create discount (admin)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Discount created' })
+  async createDiscount(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateDiscountDto,
+  ) {
+    return this.discountService.create(dto, adminId, true);
+  }
+
+  @Get('discounts/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get discount by ID (admin)' })
+  @ApiParam({ name: 'id', description: 'Discount ID' })
+  async getDiscount(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.discountService.findOne(id, adminId, true);
+  }
+
+  @Patch('discounts/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Update discount (admin)' })
+  @ApiParam({ name: 'id', description: 'Discount ID' })
+  async updateDiscount(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateDiscountDto,
+  ) {
+    return this.discountService.update(id, dto, adminId, true);
+  }
+
+  @Delete('discounts/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete discount (admin)' })
+  @ApiParam({ name: 'id', description: 'Discount ID' })
+  async deleteDiscount(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.discountService.delete(id, adminId, true);
   }
 
   @Post('products/:id/approve')

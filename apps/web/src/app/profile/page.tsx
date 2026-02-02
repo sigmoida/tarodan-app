@@ -25,6 +25,7 @@ import {
   DocumentTextIcon,
   ShieldCheckIcon,
   CurrencyDollarIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi } from '@/lib/api';
@@ -285,6 +286,7 @@ export default function ProfilePage() {
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
         { icon: HeartIcon, label: t('nav.favorites'), href: '/wishlist', desc: 'Favori ürünleriniz' },
         { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz', badge: pendingCounts.trades },
+        { icon: ReceiptPercentIcon, label: 'İndirimlerim', href: '/profile/discounts', desc: 'İndirim ve kampanyalarınız', sellerOnly: true },
       ],
     },
     {
@@ -566,7 +568,9 @@ export default function ProfilePage() {
                 <h2 className="font-semibold text-gray-900">{section.title}</h2>
               </div>
               <div className="divide-y divide-gray-50">
-                {section.items.map((item: any) => (
+                {section.items
+                  .filter((item: any) => !item.sellerOnly || profile?.isSeller)
+                  .map((item: any) => (
                   <Link
                     key={item.label}
                     href={item.href}

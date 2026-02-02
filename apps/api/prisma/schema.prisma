@@ -17,7 +17,6 @@ datasource db {
 
 // User model is defined below with all fields including isBanned
 
-
 // =============================================================================
 
 enum ProductStatus {
@@ -179,35 +178,51 @@ enum TicketCategory {
 }
 
 // =============================================================================
+// DISCOUNT SYSTEM ENUMS
+// =============================================================================
+
+enum DiscountType {
+  percentage // Yüzde indirim (ör. %10)
+  fixed_amount // Sabit tutar (ör. 50 TL)
+}
+
+enum DiscountScope {
+  global // Tüm site
+  category // Belirli kategori
+  product // Belirli ürün(ler)
+  seller // Belirli satıcının tüm ürünleri
+}
+
+// =============================================================================
 // USERS & AUTHENTICATION - EXTENDED FOR ALL GAPS
 // =============================================================================
 
 model User {
-  id              String      @id @default(uuid())
-  email           String      @unique
-  phone           String?     @unique
-  passwordHash    String      @map("password_hash")
-  displayName     String      @map("display_name")
-  avatarUrl       String?     @map("avatar_url")
-  bio             String?
-  birthDate       DateTime?   @map("birth_date")
-  isVerified      Boolean     @default(false) @map("is_verified")
-  isEmailVerified Boolean     @default(false) @map("is_email_verified") // GAP-006
-  isPhoneVerified Boolean     @default(false) @map("is_phone_verified")
-  isSeller        Boolean     @default(false) @map("is_seller")
-  sellerType      SellerType? @map("seller_type")
-  taxId           String?     @map("tax_id") // For corporate sellers (Vergi No)
-  companyName     String?     @map("company_name") // For corporate sellers
-  fcmToken        String?     @map("fcm_token") // Push notifications
-  acceptsMarketingEmails Boolean @default(false) @map("accepts_marketing_emails") // Marketing email consent
-  isBanned        Boolean     @default(false) @map("is_banned")
-  bannedAt        DateTime?   @map("banned_at")
-  bannedReason    String?     @map("banned_reason")
-  bannedBy        String?     @map("banned_by") // AdminUser ID
-  lastLoginAt     DateTime?   @map("last_login_at")
-  lastActivityAt  DateTime?   @map("last_activity_at")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id                     String      @id @default(uuid())
+  email                  String      @unique
+  phone                  String?     @unique
+  passwordHash           String      @map("password_hash")
+  displayName            String      @map("display_name")
+  avatarUrl              String?     @map("avatar_url")
+  bio                    String?
+  birthDate              DateTime?   @map("birth_date")
+  isVerified             Boolean     @default(false) @map("is_verified")
+  isEmailVerified        Boolean     @default(false) @map("is_email_verified") // GAP-006
+  isPhoneVerified        Boolean     @default(false) @map("is_phone_verified")
+  isSeller               Boolean     @default(false) @map("is_seller")
+  sellerType             SellerType? @map("seller_type")
+  taxId                  String?     @map("tax_id") // For corporate sellers (Vergi No)
+  companyName            String?     @map("company_name") // For corporate sellers
+  fcmToken               String?     @map("fcm_token") // Push notifications
+  acceptsMarketingEmails Boolean     @default(false) @map("accepts_marketing_emails") // Marketing email consent
+  isBanned               Boolean     @default(false) @map("is_banned")
+  bannedAt               DateTime?   @map("banned_at")
+  bannedReason           String?     @map("banned_reason")
+  bannedBy               String?     @map("banned_by") // AdminUser ID
+  lastLoginAt            DateTime?   @map("last_login_at")
+  lastActivityAt         DateTime?   @map("last_activity_at")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
 
   // Relations - Existing
   addresses    Address[]
@@ -269,6 +284,11 @@ model User {
 
   // Relations - Payment Methods
   paymentMethods PaymentMethod[]
+
+  // Relations - Discount System
+  discounts      Discount[] // Seller's own discounts
+  discountUsages DiscountUsage[] // User's discount usage history
+  cart           Cart? // User's shopping cart
 
   @@index([email])
   @@index([isSeller])
@@ -531,29 +551,38 @@ model Category {
   children        Category[]       @relation("CategoryHierarchy")
   products        Product[]
   commissionRules CommissionRule[]
+  discounts       Discount[] // Category-specific discounts
 
   @@map("categories")
 }
 
 model Product {
-  id             String           @id @default(uuid())
-  sellerId       String           @map("seller_id")
-  categoryId     String           @map("category_id")
-  title          String
-  description    String?
-  price          Decimal          @db.Decimal(10, 2)
-  condition      ProductCondition
-  status         ProductStatus    @default(pending)
-  isTradeEnabled Boolean          @default(false) @map("is_trade_enabled") // GAP-001
-  viewCount      Int              @default(0) @map("view_count")
-  likeCount      Int              @default(0) @map("like_count")
-  quantity       Int?             @map("quantity")
-  maxQuantityPerOrder Int?       @map("max_quantity_per_order")
-  popularityScore Int?            @map("popularity_score")
-  popularityUpdatedAt DateTime?   @map("popularity_updated_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  version        Int              @default(1) // Optimistic locking
+  id                  String           @id @default(uuid())
+  sellerId            String           @map("seller_id")
+  categoryId          String           @map("category_id")
+  title               String
+  description         String?
+  price               Decimal          @db.Decimal(10, 2)
+  condition           ProductCondition
+  status              ProductStatus    @default(pending)
+  isTradeEnabled      Boolean          @default(false) @map("is_trade_enabled") // GAP-001
+  viewCount           Int              @default(0) @map("view_count")
+  likeCount           Int              @default(0) @map("like_count")
+  quantity            Int?             @map("quantity")
+  maxQuantityPerOrder Int?             @map("max_quantity_per_order")
+  popularityScore     Int?             @map("popularity_score")
+  popularityUpdatedAt DateTime?        @map("popularity_updated_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  version             Int              @default(1) // Optimistic locking
+
+  // Sale/Discount pricing – A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili + süre bitince geri dönüş)
+  oldPrice      Decimal?  @map("old_price") @db.Decimal(10, 2)
+  saleStartDate DateTime? @map("sale_start_date")
+  saleEndDate   DateTime? @map("sale_end_date")
+  // Legacy (deprecated): API uyumluluğu için okumada doldurulur; yazmada artık kullanılmıyor
+  originalPrice Decimal?  @map("original_price") @db.Decimal(10, 2)
+  salePrice     Decimal?  @map("sale_price") @db.Decimal(10, 2)
 
   // Relations
   seller   User           @relation("SellerProducts", fields: [sellerId], references: [id])
@@ -577,10 +606,14 @@ model Product {
   // Like relations (Business Dashboard Feature)
   likes ProductLike[]
 
+  // Cart relations (Discount System)
+  cartItems CartItem[]
+
   @@index([sellerId])
   @@index([status])
   @@index([isTradeEnabled])
   @@index([createdAt(sort: Desc)])
+  @@index([saleStartDate, saleEndDate])
   @@map("products")
 }
 
@@ -968,13 +1001,13 @@ model Collection {
 }
 
 model CollectionItem {
-  id             String   @id @default(uuid())
-  collectionId   String   @map("collection_id")
-  productId      String?  @map("product_id")
-  sortOrder      Int      @default(0) @map("sort_order")
-  isFeatured     Boolean  @default(false) @map("is_featured")
-  addedAt        DateTime @default(now()) @map("added_at")
-  
+  id           String   @id @default(uuid())
+  collectionId String   @map("collection_id")
+  productId    String?  @map("product_id")
+  sortOrder    Int      @default(0) @map("sort_order")
+  isFeatured   Boolean  @default(false) @map("is_featured")
+  addedAt      DateTime @default(now()) @map("added_at")
+
   // Custom product fields (when productId is null)
   customTitle       String? @map("custom_title")
   customDescription String? @map("custom_description")
@@ -1104,6 +1137,12 @@ model Order {
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime    @updatedAt @map("updated_at")
   version           Int         @default(1) // Optimistic locking
+
+  // Discount fields
+  subtotal          Decimal? @db.Decimal(10, 2) // İndirimlerden önceki tutar
+  discountAmount    Decimal  @default(0) @map("discount_amount") @db.Decimal(10, 2) // Toplam indirim
+  discountCode      String?  @map("discount_code") // Uygulanan kupon kodu
+  discountBreakdown Json?    @map("discount_breakdown") // Detaylı indirim bilgisi
 
   // Relations
   buyer    User      @relation("BuyerOrders", fields: [buyerId], references: [id])
@@ -1490,46 +1529,148 @@ enum AdDeviceType {
 }
 
 enum AdPosition {
-  header      // top banner (leaderboard 728x90, billboard 970x250)
-  sidebar     // right/left sidebar (medium rectangle 300x250, wide skyscraper 160x600)
-  footer      // bottom banner
-  inline      // between content
-  popup       // modal popup
+  header // top banner (leaderboard 728x90, billboard 970x250)
+  sidebar // right/left sidebar (medium rectangle 300x250, wide skyscraper 160x600)
+  footer // bottom banner
+  inline // between content
+  popup // modal popup
 }
 
 model Advertisement {
-  id              String       @id @default(uuid())
-  title           String
-  imageUrl        String?      @map("image_url")
-  linkUrl         String?      @map("link_url")
-  content         String?      // HTML or plain text (for text ads)
-  altText         String?      @map("alt_text") // Accessibility
-  
+  id       String  @id @default(uuid())
+  title    String
+  imageUrl String? @map("image_url")
+  linkUrl  String? @map("link_url")
+  content  String? // HTML or plain text (for text ads)
+  altText  String? @map("alt_text") // Accessibility
+
   // IAB Dimensions
-  width           Int?         // Image width in pixels
-  height          Int?         // Image height in pixels
-  
+  width  Int? // Image width in pixels
+  height Int? // Image height in pixels
+
   // Targeting
-  position        AdPosition   @default(header)
-  deviceType      AdDeviceType @default(all) @map("device_type")
-  
+  position   AdPosition   @default(header)
+  deviceType AdDeviceType @default(all) @map("device_type")
+
   // Display settings
-  displayOrder    Int          @default(0) @map("display_order")
-  isActive        Boolean      @default(true) @map("is_active")
-  startDate       DateTime?    @map("start_date")
-  endDate         DateTime?    @map("end_date")
-  
+  displayOrder Int       @default(0) @map("display_order")
+  isActive     Boolean   @default(true) @map("is_active")
+  startDate    DateTime? @map("start_date")
+  endDate      DateTime? @map("end_date")
+
   // Analytics
-  clickCount      Int          @default(0) @map("click_count")
-  impressionCount Int          @default(0) @map("impression_count")
-  
+  clickCount      Int @default(0) @map("click_count")
+  impressionCount Int @default(0) @map("impression_count")
+
   // Timestamps
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([position, deviceType, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
+}
+
+// =============================================================================
+// DISCOUNT SYSTEM (Multi-Vendor Discount Engine)
+// =============================================================================
+
+model Discount {
+  id          String  @id @default(uuid())
+  code        String? @unique // Kupon kodu (NULL = otomatik kampanya)
+  name        String // Kampanya adı
+  description String?
+
+  type  DiscountType // percentage | fixed_amount
+  value Decimal       @db.Decimal(10, 2) // İndirim değeri
+  scope DiscountScope // global | category | product | seller
+
+  // Ownership (Critical Logic)
+  // NULL = Admin oluşturdu (global/category için)
+  // NOT NULL = Satıcı oluşturdu (sadece kendi ürünlerinde geçerli)
+  sellerId String? @map("seller_id")
+  seller   User?   @relation(fields: [sellerId], references: [id])
+
+  // Scope targets
+  categoryId       String?   @map("category_id") // scope=category ise
+  category         Category? @relation(fields: [categoryId], references: [id])
+  targetProductIds String[]  @default([]) // scope=product ise ürün ID'leri
+
+  // Rules
+  minCartValue      Decimal? @map("min_cart_value") @db.Decimal(10, 2) // Min sepet tutarı
+  maxDiscountAmount Decimal? @map("max_discount_amount") @db.Decimal(10, 2) // Max indirim tutarı
+  usageLimitTotal   Int?     @map("usage_limit_total") // Toplam kullanım limiti
+  usageLimitPerUser Int?     @default(1) @map("usage_limit_per_user") // Kullanıcı başı limit
+  usedCount         Int      @default(0) @map("used_count") // Kullanılma sayısı
+
+  // Stacking
+  isStackable Boolean @default(false) @map("is_stackable") // Diğer indirimlerle kombine?
+  priority    Int     @default(0) // Düşük değer = önce uygulanır
+
+  // Validity
+  isActive  Boolean  @default(true) @map("is_active")
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  usages DiscountUsage[]
+
+  @@index([sellerId])
+  @@index([isActive, startDate, endDate])
+  @@index([code])
+  @@index([scope])
+  @@map("discounts")
+}
+
+model DiscountUsage {
+  id         String   @id @default(uuid())
+  discountId String   @map("discount_id")
+  userId     String   @map("user_id")
+  orderId    String?  @map("order_id")
+  amount     Decimal  @db.Decimal(10, 2) // Uygulanan indirim tutarı
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  discount Discount @relation(fields: [discountId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([discountId, userId])
+  @@index([orderId])
+  @@map("discount_usages")
+}
+
+// =============================================================================
+// CART SYSTEM (Backend Cart for Discount Calculations)
+// =============================================================================
+
+model Cart {
+  id         String     @id @default(uuid())
+  userId     String     @unique @map("user_id")
+  user       User       @relation(fields: [userId], references: [id])
+  items      CartItem[]
+  couponCode String?    @map("coupon_code") // Uygulanan kupon kodu
+  expiresAt  DateTime   @map("expires_at") // Sepet süresi (24 saat)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String @id @default(uuid())
+  cartId    String @map("cart_id")
+  productId String @map("product_id")
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
 }
 
 // =============================================================================
@@ -1546,3 +1687,6 @@ model Advertisement {
 // - SupportTicket: creatorId, status, priority
 // - AuditLog: adminUserId, entityType+entityId, createdAt
 // - UserFollow: followerId, followingId
+// - Discount: sellerId, isActive+startDate+endDate, code, scope
+// - Cart: userId
+// - CartItem: cartId, productId

@@ -72,8 +72,13 @@ api.interceptors.response.use(
   }
 );
 
-// API endpoints
+// API endpoints (api is the axios instance; use api.get/post etc. for custom paths)
 export const adminApi = {
+  get: (url: string, config?: any) => api.get(url, config),
+  post: (url: string, data?: any, config?: any) => api.post(url, data, config),
+  patch: (url: string, data?: any, config?: any) => api.patch(url, data, config),
+  delete: (url: string, config?: any) => api.delete(url, config),
+
   // Dashboard
   getDashboard: () => api.get('/admin/dashboard'),
   getRecentOrders: (limit?: number) => api.get('/admin/dashboard/recent-orders', { params: { limit } }),

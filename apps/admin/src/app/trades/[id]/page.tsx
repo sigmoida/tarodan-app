@@ -12,6 +12,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -217,7 +218,7 @@ export default function TradeDetailPage() {
                           {item.product.title}
                         </Link>
                         <p className="text-xs text-gray-600">
-                          ₺{item.product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                          ₺{getProductEffectivePrice(item.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -263,7 +264,7 @@ export default function TradeDetailPage() {
                           {item.product.title}
                         </Link>
                         <p className="text-xs text-gray-600">
-                          ₺{item.product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                          ₺{getProductEffectivePrice(item.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>

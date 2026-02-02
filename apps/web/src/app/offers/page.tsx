@@ -24,6 +24,7 @@ import {
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Offer {
@@ -37,6 +38,10 @@ interface Offer {
     id: string;
     title: string;
     price: number;
+    oldPrice?: number | null;
+    originalPrice?: number | null;
+    salePrice?: number | null;
+    isOnSale?: boolean;
     images: { url: string }[];
   };
   buyer?: {
@@ -73,8 +78,9 @@ export default function OffersPage() {
     setLoading(true);
     setError(null);
     try {
+      // API expects type: 'sent' | 'received' (not role: buyer/seller)
       const response = await api.get('/offers', {
-        params: { role: activeTab === 'sent' ? 'buyer' : 'seller' }
+        params: { type: activeTab }
       });
       setOffers(response.data?.data || response.data?.offers || []);
     } catch (err: any) {
@@ -356,7 +362,8 @@ export default function OffersPage() {
               {offers.map((offer, index) => {
                 const statusConfig = getStatusConfig(offer.status);
                 const StatusIcon = statusConfig.icon;
-                const discount = calculateDiscount(offer.amount, offer.product.price);
+                const listingEffectivePrice = getProductEffectivePrice(offer.product);
+                const discount = calculateDiscount(offer.amount, listingEffectivePrice);
                 const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;
                 const otherUser = activeTab === 'received' ? offer.buyer : offer.seller;
 
@@ -407,7 +414,7 @@ export default function OffersPage() {
                               {offer.product.title}
                             </Link>
                             <p className="text-gray-500 text-sm mt-1">
-                              {locale === 'en' ? 'Listing Price:' : 'İlan Fiyatı:'} <span className="line-through">₺{offer.product.price.toLocaleString('tr-TR')}</span>
+                              {locale === 'en' ? 'Listing Price:' : 'İlan Fiyatı:'} <span className="line-through">₺{listingEffectivePrice.toLocaleString('tr-TR')}</span>
                             </p>
                           </div>
 

@@ -2,11 +2,15 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   status: string;
   seller: { displayName: string };
   category?: { name: string };
@@ -94,7 +98,7 @@ export function ProductsTable({ products, onApprove, onReject }: ProductsTablePr
               <td className="py-3 px-4 text-sm">{product.seller.displayName}</td>
               <td className="py-3 px-4 text-sm">{product.category?.name || '-'}</td>
               <td className="py-3 px-4 font-medium">
-                {product.price.toLocaleString('tr-TR')} TL
+                {getProductEffectivePrice(product).toLocaleString('tr-TR')} TL
               </td>
               <td className="py-3 px-4">
                 <span

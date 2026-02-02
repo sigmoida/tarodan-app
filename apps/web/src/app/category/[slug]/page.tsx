@@ -12,11 +12,15 @@ import {
   Squares2X2Icon,
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   images: string[];
   condition: string;
   status: string;
@@ -343,7 +347,7 @@ export default function CategoryPage() {
                       </h3>
                       <div className="flex items-center justify-between">
                         <span className="text-primary-500 font-bold text-lg">
-                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <span className="text-xs text-gray-600">
                           {getConditionLabel(product.condition)}
@@ -392,7 +396,7 @@ export default function CategoryPage() {
                       </div>
                       <div className="flex items-center justify-between mt-4">
                         <span className="text-primary-500 font-bold text-xl">
-                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <button className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
                           <HeartIcon className="h-5 w-5 text-white" />

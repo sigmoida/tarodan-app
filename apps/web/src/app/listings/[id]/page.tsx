@@ -26,6 +26,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
@@ -44,6 +45,11 @@ interface Listing {
   title: string;
   description: string;
   price: number;
+  oldPrice?: number | null;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
+  discountPercent?: number | null;
   images: Array<ProductImage | string>;
   brand?: string;
   scale?: string;
@@ -87,6 +93,8 @@ export default function ListingDetailPage() {
   const [showTradeModal, setShowTradeModal] = useState(false);
   
   const [listing, setListing] = useState<Listing | null>(null);
+  // A + oldPrice: price (A) = güncel satış fiyatı
+  const effectivePrice = listing ? Number(listing.price) : 0;
   const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -268,16 +276,7 @@ export default function ListingDetailPage() {
     
     setIsAddingToCart(true);
     try {
-      await addToCart({
-        productId: listing.id,
-        title: listing.title,
-        price: Number(listing.price),
-        imageUrl: listing.images?.length ? getImageUrl(listing.images[0]) : 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Product',
-        seller: {
-          id: listing.sellerId || listing.seller?.id || '',
-          displayName: listing.seller?.displayName || listing.seller?.username || t('product.seller'),
-        },
-      });
+      await addToCart(listing.id);
       toast.success(t('product.addedToCart'));
     } catch (error) {
       toast.error(t('common.operationFailed'));
@@ -291,7 +290,7 @@ export default function ListingDetailPage() {
     
     setIsAddingToCart(true);
     try {
-      await removeFromCart(cartItem.id);
+      await removeFromCart(cartItem.productId);
       toast.success(t('product.removedFromCart'));
     } catch (error) {
       toast.error(t('product.removeFromCartFailed'));
@@ -361,13 +360,13 @@ export default function ListingDetailPage() {
       return;
     }
     
-    const minOffer = Number(listing.price) * 0.5; // Minimum %50
+    const minOffer = effectivePrice * 0.5; // Minimum %50 of current price
     if (amount < minOffer) {
       toast.error(`Min: ${minOffer.toFixed(2)} TL (50%)`);
       return;
     }
     
-    if (amount >= Number(listing.price)) {
+    if (amount >= effectivePrice) {
       toast.error(t('product.offerMustBeLower'));
       return;
     }
@@ -486,7 +485,7 @@ export default function ListingDetailPage() {
   const shareToSocial = async (platform: string) => {
     const url = encodeURIComponent(window.location.href);
     const title = encodeURIComponent(listing?.title || 'Check this out on Tarodan!');
-    const text = encodeURIComponent(`${listing?.title} - ${listing?.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
+    const text = encodeURIComponent(`${listing?.title} - ${effectivePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
     
     let shareUrl = '';
     
@@ -1071,9 +1070,21 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-orange-500 mb-4">
-              {Number(listing.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-            </p>
+            <div className="mb-4">
+              {isProductOnSaleDisplay(listing) && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl text-gray-400 line-through">
+                    {getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </span>
+                  <span className="bg-red-500 text-white text-sm font-bold px-2 py-0.5 rounded">
+                    %{listing.discountPercent ?? (listing.oldPrice != null && listing.price ? Math.round((1 - Number(listing.price) / Number(listing.oldPrice)) * 100) : 0)} indirim
+                  </span>
+                </div>
+              )}
+              <p className="text-4xl font-bold text-orange-500">
+                {effectivePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+              </p>
+            </div>
 
             {/* View & Like Stats */}
             <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
@@ -1623,10 +1634,10 @@ export default function ListingDetailPage() {
                   {t('product.productPrice')}
                 </label>
                 <div className="text-lg font-semibold text-gray-900">
-                  {Number(listing.price).toLocaleString('tr-TR')} TL
+                  {effectivePrice.toLocaleString('tr-TR')} TL
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
+                  {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(effectivePrice * 0.5).toLocaleString('tr-TR')} TL (%50)
                 </p>
               </div>
               
@@ -1639,8 +1650,8 @@ export default function ListingDetailPage() {
                   value={offerAmount}
                   onChange={(e) => setOfferAmount(e.target.value)}
                   placeholder={locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'}
-                  min={Math.round(Number(listing.price) * 0.5)}
-                  max={Number(listing.price) - 1}
+                  min={Math.round(effectivePrice * 0.5)}
+                  max={Math.max(0, Math.round(effectivePrice) - 1)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>

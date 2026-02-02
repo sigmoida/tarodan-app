@@ -12,9 +12,10 @@ import {
 } from '@heroicons/react/24/solid';
 import { api, listingsApi, collectionsApi } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
 import AuthRequiredModal from '@/components/AuthRequiredModal';
-import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
 
@@ -29,6 +30,11 @@ interface Product {
   id: string;
   title: string;
   price: number;
+  oldPrice?: number | null;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
+  discountPercent?: number | null;
   images?: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
   brand?: string;
   scale?: string;
@@ -153,8 +159,10 @@ export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
+  const [discountedProducts, setDiscountedProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(false);
+  const [isLoadingDiscounted, setIsLoadingDiscounted] = useState(false);
   const [topCollections, setTopCollections] = useState<FeaturedCollector[]>([]);
   const [currentCollectionIndex, setCurrentCollectionIndex] = useState(0);
   const [companyOfWeek, setCompanyOfWeek] = useState<FeaturedBusiness | null>(null);
@@ -169,9 +177,28 @@ export default function Home() {
 
   useEffect(() => {
     fetchBestSellers();
+    fetchDiscountedProducts();
     fetchTopCollections();
     fetchCompanyOfWeek();
   }, []);
+
+  const fetchDiscountedProducts = async () => {
+    setIsLoadingDiscounted(true);
+    try {
+      const response = await listingsApi.getAll({ 
+        limit: 12,
+        page: 1,
+        discountOnly: true,
+        status: 'active'
+      });
+      const products = response.data.data || response.data.products || [];
+      setDiscountedProducts(Array.isArray(products) ? products : []);
+    } catch (error) {
+      console.error('Failed to fetch discounted products:', error);
+    } finally {
+      setIsLoadingDiscounted(false);
+    }
+  };
 
   // Auto-rotate collections every 10 seconds
   useEffect(() => {
@@ -274,10 +301,10 @@ export default function Home() {
   };
 
   const getProductTag = (product: Product): string | null => {
+    if (isProductOnSaleDisplay(product)) return locale === 'en' ? 'Sale' : 'İndirim';
     const daysSinceCreation = product.createdAt 
       ? Math.floor((new Date().getTime() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24))
       : 100;
-    
     if (daysSinceCreation < 7) return locale === 'en' ? 'New' : 'Yeni';
     if (product.viewCount && product.viewCount > 1000) return locale === 'en' ? 'Rare' : 'Nadir';
     return null;
@@ -472,6 +499,88 @@ export default function Home() {
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
 
+      {/* İndirimdekiler Section - Popüler ilanların üstünde */}
+      <section className="py-12 bg-gradient-to-br from-red-50/80 to-orange-50/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-red-500 rounded"></div>
+              <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                <TagIcon className="w-7 h-7 text-red-500" />
+                {locale === 'en' ? 'On Sale' : 'İndirimdekiler'}
+              </h2>
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                {locale === 'en' ? 'Deals' : 'Fırsat'}
+              </span>
+            </div>
+            <Link 
+              href="/listings?discountOnly=true"
+              className="text-red-600 font-semibold hover:text-red-700 flex items-center gap-1"
+            >
+              {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex gap-4 min-w-0 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {isLoadingDiscounted ? (
+                [...Array(6)].map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[180px] sm:w-auto bg-white rounded-xl overflow-hidden animate-pulse border border-gray-100">
+                    <div className="aspect-square bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-5 bg-gray-200 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))
+              ) : discountedProducts.length === 0 ? (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  {locale === 'en' ? 'No products on sale at the moment.' : 'Şu an indirimde ürün bulunmuyor.'}
+                </div>
+              ) : (
+                discountedProducts.slice(0, 6).map((product) => (
+                  <Link key={product.id} href={`/listings/${product.id}`} className="flex-shrink-0 w-[180px] sm:w-auto block">
+                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-0.5 border border-gray-100">
+                      <div className="relative aspect-square bg-gray-100">
+                        <Image
+                          src={getImageUrl(product.images?.[0])}
+                          alt={product.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                          }}
+                        />
+                        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-md">
+                          %{product.discountPercent ?? (isProductOnSaleDisplay(product) ? Math.round((1 - getProductEffectivePrice(product) / getProductOriginalPriceForDisplay(product)) * 100) : 0)} {locale === 'en' ? 'OFF' : 'İndirim'}
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-medium text-gray-900 line-clamp-2 text-sm mb-1.5">
+                          {product.title}
+                        </h3>
+                        {isProductOnSaleDisplay(product) && (
+                          <span className="text-xs text-gray-400 line-through block">
+                            {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                          </span>
+                        )}
+                        <p className="text-base font-bold text-red-600">
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section Divider - Gradient Line */}
+      <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
+
       {/* Popüler İlanlar Section */}
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -557,9 +666,16 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <p className="text-primary-500 font-bold text-lg">
-                            {formatPrice(product.price)}
-                          </p>
+                          <div>
+                            {isProductOnSaleDisplay(product) && (
+                              <p className="text-sm text-gray-400 line-through">
+                                {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                              </p>
+                            )}
+                            <p className="text-primary-500 font-bold text-lg">
+                              {formatPrice(getProductEffectivePrice(product))}
+                            </p>
+                          </div>
                           {product.rating && product.rating.average !== null && product.rating.count > 0 && (
                             <div className="flex items-center gap-1">
                               <StarIcon className="w-4 h-4 text-yellow-400" />
@@ -622,8 +738,13 @@ export default function Home() {
                         <h3 className="font-medium text-gray-900 line-clamp-2 text-sm group-hover:text-primary-500 transition-colors">
                           {product.title}
                         </h3>
+                        {isProductOnSaleDisplay(product) && (
+                          <p className="text-xs text-gray-400 line-through mt-0.5">
+                            {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                          </p>
+                        )}
                         <p className="text-primary-500 font-bold mt-1">
-                          {formatPrice(product.price)}
+                          {formatPrice(getProductEffectivePrice(product))}
                         </p>
                       </div>
                     </div>
@@ -637,6 +758,90 @@ export default function Home() {
 
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
+
+      {/* İndirimli Ürünler Section */}
+      {discountedProducts.length > 0 && (
+        <section className="py-12 bg-gradient-to-br from-red-50 to-orange-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 bg-red-500 rounded"></div>
+                <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                  <TagIcon className="w-8 h-8 text-red-500" />
+                  {locale === 'en' ? 'On Sale' : 'Fırsatlar'}
+                </h2>
+                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold animate-pulse">
+                  🔥 {locale === 'en' ? 'Hot Deals' : 'Fırsat'}
+                </span>
+              </div>
+              <Link 
+                href="/listings?discountOnly=true"
+                className="text-red-500 font-semibold hover:text-red-600 flex items-center gap-1"
+              >
+                {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              {isLoadingDiscounted ? (
+                [...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-5 bg-gray-200 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                discountedProducts.slice(0, 6).map((product) => (
+                  <Link key={product.id} href={`/listings/${product.id}`}>
+                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 border border-gray-100">
+                      <div className="relative aspect-square bg-gray-100">
+                        <Image
+                          src={getImageUrl(product.images?.[0])}
+                          alt={product.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+                          }}
+                        />
+                        {/* Discount Badge */}
+                        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-md">
+                          %{product.discountPercent ?? (isProductOnSaleDisplay(product) ? Math.round((1 - getProductEffectivePrice(product) / getProductOriginalPriceForDisplay(product)) * 100) : 0)} {locale === 'en' ? 'OFF' : 'İndirim'}
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-medium text-gray-900 line-clamp-2 text-sm mb-2">
+                          {product.title}
+                        </h3>
+                        <div className="flex flex-col">
+                          {isProductOnSaleDisplay(product) && (
+                            <span className="text-xs text-gray-400 line-through">
+                              {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                            </span>
+                          )}
+                          <p className="text-lg font-bold text-red-500">
+                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Section Divider - Gradient Line */}
+      {discountedProducts.length > 0 && (
+        <div className="h-[2px] bg-gradient-to-r from-transparent via-red-400/60 to-transparent my-0"></div>
+      )}
 
       {/* En İyi Koleksiyonlar Section */}
       {topCollections.length > 0 && (
@@ -916,8 +1121,13 @@ export default function Home() {
                             <p className="text-xs text-gray-500 mb-2">
                               {extractBrandFromTitle(product.title)} • {extractScaleFromTitle(product.title)}
                             </p>
+                            {isProductOnSaleDisplay(product) && (
+                              <p className="text-xs text-gray-400 line-through">
+                                {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                              </p>
+                            )}
                             <p className="text-lg font-bold text-orange-500">
-                              TRY {product.price.toLocaleString('tr-TR')}
+                              {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                             </p>
                           </div>
                         </div>

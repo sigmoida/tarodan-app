@@ -65,6 +65,15 @@ export class DirectBuyDto {
   @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
   billingAddressId?: string;
+
+  @ApiPropertyOptional({
+    example: 'INDIRIM10',
+    description: 'Coupon code to apply (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value?.toUpperCase()))
+  couponCode?: string;
 }
 
 /**
@@ -79,6 +88,15 @@ export class DirectBuyResponseDto {
 
   @ApiProperty({ description: 'Total amount to pay' })
   totalAmount: number;
+
+  @ApiPropertyOptional({ description: 'Subtotal before discounts' })
+  subtotal?: number;
+
+  @ApiPropertyOptional({ description: 'Total discount applied' })
+  discountAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Applied coupon code' })
+  appliedCouponCode?: string;
 
   @ApiProperty({ description: 'Payment URL to redirect user' })
   paymentUrl: string;

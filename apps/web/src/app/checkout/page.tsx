@@ -13,11 +13,14 @@ import {
   CheckCircleIcon,
   ArrowLeftIcon,
   ShieldCheckIcon,
+  TagIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ordersApi, paymentsApi, listingsApi, addressesApi, api } from '@/lib/api';
+import { getProductEffectivePrice, getProductOriginalPriceForDisplay, isProductOnSaleDisplay } from '@/lib/productPrice';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { useTranslation } from '@/i18n';
 
@@ -38,6 +41,8 @@ interface CheckoutItem {
   productId: string;
   title: string;
   price: number;
+  /** Üstü çizili eski fiyat (satıcı indirimi varsa) */
+  originalPrice?: number;
   imageUrl: string;
   seller: {
     id: string;
@@ -48,7 +53,7 @@ interface CheckoutItem {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { items: cartItems, total: cartTotal, clearCart } = useCartStore();
+  const { items: cartItems, subtotal: cartSubtotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
   
@@ -90,6 +95,18 @@ export default function CheckoutPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [saveCard, setSaveCard] = useState(false);
+  
+  // Coupon code state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    name: string;
+    discountAmount: number;
+    type: string;
+    value: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   // Phone formatting helper
   const formatPhoneNumber = (value: string): string => {
@@ -121,10 +138,65 @@ export default function CheckoutPage() {
   const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
   const [useNewCard, setUseNewCard] = useState(true);
 
-  // Get checkout items (either from cart or direct buy)
-  const checkoutItems: CheckoutItem[] = directProduct ? [directProduct] : cartItems;
-  const subtotal = directProduct ? directProduct.price : cartTotal;
-  const grandTotal = subtotal + shippingCost;
+  // Get checkout items (either from cart or direct buy). Cart API returns effectivePrice, originalPrice, productTitle; normalize to CheckoutItem.
+  const checkoutItems: CheckoutItem[] = directProduct
+    ? [directProduct]
+    : cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
+        id: item.id,
+        productId: item.productId,
+        title: item.productTitle,
+        price: item.effectivePrice,
+        originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
+        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: { id: item.sellerId, displayName: item.sellerName },
+      }));
+  const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
+  const discountAmount = appliedCoupon?.discountAmount || 0;
+  const grandTotal = Math.max(0, subtotal - discountAmount + shippingCost);
+
+  // Apply coupon code
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError(locale === 'en' ? 'Please enter a coupon code' : 'Lütfen kupon kodu girin');
+      return;
+    }
+    
+    setCouponLoading(true);
+    setCouponError(null);
+    
+    try {
+      const response = await api.post('/discounts/validate', {
+        code: couponCode.trim(),
+        cartItems: directProduct
+          ? [{ productId: directProduct.productId, quantity: 1 }]
+          : cartItems.map((item: { productId: string; quantity: number }) => ({ productId: item.productId, quantity: item.quantity })),
+      });
+      
+      if (response.data.isValid && response.data.discount) {
+        setAppliedCoupon({
+          code: response.data.discount.code,
+          name: response.data.discount.name,
+          discountAmount: response.data.discount.estimatedDiscount,
+          type: response.data.discount.type,
+          value: response.data.discount.value,
+        });
+        setCouponCode('');
+        toast.success(locale === 'en' ? 'Coupon applied!' : 'Kupon uygulandı!');
+      } else {
+        setCouponError(response.data.error || (locale === 'en' ? 'Invalid coupon' : 'Geçersiz kupon'));
+      }
+    } catch (error: any) {
+      setCouponError(error.response?.data?.message || (locale === 'en' ? 'Failed to apply coupon' : 'Kupon uygulanamadı'));
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+  
+  // Remove applied coupon
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
 
   useEffect(() => {
     if (directProductId) {
@@ -220,11 +292,15 @@ export default function CheckoutPage() {
     try {
       const response = await listingsApi.getOne(directProductId!);
       const product = response.data.product || response.data;
+      const effectivePrice = getProductEffectivePrice(product);
+      const onSale = isProductOnSaleDisplay(product);
+      const originalPriceForDisplay = onSale ? getProductOriginalPriceForDisplay(product) : undefined;
       setDirectProduct({
         id: `direct-${product.id}`,
         productId: product.id,
         title: product.title,
-        price: Number(product.price),
+        price: effectivePrice,
+        originalPrice: originalPriceForDisplay != null && originalPriceForDisplay > effectivePrice ? originalPriceForDisplay : undefined,
         imageUrl: product.images?.[0]?.url || product.images?.[0] || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
         seller: {
           id: product.sellerId || product.seller?.id,
@@ -462,8 +538,10 @@ export default function CheckoutPage() {
               productId: string;
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
+              couponCode?: string;
             } = {
               productId: item.productId,
+              ...(appliedCoupon && { couponCode: appliedCoupon.code }),
             };
             
             if (validAddressId) {
@@ -1274,9 +1352,16 @@ export default function CheckoutPage() {
                         <p className="font-semibold">{item.title}</p>
                         <p className="text-sm text-gray-500">Satıcı: {item.seller.displayName}</p>
                       </div>
-                      <p className="font-bold text-primary-500">
-                        {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                      </p>
+                      <div className="text-right">
+                        {item.originalPrice != null && item.originalPrice > item.price && (
+                          <p className="text-sm text-gray-400 line-through">
+                            {item.originalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          </p>
+                        )}
+                        <p className="font-bold text-primary-500">
+                          {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1363,7 +1448,12 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.title}</p>
-                      <p className="text-sm text-gray-500">
+                      {item.originalPrice != null && item.originalPrice > item.price && (
+                        <p className="text-xs text-gray-400 line-through">
+                          {item.originalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-700 font-medium">
                         {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
                     </div>
@@ -1378,11 +1468,71 @@ export default function CheckoutPage() {
 
               <hr className="my-4" />
 
+              {/* Coupon Code Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <TagIcon className="w-4 h-4 inline-block mr-1" />
+                  {locale === 'en' ? 'Coupon Code' : 'Kupon Kodu'}
+                </label>
+                
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-green-800">{appliedCoupon.code}</p>
+                      <p className="text-xs text-green-600">{appliedCoupon.name}</p>
+                      <p className="text-sm font-semibold text-green-700">
+                        -{appliedCoupon.discountAmount.toFixed(2)} TL
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="p-1 hover:bg-green-100 rounded-full transition-colors"
+                      title={locale === 'en' ? 'Remove coupon' : 'Kuponu kaldır'}
+                    >
+                      <XMarkIcon className="w-5 h-5 text-green-700" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        setCouponError(null);
+                      }}
+                      placeholder={locale === 'en' ? 'Enter code' : 'Kod girin'}
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <button
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {couponLoading ? '...' : (locale === 'en' ? 'Apply' : 'Uygula')}
+                    </button>
+                  </div>
+                )}
+                
+                {couponError && (
+                  <p className="mt-2 text-xs text-red-600">{couponError}</p>
+                )}
+              </div>
+
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
-                  <span className="font-medium">{subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                  <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
+                
+                {/* Discount Breakdown */}
+                {appliedCoupon && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{locale === 'en' ? 'Discount' : 'İndirim'} ({appliedCoupon.code})</span>
+                    <span className="font-medium">-{appliedCoupon.discountAmount.toFixed(2)} TL</span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
                   <span className="font-medium">
@@ -1395,6 +1545,16 @@ export default function CheckoutPage() {
                     )}
                   </span>
                 </div>
+                
+                {/* Total Savings */}
+                {discountAmount > 0 && (
+                  <div className="p-2 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-700 font-medium text-center">
+                      {locale === 'en' ? 'You save' : 'Kazancınız'}: {discountAmount.toFixed(2)} TL 🎉
+                    </p>
+                  </div>
+                )}
+                
                 <hr />
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{locale === 'en' ? 'Total' : 'Toplam'}</span>
