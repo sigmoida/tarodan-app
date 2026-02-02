@@ -108,7 +108,7 @@ export default function SupportPage() {
       setTickets(data.data || data.tickets || []);
       setTotalPages(data.meta?.totalPages || 1);
     } catch (error) {
-      console.error('Failed to load tickets:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load tickets:', error);
       // Use mock data for display
       setTickets([
         {
@@ -155,7 +155,7 @@ export default function SupportPage() {
       const response = await adminApi.getTicket(ticketId);
       setSelectedTicket(response.data);
     } catch (error) {
-      console.error('Failed to load ticket details:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load ticket details:', error);
       // Mock data for selected ticket
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket) {
@@ -184,7 +184,7 @@ export default function SupportPage() {
       setReplyContent('');
       loadTicketDetails(selectedTicket.id);
     } catch (error) {
-      console.error('Failed to send reply:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to send reply:', error);
       toast.error('Yanıt gönderilemedi');
     }
   };
@@ -198,7 +198,7 @@ export default function SupportPage() {
         setSelectedTicket({ ...selectedTicket, status: newStatus });
       }
     } catch (error) {
-      console.error('Failed to update status:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to update status:', error);
       toast.error('Durum güncellenemedi');
     }
   };

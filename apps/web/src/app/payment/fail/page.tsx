@@ -27,8 +27,8 @@ export default function PaymentFailPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Allow access for authenticated users OR guest checkout
-    if (!isAuthenticated && !isGuestCheckout) {
+    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push('/login');
       return;
     }
@@ -42,13 +42,13 @@ export default function PaymentFailPage() {
 
   const fetchPayment = async () => {
     try {
-      // Use guest endpoint if guest checkout
-      const response = isGuestCheckout 
+      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
     } catch (error) {
-      console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
     } finally {
       setIsLoading(false);
     }

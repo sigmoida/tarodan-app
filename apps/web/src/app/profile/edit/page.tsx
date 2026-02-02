@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeftIcon, 
@@ -101,7 +101,7 @@ export default function EditProfilePage() {
       setUser(updatedUser);
       toast.success(locale === 'en' ? 'Profile photo updated' : 'Profil fotoğrafı güncellendi');
     } catch (error: any) {
-      console.error('Photo upload error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Photo upload error:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to upload photo' : 'Fotoğraf yüklenemedi'));
     } finally {
       setUploadingPhoto(false);
@@ -119,7 +119,7 @@ export default function EditProfilePage() {
       toast.success(locale === 'en' ? 'Profile updated successfully!' : 'Profil başarıyla güncellendi!');
       setTimeout(() => setSaved(false), 3000);
     } catch (error: any) {
-      console.error('Profile update error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Profile update error:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update profile' : 'Profil güncellenemedi'));
     } finally {
       setLoading(false);
@@ -148,12 +148,12 @@ export default function EditProfilePage() {
             <div className="relative">
               <div className="w-28 h-28 rounded-2xl overflow-hidden bg-white/20 border-4 border-white/30 shadow-lg">
                 {profilePhoto ? (
-                  <Image
+                  <OptimizedImage
                     src={profilePhoto}
                     alt="Profil Fotoğrafı"
                     fill
                     className="object-cover"
-                    unoptimized
+                    logContext={{ page: 'profile-edit-avatar' }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">

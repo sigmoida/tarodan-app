@@ -1,20 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage, { getOptimizedImageUrl } from '@/components/OptimizedImage';
 import { 
   ArrowRightIcon,
   HandThumbUpIcon,
   StarIcon,
   CheckBadgeIcon,
 } from '@heroicons/react/24/solid';
-import { api, listingsApi, collectionsApi } from '@/lib/api';
+import { api, listingsApi } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
 import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
@@ -158,14 +165,10 @@ const SCALES = ['1:8 Diecast', '1:12 Diecast', '1:18 Diecast', '1:24 Diecast', '
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
-  const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [discountedProducts, setDiscountedProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(false);
   const [isLoadingDiscounted, setIsLoadingDiscounted] = useState(false);
-  const [topCollections, setTopCollections] = useState<FeaturedCollector[]>([]);
   const [currentCollectionIndex, setCurrentCollectionIndex] = useState(0);
-  const [companyOfWeek, setCompanyOfWeek] = useState<FeaturedBusiness | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalConfig, setAuthModalConfig] = useState({
     title: t('auth.authRequired'),
@@ -175,11 +178,54 @@ export default function Home() {
   });
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-3');
 
+  const { data: topCollections = [] } = useQuery({
+    queryKey: ['home', 'topCollections', { limit: 20 }],
+    queryFn: async () => {
+      const response = await api.get<FeaturedCollector[]>('/users/top-collections', { params: { limit: 20 } });
+      return Array.isArray(response.data) ? response.data : [];
+    },
+    meta: { page: 'home', section: 'topCollections' },
+  });
+
+  const {
+    data: bestSellersData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isLoadingBestSellers,
+  } = useInfiniteQuery({
+    queryKey: ['home', 'bestSellers', { sortBy: 'viewCount', sortOrder: 'desc', status: 'active' }],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await listingsApi.getAll({
+        limit: 20,
+        page: pageParam,
+        sortBy: 'viewCount',
+        sortOrder: 'desc',
+        status: 'active',
+      });
+      const products = response.data.data || response.data.products || [];
+      return Array.isArray(products) ? products : [];
+    },
+    getNextPageParam: (_lastPage, allPages) => {
+      if (_lastPage.length < 20) return undefined;
+      return allPages.length + 1;
+    },
+    initialPageParam: 1,
+    meta: { page: 'home', section: 'bestSellers' },
+  });
+  const bestSellers = bestSellersData?.pages.flatMap((p) => p) ?? [];
+
+  const { data: companyOfWeek = null } = useQuery({
+    queryKey: ['home', 'featuredBusiness'],
+    queryFn: async () => {
+      const response = await api.get<FeaturedBusiness | null>('/users/featured-business');
+      return response.data ?? null;
+    },
+    meta: { page: 'home', section: 'featuredBusiness' },
+  });
+
   useEffect(() => {
-    fetchBestSellers();
     fetchDiscountedProducts();
-    fetchTopCollections();
-    fetchCompanyOfWeek();
   }, []);
 
   const fetchDiscountedProducts = async () => {
@@ -211,55 +257,20 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [topCollections.length]);
 
-  const fetchBestSellers = async (page: number = 0) => {
-    setIsLoadingBestSellers(true);
-    try {
-      const response = await listingsApi.getAll({ 
-        limit: 20,
-        page: page + 1,
-        sortBy: 'viewCount',
-        sortOrder: 'desc',
-        status: 'active'
-      });
-      const products = response.data.data || response.data.products || [];
-      if (page === 0) {
-        setBestSellers(Array.isArray(products) ? products : []);
-      } else {
-        setBestSellers(prev => [...prev, ...(Array.isArray(products) ? products : [])]);
-      }
-    } catch (error) {
-      console.error('Failed to fetch best sellers:', error);
-    } finally {
-      setIsLoadingBestSellers(false);
-    }
-  };
-
   const handleNextPage = () => {
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     const itemsPerPage = 5;
     const currentIndex = nextPage * itemsPerPage;
-    
-    // Load more if we're near the end
-    if (currentIndex + itemsPerPage >= bestSellers.length && !isLoadingBestSellers) {
-      fetchBestSellers(Math.floor(bestSellers.length / 20));
+    // Load more if we're near the end (React Query infinite)
+    if (currentIndex + itemsPerPage >= bestSellers.length && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
   };
 
   const handlePrevPage = () => {
     if (currentPage > 0) {
       setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const fetchTopCollections = async () => {
-    try {
-      const response = await api.get('/users/top-collections', { params: { limit: 20 } });
-      if (response.data && Array.isArray(response.data)) {
-        setTopCollections(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch top collections:', error);
     }
   };
 
@@ -272,24 +283,6 @@ export default function Home() {
   const handlePrevCollection = () => {
     if (topCollections.length > 0) {
       setCurrentCollectionIndex((prev) => (prev - 1 + topCollections.length) % topCollections.length);
-    }
-  };
-
-  const fetchCompanyOfWeek = async () => {
-    try {
-      // Use the new featured-business API endpoint
-      // This endpoint ONLY returns business accounts (membership.tier.type = 'business')
-      const response = await api.get('/users/featured-business');
-      if (response.data) {
-        setCompanyOfWeek(response.data);
-      } else {
-        // If no business accounts exist, set to null (don't show the section)
-        setCompanyOfWeek(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch featured business:', error);
-      // If API fails, don't show the section (no fallback to free users)
-      setCompanyOfWeek(null);
     }
   };
 
@@ -616,21 +609,20 @@ export default function Home() {
                 {locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
               </div>
             ) : productLayout === 'list' ? (
-              bestSellers.map((product) => {
+              bestSellers.map((product, index) => {
                 const tag = getProductTag(product);
                 return (
                   <Link key={product.id} href={`/listings/${product.id}`}>
                     <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all border border-gray-100 flex gap-4 p-4">
                       <div className="relative w-32 h-32 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
+                        <OptimizedImage
                           src={getImageUrl(product.images?.[0])}
                           alt={product.title}
                           fill
                           className="object-cover"
-                          unoptimized
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                          }}
+                          fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                          logContext={{ productId: product.id, page: 'home-list' }}
+                          priority={index === 0}
                         />
                         {tag && (
                           <div className="absolute top-2 right-2">
@@ -690,21 +682,20 @@ export default function Home() {
                 );
               })
             ) : (
-              bestSellers.map((product) => {
+              bestSellers.map((product, index) => {
                 const tag = getProductTag(product);
                 return (
                   <Link key={product.id} href={`/listings/${product.id}`}>
                     <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
                       <div className="relative aspect-square bg-gray-100">
-                        <Image
+                        <OptimizedImage
                           src={getImageUrl(product.images?.[0])}
                           alt={product.title}
                           fill
                           className="object-cover"
-                          unoptimized
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                          }}
+                          fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                          logContext={{ productId: product.id, page: 'home-grid' }}
+                          priority={index === 0}
                         />
                         {/* View & Like Stats */}
                         <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -899,13 +890,13 @@ export default function Home() {
                           <div className="md:col-span-1">
                             <div className="flex flex-col items-center md:items-start">
                               {collection.user?.avatarUrl ? (
-                                <Image
+                                <OptimizedImage
                                   src={collection.user.avatarUrl}
                                   alt={collection.user.displayName}
                                   width={80}
                                   height={80}
                                   className="rounded-full mb-4 object-cover"
-                                  unoptimized
+                                  logContext={{ userId: collection.user?.id, page: 'home-collection-avatar' }}
                                 />
                               ) : (
                                 <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold mb-4">
@@ -950,15 +941,13 @@ export default function Home() {
                               <Link key={item.id} href={item.productId ? `/listings/${item.productId}` : '#'}>
                                 <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
                                   <div className="relative aspect-square bg-gray-100">
-                                    <Image
+                                    <OptimizedImage
                                       src={getImageUrl(item.productImage)}
                                       alt={item.productTitle}
                                       fill
                                       className="object-cover"
-                                      unoptimized
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
-                                      }}
+                                      fallbackSrc={`https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`}
+                                      logContext={{ itemId: item.id, page: 'home-collection-item' }}
                                     />
                                   </div>
                                   <div className="p-4">
@@ -1031,13 +1020,13 @@ export default function Home() {
                 <div className="md:col-span-1">
                   <div className="flex flex-col items-center md:items-start">
                     {companyOfWeek.avatarUrl ? (
-                      <Image
+                      <OptimizedImage
                         src={companyOfWeek.avatarUrl}
                         alt={companyOfWeek.companyName || companyOfWeek.displayName}
                         width={80}
                         height={80}
                         className="rounded-full mb-4 object-cover border-4 border-orange-200"
-                        unoptimized
+                        logContext={{ companyId: companyOfWeek.id, page: 'home-company-avatar' }}
                       />
                     ) : (
                       <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-2xl font-bold mb-4 border-4 border-orange-200">
@@ -1101,15 +1090,13 @@ export default function Home() {
                       <Link key={product.id} href={`/listings/${product.id}`}>
                         <div className="bg-gray-50 rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
                           <div className="relative aspect-square bg-gray-100">
-                            <Image
+                            <OptimizedImage
                               src={product.image || `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`}
                               alt={product.title}
                               fill
                               className="object-cover"
-                              unoptimized
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = `https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`;
-                              }}
+                              fallbackSrc={`https://placehold.co/400x400/f3f4f6/9ca3af?text=${locale === 'en' ? 'Product' : 'Ürün'}`}
+                              logContext={{ productId: product.id, page: 'home-company-product' }}
                             />
                             <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
                               <HandThumbUpIcon className="w-4 h-4 text-orange-500" />
@@ -1145,13 +1132,13 @@ export default function Home() {
                             <div className="bg-gray-50 rounded-xl p-4 hover:shadow-md transition-all flex items-center gap-4">
                               <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                                 {collection.coverImageUrl ? (
-                                  <Image
+                                  <OptimizedImage
                                     src={collection.coverImageUrl}
                                     alt={collection.name}
                                     width={64}
                                     height={64}
                                     className="object-cover w-full h-full"
-                                    unoptimized
+                                    logContext={{ collectionId: collection.id, page: 'home-company-collection' }}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-2xl">📚</div>

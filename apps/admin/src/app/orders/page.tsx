@@ -74,7 +74,7 @@ export default function OrdersPage() {
       const data = response.data.data || response.data.users || [];
       setUsers(data.map((u: any) => ({ id: u.id, displayName: u.displayName, email: u.email })));
     } catch (error) {
-      console.error('Load users error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Load users error:', error);
     } finally {
       setLoadingUsers(false);
     }
@@ -156,7 +156,7 @@ export default function OrdersPage() {
       })));
       setTotal(meta.total || data.length);
     } catch (error) {
-      console.error('Orders load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Orders load error:', error);
       toast.error('Siparişler yüklenemedi');
     } finally {
       setLoading(false);
@@ -183,7 +183,7 @@ export default function OrdersPage() {
       setEditingOrderId(null);
       loadOrders();
     } catch (error: any) {
-      console.error('Status update error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Status update error:', error);
       toast.error(error.response?.data?.message || 'Durum güncellenemedi');
     } finally {
       setUpdatingStatus(false);

@@ -51,19 +51,30 @@ export class AdminService {
    */
   async getCommissionRules() {
     const rules = await this.prisma.commissionRule.findMany({
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      include: { category: { select: { id: true, name: true } } },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     });
 
     return rules.map((r) => ({
       id: r.id,
       name: r.name,
-      percentage: Number(r.percentage),
-      type: r.ruleType,
+      categoryId: r.categoryId,
+      categoryName: r.category?.name || null,
       sellerType: r.sellerType,
-      minAmount: r.minAmount ? Number(r.minAmount) : null,
+      appliesTo: r.appliesTo || 'SELLER',
+      sellerRate: r.sellerRate ? Number(r.sellerRate) : null,
+      buyerRate: r.buyerRate ? Number(r.buyerRate) : null,
+      sellerMin: r.sellerMin ? Number(r.sellerMin) : null,
+      sellerMax: r.sellerMax ? Number(r.sellerMax) : null,
+      buyerMin: r.buyerMin ? Number(r.buyerMin) : null,
+      buyerMax: r.buyerMax ? Number(r.buyerMax) : null,
       isActive: r.isActive,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
+      // Legacy fields for backward compatibility
+      percentage: Number(r.percentage),
+      type: r.ruleType,
+      minAmount: r.minAmount ? Number(r.minAmount) : null,
     }));
   }
 
@@ -72,15 +83,67 @@ export class AdminService {
    * Requirement: Commission configuration via admin (project.md)
    */
   async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
+    // Validate appliesTo requirements
+    if (dto.appliesTo === 'SELLER' && !dto.sellerRate) {
+      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
+    }
+    if (dto.appliesTo === 'BUYER' && !dto.buyerRate) {
+      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
+    }
+    if (dto.appliesTo === 'BOTH' && (!dto.sellerRate || !dto.buyerRate)) {
+      throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
+    }
+
+    // Validate min <= max
+    if (dto.sellerMin != null && dto.sellerMax != null && dto.sellerMin > dto.sellerMax) {
+      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
+    }
+    if (dto.buyerMin != null && dto.buyerMax != null && dto.buyerMin > dto.buyerMax) {
+      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
+    }
+
+    // If categoryId is empty string, set to null
+    const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
+
+    // Check if a rule with the same combination already exists
+    const existingRule = await this.prisma.commissionRule.findFirst({
+      where: {
+        categoryId: categoryId,
+        sellerType: dto.sellerType,
+        isActive: true,
+      },
+    });
+
+    if (existingRule) {
+      const categoryName = categoryId 
+        ? (await this.prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name || 'Kategori'
+        : 'Tüm Kategoriler';
+      const sellerTypeName = dto.sellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : dto.sellerType;
+      throw new BadRequestException(
+        `Bu kombinasyon için zaten bir kural mevcut: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
+      );
+    }
+
     const rule = await this.prisma.commissionRule.create({
       data: {
         name: dto.name,
-        percentage: dto.percentage,
-        ruleType: dto.type,
+        categoryId,
         sellerType: dto.sellerType,
-        minAmount: dto.minAmount,
+        appliesTo: dto.appliesTo,
+        sellerRate: dto.sellerRate != null ? dto.sellerRate : null,
+        buyerRate: dto.buyerRate != null ? dto.buyerRate : null,
+        sellerMin: dto.sellerMin != null ? dto.sellerMin : null,
+        sellerMax: dto.sellerMax != null ? dto.sellerMax : null,
+        buyerMin: dto.buyerMin != null ? dto.buyerMin : null,
+        buyerMax: dto.buyerMax != null ? dto.buyerMax : null,
+        priority: 0, // Priority removed - each combination can only have one rule
         isActive: dto.isActive ?? true,
+        // Legacy fields (for backward compatibility)
+        percentage: dto.percentage ?? (dto.sellerRate || 0),
+        ruleType: dto.type || 'default',
+        minAmount: dto.minAmount,
       },
+      include: { category: { select: { id: true, name: true } } },
     });
 
     // Log action
@@ -89,13 +152,23 @@ export class AdminService {
     return {
       id: rule.id,
       name: rule.name,
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
+      categoryId: rule.categoryId,
+      categoryName: rule.category?.name || null,
       sellerType: rule.sellerType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
+      appliesTo: rule.appliesTo,
+      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
+      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
+      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
+      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
+      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
+      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
+      // Legacy fields
+      percentage: Number(rule.percentage),
+      type: rule.ruleType,
+      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
     };
   }
 
@@ -111,16 +184,91 @@ export class AdminService {
       throw new NotFoundException('Komisyon kuralı bulunamadı');
     }
 
+    // Determine final appliesTo value
+    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? 'SELLER';
+
+    // Validate appliesTo requirements
+    if (appliesTo === 'SELLER' && dto.sellerRate === undefined && !existing.sellerRate) {
+      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
+    }
+    if (appliesTo === 'BUYER' && dto.buyerRate === undefined && !existing.buyerRate) {
+      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
+    }
+    if (appliesTo === 'BOTH') {
+      const finalSellerRate = dto.sellerRate !== undefined ? dto.sellerRate : existing.sellerRate;
+      const finalBuyerRate = dto.buyerRate !== undefined ? dto.buyerRate : existing.buyerRate;
+      if (!finalSellerRate || !finalBuyerRate) {
+        throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
+      }
+    }
+
+    // Validate min <= max
+    const sellerMin = dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
+    const sellerMax = dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
+    if (sellerMin != null && sellerMax != null && sellerMin > sellerMax) {
+      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
+    }
+
+    const buyerMin = dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
+    const buyerMax = dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
+    if (buyerMin != null && buyerMax != null && buyerMin > buyerMax) {
+      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
+    }
+
+    // Determine final categoryId and sellerType
+    const finalCategoryId = dto.categoryId !== undefined 
+      ? (dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null)
+      : existing.categoryId;
+    const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
+
+    // Check if changing categoryId or sellerType would conflict with another rule
+    if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
+        (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
+      const conflictingRule = await this.prisma.commissionRule.findFirst({
+        where: {
+          categoryId: finalCategoryId,
+          sellerType: finalSellerType,
+          isActive: true,
+          id: { not: existing.id }, // Exclude current rule
+        },
+      });
+
+      if (conflictingRule) {
+        const categoryName = finalCategoryId 
+          ? (await this.prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } }))?.name || 'Kategori'
+          : 'Tüm Kategoriler';
+        const sellerTypeName = finalSellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : finalSellerType;
+        throw new BadRequestException(
+          `Bu kombinasyon başka bir kural tarafından kullanılıyor: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
+        );
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.categoryId !== undefined) {
+      updateData.categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
+    }
+    if (dto.sellerType !== undefined) updateData.sellerType = dto.sellerType;
+    if (dto.appliesTo !== undefined) updateData.appliesTo = dto.appliesTo;
+    if (dto.sellerRate !== undefined) updateData.sellerRate = dto.sellerRate;
+    if (dto.buyerRate !== undefined) updateData.buyerRate = dto.buyerRate;
+    if (dto.sellerMin !== undefined) updateData.sellerMin = dto.sellerMin;
+    if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
+    if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
+    if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
+    // Priority removed - not used anymore
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    // Legacy fields
+    if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
+    if (dto.type !== undefined) updateData.ruleType = dto.type;
+    if (dto.minAmount !== undefined) updateData.minAmount = dto.minAmount;
+
     const rule = await this.prisma.commissionRule.update({
       where: { id: ruleId },
-      data: {
-        name: dto.name,
-        percentage: dto.percentage,
-        ruleType: dto.type,
-        sellerType: dto.sellerType,
-        minAmount: dto.minAmount,
-        isActive: dto.isActive,
-      },
+      data: updateData,
+      include: { category: { select: { id: true, name: true } } },
     });
 
     await this.createAuditLog(adminId, 'commission_rule_update', 'CommissionRule', rule.id, existing, rule);
@@ -128,13 +276,23 @@ export class AdminService {
     return {
       id: rule.id,
       name: rule.name,
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
+      categoryId: rule.categoryId,
+      categoryName: rule.category?.name || null,
       sellerType: rule.sellerType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
+      appliesTo: rule.appliesTo,
+      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
+      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
+      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
+      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
+      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
+      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
+      // Legacy fields
+      percentage: Number(rule.percentage),
+      type: rule.ruleType,
+      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
     };
   }
 
@@ -171,6 +329,50 @@ export class AdminService {
   }
 
   /**
+   * Get public platform settings (listing limits, message settings, and membership prices)
+   */
+  async getPublicSettings() {
+    const settings = await this.prisma.platformSetting.findMany({
+      where: {
+        settingKey: {
+          in: [
+            'free_listing_limit',
+            'premium_listing_limit',
+            'business_listing_limit',
+            'max_message_length',
+            'premium_monthly_price',
+            'business_monthly_price',
+            'yearly_discount_percentage',
+          ],
+        },
+      },
+    });
+
+    const result: Record<string, number> = {};
+    settings.forEach((setting) => {
+      // For prices and percentages, use parseFloat; for limits, use parseInt
+      const isPriceOrPercentage = setting.settingKey.includes('_price') || setting.settingKey.includes('_percentage');
+      const value = isPriceOrPercentage 
+        ? parseFloat(setting.settingValue)
+        : parseInt(setting.settingValue, 10);
+      if (!isNaN(value)) {
+        result[setting.settingKey] = value;
+      }
+    });
+
+    // Calculate yearly prices from monthly prices and discount
+    const discountPercentage = result.yearly_discount_percentage ?? 20;
+    if (result.premium_monthly_price) {
+      result.premium_yearly_price = result.premium_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
+    if (result.business_monthly_price) {
+      result.business_yearly_price = result.business_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
+
+    return result;
+  }
+
+  /**
    * Update platform setting
    */
   async updatePlatformSetting(adminId: string, dto: UpdatePlatformSettingDto) {
@@ -192,7 +394,89 @@ export class AdminService {
       },
     });
 
-    await this.createAuditLog(adminId, 'setting_update', 'PlatformSetting', setting.id, existing, setting);
+    // If this is a membership price setting, also update the MembershipTier
+    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' || 
+        dto.key === 'yearly_discount_percentage') {
+      try {
+        // Get discount percentage
+        const discountSetting = await this.prisma.platformSetting.findUnique({
+          where: { settingKey: 'yearly_discount_percentage' },
+        });
+        const discountPercentage = discountSetting 
+          ? parseFloat(discountSetting.settingValue) 
+          : (dto.key === 'yearly_discount_percentage' ? parseFloat(dto.value) : 20);
+        const finalDiscount = isNaN(discountPercentage) ? 20 : discountPercentage;
+
+        if (dto.key === 'premium_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update premium tier
+          const premiumMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'premium_monthly_price' },
+          });
+          const premiumMonthly = premiumMonthlySetting 
+            ? parseFloat(premiumMonthlySetting.settingValue)
+            : (dto.key === 'premium_monthly_price' ? parseFloat(dto.value) : null);
+          
+          if (premiumMonthly !== null && !isNaN(premiumMonthly)) {
+            const premiumYearly = premiumMonthly * 12 * (1 - finalDiscount / 100);
+            const premiumTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'premium' },
+            });
+            
+            if (premiumTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: premiumTier.id },
+                data: {
+                  monthlyPrice: premiumMonthly,
+                  yearlyPrice: premiumYearly,
+                },
+              });
+              this.logger.log(`Updated premium tier: monthly=${premiumMonthly}, yearly=${premiumYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
+
+        if (dto.key === 'business_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update business tier
+          const businessMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'business_monthly_price' },
+          });
+          const businessMonthly = businessMonthlySetting 
+            ? parseFloat(businessMonthlySetting.settingValue)
+            : (dto.key === 'business_monthly_price' ? parseFloat(dto.value) : null);
+          
+          if (businessMonthly !== null && !isNaN(businessMonthly)) {
+            const businessYearly = businessMonthly * 12 * (1 - finalDiscount / 100);
+            const businessTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'business' },
+            });
+            
+            if (businessTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: businessTier.id },
+                data: {
+                  monthlyPrice: businessMonthly,
+                  yearlyPrice: businessYearly,
+                },
+              });
+              this.logger.log(`Updated business tier: monthly=${businessMonthly}, yearly=${businessYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Failed to update membership tier price for ${dto.key}:`, error);
+        // Don't throw - platform setting update succeeded, tier update is secondary
+      }
+    }
+
+    // Get AdminUser ID from User ID
+    const adminUser = await this.prisma.adminUser.findFirst({
+      where: { userId: adminId, isActive: true },
+      select: { id: true },
+    });
+
+    if (adminUser) {
+      await this.createAuditLog(adminUser.id, 'setting_update', 'PlatformSetting', setting.id, existing, setting);
+    }
 
     return setting;
   }

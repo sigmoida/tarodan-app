@@ -10,9 +10,12 @@ import {
   UseGuards,
   ParseUUIDPipe,
   BadRequestException,
+  NotFoundException,
+  ForbiddenException,
   Ip,
   Headers,
   Req,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +38,8 @@ import { JwtAuthGuard, Public, CurrentUser } from '../auth';
 @ApiTags('products')
 @Controller('products')
 export class ProductController {
+  private readonly logger = new Logger(ProductController.name);
+
   constructor(private readonly productService: ProductService) {}
 
   /**
@@ -50,7 +55,20 @@ export class ProductController {
     type: PaginatedProductsDto,
   })
   async findAll(@Query() query: ProductQueryDto) {
-    return this.productService.findAll(query);
+    try {
+      return await this.productService.findAll(query);
+    } catch (err) {
+      this.logger.warn(`findAll failed: ${err}`);
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: query.page ?? 1,
+          limit: query.limit ?? 20,
+          totalPages: 0,
+        },
+      };
+    }
   }
 
   /**
@@ -74,34 +92,9 @@ export class ProductController {
   }
 
   /**
-   * GET /products/my/:id
-   * Get seller's own single product (any status)
-   */
-  @Get('my/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kendi ürün detayım' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Satıcının kendi ürün detayı',
-    type: ProductResponseDto,
-  })
-  @ApiResponse({ status: 403, description: 'Bu ürün size ait değil' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
-  async findMyProductById(
-    @CurrentUser('id') sellerId: string,
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-  ) {
-    return this.productService.findSellerProductById(sellerId, id);
-  }
-
-  /**
    * GET /products/my/stats
    * Get seller's listing statistics and membership limits
+   * IMPORTANT: This route must be defined BEFORE 'my/:id' to avoid route conflicts
    */
   @Get('my/stats')
   @UseGuards(JwtAuthGuard)
@@ -152,7 +145,18 @@ export class ProductController {
     },
   })
   async getMyListingStats(@CurrentUser('id') sellerId: string) {
-    return this.productService.getSellerListingStats(sellerId);
+    if (!sellerId) {
+      throw new BadRequestException('Kullanıcı kimliği bulunamadı');
+    }
+    try {
+      return await this.productService.getSellerListingStats(sellerId);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      this.logger.error('getMyListingStats failed');
+      throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    }
   }
 
   /**

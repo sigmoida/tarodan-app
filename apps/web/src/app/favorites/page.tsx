@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import { HeartIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { wishlistApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface WishlistItem {
   id: string;
@@ -26,47 +28,44 @@ interface WishlistItem {
 
 export default function FavoritesPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t } = useTranslation();
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       toast.error(t('favorites.loginRequired'));
       router.push('/login?redirect=/favorites');
-      return;
     }
-    fetchFavorites();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading, router, t]);
 
-  const fetchFavorites = async () => {
-    setIsLoading(true);
-    try {
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: async (): Promise<WishlistItem[]> => {
       const response = await wishlistApi.get();
       const wishlistItems = response.data?.items || response.data?.data || response.data || [];
       const validItems = (Array.isArray(wishlistItems) ? wishlistItems : []).filter(
         (item: any) => item && item.productId && item.productTitle
       );
-      setItems(validItems);
-    } catch (error: any) {
-      console.error('Failed to fetch favorites:', error);
-      if (error.response?.status !== 404) {
-        toast.error(t('favorites.loadFailed'));
-      }
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return validItems;
+    },
+    enabled: !authLoading && isAuthenticated,
+    meta: { page: 'favorites' },
+  });
+  const items = wishlistQuery.data ?? [];
+  const isLoading = wishlistQuery.isLoading;
 
   const handleRemove = async (productId: string) => {
     try {
       await wishlistApi.remove(productId);
       toast.success(t('product.removedFromFavorites'));
-      fetchFavorites();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist-check', productId] }),
+      ]);
     } catch (error: any) {
-      console.error('Failed to remove from favorites:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to remove from favorites:', error);
       toast.error(t('common.operationFailed'));
     }
   };
@@ -77,6 +76,14 @@ export default function FavoritesPage() {
     }
     return productImage;
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -131,15 +138,13 @@ export default function FavoritesPage() {
                 >
                   <Link href={`/listings/${item.productId}`}>
                     <div className="relative aspect-square bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={getImageUrl(item.productImage)}
                         alt={item.productTitle || 'Product'}
                         fill
                         className="object-cover"
-                        unoptimized
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Product';
-                        }}
+                        fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Product"
+                        logContext={{ itemId: item.id, page: 'favorites' }}
                       />
                       <button
                         onClick={(e) => {

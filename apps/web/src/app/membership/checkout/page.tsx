@@ -148,7 +148,7 @@ export default function MembershipCheckoutPage() {
         router.push('/membership/success?tier=' + tier);
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Payment error:', error);
       toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu');
     } finally {
       setIsProcessing(false);

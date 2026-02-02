@@ -2,6 +2,7 @@ import {
   Injectable,
   OnModuleInit,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
@@ -42,6 +43,7 @@ export interface SearchResponse {
 
 @Injectable()
 export class SearchService implements OnModuleInit {
+  private readonly logger = new Logger(SearchService.name);
   private client: Client;
   private readonly PRODUCTS_INDEX = 'products';
 
@@ -202,7 +204,7 @@ export class SearchService implements OnModuleInit {
             },
           },
         });
-        console.log('✅ Created Elasticsearch index: products with ngram analyzers');
+        this.logger.log('Created Elasticsearch index: products with ngram analyzers');
       }
 
       // Update index tracking in DB
@@ -216,7 +218,7 @@ export class SearchService implements OnModuleInit {
         },
       });
     } catch (error) {
-      console.error('Elasticsearch index creation failed:', error);
+      this.logger.warn('Elasticsearch index creation failed');
       // Don't throw - allow app to start without ES
     }
   }
@@ -392,7 +394,7 @@ export class SearchService implements OnModuleInit {
 
       // If ES returns 0 results, fallback to database search
       if (hits.length === 0 && query) {
-        console.log('Elasticsearch returned 0 results, falling back to database search');
+        this.logger.debug('Elasticsearch returned 0 results, falling back to database search');
         return this.fallbackSearch(options);
       }
 
@@ -415,8 +417,7 @@ export class SearchService implements OnModuleInit {
         took: response.took || 0,
       };
     } catch (error) {
-      console.error('Elasticsearch search error:', error);
-      // Fallback to database search
+      this.logger.warn('Elasticsearch search error, falling back to database');
       return this.fallbackSearch(options);
     }
   }
@@ -462,7 +463,7 @@ export class SearchService implements OnModuleInit {
       // Update document count
       await this.updateIndexStats();
     } catch (error) {
-      console.error('Elasticsearch indexing error:', error);
+      this.logger.warn('Elasticsearch indexing error');
     }
   }
 
@@ -477,7 +478,7 @@ export class SearchService implements OnModuleInit {
       });
       await this.updateIndexStats();
     } catch (error) {
-      console.error('Elasticsearch delete error:', error);
+      this.logger.warn('Elasticsearch delete error');
     }
   }
 
@@ -486,21 +487,17 @@ export class SearchService implements OnModuleInit {
    * Use this when analyzer settings change
    */
   async forceRecreateIndex(): Promise<void> {
-    console.log('🔄 Force recreating Elasticsearch index...');
-    
+    this.logger.log('Force recreating Elasticsearch index');
     try {
-      // Delete existing index
       const exists = await this.client.indices.exists({ index: this.PRODUCTS_INDEX });
       if (exists) {
         await this.client.indices.delete({ index: this.PRODUCTS_INDEX });
-        console.log('🗑️ Deleted old index');
+        this.logger.log('Deleted old index');
       }
-      
-      // Create new index with updated settings
       await this.ensureIndexExists();
-      console.log('✅ Index recreated with updated settings');
+      this.logger.log('Index recreated with updated settings');
     } catch (error) {
-      console.error('Failed to recreate index:', error);
+      this.logger.error('Failed to recreate index');
       throw error;
     }
   }
@@ -568,7 +565,7 @@ export class SearchService implements OnModuleInit {
 
       return products.length;
     } catch (error) {
-      console.error('Elasticsearch reindex error:', error);
+      this.logger.error('Elasticsearch reindex error');
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: { status: 'error' },
@@ -653,7 +650,7 @@ export class SearchService implements OnModuleInit {
         .map((hit: any) => hit._source.title)
         .slice(0, limit);
     } catch (error) {
-      console.error('Elasticsearch autocomplete error:', error);
+      this.logger.warn('Elasticsearch autocomplete error, using fallback');
       return this.fallbackAutocomplete(query, limit);
     }
   }
@@ -784,7 +781,7 @@ export class SearchService implements OnModuleInit {
         },
       });
     } catch (error) {
-      console.error('Failed to update index stats:', error);
+      this.logger.warn('Failed to update index stats');
     }
   }
 }

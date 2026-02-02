@@ -123,29 +123,15 @@ export class TradeService {
       throw new NotFoundException('Alıcı kullanıcı bulunamadı');
     }
 
-    // Validate initiator membership - must be premium to create trade
     const initiatorCanTrade = await this.membershipService.canCreateTrade(initiatorId);
     if (!initiatorCanTrade.allowed) {
-      console.error(`[Trade] Initiator ${initiatorId} cannot trade:`, initiatorCanTrade.reason);
-      const initiatorMembership = await this.membershipService.getUserMembership(initiatorId);
-      console.error(`[Trade] Initiator membership:`, {
-        tier: initiatorMembership.tier.type,
-        tierName: initiatorMembership.tier.name,
-        canTrade: initiatorMembership.tier.canTrade,
-      });
+      this.logger.warn('Trade create failed: initiator cannot trade');
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
-    // Validate receiver membership - must have trade capability to receive trade
     const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
     if (!receiverCanTrade.allowed) {
-      console.error(`[Trade] Receiver ${dto.receiverId} cannot trade:`, receiverCanTrade.reason);
-      const receiverMembership = await this.membershipService.getUserMembership(dto.receiverId);
-      console.error(`[Trade] Receiver membership:`, {
-        tier: receiverMembership.tier.type,
-        tierName: receiverMembership.tier.name,
-        canTrade: receiverMembership.tier.canTrade,
-      });
+      this.logger.warn('Trade create failed: receiver cannot trade');
       throw new BadRequestException(
         receiverCanTrade.reason || 'Takas teklifi gönderilemiyor. Alıcı kullanıcı takas özelliğine sahip değil.',
       );
@@ -266,7 +252,7 @@ export class TradeService {
         },
       );
     } catch (error) {
-      console.error('Failed to send trade notification:', error);
+      this.logger.warn('Failed to send trade notification');
     }
 
     return this.getTradeById(trade.id, initiatorId);
@@ -511,7 +497,7 @@ export class TradeService {
         },
       );
     } catch (error) {
-      console.error('Failed to send trade accepted notification:', error);
+      this.logger.warn('Failed to send trade accepted notification');
     }
 
     return this.getTradeById(tradeId, userId);
@@ -572,7 +558,7 @@ export class TradeService {
         },
       );
     } catch (error) {
-      console.error('Failed to send trade rejected notification:', error);
+      this.logger.warn('Failed to send trade rejected notification');
     }
 
     return this.getTradeById(tradeId, userId);
@@ -947,6 +933,19 @@ export class TradeService {
     // Generate tracking number (in real system, this would come from shipping provider)
     const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+    // Get confirmation deadline setting if both parties have shipped
+    let confirmationDeadline: Date | null = null;
+    if (newStatus === TradeStatus.both_shipped) {
+      const confirmationDaysSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'trade_confirmation_deadline_days' },
+      });
+      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+      
+      const now = new Date();
+      confirmationDeadline = new Date(now);
+      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       // Create shipment
       await tx.tradeShipment.create({
@@ -966,6 +965,7 @@ export class TradeService {
         where: { id: tradeId, version: trade.version },
         data: {
           status: newStatus,
+          confirmationDeadline,
           version: { increment: 1 },
         },
       });
@@ -1017,6 +1017,11 @@ export class TradeService {
 
     if (shipment.confirmedAt) {
       throw new BadRequestException('Bu gönderim zaten onaylandı');
+    }
+
+    // Check confirmation deadline if trade has one
+    if (trade.confirmationDeadline && new Date() > trade.confirmationDeadline) {
+      throw new BadRequestException('Onay süresi dolmuş');
     }
 
     // Determine new status
@@ -1307,7 +1312,7 @@ export class TradeService {
         });
         cancelledCount++;
       } catch (error) {
-        console.error(`Failed to auto-cancel trade ${trade.id}:`, error);
+        this.logger.error('Failed to auto-cancel trade');
       }
     }
 

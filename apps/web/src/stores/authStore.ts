@@ -51,6 +51,12 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
     canTrade: false,
     canCreateCollections: false,
   },
+  basic: {
+    maxListings: 50,
+    maxImagesPerListing: 6,
+    canTrade: true,
+    canCreateCollections: true,
+  },
   premium: {
     maxListings: -1,
     maxImagesPerListing: 15,
@@ -129,38 +135,52 @@ interface AuthState {
   getMembershipLimits: () => MembershipLimits;
 }
 
+// Sync read from localStorage on client so first paint has correct auth state (no "giriş yapın" flash).
+function getInitialAuthFromStorage(): Pick<AuthState, 'token' | 'refreshToken' | 'isAuthenticated' | 'isLoading'> {
+  if (typeof window === 'undefined') {
+    return { token: null, refreshToken: null, isAuthenticated: false, isLoading: true };
+  }
+  const token = localStorage.getItem('auth_token');
+  const refreshToken = localStorage.getItem('refresh_token');
+  const hasToken = !!token;
+  return {
+    token,
+    refreshToken,
+    isAuthenticated: hasToken,
+    // When we have a token, keep isLoading true until checkAuth() validates and loads user.
+    isLoading: true,
+  };
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      const initial = getInitialAuthFromStorage();
+      return {
       user: null,
-      token: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      isLoading: true,
+      token: initial.token,
+      refreshToken: initial.refreshToken,
+      isAuthenticated: initial.isAuthenticated,
+      isLoading: initial.isLoading,
       limits: null,
       
       login: async (email: string, password: string) => {
-        console.log('[AuthStore] login called with:', email);
         const response = await authApi.login(email, password);
-        console.log('[AuthStore] API response:', response.data);
         const { user: apiUser, tokens } = response.data;
         const token = tokens.accessToken;
         const refreshToken = tokens.refreshToken;
-        console.log('[AuthStore] Token extracted:', token ? 'yes' : 'no');
         
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', token);
           if (refreshToken) {
             localStorage.setItem('refresh_token', refreshToken);
           }
-          console.log('[AuthStore] Tokens saved to localStorage');
         }
         
         const user = mapApiUser(apiUser);
         const limits = TIER_LIMITS[user.membershipTier];
         
         set({ user, token, refreshToken, isAuthenticated: true, limits });
-        console.log('[AuthStore] State updated, isAuthenticated: true, tier:', user.membershipTier);
       },
       
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
@@ -181,30 +201,30 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem('refresh_token');
         }
         
-        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
       },
       
       checkAuth: async () => {
+        const token = typeof window !== 'undefined' 
+          ? localStorage.getItem('auth_token') 
+          : null;
+        const refreshToken = typeof window !== 'undefined'
+          ? localStorage.getItem('refresh_token')
+          : null;
+
+        if (!token) {
+          set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
+          return;
+        }
+
         set({ isLoading: true });
-        
         try {
-          const token = typeof window !== 'undefined' 
-            ? localStorage.getItem('auth_token') 
-            : null;
-          const refreshToken = typeof window !== 'undefined'
-            ? localStorage.getItem('refresh_token')
-            : null;
-            
-          if (token) {
-            // Use /users/me for more complete profile data
-            const response = await userApi.getProfile();
-            const apiUser = response.data.user || response.data;
-            const user = mapApiUser(apiUser);
-            const limits = TIER_LIMITS[user.membershipTier];
-            set({ user, token, refreshToken, isAuthenticated: true, limits });
-          } else {
-            set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
-          }
+          // Use /users/me for more complete profile data
+          const response = await userApi.getProfile();
+          const apiUser = response.data.user || response.data;
+          const user = mapApiUser(apiUser);
+          const limits = TIER_LIMITS[user.membershipTier];
+          set({ user, token, refreshToken, isAuthenticated: true, limits });
         } catch (error) {
           if (typeof window !== 'undefined') {
             localStorage.removeItem('auth_token');
@@ -230,7 +250,9 @@ export const useAuthStore = create<AuthState>()(
           const limits = TIER_LIMITS[user.membershipTier];
           set({ user, limits });
         } catch (error) {
-          console.error('Failed to refresh user:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to refresh user:', error);
+          }
         }
       },
       
@@ -258,7 +280,8 @@ export const useAuthStore = create<AuthState>()(
         const { user } = get();
         return TIER_LIMITS[user?.membershipTier || 'free'];
       },
-    }),
+    };
+    },
     {
       name: 'auth-storage',
       partialize: (state) => ({ token: state.token, refreshToken: state.refreshToken }),

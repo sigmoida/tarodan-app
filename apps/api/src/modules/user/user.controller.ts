@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +24,8 @@ import { UpdateProfileDto, CreateAddressDto, UpdateAddressDto } from './dto';
 @ApiTags('users')
 @Controller('users')
 export class UserController {
+  private readonly logger = new Logger(UserController.name);
+
   constructor(private readonly userService: UserService) {}
 
   /**
@@ -472,7 +475,12 @@ export class UserController {
     },
   })
   async getFeaturedBusiness() {
-    return this.userService.getFeaturedBusiness();
+    try {
+      return await this.userService.getFeaturedBusiness();
+    } catch (err) {
+      this.logger.warn(`getFeaturedBusiness failed: ${err}`);
+      return null;
+    }
   }
 
   /**

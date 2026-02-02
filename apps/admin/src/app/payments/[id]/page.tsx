@@ -93,7 +93,7 @@ export default function AdminPaymentDetailPage() {
       const response = await adminApi.getPayment(paymentId);
       setPayment(response.data);
     } catch (error: any) {
-      console.error('Payment load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Payment load error:', error);
       toast.error(error.response?.data?.message || 'Ödeme yüklenemedi');
       router.push('/payments');
     } finally {

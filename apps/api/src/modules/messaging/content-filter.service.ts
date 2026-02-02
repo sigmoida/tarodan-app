@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 
 export interface FilterResult {
@@ -22,6 +22,7 @@ export interface ContentFilterRule {
 
 @Injectable()
 export class ContentFilterService implements OnModuleInit {
+  private readonly logger = new Logger(ContentFilterService.name);
   private filters: ContentFilterRule[] = [];
 
   constructor(private readonly prisma: PrismaService) {}
@@ -50,7 +51,7 @@ export class ContentFilterService implements OnModuleInit {
       regex: new RegExp(f.pattern, 'gi'),
     }));
 
-    console.log(`📋 Loaded ${this.filters.length} content filters`);
+    this.logger.log(`Loaded ${this.filters.length} content filters`);
   }
 
   /**
@@ -131,8 +132,7 @@ export class ContentFilterService implements OnModuleInit {
         };
       }
     } catch (error) {
-      console.error('AI moderation failed:', error);
-      // Fall back to regex result
+      this.logger.warn('AI moderation failed');
     }
     */
 

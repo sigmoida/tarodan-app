@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CurrencyDollarIcon,
@@ -58,12 +60,10 @@ interface Offer {
 
 export default function OffersPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
-  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,32 +71,30 @@ export default function OffersPage() {
       router.push('/login');
       return;
     }
-    loadOffers();
-  }, [isAuthenticated, activeTab]);
+  }, [isAuthenticated, router]);
 
-  const loadOffers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // API expects type: 'sent' | 'received' (not role: buyer/seller)
+  const offersQuery = useQuery({
+    queryKey: ['offers', activeTab],
+    queryFn: async (): Promise<Offer[]> => {
       const response = await api.get('/offers', {
         params: { type: activeTab }
       });
-      setOffers(response.data?.data || response.data?.offers || []);
-    } catch (err: any) {
-      console.error('Offers load error:', err);
-      setError(locale === 'en' ? 'Failed to load offers' : 'Teklifler yüklenirken bir hata oluştu');
-      setOffers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data?.data || response.data?.offers || [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'offers' },
+  });
+  const offers = offersQuery.data ?? [];
+  const loading = offersQuery.isLoading;
+  const error = offersQuery.isError ? (locale === 'en' ? 'Failed to load offers' : 'Teklifler yüklenirken bir hata oluştu') : null;
+
+  const invalidateOffers = () => queryClient.invalidateQueries({ queryKey: ['offers'] });
 
   const handleAccept = async (offerId: string) => {
     setActionLoading(offerId);
     try {
       await api.post(`/offers/${offerId}/accept`);
-      loadOffers();
+      await invalidateOffers();
     } catch (err: any) {
       alert(err.response?.data?.message || (locale === 'en' ? 'Failed to accept offer' : 'Teklif kabul edilirken hata oluştu'));
     } finally {
@@ -108,7 +106,7 @@ export default function OffersPage() {
     setActionLoading(offerId);
     try {
       await api.post(`/offers/${offerId}/reject`);
-      loadOffers();
+      await invalidateOffers();
     } catch (err: any) {
       alert(err.response?.data?.message || (locale === 'en' ? 'Failed to reject offer' : 'Teklif reddedilirken hata oluştu'));
     } finally {
@@ -120,7 +118,7 @@ export default function OffersPage() {
     setActionLoading(offerId);
     try {
       await api.post(`/offers/${offerId}/cancel`);
-      loadOffers();
+      await invalidateOffers();
     } catch (err: any) {
       alert(err.response?.data?.message || (locale === 'en' ? 'Failed to cancel offer' : 'Teklif iptal edilirken hata oluştu'));
     } finally {
@@ -319,7 +317,7 @@ export default function OffersPage() {
             <ExclamationCircleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <p className="text-red-500 mb-4">{error}</p>
             <button
-              onClick={loadOffers}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['offers'] })}
               className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-colors"
             >
               {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
@@ -383,11 +381,13 @@ export default function OffersPage() {
                         className="relative w-full md:w-48 h-48 md:h-auto flex-shrink-0 group"
                       >
                         {offer.product.images?.[0] ? (
-                          <Image
+                          <OptimizedImage
                             src={offer.product.images[0].url}
                             alt={offer.product.title}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                            logContext={{ productId: offer.product.id, page: 'offers' }}
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">

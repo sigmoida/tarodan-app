@@ -25,8 +25,7 @@ import {
   PendingMessagesResponseDto,
 } from './dto';
 
-// Daily message limit
-const DAILY_MESSAGE_LIMIT = 50;
+// Daily message limit - now read from platform settings (default: 50)
 
 @Injectable()
 export class MessagingService {
@@ -123,8 +122,19 @@ export class MessagingService {
     senderId: string,
     dto: SendMessageDto,
   ): Promise<MessageResponseDto> {
-    // Check daily message limit
-    await this.checkDailyMessageLimit(senderId);
+    // Check message length from platform settings
+    const maxLengthSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'max_message_length' },
+    });
+    const maxLength = maxLengthSetting?.settingValue
+      ? parseInt(maxLengthSetting.settingValue, 10)
+      : 1000; // Default: 1000
+
+    if (dto.content.length > maxLength) {
+      throw new BadRequestException(
+        `Mesaj uzunluğu maksimum ${maxLength} karakter olabilir. Mevcut uzunluk: ${dto.content.length}`
+      );
+    }
 
     // Get thread and verify sender is participant
     const thread = await this.prisma.messageThread.findUnique({
@@ -555,6 +565,14 @@ export class MessagingService {
   // HELPER: Check daily message limit
   // ==========================================================================
   private async checkDailyMessageLimit(userId: string): Promise<void> {
+    // Get daily message limit from platform settings
+    const dailyLimitSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'daily_message_limit' },
+    });
+    const dailyLimit = dailyLimitSetting?.settingValue
+      ? parseInt(dailyLimitSetting.settingValue, 10)
+      : 50; // Default: 50
+
     // Get start of today (UTC)
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -569,10 +587,10 @@ export class MessagingService {
       },
     });
 
-    if (messageCount >= DAILY_MESSAGE_LIMIT) {
-      this.logger.warn(`User ${userId} exceeded daily message limit (${messageCount}/${DAILY_MESSAGE_LIMIT})`);
+    if (messageCount >= dailyLimit) {
+      this.logger.warn(`User ${userId} exceeded daily message limit (${messageCount}/${dailyLimit})`);
       throw new BadRequestException(
-        `Günlük mesaj limitinize (${DAILY_MESSAGE_LIMIT}) ulaştınız. Yarın tekrar deneyin.`
+        `Günlük mesaj limitinize (${dailyLimit}) ulaştınız. Yarın tekrar deneyin.`
       );
     }
   }
@@ -581,6 +599,14 @@ export class MessagingService {
   // Get remaining daily messages
   // ==========================================================================
   async getRemainingDailyMessages(userId: string): Promise<{ remaining: number; limit: number }> {
+    // Get daily message limit from platform settings
+    const dailyLimitSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'daily_message_limit' },
+    });
+    const dailyLimit = dailyLimitSetting?.settingValue
+      ? parseInt(dailyLimitSetting.settingValue, 10)
+      : 50; // Default: 50
+
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
@@ -594,8 +620,8 @@ export class MessagingService {
     });
 
     return {
-      remaining: Math.max(0, DAILY_MESSAGE_LIMIT - messageCount),
-      limit: DAILY_MESSAGE_LIMIT,
+      remaining: Math.max(0, dailyLimit - messageCount),
+      limit: dailyLimit,
     };
   }
 }

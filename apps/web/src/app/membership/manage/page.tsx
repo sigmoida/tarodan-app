@@ -91,12 +91,12 @@ export default function MembershipManagePage() {
       const response = await api.get('/membership/me');
       setMembership(response.data);
     } catch (error) {
-      console.error('Failed to fetch membership:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch membership:', error);
       const tier = user?.membershipTier || 'free';
       setMembership({
         tier,
         tierName: tierNames[tier] || 'Ücretsiz Üyelik',
-        startDate: user?.createdAt || new Date().toISOString(),
+        startDate: user?.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString()) : new Date().toISOString(),
         endDate: tier === 'free' ? '' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         autoRenew: false,
         nextBillingDate: tier !== 'free' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
@@ -119,7 +119,7 @@ export default function MembershipManagePage() {
         setSelectedPaymentMethod(defaultCard.id);
       }
     } catch (error) {
-      console.error('Failed to fetch payment methods:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
       setPaymentMethods([]);
     }
   };

@@ -343,8 +343,7 @@ export class AuthService {
             };
           }
         } catch (membershipError) {
-          console.error('Error formatting membership data:', membershipError);
-          console.error('Membership object:', JSON.stringify(user.membership, null, 2));
+          this.logger.warn('Error formatting membership data for login response');
           // Continue without membership data if there's an error
         }
       }
@@ -368,10 +367,7 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      // Log unexpected errors with full details
-      console.error('Login error:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      this.logger.error('Login failed');
       throw new BadRequestException(
         `Giriş işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -398,24 +394,19 @@ export class AuthService {
       },
     });
 
-    console.log('Admin login attempt:', { email: dto.email, userFound: !!user, hasAdminUser: !!user?.adminUser });
-
     if (!user || !user.adminUser) {
-      console.log('Admin login failed: User not found or no admin user');
+      this.logger.warn('Admin login failed: user not found or no admin user');
       throw new UnauthorizedException('Email veya şifre hatalı');
     }
 
     if (!user.adminUser.isActive) {
-      console.log('Admin login failed: Admin account is inactive');
+      this.logger.warn('Admin login failed: admin account inactive');
       throw new UnauthorizedException('Admin hesabı deaktif edilmiş');
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    console.log('Password validation:', { isValid: isPasswordValid });
-
     if (!isPasswordValid) {
-      console.log('Admin login failed: Invalid password');
+      this.logger.warn('Admin login failed: invalid password');
       throw new UnauthorizedException('Email veya şifre hatalı');
     }
 
@@ -426,7 +417,6 @@ export class AuthService {
       user.adminUser.role,
     );
 
-    // Update lastLoginAt for both user and admin user
     await Promise.all([
       this.prisma.user.update({
         where: { id: user.id },
@@ -437,6 +427,8 @@ export class AuthService {
         data: { lastLoginAt: new Date() },
       }),
     ]);
+
+    this.logger.log('Admin login success');
 
     return {
       user: {
@@ -568,7 +560,7 @@ export class AuthService {
 
       return { accessToken, refreshToken };
     } catch (error) {
-      console.error('Token generation error:', error);
+      this.logger.error('Token generation failed');
       throw new Error(`Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

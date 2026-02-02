@@ -34,6 +34,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole } from '@prisma/client';
 import {
   CreateCommissionRuleDto,
@@ -123,6 +124,14 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, type: [PlatformSettingResponseDto] })
   async getPlatformSettings() {
     return this.adminService.getPlatformSettings();
+  }
+
+  @Get('settings/public')
+  @Public()
+  @ApiOperation({ summary: 'Get public platform settings (listing limits)' })
+  @ApiResponse({ status: HttpStatus.OK })
+  async getPublicSettings() {
+    return this.adminService.getPublicSettings();
   }
 
   @Patch('settings')

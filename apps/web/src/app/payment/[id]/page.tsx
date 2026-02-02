@@ -28,8 +28,8 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // Allow access for authenticated users OR guest checkout
-    if (!isAuthenticated && !isGuestCheckout) {
+    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }
@@ -40,9 +40,8 @@ export default function PaymentPage() {
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
-      // Use lightweight status endpoint for polling
-      // Use guest endpoint if guest checkout
-      const response = isGuestCheckout 
+      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
         : await paymentsApi.getStatusLight(paymentId);
       const paymentData = response.data;
@@ -59,7 +58,7 @@ export default function PaymentPage() {
         }
       }
     } catch (error: any) {
-      console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
       toast.error('Ödeme bilgisi yüklenemedi');
       // Redirect to home for guests, orders page for authenticated users
       router.push(isGuestCheckout ? '/' : '/orders');
@@ -89,7 +88,7 @@ export default function PaymentPage() {
           router.push(`/payment/fail?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
         }
       } catch (error) {
-        console.error('Failed to check payment status:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to check payment status:', error);
       }
     }, 2000);
 

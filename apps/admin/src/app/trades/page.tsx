@@ -67,7 +67,7 @@ export default function TradesPage() {
       const data = response.data.data || response.data.users || [];
       setUsers(data.map((u: any) => ({ id: u.id, displayName: u.displayName, email: u.email })));
     } catch (error) {
-      console.error('Load users error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Load users error:', error);
     } finally {
       setLoadingUsers(false);
     }
@@ -128,7 +128,7 @@ export default function TradesPage() {
       })));
       setTotal(meta.total || data.length);
     } catch (error) {
-      console.error('Trades load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Trades load error:', error);
       toast.error('Takaslar yüklenemedi');
     } finally {
       setLoading(false);

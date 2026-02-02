@@ -90,21 +90,25 @@ export default function EditListingPage() {
     const timer = setTimeout(() => {
       const storageKey = `editListingFormData_${id}`;
       const savedFormData = localStorage.getItem(storageKey);
-      console.log('[EDIT] useEffect [id] - Loading from localStorage - key:', storageKey);
-      console.log('[EDIT] useEffect [id] - localStorage data exists:', !!savedFormData);
-      console.log('[EDIT] useEffect [id] - localStorage data length:', savedFormData?.length || 0);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] useEffect [id] - Loading from localStorage - key:', storageKey);
+        console.log('[EDIT] useEffect [id] - localStorage data exists:', !!savedFormData);
+        console.log('[EDIT] useEffect [id] - localStorage data length:', savedFormData?.length || 0);
+      }
       
       if (savedFormData) {
         try {
           const parsed = JSON.parse(savedFormData);
-          console.log('[EDIT] useEffect [id] - Parsed localStorage data:', parsed);
-          console.log('[EDIT] useEffect [id] - Quantity from localStorage:', parsed.quantity, 'type:', typeof parsed.quantity);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[EDIT] useEffect [id] - Parsed localStorage data:', parsed);
+            console.log('[EDIT] useEffect [id] - Quantity from localStorage:', parsed.quantity, 'type:', typeof parsed.quantity);
+          }
           
           // Always restore if we have data, even if quantity is empty string
           const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
             ? String(parsed.quantity) 
             : '';
-          console.log('[EDIT] useEffect [id] - Setting quantity from localStorage to:', quantityValue);
+          if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - Setting quantity from localStorage to:', quantityValue);
           
           setFormData(prev => {
             const newData = {
@@ -112,16 +116,16 @@ export default function EditListingPage() {
               ...parsed,
               quantity: quantityValue,
             };
-            console.log('[EDIT] useEffect [id] - Setting formData to:', newData);
+            if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - Setting formData to:', newData);
             return newData;
           });
         } catch (e) {
-          console.error('[EDIT] useEffect [id] - Failed to parse saved form data:', e);
+          if (process.env.NODE_ENV === 'development') console.error('[EDIT] useEffect [id] - Failed to parse saved form data:', e);
         }
       } else {
-        console.log('[EDIT] useEffect [id] - No saved data in localStorage');
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - No saved data in localStorage');
         // Also check all localStorage keys to debug
-        console.log('[EDIT] useEffect [id] - All localStorage keys:', Object.keys(localStorage).filter(k => k.includes('editListing')));
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - All localStorage keys:', Object.keys(localStorage).filter(k => k.includes('editListing')));
       }
     }, 100); // Small delay to ensure localStorage is ready
     
@@ -141,26 +145,32 @@ export default function EditListingPage() {
         ? String(formData.quantity) 
         : '';
       
-      console.log('[EDIT] Save useEffect - quantity:', formData.quantity, '->', quantityToSave, 'type:', typeof formData.quantity);
-      console.log('[EDIT] Save useEffect - Full formData:', formData);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] Save useEffect - quantity:', formData.quantity, '->', quantityToSave, 'type:', typeof formData.quantity);
+        console.log('[EDIT] Save useEffect - Full formData:', formData);
+      }
       
       const dataToSave = {
         ...formData,
         quantity: quantityToSave,
       };
       
-      console.log('[EDIT] Save useEffect - Data to save:', dataToSave);
-      console.log('[EDIT] Save useEffect - Storage key:', storageKey);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] Save useEffect - Data to save:', dataToSave);
+        console.log('[EDIT] Save useEffect - Storage key:', storageKey);
+      }
       
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
       
       // Verify it was saved
       const verify = localStorage.getItem(storageKey);
-      console.log('[EDIT] Save useEffect - Verification - saved data exists:', !!verify);
-      console.log('[EDIT] Save useEffect - Verification - saved data:', verify);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] Save useEffect - Verification - saved data exists:', !!verify);
+        console.log('[EDIT] Save useEffect - Verification - saved data:', verify);
+      }
       if (verify) {
         const parsed = JSON.parse(verify);
-        console.log('[EDIT] Save useEffect - Verification - parsed quantity:', parsed.quantity);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] Save useEffect - Verification - parsed quantity:', parsed.quantity);
       }
     }, 300); // Debounce to avoid too many writes
     
@@ -178,16 +188,16 @@ export default function EditListingPage() {
     // This ensures user's edits are preserved even if fetchListing runs immediately
     const storageKey = `editListingFormData_${id}`;
     const savedFormData = localStorage.getItem(storageKey);
-    console.log('[EDIT] Main useEffect - Loading from localStorage BEFORE fetchListing:', storageKey, 'exists:', !!savedFormData);
+    if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Loading from localStorage BEFORE fetchListing:', storageKey, 'exists:', !!savedFormData);
     
     if (savedFormData) {
       try {
         const parsed = JSON.parse(savedFormData);
-        console.log('[EDIT] Main useEffect - Found saved data, setting formData immediately');
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Found saved data, setting formData immediately');
         const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
           ? String(parsed.quantity) 
           : '';
-        console.log('[EDIT] Main useEffect - Setting quantity to:', quantityValue);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Setting quantity to:', quantityValue);
         
         // Set formData immediately, before fetchListing runs
         setFormData(prev => ({
@@ -196,7 +206,7 @@ export default function EditListingPage() {
           quantity: quantityValue,
         }));
       } catch (e) {
-        console.error('[EDIT] Main useEffect - Failed to parse saved form data:', e);
+        if (process.env.NODE_ENV === 'development') console.error('[EDIT] Main useEffect - Failed to parse saved form data:', e);
       }
     }
     
@@ -246,30 +256,37 @@ export default function EditListingPage() {
       
       // Check ALL localStorage keys first for debugging
       const allKeys = Object.keys(localStorage).filter(k => k.includes('editListing'));
-      console.log('[EDIT] fetchListing - All editListing keys in localStorage:', allKeys);
-      console.log('[EDIT] fetchListing - Looking for key:', storageKey);
-      console.log('[EDIT] fetchListing - Key exists?', allKeys.includes(storageKey));
-      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] fetchListing - All editListing keys in localStorage:', allKeys);
+        console.log('[EDIT] fetchListing - Looking for key:', storageKey);
+        console.log('[EDIT] fetchListing - Key exists?', allKeys.includes(storageKey));
+      }
       const savedFormData = localStorage.getItem(storageKey);
-      console.log('[EDIT] fetchListing - localStorage.getItem result:', savedFormData);
-      console.log('[EDIT] fetchListing - localStorage.getItem result type:', typeof savedFormData);
-      console.log('[EDIT] fetchListing - localStorage.getItem result length:', savedFormData?.length || 0);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] fetchListing - localStorage.getItem result:', savedFormData);
+        console.log('[EDIT] fetchListing - localStorage.getItem result type:', typeof savedFormData);
+        console.log('[EDIT] fetchListing - localStorage.getItem result length:', savedFormData?.length || 0);
+      }
       
       let savedData = null;
       if (savedFormData) {
         try {
           savedData = JSON.parse(savedFormData);
-          console.log('[EDIT] fetchListing - parsed savedData:', savedData);
-          console.log('[EDIT] fetchListing - savedData.quantity:', savedData.quantity, 'type:', typeof savedData.quantity);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[EDIT] fetchListing - parsed savedData:', savedData);
+            console.log('[EDIT] fetchListing - savedData.quantity:', savedData.quantity, 'type:', typeof savedData.quantity);
+          }
         } catch (e) {
-          console.error('[EDIT] fetchListing - Failed to parse saved form data:', e);
+          if (process.env.NODE_ENV === 'development') console.error('[EDIT] fetchListing - Failed to parse saved form data:', e);
         }
       } else {
-        console.log('[EDIT] fetchListing - No saved data found in localStorage');
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - No saved data found in localStorage');
       }
 
-      console.log('[EDIT] fetchListing - API listing.quantity:', listing.quantity, 'type:', typeof listing.quantity);
-      console.log('[EDIT] fetchListing - current formData.quantity:', formData.quantity, 'type:', typeof formData.quantity);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EDIT] fetchListing - API listing.quantity:', listing.quantity, 'type:', typeof listing.quantity);
+        console.log('[EDIT] fetchListing - current formData.quantity:', formData.quantity, 'type:', typeof formData.quantity);
+      }
 
       // Merge API data with saved data, prioritizing saved data if it exists
       // Special handling for quantity: prioritize saved value, then API value, then empty string
@@ -280,25 +297,25 @@ export default function EditListingPage() {
       // First priority: saved data from localStorage (user's current edits)
       if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
         quantityValue = String(savedData.quantity);
-        console.log('[EDIT] fetchListing - Using localStorage quantity:', quantityValue);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using localStorage quantity:', quantityValue);
       } 
       // Second priority: API value from database (null = unlimited, number = limited)
       else if (listing.quantity !== undefined && listing.quantity !== null) {
         quantityValue = String(listing.quantity);
-        console.log('[EDIT] fetchListing - Using API quantity:', quantityValue);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using API quantity:', quantityValue);
       }
       // Third priority: keep existing formData value if available
       else if (formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '') {
         quantityValue = String(formData.quantity);
-        console.log('[EDIT] fetchListing - Using existing formData quantity:', quantityValue);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using existing formData quantity:', quantityValue);
       }
       // Default: empty string (unlimited stock) - API returned null or undefined
       else {
         quantityValue = '';
-        console.log('[EDIT] fetchListing - Using default empty quantity (unlimited) - API returned:', listing.quantity);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using default empty quantity (unlimited) - API returned:', listing.quantity);
       }
       
-      console.log('[EDIT] fetchListing - Final quantityValue:', quantityValue);
+      if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Final quantityValue:', quantityValue);
 
       // IMPORTANT: Preserve quantity from localStorage if it exists, even if API says null/undefined
       // This ensures user's edits are not lost when page reloads
@@ -306,12 +323,12 @@ export default function EditListingPage() {
       
       if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
         finalQuantity = String(savedData.quantity);
-        console.log('[EDIT] fetchListing - OVERRIDING quantity with localStorage value:', finalQuantity);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - OVERRIDING quantity with localStorage value:', finalQuantity);
       } else {
-        console.log('[EDIT] fetchListing - Using computed quantityValue:', finalQuantity);
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using computed quantityValue:', finalQuantity);
       }
       
-      console.log('[EDIT] fetchListing - Final quantity decision:', {
+      if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Final quantity decision:', {
         savedDataExists: !!savedData,
         savedDataQuantity: savedData?.quantity,
         savedDataQuantityType: typeof savedData?.quantity,
@@ -327,20 +344,20 @@ export default function EditListingPage() {
         // First priority: savedData from localStorage (read in fetchListing)
         if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
           quantityToUse = String(savedData.quantity);
-          console.log('[EDIT] fetchListing - Using savedData.quantity:', quantityToUse);
+          if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using savedData.quantity:', quantityToUse);
         }
         // Second priority: prev.quantity (from main useEffect that loaded localStorage)
         else if (prev.quantity && prev.quantity !== '') {
           quantityToUse = String(prev.quantity);
-          console.log('[EDIT] fetchListing - Preserving prev.quantity:', quantityToUse);
+          if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Preserving prev.quantity:', quantityToUse);
         }
         // Third priority: finalQuantity (computed from API)
         else {
           quantityToUse = finalQuantity;
-          console.log('[EDIT] fetchListing - Using finalQuantity:', quantityToUse);
+          if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using finalQuantity:', quantityToUse);
         }
         
-        console.log('[EDIT] fetchListing - setFormData decision:', {
+        if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - setFormData decision:', {
           savedDataQuantity: savedData?.quantity,
           prevQuantity: prev.quantity,
           finalQuantity,
@@ -361,8 +378,10 @@ export default function EditListingPage() {
           status: savedData?.status || listing.status || prev.status || 'active',
         };
         
-        console.log('[EDIT] fetchListing - Setting formData with quantity:', newFormData.quantity);
-        console.log('[EDIT] fetchListing - Full newFormData:', newFormData);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[EDIT] fetchListing - Setting formData with quantity:', newFormData.quantity);
+          console.log('[EDIT] fetchListing - Full newFormData:', newFormData);
+        }
         
         return newFormData;
       });
@@ -380,7 +399,7 @@ export default function EditListingPage() {
         saleEndDate: end,
       });
     } catch (error: any) {
-      console.error('Failed to fetch listing:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch listing:', error);
       toast.error(error.response?.data?.message || 'İlan yüklenemedi');
       router.push('/profile/listings');
     } finally {
@@ -394,7 +413,7 @@ export default function EditListingPage() {
       const cats = response.data.data || response.data || [];
       setCategories(cats);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch categories:', error);
     }
   };
 
@@ -432,7 +451,7 @@ export default function EditListingPage() {
       });
       toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
     } catch (error: any) {
-      console.error('Failed to upload images:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
     } finally {
       setUploadingImages(false);
@@ -490,23 +509,23 @@ export default function EditListingPage() {
         payload.saleEndDate = null;
       }
       
-      console.log('[EDIT] handleSubmit - Payload quantity:', payload.quantity, 'from formData.quantity:', formData.quantity);
+      if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - Payload quantity:', payload.quantity, 'from formData.quantity:', formData.quantity);
 
       await listingsApi.update(id, payload as any);
       toast.success('İlanınız güncellendi!');
       
       // Clear saved form data after successful submission
       // Only clear if we're actually navigating away (not just refreshing)
-      console.log('[EDIT] handleSubmit - Clearing localStorage for:', `editListingFormData_${id}`);
+      if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - Clearing localStorage for:', `editListingFormData_${id}`);
       localStorage.removeItem(`editListingFormData_${id}`);
-      console.log('[EDIT] handleSubmit - localStorage cleared, redirecting...');
+      if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - localStorage cleared, redirecting...');
       
       // Small delay to ensure localStorage is cleared before navigation
       await new Promise(resolve => setTimeout(resolve, 100));
       
       router.push(`/listings/${id}`);
     } catch (error: any) {
-      console.error('Failed to update listing:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to update listing:', error);
       toast.error(error.response?.data?.message || 'İlan güncellenemedi');
     } finally {
       setIsLoading(false);
@@ -768,14 +787,14 @@ export default function EditListingPage() {
                   value={formData.quantity || ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    console.log('[EDIT] Input onChange - value:', value, 'type:', typeof value);
+                    if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - value:', value, 'type:', typeof value);
                     // Save as string, empty string means unlimited stock
                     const newQuantity = value === '' ? '' : value;
-                    console.log('[EDIT] Input onChange - setting quantity to:', newQuantity);
+                    if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - setting quantity to:', newQuantity);
                     setFormData({ ...formData, quantity: newQuantity });
                   }}
                   onBlur={() => {
-                    console.log('[EDIT] Input onBlur - current formData.quantity:', formData.quantity);
+                    if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onBlur - current formData.quantity:', formData.quantity);
                   }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
                   placeholder="Sınırsız"

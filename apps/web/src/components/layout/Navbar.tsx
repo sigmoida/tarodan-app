@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bars3Icon,
@@ -27,9 +28,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
-import { messagesApi, api } from '@/lib/api';
+import { messagesApi, api, wishlistApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -72,6 +79,26 @@ export default function Navbar() {
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  // Defer auth-dependent UI until after mount so server and first client render match (avoids hydration error).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const showAuthUI = mounted && isAuthenticated;
+
+  const wishlistQuery = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: async () => {
+      const res = await wishlistApi.get();
+      const data = res.data;
+      const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+      return Array.isArray(items) ? items : [];
+    },
+    enabled: showAuthUI,
+    meta: { page: 'navbar-wishlist-count' },
+  });
+  const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
@@ -163,7 +190,7 @@ export default function Navbar() {
       }, 0);
       setUnreadMessageCount(totalUnread);
     } catch (error) {
-      console.error('Failed to fetch unread message count:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch unread message count:', error);
     }
   };
 
@@ -176,7 +203,7 @@ export default function Navbar() {
       setPendingOffersCount(offersRes?.data?.received || 0);
       setPendingTradesCount(tradesRes?.data?.received || 0);
     } catch (error) {
-      console.error('Failed to fetch pending counts:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
     }
   };
 
@@ -214,7 +241,7 @@ export default function Navbar() {
         setAdImageError(new Set());
       })
       .catch((err) => {
-        console.error('Failed to fetch ads:', err);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch ads:', err);
         setTopAds([]);
       });
   }, [shouldShowAd, isMobile]);
@@ -344,6 +371,7 @@ export default function Navbar() {
               width={160}
               height={52}
               className="object-contain"
+              style={{ width: 'auto', height: 'auto' }}
               priority
             />
           </Link>
@@ -450,8 +478,8 @@ export default function Navbar() {
           {/* Nav Links - Desktop */}
           <div className="hidden lg:flex items-center gap-6 mr-12">
             {NAV_LINKS.map((link) => {
-              // Takaslar link requires auth for guests
-              if (link.href === '/trades' && !isAuthenticated) {
+              // Takaslar link requires auth for guests (use showAuthUI so server/client match until mounted)
+              if (link.href === '/trades' && !showAuthUI) {
                 return (
                   <button
                     key={link.href}
@@ -491,7 +519,7 @@ export default function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-4 ml-8">
-            {isAuthenticated ? (
+            {showAuthUI ? (
               <>
                 {/* Yeni İlan Ekle Butonu - Desktop */}
                 <Link
@@ -514,9 +542,14 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/favorites"
-                  className="p-2 text-white hover:text-orange-100 transition-colors hidden sm:block"
+                  className="p-2 text-white hover:text-orange-100 transition-colors relative hidden sm:block"
                 >
                   <HeartIcon className="w-6 h-6" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                      {wishlistCount > 9 ? '9+' : wishlistCount}
+                    </span>
+                  )}
                 </Link>
                 <NotificationBell />
                 <Link
@@ -766,8 +799,8 @@ export default function Navbar() {
 
               {/* Mobile Nav Links */}
               {NAV_LINKS.map((link) => {
-                // Takaslar link requires auth for guests
-                if (link.href === '/trades' && !isAuthenticated) {
+                // Takaslar link requires auth for guests (use showAuthUI for hydration safety)
+                if (link.href === '/trades' && !showAuthUI) {
                   return (
                     <button
                       key={link.href}
@@ -795,7 +828,7 @@ export default function Navbar() {
               
               {/* Mobile Auth Links */}
               <div className="border-t border-orange-600 pt-4 mt-4">
-                {isAuthenticated ? (
+                {showAuthUI ? (
                   <div className="space-y-2">
                     {/* Yeni İlan Ekle Butonu - Mobile */}
                     <Link

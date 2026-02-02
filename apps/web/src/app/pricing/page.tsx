@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -22,8 +22,70 @@ export default function PricingPage() {
   const { isAuthenticated, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [listingLimits, setListingLimits] = useState<{
+    free_listing_limit?: number;
+    premium_listing_limit?: number;
+    business_listing_limit?: number;
+  }>({});
+  const [membershipPrices, setMembershipPrices] = useState<{
+    premium_monthly_price?: number;
+    premium_yearly_price?: number;
+    business_monthly_price?: number;
+    business_yearly_price?: number;
+    yearly_discount_percentage?: number;
+  }>({});
 
-  const MEMBERSHIP_TIERS = [
+  // Fetch listing limits and membership prices from platform settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get('/admin/settings/public');
+        const settings = response.data || {};
+        setListingLimits({
+          free_listing_limit: settings.free_listing_limit,
+          premium_listing_limit: settings.premium_listing_limit,
+          business_listing_limit: settings.business_listing_limit,
+        });
+        setMembershipPrices({
+          premium_monthly_price: settings.premium_monthly_price,
+          premium_yearly_price: settings.premium_yearly_price,
+          business_monthly_price: settings.business_monthly_price,
+          business_yearly_price: settings.business_yearly_price,
+          yearly_discount_percentage: settings.yearly_discount_percentage,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch settings:', error);
+        // Use defaults if API fails
+        setListingLimits({
+          free_listing_limit: 5,
+          premium_listing_limit: -1,
+          business_listing_limit: 1000,
+        });
+        setMembershipPrices({
+          premium_monthly_price: 99,
+          premium_yearly_price: 960,
+          business_monthly_price: 499,
+          business_yearly_price: 4790,
+        });
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const getListingLimitText = (tierId: string) => {
+    const limit = tierId === 'free' 
+      ? listingLimits.free_listing_limit ?? 5
+      : tierId === 'premium'
+      ? listingLimits.premium_listing_limit ?? -1
+      : listingLimits.business_listing_limit ?? 1000;
+    
+    if (limit === -1) {
+      return `${t('membership.unlimited')} ${t('membership.listingsLimit')}`;
+    }
+    return `${limit} ${t('membership.listingsLimit')}`;
+  };
+
+  const MEMBERSHIP_TIERS = useMemo(() => [
     {
       id: 'free',
       name: t('membership.free'),
@@ -31,7 +93,7 @@ export default function PricingPage() {
       period: t('membership.perMonth'),
       description: t('membership.subtitle'),
       features: [
-        { text: `5 ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('free'), included: true },
         { text: t('search.search'), included: true },
         { text: t('message.messages'), included: true },
         { text: t('nav.trades'), included: false },
@@ -44,11 +106,11 @@ export default function PricingPage() {
     {
       id: 'premium',
       name: t('membership.premium'),
-      price: 99,
+      price: membershipPrices.premium_monthly_price ?? 99,
       period: t('membership.perMonth'),
       description: t('membership.mostPopular'),
       features: [
-        { text: `${t('membership.unlimited')} ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('premium'), included: true },
         { text: '15 resim/ilan', included: true },
         { text: t('nav.trades'), included: true },
         { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
@@ -61,11 +123,11 @@ export default function PricingPage() {
     {
       id: 'business',
       name: t('membership.business'),
-      price: 499,
+      price: membershipPrices.business_monthly_price ?? 499,
       period: t('membership.perMonth'),
       description: t('membership.business'),
       features: [
-        { text: `1000 ${t('membership.listingsLimit')}`, included: true },
+        { text: getListingLimitText('business'), included: true },
         { text: t('search.search'), included: true },
         { text: t('message.messages'), included: true },
         { text: t('nav.trades'), included: true },
@@ -77,7 +139,7 @@ export default function PricingPage() {
       popular: false,
       color: 'gold',
     },
-  ];
+  ], [listingLimits, membershipPrices, t]);
 
   useEffect(() => {
     const tier = searchParams.get('tier');
@@ -94,11 +156,11 @@ export default function PricingPage() {
 
   const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
-      toast.info(t('membership.planAlreadyActive'));
+      toast(t('membership.planAlreadyActive'));
       return;
     }
     if (tierId === currentTier) {
-      toast.info(t('membership.planAlreadyActive'));
+      toast(t('membership.planAlreadyActive'));
       return;
     }
     setSelectedTier(tierId);
@@ -177,9 +239,18 @@ export default function PricingPage() {
         <div className="flex justify-center mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
           {MEMBERSHIP_TIERS.map((tier, index) => {
-            const displayPrice = selectedPeriod === 'yearly' && tier.price > 0
-              ? Math.round(tier.price * 12 * 0.8)
-              : tier.price;
+            let displayPrice = tier.price;
+            if (selectedPeriod === 'yearly' && tier.price > 0) {
+              const discountPercentage = membershipPrices.yearly_discount_percentage ?? 20;
+              if (tier.id === 'premium' && membershipPrices.premium_yearly_price) {
+                displayPrice = membershipPrices.premium_yearly_price;
+              } else if (tier.id === 'business' && membershipPrices.business_yearly_price) {
+                displayPrice = membershipPrices.business_yearly_price;
+              } else {
+                // Fallback: calculate from monthly price with discount percentage
+                displayPrice = Math.round(tier.price * 12 * (1 - discountPercentage / 100) * 100) / 100;
+              }
+            }
             
             const isSelected = selectedTier === tier.id;
             const isCurrent = currentTier === tier.id;
@@ -245,6 +316,21 @@ export default function PricingPage() {
                     {selectedPeriod === 'yearly' && tier.price > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
                         Ayda {Math.round(displayPrice / 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        {tier.id === 'premium' && membershipPrices.premium_monthly_price && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            (Normal: {membershipPrices.premium_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
+                          </span>
+                        )}
+                        {tier.id === 'business' && membershipPrices.business_monthly_price && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            (Normal: {membershipPrices.business_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
+                          </span>
+                        )}
+                        {membershipPrices.yearly_discount_percentage && (
+                          <span className="text-xs text-green-500 ml-1">
+                            (%{membershipPrices.yearly_discount_percentage} indirim)
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>

@@ -42,7 +42,7 @@ export class CreateProductDto {
   @IsNumber({}, { message: 'Fiyat sayı olmalıdır' })
   @Type(() => Number)
   @Min(1, { message: 'Fiyat en az 1 TL olmalıdır' })
-  @Max(9999999, { message: 'Fiyat en fazla 9,999,999 TL olabilir' })
+  // Max validation is handled by platform settings (min_product_price, max_product_price)
   price: number;
 
   @ApiProperty({

@@ -233,7 +233,7 @@ export default function DashboardPage() {
       }
 
     } catch (error) {
-      console.error('Dashboard load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Dashboard load error:', error);
       // Fallback to zeros if API fails
       setStats({
         totalUsers: 0,

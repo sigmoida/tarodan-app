@@ -6,42 +6,40 @@ import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface Settings {
-  commissionRate: number;
   freeListingLimit: number;
+  premiumListingLimit: number;
+  businessListingLimit: number;
   tradeResponseHours: number;
+  tradePaymentHours: number;
   tradeShippingDays: number;
   tradeConfirmationDays: number;
   minProductPrice: number;
   maxProductPrice: number;
-  requireProductApproval: boolean;
-  requireMessageApproval: boolean;
-}
-
-interface CommissionRule {
-  id: string;
-  name: string;
-  type: string;
-  buyerRate: number;
-  sellerRate: number;
-  isActive: boolean;
+  maxMessageLength: number;
+  premiumMonthlyPrice: number;
+  businessMonthlyPrice: number;
+  yearlyDiscountPercentage: number;
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    commissionRate: 5,
     freeListingLimit: 10,
+    premiumListingLimit: -1, // -1 means unlimited
+    businessListingLimit: -1, // -1 means unlimited
     tradeResponseHours: 72,
+    tradePaymentHours: 48,
     tradeShippingDays: 7,
     tradeConfirmationDays: 3,
     minProductPrice: 10,
     maxProductPrice: 100000,
-    requireProductApproval: true,
-    requireMessageApproval: true,
+    maxMessageLength: 1000,
+    premiumMonthlyPrice: 99,
+    businessMonthlyPrice: 499,
+    yearlyDiscountPercentage: 20,
   });
-  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'commission' | 'trade'>('general');
+  const [activeTab, setActiveTab] = useState<'listing' | 'trade' | 'message' | 'membership'>('listing');
 
   useEffect(() => {
     loadSettings();
@@ -49,27 +47,83 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const [rulesResponse, settingsResponse] = await Promise.all([
-        adminApi.getCommissionRules(),
-        adminApi.getSettings(),
-      ]);
-      const rules = rulesResponse.data.data || rulesResponse.data || [];
-      setCommissionRules(rules.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        type: r.type,
-        buyerRate: 0,
-        sellerRate: r.percentage,
-        isActive: r.isActive,
-      })));
-      const settingsData = settingsResponse.data.data || settingsResponse.data || [];
+      const settingsResponse = await adminApi.getSettings();
+      // API response format: { data: { data: [...] } } or { data: [...] }
+      const settingsData = settingsResponse.data?.data || settingsResponse.data || [];
       const settingsObj: Record<string, any> = {};
-      settingsData.forEach((s: any) => {
-        settingsObj[s.key] = s.value;
+      
+      // Handle both array and object formats
+      // Backend returns Prisma model with settingKey and settingValue fields
+      if (Array.isArray(settingsData)) {
+        settingsData.forEach((s: any) => {
+          const key = s.settingKey || s.key;
+          const value = s.settingValue || s.value;
+          if (key) {
+            settingsObj[key] = value;
+          }
+        });
+      } else if (typeof settingsData === 'object') {
+        Object.keys(settingsData).forEach((key) => {
+          settingsObj[key] = settingsData[key];
+        });
+      }
+      
+      if (process.env.NODE_ENV === 'development') console.log('Loaded settings:', settingsObj);
+      
+      // Load membership tier prices if not in platform settings
+      let premiumMonthlyPrice = settingsObj.premium_monthly_price ? Number(settingsObj.premium_monthly_price) : null;
+      let businessMonthlyPrice = settingsObj.business_monthly_price ? Number(settingsObj.business_monthly_price) : null;
+      let yearlyDiscountPercentage = settingsObj.yearly_discount_percentage ? Number(settingsObj.yearly_discount_percentage) : null;
+
+      if (premiumMonthlyPrice === null || businessMonthlyPrice === null || yearlyDiscountPercentage === null) {
+        try {
+          const tiersResponse = await adminApi.getMembershipTiers();
+          const tiers = tiersResponse.data?.tiers || tiersResponse.data || [];
+          
+          const premiumTier = tiers.find((t: any) => t.type === 'premium');
+          const businessTier = tiers.find((t: any) => t.type === 'business');
+          
+          if (premiumMonthlyPrice === null && premiumTier) {
+            premiumMonthlyPrice = Number(premiumTier.monthlyPrice) || 99;
+          }
+          if (businessMonthlyPrice === null && businessTier) {
+            businessMonthlyPrice = Number(businessTier.monthlyPrice) || 499;
+          }
+          // Calculate discount percentage from existing prices if available
+          if (yearlyDiscountPercentage === null && premiumTier) {
+            const monthly = Number(premiumTier.monthlyPrice) || 99;
+            const yearly = Number(premiumTier.yearlyPrice) || 960;
+            if (monthly > 0 && yearly > 0) {
+              // Calculate: yearly = monthly * 12 * (1 - discount/100)
+              // discount = (1 - yearly/(monthly*12)) * 100
+              yearlyDiscountPercentage = Math.round((1 - yearly / (monthly * 12)) * 100);
+            } else {
+              yearlyDiscountPercentage = 20; // Default
+            }
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') console.error('Failed to load membership tiers:', error);
+        }
+      }
+      
+      // Map platform setting keys to local settings
+      setSettings({
+        freeListingLimit: settingsObj.free_listing_limit ? Number(settingsObj.free_listing_limit) : 10,
+        premiumListingLimit: settingsObj.premium_listing_limit ? Number(settingsObj.premium_listing_limit) : -1,
+        businessListingLimit: settingsObj.business_listing_limit ? Number(settingsObj.business_listing_limit) : -1,
+        minProductPrice: settingsObj.min_product_price ? Number(settingsObj.min_product_price) : 10,
+        maxProductPrice: settingsObj.max_product_price ? Number(settingsObj.max_product_price) : 100000,
+        tradeResponseHours: settingsObj.trade_response_deadline_hours ? Number(settingsObj.trade_response_deadline_hours) : 72,
+        tradePaymentHours: settingsObj.trade_payment_deadline_hours ? Number(settingsObj.trade_payment_deadline_hours) : 48,
+        tradeShippingDays: settingsObj.trade_shipping_deadline_days ? Number(settingsObj.trade_shipping_deadline_days) : 7,
+        tradeConfirmationDays: settingsObj.trade_confirmation_deadline_days ? Number(settingsObj.trade_confirmation_deadline_days) : 3,
+        maxMessageLength: settingsObj.max_message_length ? Number(settingsObj.max_message_length) : 1000,
+        premiumMonthlyPrice: premiumMonthlyPrice ?? 99,
+        businessMonthlyPrice: businessMonthlyPrice ?? 499,
+        yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
       });
-      setSettings(settingsObj);
     } catch (error) {
-      console.error('Settings load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Settings load error:', error);
       toast.error('Ayarlar yüklenemedi');
     } finally {
       setLoading(false);
@@ -79,28 +133,48 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await adminApi.updateSettings(settings);
+      // Save each setting individually with correct keys
+      const settingsToSave = [];
+      
+      if (activeTab === 'listing') {
+        settingsToSave.push(
+          adminApi.updateSetting('free_listing_limit', settings.freeListingLimit.toString()),
+          adminApi.updateSetting('premium_listing_limit', settings.premiumListingLimit.toString()),
+          adminApi.updateSetting('business_listing_limit', settings.businessListingLimit.toString()),
+          adminApi.updateSetting('min_product_price', settings.minProductPrice.toString()),
+          adminApi.updateSetting('max_product_price', settings.maxProductPrice.toString())
+        );
+      } else if (activeTab === 'trade') {
+        settingsToSave.push(
+          adminApi.updateSetting('trade_response_deadline_hours', settings.tradeResponseHours.toString()),
+          adminApi.updateSetting('trade_payment_deadline_hours', settings.tradePaymentHours.toString()),
+          adminApi.updateSetting('trade_shipping_deadline_days', settings.tradeShippingDays.toString()),
+          adminApi.updateSetting('trade_confirmation_deadline_days', settings.tradeConfirmationDays.toString())
+        );
+      } else if (activeTab === 'message') {
+        settingsToSave.push(
+          adminApi.updateSetting('max_message_length', settings.maxMessageLength.toString())
+        );
+      } else if (activeTab === 'membership') {
+        settingsToSave.push(
+          adminApi.updateSetting('premium_monthly_price', settings.premiumMonthlyPrice.toString()),
+          adminApi.updateSetting('business_monthly_price', settings.businessMonthlyPrice.toString()),
+          adminApi.updateSetting('yearly_discount_percentage', settings.yearlyDiscountPercentage.toString())
+        );
+      }
+      
+      await Promise.all(settingsToSave);
       toast.success('Ayarlar kaydedildi');
+      // Reload settings after save to reflect changes
+      await loadSettings();
     } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Settings save error:', error);
       toast.error('Ayarlar kaydedilemedi');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleToggleCommissionRule = async (ruleId: string, isActive: boolean) => {
-    try {
-      await adminApi.updateCommissionRule(ruleId, { isActive: !isActive });
-      setCommissionRules((prev) =>
-        prev.map((rule) =>
-          rule.id === ruleId ? { ...rule, isActive: !isActive } : rule
-        )
-      );
-      toast.success('Komisyon kuralı güncellendi');
-    } catch (error) {
-      toast.error('Kural güncellenemedi');
-    }
-  };
 
   if (loading) {
     return (
@@ -123,9 +197,10 @@ export default function SettingsPage() {
         {/* Tabs */}
         <div className="flex gap-2 border-b border-dark-700 pb-2">
           {[
-            { id: 'general', label: 'Genel' },
-            { id: 'commission', label: 'Komisyon' },
+            { id: 'listing', label: 'İlan' },
             { id: 'trade', label: 'Takas' },
+            { id: 'message', label: 'Mesaj' },
+            { id: 'membership', label: 'Üyelik' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -141,10 +216,10 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* General Settings */}
-        {activeTab === 'general' && (
+        {/* Listing Settings */}
+        {activeTab === 'listing' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Genel Ayarlar</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">İlan Ayarları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
@@ -152,6 +227,7 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   value={settings.freeListingLimit}
                   onChange={(e) =>
                     setSettings({ ...settings, freeListingLimit: Number(e.target.value) })
@@ -159,7 +235,41 @@ export default function SettingsPage() {
                   className="admin-input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Ücretsiz üyelerin aylık ilan limiti
+                  Ücretsiz üyelerin ilan limiti
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Premium İlan Limiti
+                </label>
+                <input
+                  type="number"
+                  min="-1"
+                  value={settings.premiumListingLimit}
+                  onChange={(e) =>
+                    setSettings({ ...settings, premiumListingLimit: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Premium üyelerin ilan limiti (-1 = sınırsız)
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Business İlan Limiti
+                </label>
+                <input
+                  type="number"
+                  min="-1"
+                  value={settings.businessListingLimit}
+                  onChange={(e) =>
+                    setSettings({ ...settings, businessListingLimit: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Business üyelerin ilan limiti (-1 = sınırsız)
                 </p>
               </div>
               <div>
@@ -168,12 +278,17 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={settings.minProductPrice}
                   onChange={(e) =>
                     setSettings({ ...settings, minProductPrice: Number(e.target.value) })
                   }
                   className="admin-input"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)
+                </p>
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
@@ -181,94 +296,18 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={settings.maxProductPrice}
                   onChange={(e) =>
                     setSettings({ ...settings, maxProductPrice: Number(e.target.value) })
                   }
                   className="admin-input"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="requireProductApproval"
-                  checked={settings.requireProductApproval}
-                  onChange={(e) =>
-                    setSettings({ ...settings, requireProductApproval: e.target.checked })
-                  }
-                  className="w-5 h-5 rounded"
-                />
-                <label htmlFor="requireProductApproval" className="text-gray-300">
-                  Ürün onayı gerekli
-                </label>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="requireMessageApproval"
-                  checked={settings.requireMessageApproval}
-                  onChange={(e) =>
-                    setSettings({ ...settings, requireMessageApproval: e.target.checked })
-                  }
-                  className="w-5 h-5 rounded"
-                />
-                <label htmlFor="requireMessageApproval" className="text-gray-300">
-                  Şüpheli mesajları onayla
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Commission Settings */}
-        {activeTab === 'commission' && (
-          <div className="space-y-6">
-            <div className="admin-card">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-white">Komisyon Kuralları</h2>
-                <button className="btn-primary text-sm">+ Yeni Kural</button>
-              </div>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Kural</th>
-                    <th>Tip</th>
-                    <th>Alıcı Oranı</th>
-                    <th>Satıcı Oranı</th>
-                    <th>Durum</th>
-                    <th>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {commissionRules.map((rule) => (
-                    <tr key={rule.id}>
-                      <td className="font-medium">{rule.name}</td>
-                      <td>
-                        <span className="badge badge-gray">{rule.type}</span>
-                      </td>
-                      <td>%{rule.buyerRate}</td>
-                      <td>%{rule.sellerRate}</td>
-                      <td>
-                        <button
-                          onClick={() => handleToggleCommissionRule(rule.id, rule.isActive)}
-                          className={`px-3 py-1 rounded-full text-xs ${
-                            rule.isActive
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-gray-600 text-gray-400'
-                          }`}
-                        >
-                          {rule.isActive ? 'Aktif' : 'Pasif'}
-                        </button>
-                      </td>
-                      <td>
-                        <button className="text-primary-400 hover:text-primary-300 text-sm">
-                          Düzenle
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
@@ -292,6 +331,22 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Takas teklifine yanıt süresi
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Ödeme Süresi (Saat)
+                </label>
+                <input
+                  type="number"
+                  value={settings.tradePaymentHours}
+                  onChange={(e) =>
+                    setSettings({ ...settings, tradePaymentHours: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kabul sonrası ödeme süresi (nakit takaslar için)
                 </p>
               </div>
               <div>
@@ -325,6 +380,141 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Teslim sonrası onay süresi
                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Message Settings */}
+        {activeTab === 'message' && (
+          <div className="admin-card">
+            <h2 className="text-lg font-semibold text-white mb-4">Mesaj Ayarları</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Maksimum Mesaj Uzunluğu
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={settings.maxMessageLength}
+                  onChange={(e) =>
+                    setSettings({ ...settings, maxMessageLength: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Bir mesajın maksimum karakter uzunluğu
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Membership Settings */}
+        {activeTab === 'membership' && (
+          <div className="admin-card">
+            <h2 className="text-lg font-semibold text-white mb-4">Üyelik Fiyatları</h2>
+            <div className="space-y-6">
+              {/* Discount Percentage */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Yıllık İndirim Oranı</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      İndirim Yüzdesi (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={settings.yearlyDiscountPercentage}
+                      onChange={(e) =>
+                        setSettings({ ...settings, yearlyDiscountPercentage: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık üyelik için uygulanacak indirim yüzdesi
+                    </p>
+                    <p className="text-xs text-blue-400 mt-2">
+                      Yıllık fiyat = (Aylık Fiyat × 12) × (1 - İndirim%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Premium Tier */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Premium Üyelik</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Aylık Fiyat (₺)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.premiumMonthlyPrice}
+                      onChange={(e) =>
+                        setSettings({ ...settings, premiumMonthlyPrice: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Premium üyeliğin aylık fiyatı
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
+                    </label>
+                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                      {Math.round((settings.premiumMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık fiyat otomatik hesaplanır: {settings.premiumMonthlyPrice} × 12 × (1 - {settings.yearlyDiscountPercentage}%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Tier */}
+              <div className="border border-gray-700 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-white mb-4">Business Üyelik</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Aylık Fiyat (₺)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.businessMonthlyPrice}
+                      onChange={(e) =>
+                        setSettings({ ...settings, businessMonthlyPrice: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Business üyeliğin aylık fiyatı
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
+                    </label>
+                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                      {Math.round((settings.businessMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık fiyat otomatik hesaplanır: {settings.businessMonthlyPrice} × 12 × (1 - {settings.yearlyDiscountPercentage}%)
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

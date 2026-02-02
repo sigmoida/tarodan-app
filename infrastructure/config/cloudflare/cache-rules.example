@@ -1,0 +1,21 @@
+# Cloudflare Cache Rules (Dashboard: Caching > Cache Rules)
+# Domain proxy Cloudflare üzerinden açıkken bu kuralları ekle.
+# Yeni statik path eklediğinde burada da tanımla.
+
+# Kural 1: Next.js statik asset'ler (_next/static) – uzun cache
+# If: URI Path starts with /_next/static/
+# Then: Cache eligibility = Eligible for cache, Edge TTL = 1 month (or Respect existing headers)
+# Neden: Hash'li JS/CSS; deploy'da URL değişir, güvenle cache'lenir.
+
+# Kural 2: Public statik (favicon, logo, images)
+# If: URI Path matches (favicon.ico OR /logo.svg OR /tarodan-logo.jpg OR /images/*)
+# Then: Cache eligibility = Eligible, Edge TTL = 1 week (or Respect existing headers)
+# Neden: next.config.js ile uyumlu; tarayıcı zaten Cache-Control alıyor, Cloudflare de cache'ler.
+
+# Kural 3: API – cache'leme (varsayılan: Bypass cache)
+# If: URI Path starts with /api/
+# Then: Cache eligibility = Bypass cache (veya sadece belirli GET endpoint'lerde kısa TTL)
+# Neden: API çoğunlukla dinamik; yanlış cache kullanıcıya eski veri gösterebilir.
+
+# Not: "Respect existing headers" seçilirse Next.js'in Cache-Control değerleri kullanılır.
+# Cache key: genelde "Include: Query string" kapalı (statik path'lerde query yok).

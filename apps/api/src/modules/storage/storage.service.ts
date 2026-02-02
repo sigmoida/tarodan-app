@@ -3,6 +3,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   OnModuleInit,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
@@ -33,6 +34,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 @Injectable()
 export class StorageService implements OnModuleInit {
+  private readonly logger = new Logger(StorageService.name);
   private minioClient: Minio.Client;
   private readonly buckets = ['products', 'avatars', 'documents', 'collections', 'tickets'];
   private isMinioAvailable = false;
@@ -56,9 +58,9 @@ export class StorageService implements OnModuleInit {
     try {
       await this.ensureBucketsExist();
       this.isMinioAvailable = true;
-      console.log('✅ MinIO connection established');
+      this.logger.log('MinIO connection established');
     } catch (error) {
-      console.warn('⚠️ MinIO is not available. File uploads will be disabled.', error.message);
+      this.logger.warn('MinIO is not available. File uploads will be disabled.');
       this.isMinioAvailable = false;
     }
   }
@@ -79,7 +81,7 @@ export class StorageService implements OnModuleInit {
         const exists = await this.minioClient.bucketExists(bucket);
         if (!exists) {
           await this.minioClient.makeBucket(bucket, 'tr-istanbul');
-          console.log(`✅ Created MinIO bucket: ${bucket}`);
+          this.logger.log('Created MinIO bucket');
 
           // Set public read policy for products and avatars
           if (['products', 'avatars', 'collections'].includes(bucket)) {
@@ -98,7 +100,7 @@ export class StorageService implements OnModuleInit {
           }
         }
       } catch (error) {
-        console.error(`Failed to create bucket ${bucket}:`, error);
+        this.logger.warn('Failed to create bucket');
       }
     }
   }
@@ -184,7 +186,7 @@ export class StorageService implements OnModuleInit {
         mimeType: options.mimeType || 'application/octet-stream',
       };
     } catch (error) {
-      console.error('MinIO upload error:', error);
+      this.logger.error('MinIO upload error');
       throw new InternalServerErrorException('Dosya yükleme başarısız');
     }
   }
@@ -229,7 +231,7 @@ export class StorageService implements OnModuleInit {
       try {
         await this.minioClient.removeObject(bucket, key);
       } catch (error) {
-        console.error('MinIO delete error:', error);
+        this.logger.warn('MinIO delete error');
         // Don't throw - database record is already deleted
       }
     }
@@ -263,7 +265,7 @@ export class StorageService implements OnModuleInit {
     try {
       return await this.minioClient.presignedPutObject(bucket, key, expirySeconds);
     } catch (error) {
-      console.error('MinIO presigned URL error:', error);
+      this.logger.error('MinIO presigned URL error');
       throw new InternalServerErrorException('Presigned URL oluşturulamadı');
     }
   }
@@ -283,7 +285,7 @@ export class StorageService implements OnModuleInit {
     try {
       return await this.minioClient.presignedGetObject(bucket, key, expirySeconds);
     } catch (error) {
-      console.error('MinIO presigned URL error:', error);
+      this.logger.error('MinIO presigned URL error');
       throw new InternalServerErrorException('Presigned URL oluşturulamadı');
     }
   }

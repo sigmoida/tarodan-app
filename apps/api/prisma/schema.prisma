@@ -101,6 +101,19 @@ enum SellerType {
   platform
 }
 
+enum CommissionAppliesTo {
+  SELLER
+  BUYER
+  BOTH
+}
+
+enum CommissionSellerType {
+  FREE
+  PREMIUM
+  BUSINESS
+  ALL
+}
+
 // =============================================================================
 // GAP-001: TRADE SYSTEM ENUMS (BLOCKER FIX)
 // =============================================================================
@@ -1132,6 +1145,8 @@ model Order {
   totalAmount       Decimal     @map("total_amount") @db.Decimal(10, 2)
   shippingCost      Decimal     @default(0) @map("shipping_cost") @db.Decimal(10, 2)
   commissionAmount  Decimal     @map("commission_amount") @db.Decimal(10, 2)
+  buyerFeeAmount    Decimal     @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
+  sellerFeeAmount   Decimal     @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
   status            OrderStatus @default(pending_payment)
   shippingAddress   Json?       @map("shipping_address") // Snapshot of address at order time
   createdAt         DateTime    @default(now()) @map("created_at")
@@ -1286,25 +1301,36 @@ model ShipmentEvent {
 // =============================================================================
 
 model CommissionRule {
-  id             String              @id @default(uuid())
+  id             String                @id @default(uuid())
   name           String
-  ruleType       CommissionRuleType  @map("rule_type")
-  categoryId     String?             @map("category_id")
-  sellerType     SellerType?         @map("seller_type")
-  membershipTier MembershipTierType? @map("membership_tier") // Per-tier commission
-  minAmount      Decimal?            @map("min_amount") @db.Decimal(10, 2) // Min order amount
-  percentage     Decimal             @db.Decimal(5, 4) // e.g., 0.0500 = 5%
-  minCommission  Decimal?            @map("min_commission") @db.Decimal(10, 2)
-  maxCommission  Decimal?            @map("max_commission") @db.Decimal(10, 2)
-  isActive       Boolean             @default(true) @map("is_active")
-  priority       Int                 @default(0)
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
+  ruleType       CommissionRuleType     @map("rule_type")
+  categoryId     String?                @map("category_id")
+  sellerType     CommissionSellerType?  @map("seller_type")
+  membershipTier MembershipTierType?    @map("membership_tier") // Per-tier commission
+  minAmount      Decimal?               @map("min_amount") @db.Decimal(10, 2) // Min order amount
+  percentage     Decimal                @db.Decimal(5, 4) // e.g., 0.0500 = 5% (legacy)
+  minCommission  Decimal?               @map("min_commission") @db.Decimal(10, 2) // Legacy
+  maxCommission  Decimal?               @map("max_commission") @db.Decimal(10, 2) // Legacy
+  isActive       Boolean                @default(true) @map("is_active")
+  priority       Int                    @default(0)
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  // New fields
+  appliesTo      CommissionAppliesTo    @default(SELLER) @map("applies_to")
+  sellerRate     Decimal?               @map("seller_rate") @db.Decimal(5, 4)
+  buyerRate      Decimal?               @map("buyer_rate") @db.Decimal(5, 4)
+  sellerMin      Decimal?               @map("seller_min") @db.Decimal(10, 2)
+  sellerMax      Decimal?               @map("seller_max") @db.Decimal(10, 2)
+  buyerMin       Decimal?               @map("buyer_min") @db.Decimal(10, 2)
+  buyerMax       Decimal?               @map("buyer_max") @db.Decimal(10, 2)
 
   // Relations
   category Category? @relation(fields: [categoryId], references: [id])
 
   @@index([isActive])
+  @@index([categoryId, sellerType, isActive])
+  @@index([sellerType, isActive])
   @@map("commission_rules")
 }
 

@@ -22,14 +22,19 @@ export default function LoginPage() {
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (prefer sessionStorage so redirect is not lost when URL is stripped)
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Login] Already authenticated, redirecting...');
-      const redirect = new URLSearchParams(window.location.search).get('redirect');
-      router.push(redirect || '/');
+    if (isAuthenticated && typeof window !== 'undefined') {
+      let redirect: string | null = null;
+      try {
+        redirect = sessionStorage.getItem('login_redirect');
+        if (redirect) sessionStorage.removeItem('login_redirect');
+      } catch (_) {}
+      if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
+      const target = redirect && redirect.startsWith('/') ? redirect : '/';
+      window.location.href = target;
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -38,16 +43,21 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    console.log('[Login] Attempting login with:', email);
-    
+
     try {
       await login(email, password);
-      console.log('[Login] Login successful!');
       toast.success(t('auth.loginSuccess'));
-      // Use window.location for reliable redirect
-      window.location.href = '/';
+      let redirect: string | null = null;
+      try {
+        redirect = sessionStorage.getItem('login_redirect');
+        if (redirect) sessionStorage.removeItem('login_redirect');
+      } catch (_) {}
+      if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
+      window.location.href = redirect && redirect.startsWith('/') ? redirect : '/';
     } catch (error: any) {
-      console.error('[Login] Login error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Login] Login error:', error);
+      }
       const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
       
       // Check if error is about unverified email

@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import {
@@ -26,6 +27,8 @@ import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
 
 @Injectable()
 export class MembershipService {
+  private readonly logger = new Logger(MembershipService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
@@ -92,13 +95,66 @@ export class MembershipService {
       });
     }
 
-    // Get usage stats
+    // Map tier to DTO first
+    let tierDto = this.mapTierToDto(membership.tier);
+    
+    // Override listing limits based on tier type if platform setting exists
+    // This must be done BEFORE getUserUsageStats so it uses the correct limit
+    if (membership.tier.type === MembershipTierType.free) {
+      const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'free_listing_limit' },
+      });
+      if (freeListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit) && platformLimit > 0) {
+          tierDto.maxFreeListings = platformLimit;
+          tierDto.maxTotalListings = platformLimit; // For free tier, total = free
+          // Also update the tier object so getUserUsageStats uses the correct value
+          membership.tier.maxFreeListings = platformLimit;
+          membership.tier.maxTotalListings = platformLimit;
+        }
+      }
+    } else if (membership.tier.type === MembershipTierType.premium) {
+      const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'premium_listing_limit' },
+      });
+      if (premiumListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit)) {
+          if (platformLimit === -1) {
+            tierDto.maxTotalListings = -1; // Unlimited
+            membership.tier.maxTotalListings = -1;
+          } else if (platformLimit > 0) {
+            tierDto.maxTotalListings = platformLimit;
+            membership.tier.maxTotalListings = platformLimit;
+          }
+        }
+      }
+    } else if (membership.tier.type === MembershipTierType.business) {
+      const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'business_listing_limit' },
+      });
+      if (businessListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit)) {
+          if (platformLimit === -1) {
+            tierDto.maxTotalListings = -1; // Unlimited
+            membership.tier.maxTotalListings = -1;
+          } else if (platformLimit > 0) {
+            tierDto.maxTotalListings = platformLimit;
+            membership.tier.maxTotalListings = platformLimit;
+          }
+        }
+      }
+    }
+
+    // Get usage stats (this will use the overridden maxFreeListings)
     const stats = await this.getUserUsageStats(userId, membership.tier);
 
     return {
       id: membership.id,
       userId: membership.userId,
-      tier: this.mapTierToDto(membership.tier),
+      tier: tierDto,
       status: membership.status,
       autoRenew: membership.autoRenew,
       paymentMethodId: membership.paymentMethodId || undefined,
@@ -114,23 +170,87 @@ export class MembershipService {
   // GET USER'S MEMBERSHIP LIMITS (for checking permissions)
   // ==========================================================================
   async getUserLimits(userId: string): Promise<MembershipLimitsDto> {
-    const membership = await this.getUserMembership(userId);
+    try {
+      if (!userId) {
+        throw new BadRequestException('Kullanıcı kimliği bulunamadı');
+      }
 
-    return {
-      canCreateListing: membership.remainingTotalListings > 0,
-      canUseFreeSlot: membership.remainingFreeListings > 0,
-      canTrade: membership.tier.canTrade,
-      canCreateCollection: membership.tier.canCreateCollections,
-      maxImages: membership.tier.maxImagesPerListing,
-      maxFreeListings: membership.tier.maxFreeListings,
-      maxTotalListings: membership.tier.maxTotalListings,
-      remainingFreeListings: membership.remainingFreeListings,
-      remainingTotalListings: membership.remainingTotalListings,
-      remainingFeaturedSlots: membership.remainingFeaturedSlots,
-      commissionDiscount: membership.tier.commissionDiscount,
-      tierName: membership.tier.name,
-      tierType: membership.tier.type,
-    };
+      const membership = await this.getUserMembership(userId);
+
+      if (!membership || !membership.tier) {
+        throw new NotFoundException('Üyelik bilgisi bulunamadı');
+      }
+
+      // getUserUsageStats already handles platform setting override for all tiers
+      // We just need to ensure maxFreeListings and maxTotalListings reflect the platform setting override
+      let maxFreeListings = membership.tier.maxFreeListings;
+      let maxTotalListings = membership.tier.maxTotalListings;
+      
+      if (membership.tier.type === MembershipTierType.free) {
+        const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
+          where: { settingKey: 'free_listing_limit' },
+        });
+        if (freeListingLimitSetting?.settingValue) {
+          const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+          if (!isNaN(platformLimit) && platformLimit > 0) {
+            maxFreeListings = platformLimit;
+            maxTotalListings = platformLimit; // For free tier, total = free
+          }
+        }
+      } else if (membership.tier.type === MembershipTierType.premium) {
+        const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
+          where: { settingKey: 'premium_listing_limit' },
+        });
+        if (premiumListingLimitSetting?.settingValue) {
+          const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+          if (!isNaN(platformLimit)) {
+            if (platformLimit === -1) {
+              maxTotalListings = -1; // Unlimited
+            } else if (platformLimit > 0) {
+              maxTotalListings = platformLimit;
+            }
+          }
+        }
+      } else if (membership.tier.type === MembershipTierType.business) {
+        const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
+          where: { settingKey: 'business_listing_limit' },
+        });
+        if (businessListingLimitSetting?.settingValue) {
+          const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+          if (!isNaN(platformLimit)) {
+            if (platformLimit === -1) {
+              maxTotalListings = -1; // Unlimited
+            } else if (platformLimit > 0) {
+              maxTotalListings = platformLimit;
+            }
+          }
+        }
+      }
+
+      return {
+        canCreateListing: membership.remainingTotalListings === -1 || membership.remainingTotalListings > 0, // -1 means unlimited
+        canUseFreeSlot: membership.remainingFreeListings > 0,
+        canTrade: membership.tier.canTrade,
+        canCreateCollection: membership.tier.canCreateCollections,
+        maxImages: membership.tier.maxImagesPerListing,
+        maxFreeListings: maxFreeListings, // Use platform setting override for free tier
+        maxTotalListings: maxTotalListings, // Use platform setting override for all tiers
+        remainingFreeListings: membership.remainingFreeListings, // Already calculated correctly by getUserUsageStats
+        remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
+        remainingFeaturedSlots: membership.remainingFeaturedSlots,
+        commissionDiscount: membership.tier.commissionDiscount,
+        tierName: membership.tier.name,
+        tierType: membership.tier.type,
+      };
+    } catch (error) {
+      this.logger.warn('getUserLimits failed');
+      // Re-throw known exceptions
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      // Wrap unknown errors
+      throw new BadRequestException(`Üyelik limitleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    }
   }
 
   // ==========================================================================
@@ -544,7 +664,7 @@ export class MembershipService {
         });
         downgradeCount++;
       } catch (error) {
-        console.error(`Failed to downgrade membership ${membership.id}:`, error);
+        this.logger.warn('Failed to downgrade membership');
       }
     }
 
@@ -614,8 +734,53 @@ export class MembershipService {
     // Count featured listings (placeholder - would need featured flag on product)
     const featuredListings = 0;
 
+    // Check platform setting for listing limit override based on tier type
+    let maxFreeListings = tier.maxFreeListings;
+    let maxTotalListings = tier.maxTotalListings;
+    
+    if (tier.type === MembershipTierType.free) {
+      const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'free_listing_limit' },
+      });
+      if (freeListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit) && platformLimit > 0) {
+          maxFreeListings = platformLimit;
+          maxTotalListings = platformLimit; // For free tier, total = free
+        }
+      }
+    } else if (tier.type === MembershipTierType.premium) {
+      const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'premium_listing_limit' },
+      });
+      if (premiumListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit)) {
+          if (platformLimit === -1) {
+            maxTotalListings = -1; // Unlimited
+          } else if (platformLimit > 0) {
+            maxTotalListings = platformLimit;
+          }
+        }
+      }
+    } else if (tier.type === MembershipTierType.business) {
+      const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'business_listing_limit' },
+      });
+      if (businessListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit)) {
+          if (platformLimit === -1) {
+            maxTotalListings = -1; // Unlimited
+          } else if (platformLimit > 0) {
+            maxTotalListings = platformLimit;
+          }
+        }
+      }
+    }
+
     // Calculate remaining
-    const usedFreeListings = Math.min(activeListings, tier.maxFreeListings);
+    const usedFreeListings = Math.min(activeListings, maxFreeListings);
     const usedTotalListings = activeListings;
     const usedFeaturedSlots = featuredListings;
 
@@ -623,8 +788,10 @@ export class MembershipService {
       usedFreeListings,
       usedTotalListings,
       usedFeaturedSlots,
-      remainingFreeListings: Math.max(0, tier.maxFreeListings - usedFreeListings),
-      remainingTotalListings: Math.max(0, tier.maxTotalListings - usedTotalListings),
+      remainingFreeListings: Math.max(0, maxFreeListings - usedFreeListings),
+      remainingTotalListings: maxTotalListings === -1 
+        ? -1 // Unlimited
+        : Math.max(0, maxTotalListings - usedTotalListings),
       remainingFeaturedSlots: Math.max(0, tier.featuredListingSlots - usedFeaturedSlots),
     };
   }

@@ -6,7 +6,7 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
-import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface Collection {
@@ -96,7 +96,7 @@ export default function EditCollectionPage() {
       setCoverImagePreview(data.coverImageUrl || '');
       setIsPublic(data.isPublic ?? true);
     } catch (error: any) {
-      console.error('Fetch collection error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Fetch collection error:', error);
       setError(error.response?.data?.message || t('collection.loadFailed'));
       toast.error(t('collection.loadFailed'));
     } finally {
@@ -133,7 +133,7 @@ export default function EditCollectionPage() {
         toast.success('Kapak resmi yüklendi');
       }
     } catch (error: any) {
-      console.error('Cover image upload error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Cover image upload error:', error);
       toast.error(error.response?.data?.message || 'Kapak resmi yüklenemedi');
       setCoverImageFile(null);
       setCoverImagePreview(coverImageUrl);
@@ -169,7 +169,7 @@ export default function EditCollectionPage() {
       const redirectPath = collection.slug || collection.id;
       router.push(`/collections/${redirectPath}`);
     } catch (error: any) {
-      console.error('Update collection error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Update collection error:', error);
       toast.error(error.response?.data?.message || t('collection.loadFailed'));
     } finally {
       setIsSaving(false);
@@ -188,7 +188,7 @@ export default function EditCollectionPage() {
       toast.success(t('collection.collectionDeleted'));
       router.push('/collections');
     } catch (error: any) {
-      console.error('Delete collection error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Delete collection error:', error);
       toast.error(error.response?.data?.message || t('collection.loadFailed'));
       setIsDeleting(false);
     }
@@ -285,12 +285,12 @@ export default function EditCollectionPage() {
               <div className="space-y-3">
                 {coverImagePreview && (
                   <div className="relative w-full h-48 rounded-xl overflow-hidden border border-gray-300">
-                    <Image
+                    <OptimizedImage
                       src={coverImagePreview}
                       alt="Cover preview"
                       fill
                       className="object-cover"
-                      unoptimized
+                      logContext={{ page: 'collection-edit-cover' }}
                     />
                   </div>
                 )}

@@ -84,7 +84,7 @@ export function LanguageProvider({ children, defaultLocale = 'tr' }: LanguagePro
         return interpolate(fallback, params);
       }
       // Return key if not found anywhere (for debugging)
-      console.warn(`Translation key not found: ${key}`);
+      if (process.env.NODE_ENV === 'development') console.warn(`Translation key not found: ${key}`);
       return key;
     }
     return interpolate(value, params);

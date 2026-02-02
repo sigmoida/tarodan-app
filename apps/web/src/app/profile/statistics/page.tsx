@@ -131,7 +131,7 @@ export default function StatisticsPage() {
         });
       }
     } catch (error) {
-      console.error('Statistics load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Statistics load error:', error);
       // Set default stats to prevent error state
       setStats({
         productsCount: 0,
@@ -148,7 +148,7 @@ export default function StatisticsPage() {
         reviewsCount: 0,
         totalRevenue: 0,
         totalSpent: 0,
-        memberSince: user?.createdAt || new Date().toISOString(),
+        memberSince: user?.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString()) : new Date().toISOString(),
         membershipTier: user?.membershipTier || 'free',
       });
     } finally {

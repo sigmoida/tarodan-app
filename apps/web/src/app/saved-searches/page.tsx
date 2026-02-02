@@ -49,7 +49,7 @@ export default function SavedSearchesPage() {
         setSavedSearches(searches);
       }
     } catch (error) {
-      console.error('Failed to load saved searches:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to load saved searches:', error);
     } finally {
       setIsLoading(false);
     }

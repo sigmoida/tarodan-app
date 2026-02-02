@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { PlusIcon, PencilIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -24,10 +25,9 @@ interface Address {
 
 export default function AddressesPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -46,21 +46,21 @@ export default function AddressesPage() {
       router.push('/login?redirect=/profile/addresses');
       return;
     }
-    fetchAddresses();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
-  const fetchAddresses = async () => {
-    setIsLoading(true);
-    try {
+  const addressesQuery = useQuery({
+    queryKey: ['profile-addresses'],
+    queryFn: async (): Promise<Address[]> => {
       const response = await addressesApi.getAll();
-      setAddresses(response.data.data || response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch addresses:', error);
-      toast.error(t('address.loadFailed'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return response.data.data || response.data || [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'profile-addresses' },
+  });
+  const addresses = addressesQuery.data ?? [];
+  const isLoading = addressesQuery.isLoading;
+
+  const invalidateAddresses = () => queryClient.invalidateQueries({ queryKey: ['profile-addresses'] });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,9 +75,9 @@ export default function AddressesPage() {
       setShowForm(false);
       setEditingId(null);
       resetForm();
-      fetchAddresses();
+      await invalidateAddresses();
     } catch (error: any) {
-      console.error('Failed to save address:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to save address:', error);
       toast.error(error.response?.data?.message || t('address.saveFailed'));
     }
   };
@@ -98,15 +98,13 @@ export default function AddressesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('address.deleteConfirm'))) {
-      return;
-    }
+    if (!confirm(t('address.deleteConfirm'))) return;
     try {
       await addressesApi.delete(id);
       toast.success(t('address.deleted'));
-      fetchAddresses();
+      await invalidateAddresses();
     } catch (error: any) {
-      console.error('Failed to delete address:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to delete address:', error);
       toast.error(t('address.deleteFailed'));
     }
   };
@@ -115,9 +113,9 @@ export default function AddressesPage() {
     try {
       await addressesApi.setDefault(id);
       toast.success(t('address.defaultUpdated'));
-      fetchAddresses();
+      await invalidateAddresses();
     } catch (error: any) {
-      console.error('Failed to set default address:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to set default address:', error);
       toast.error(t('address.defaultFailed'));
     }
   };

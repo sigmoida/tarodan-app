@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import {
   HeartIcon,
@@ -19,8 +20,14 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import AuthRequiredModal from '@/components/AuthRequiredModal';
+import dynamic from 'next/dynamic';
+import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
+
+const AuthRequiredModal = dynamic(
+  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
+  { ssr: false }
+);
 
 interface UserProduct {
   id: string;
@@ -72,21 +79,17 @@ const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 export default function CollectionDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
-  const [collection, setCollection] = useState<Collection | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [myProducts, setMyProducts] = useState<UserProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  // Custom product form state
   const [customTitle, setCustomTitle] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [customBrand, setCustomBrand] = useState('');
@@ -97,86 +100,50 @@ export default function CollectionDetailPage() {
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'products' | 'custom'>('products');
 
-  useEffect(() => {
-    if (collectionIdOrSlug) {
-      fetchCollection();
-    }
-  }, [collectionIdOrSlug]);
-
-  const fetchCollection = async () => {
-    if (!collectionIdOrSlug) {
-      setError(t('collection.invalidLink'));
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Remove 'collection-' prefix if present (legacy URL format)
+  const collectionQuery = useQuery({
+    queryKey: ['collection', collectionIdOrSlug],
+    queryFn: async (): Promise<Collection> => {
       let idOrSlug = collectionIdOrSlug;
       if (idOrSlug.startsWith('collection-')) {
         idOrSlug = idOrSlug.replace('collection-', '');
       }
-      
-      // Try UUID endpoint first if it looks like a UUID, otherwise try slug
-      let response;
-      if (isUUID(idOrSlug)) {
-        response = await collectionsApi.getOne(idOrSlug);
-      } else {
-        response = await collectionsApi.getBySlug(idOrSlug);
-      }
-      const data = response.data.collection || response.data;
-      setCollection(data);
-      // Set initial like state from API
-      if (data.isLiked !== undefined) {
-        setIsLiked(data.isLiked);
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch collection:', error);
-      const status = error.response?.status;
-      if (status === 400) {
-        setError(t('collection.invalidLink'));
-      } else if (status === 403) {
-        setError(t('collection.privateCollection'));
-      } else if (status === 404) {
-        setError(t('collection.collectionNotFound'));
-      } else {
-        setError(t('collection.loadFailed'));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const response = isUUID(idOrSlug)
+        ? await collectionsApi.getOne(idOrSlug)
+        : await collectionsApi.getBySlug(idOrSlug);
+      return response.data.collection || response.data;
+    },
+    enabled: !!collectionIdOrSlug,
+    meta: { page: 'collection-detail' },
+  });
+  const collection = collectionQuery.data ?? null;
+  const isLoading = collectionQuery.isLoading;
+  const isLiked = collection?.isLiked ?? false;
+
+  const error = useMemo(() => {
+    if (!collectionIdOrSlug) return t('collection.invalidLink');
+    if (!collectionQuery.isError) return null;
+    const err = collectionQuery.error as any;
+    const status = err?.response?.status;
+    if (status === 400) return t('collection.invalidLink');
+    if (status === 403) return t('collection.privateCollection');
+    if (status === 404) return t('collection.collectionNotFound');
+    return t('collection.loadFailed');
+  }, [collectionIdOrSlug, collectionQuery.isError, collectionQuery.error, t]);
 
   const handleLike = async () => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
-
-    if (!collection || !collection.id) {
+    if (!collection?.id) {
       toast.error(t('collection.collectionInfoNotFound'));
       return;
     }
-
     try {
-      // Use the actual collection.id (UUID) from the loaded collection object
-      // This ensures we always use the correct ID regardless of URL format
-      const idToUse = collection.id;
-      console.log('Liking collection with ID:', idToUse, 'URL param was:', collectionIdOrSlug);
-      const response = await collectionsApi.like(idToUse);
-      const { liked, likeCount } = response.data || {};
-      
-      setIsLiked(liked !== undefined ? liked : !isLiked);
-      setCollection({
-        ...collection,
-        likeCount: likeCount !== undefined ? likeCount : collection.likeCount,
-        isLiked: liked !== undefined ? liked : !isLiked,
-      });
-      toast.success(liked ? t('collection.liked') : t('collection.unliked'));
+      await collectionsApi.like(collection.id);
+      toast.success(isLiked ? t('collection.unliked') : t('collection.liked'));
+      await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
-      console.error('Failed to like collection:', error);
       const errorMessage = error?.response?.data?.message || error?.message || t('collection.likeFailed');
       if (error?.response?.status === 404) {
         toast.error(t('collection.collectionNotFound'));
@@ -188,17 +155,13 @@ export default function CollectionDetailPage() {
 
   const handleRemoveItem = async (itemId: string) => {
     if (!collection) return;
-
-    if (!confirm(t('collection.removeProductConfirm'))) {
-      return;
-    }
-
+    if (!confirm(t('collection.removeProductConfirm'))) return;
     try {
       await collectionsApi.removeItem(collection.id, itemId);
       toast.success(t('collection.productRemoved'));
-      fetchCollection();
+      await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
-      console.error('Failed to remove item:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to remove item:', error);
       toast.error(t('collection.productRemoveFailed'));
     }
   };
@@ -213,7 +176,7 @@ export default function CollectionDetailPage() {
       const availableProducts = products.filter((p: UserProduct) => !existingProductIds.includes(p.id));
       setMyProducts(availableProducts);
     } catch (error) {
-      console.error('Failed to fetch my products:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch my products:', error);
       toast.error(t('collection.productsLoadFailed'));
     } finally {
       setLoadingProducts(false);
@@ -266,9 +229,9 @@ export default function CollectionDetailPage() {
       setCustomScale('');
       setCustomImageFile(null);
       setCustomImagePreview(null);
-      fetchCollection();
+      await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
-      console.error('Failed to add custom item:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add custom item:', error);
       toast.error(error.response?.data?.message || t('collection.productsAddFailed'));
     } finally {
       setAddingItem(false);
@@ -291,9 +254,9 @@ export default function CollectionDetailPage() {
       toast.success(`${selectedProductIds.length} ${t('collection.productsAddedToCollection')}`);
       setShowAddItemModal(false);
       setSelectedProductIds([]);
-      fetchCollection();
+      await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
-      console.error('Failed to add items:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add items:', error);
       toast.error(error.response?.data?.message || t('collection.productsAddFailed'));
     } finally {
       setAddingItem(false);
@@ -375,11 +338,13 @@ export default function CollectionDetailPage() {
           {/* Cover Image */}
           <div className="aspect-video bg-gray-700 rounded-xl overflow-hidden mb-6 relative">
             {collection.coverImageUrl ? (
-              <Image
+              <OptimizedImage
                 src={collection.coverImageUrl}
                 alt={collection.name}
                 fill
                 className="object-cover"
+                fallbackSrc="https://placehold.co/1200x400/f3f4f6/9ca3af?text=Koleksiyon"
+                logContext={{ collectionId: collection.id, page: 'collection-detail-cover' }}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-6xl">
@@ -506,15 +471,13 @@ export default function CollectionDetailPage() {
                         className="block"
                       >
                         <div className="aspect-square bg-gray-100 relative">
-                          <Image
+                          <OptimizedImage
                             src={getItemImage(item)}
                             alt={item.productTitle}
                             fill
                             className="object-cover"
-                            unoptimized
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=%C3%9Cr%C3%BCn';
-                            }}
+                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                            logContext={{ itemId: item.id, page: 'collection-detail-linked' }}
                           />
                         </div>
                         <div className="p-4">
@@ -531,15 +494,13 @@ export default function CollectionDetailPage() {
                     ) : (
                       <>
                         <div className="aspect-square bg-gray-100 relative">
-                          <Image
+                          <OptimizedImage
                             src={item.customImageUrl || item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
                             alt={item.productTitle}
                             fill
                             className="object-cover"
-                            unoptimized
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                            }}
+                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                            logContext={{ itemId: item.id, page: 'collection-detail-custom' }}
                           />
                         </div>
                         <div className="p-4">

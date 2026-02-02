@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
       setIsSuccess(true);
       toast.success(locale === 'tr' ? 'Şifreniz başarıyla değiştirildi!' : 'Password changed successfully!');
     } catch (error: any) {
-      console.error('Failed to reset password:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to reset password:', error);
       const errorMessage = error.response?.data?.message || (locale === 'tr' ? 'Şifre sıfırlama başarısız' : 'Password reset failed');
       setError(errorMessage);
       toast.error(errorMessage);

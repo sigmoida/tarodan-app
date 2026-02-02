@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { ConfigService } from '@nestjs/config';
@@ -20,6 +21,7 @@ import {
 
 @Injectable()
 export class SecurityService {
+  private readonly logger = new Logger(SecurityService.name);
   private readonly SECRET_BYTES = 20;
   private readonly TOKEN_EXPIRY_HOURS = 24;
   private readonly ADMIN_SESSION_TIMEOUT_MINUTES = 30;
@@ -283,7 +285,7 @@ export class SecurityService {
 
     // TODO: Send email with reset link
     // In production, integrate with email service
-    console.log(`Password reset token for ${email}: ${token}`);
+    this.logger.log('Password reset token created');
   }
 
   /**
@@ -396,7 +398,7 @@ export class SecurityService {
     });
 
     // TODO: Send email with verification link
-    console.log(`Email verification token for ${targetEmail}: ${token}`);
+    this.logger.log('Email verification token created');
   }
 
   /**

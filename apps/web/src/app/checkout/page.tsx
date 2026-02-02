@@ -84,6 +84,19 @@ export default function CheckoutPage() {
     zipCode: '',
   });
 
+  // Billing address: same as shipping (default) or different
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<string | null>(null);
+  const [newBillingAddress, setNewBillingAddress] = useState<Omit<Address, 'id'>>({
+    title: '',
+    fullName: '',
+    phone: '',
+    city: '',
+    district: '',
+    address: '',
+    zipCode: '',
+  });
+
   // Shipping cost state
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -220,7 +233,7 @@ export default function CheckoutPage() {
         setUseNewCard(false);
       }
     } catch (error) {
-      console.error('Failed to fetch saved cards:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch saved cards:', error);
       setSavedCards([]);
     }
   };
@@ -278,7 +291,7 @@ export default function CheckoutPage() {
         const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
         setShippingCost(baseRate + carrierExtra);
       } catch (error) {
-        console.error('Failed to calculate shipping:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Failed to calculate shipping:', error);
         setShippingCost(49.90); // Default fallback
       } finally {
         setShippingLoading(false);
@@ -308,7 +321,7 @@ export default function CheckoutPage() {
         },
       });
     } catch (error) {
-      console.error('Failed to fetch product:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch product:', error);
       toast.error(t('product.loadFailed'));
       router.push('/listings');
     }
@@ -331,7 +344,7 @@ export default function CheckoutPage() {
         setShowAddressForm(true);
       }
     } catch (error) {
-      console.error('Failed to fetch addresses:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch addresses:', error);
       setAddresses([]);
       // On error, show address form so user can still checkout
       setShowAddressForm(true);
@@ -346,7 +359,6 @@ export default function CheckoutPage() {
 
     try {
       const response = await addressesApi.create({
-        title: newAddress.title || (locale === 'en' ? 'Home' : 'Ev'),
         fullName: newAddress.fullName,
         phone: newAddress.phone,
         city: newAddress.city,
@@ -375,7 +387,7 @@ export default function CheckoutPage() {
         toast.error(locale === 'en' ? 'Failed to add address' : 'Adres eklenemedi');
       }
     } catch (error: any) {
-      console.error('Failed to add address:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add address:', error);
       toast.error(error.response?.data?.message || t('checkout.addressAddError'));
     }
   };
@@ -394,15 +406,17 @@ export default function CheckoutPage() {
       // Check if form has all required fields including phone
       const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
       
-      console.log('=== CHECKOUT DEBUG ===');
-      console.log('isAuthenticated:', isAuthenticated);
-      console.log('selectedAddressId:', selectedAddressId);
-      console.log('addresses.length:', addresses.length);
-      console.log('hasSavedAddress:', hasSavedAddress);
-      console.log('newAddress:', JSON.stringify(newAddress, null, 2));
-      console.log('hasFormAddress:', hasFormAddress);
-      console.log('showAddressForm:', showAddressForm);
-      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== CHECKOUT DEBUG ===');
+        console.log('isAuthenticated:', isAuthenticated);
+        console.log('selectedAddressId:', selectedAddressId);
+        console.log('addresses.length:', addresses.length);
+        console.log('hasSavedAddress:', hasSavedAddress);
+        console.log('newAddress:', JSON.stringify(newAddress, null, 2));
+        console.log('hasFormAddress:', hasFormAddress);
+        console.log('showAddressForm:', showAddressForm);
+      }
+
       // Get shipping address - prefer saved address for logged-in users, otherwise use form
       let shippingAddress: any;
       let contactEmail: string;
@@ -539,6 +553,8 @@ export default function CheckoutPage() {
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
               couponCode?: string;
+              billingAddressId?: string;
+              billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
             } = {
               productId: item.productId,
               ...(appliedCoupon && { couponCode: appliedCoupon.code }),
@@ -546,42 +562,59 @@ export default function CheckoutPage() {
             
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;
-            } else if (shippingAddress) {
-              // Validate all required fields are not empty
-              if (!shippingAddress.fullName?.trim()) {
-                throw new Error('Teslimat adresi için ad soyad gereklidir');
-              }
-              if (!shippingAddress.phone?.trim()) {
-                throw new Error('Teslimat adresi için telefon gereklidir');
-              }
-              if (!shippingAddress.city?.trim()) {
-                throw new Error('Teslimat adresi için şehir gereklidir');
-              }
-              if (!shippingAddress.district?.trim()) {
-                throw new Error('Teslimat adresi için ilçe gereklidir');
-              }
-              if (!shippingAddress.address?.trim()) {
-                throw new Error('Teslimat adresi için açık adres gereklidir');
-              }
-              // Remove spaces from phone number for API
-              const cleanPhone = shippingAddress.phone.replace(/\s/g, '');
-              // Add +90 prefix if not present
-              const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : 
-                                     cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
-              
-              payload.shippingAddress = {
-                fullName: shippingAddress.fullName.trim(),
-                phone: formattedPhone,
-                city: shippingAddress.city.trim(),
-                district: shippingAddress.district.trim(),
-                address: shippingAddress.address.trim(),
-                zipCode: shippingAddress.zipCode?.trim() || undefined,
+            }
+            if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
+              const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
+              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              payload.billingAddress = {
+                fullName: newBillingAddress.fullName.trim(),
+                phone: formattedBillingPhone,
+                city: newBillingAddress.city.trim(),
+                district: newBillingAddress.district.trim(),
+                address: newBillingAddress.address.trim(),
+                zipCode: newBillingAddress.zipCode?.trim() || undefined,
               };
-            } else {
-              throw new Error(locale === 'en' ? 'Shipping address not found' : 'Teslimat adresi bulunamadı');
+            } else if (!billingSameAsShipping && selectedBillingAddressId && selectedBillingAddressId !== validAddressId) {
+              payload.billingAddressId = selectedBillingAddressId;
+            }
+            if (!validAddressId) {
+              // Use shippingAddress from above, or fallback to newAddress if form was filled (edge case)
+              const addr = shippingAddress || (hasFormAddress && newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address
+                ? {
+                    fullName: newAddress.fullName,
+                    phone: newAddress.phone || user?.phone || '',
+                    city: newAddress.city,
+                    district: newAddress.district,
+                    address: newAddress.address,
+                    zipCode: newAddress.zipCode,
+                  }
+                : null);
+              if (addr) {
+                if (!addr.fullName?.trim()) throw new Error('Teslimat adresi için ad soyad gereklidir');
+                if (!addr.phone?.trim()) throw new Error('Teslimat adresi için telefon gereklidir');
+                if (!addr.city?.trim()) throw new Error('Teslimat adresi için şehir gereklidir');
+                if (!addr.district?.trim()) throw new Error('Teslimat adresi için ilçe gereklidir');
+                if (!addr.address?.trim()) throw new Error('Teslimat adresi için açık adres gereklidir');
+                const cleanPhone = addr.phone.replace(/\s/g, '');
+                const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
+                payload.shippingAddress = {
+                  fullName: addr.fullName.trim(),
+                  phone: formattedPhone,
+                  city: addr.city.trim(),
+                  district: addr.district.trim(),
+                  address: addr.address.trim(),
+                  zipCode: addr.zipCode?.trim() || undefined,
+                };
+              } else {
+                toast.error(locale === 'en' ? 'Please select or enter a shipping address' : 'Lütfen bir teslimat adresi seçin veya girin');
+                setIsLoading(false);
+                return;
+              }
             }
             
-            console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            if (process.env.NODE_ENV === 'development') {
+              console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
+            }
             orderResponse = await ordersApi.directBuy(payload);
           } else {
             // Guest user: use guest checkout endpoint
@@ -594,7 +627,14 @@ export default function CheckoutPage() {
             const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone : 
                                        cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
             
-            const guestPayload = {
+            const guestPayload: {
+              productId: string;
+              email: string;
+              phone: string;
+              guestName: string;
+              shippingAddress: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
+              billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
+            } = {
               productId: item.productId,
               email: contactEmail,
               phone: formattedContactPhone,
@@ -604,18 +644,26 @@ export default function CheckoutPage() {
                 phone: formattedAddrPhone,
               },
             };
+            if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
+              const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
+              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              guestPayload.billingAddress = {
+                fullName: newBillingAddress.fullName.trim(),
+                phone: formattedBillingPhone,
+                city: newBillingAddress.city.trim(),
+                district: newBillingAddress.district.trim(),
+                address: newBillingAddress.address.trim(),
+                zipCode: newBillingAddress.zipCode?.trim() || undefined,
+              };
+            }
             
-            console.log('Guest checkout payload:', JSON.stringify(guestPayload, null, 2));
             orderResponse = await ordersApi.createGuest(guestPayload);
           }
         } catch (orderError: any) {
-          console.error('Order creation failed:', orderError);
-          console.error('Full error response:', orderError.response?.data);
-          console.error('Request config:', orderError.config);
-          
-          // Extract error message from various possible locations
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Order creation failed:', orderError);
+          }
           let errorMessage = 'Sipariş oluşturulamadı';
-          
           if (orderError.response?.data) {
             const data = orderError.response.data;
             if (Array.isArray(data.message)) {
@@ -630,8 +678,6 @@ export default function CheckoutPage() {
           } else if (orderError.message) {
             errorMessage = orderError.message;
           }
-          
-          console.error('Extracted error message:', errorMessage);
           toast.error(errorMessage);
           throw orderError;
         }
@@ -672,7 +718,9 @@ export default function CheckoutPage() {
               throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');
             }
           } catch (paymentError: any) {
-            console.error('Payment initiation failed:', paymentError);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Payment initiation failed:', paymentError);
+            }
             toast.error(
               paymentError.response?.data?.message || 
               (locale === 'en' ? 'Failed to initiate payment. Please try again.' : 'Ödeme başlatılamadı. Lütfen tekrar deneyin.')
@@ -695,8 +743,9 @@ export default function CheckoutPage() {
           });
           toast.success(locale === 'en' ? 'Card information saved!' : 'Kart bilgileriniz kaydedildi!');
         } catch (cardError) {
-          console.error('Failed to save card:', cardError);
-          // Don't block checkout for card save failure
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to save card:', cardError);
+          }
         }
       }
 
@@ -712,7 +761,9 @@ export default function CheckoutPage() {
         router.push(`/checkout/success?email=${encodeURIComponent(contactEmail)}`);
       }
     } catch (error: any) {
-      console.error('Checkout failed:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Checkout failed:', error);
+      }
       toast.error(error.response?.data?.message || t('checkout.orderFailed'));
     } finally {
       setIsLoading(false);
@@ -993,13 +1044,87 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Billing address: same as shipping or different */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
+                    {t('checkout.billingAddress')}
+                  </h3>
+                  <label className="flex items-center gap-2 cursor-pointer mb-3">
+                    <input
+                      type="radio"
+                      name="billingSame"
+                      checked={billingSameAsShipping}
+                      onChange={() => {
+                        setBillingSameAsShipping(true);
+                        setSelectedBillingAddressId(null);
+                      }}
+                      className="text-primary-500"
+                    />
+                    <span>{t('checkout.billingSameAsShippingLabel')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingSame"
+                      checked={!billingSameAsShipping}
+                      onChange={() => setBillingSameAsShipping(false)}
+                      className="text-primary-500"
+                    />
+                    <span>{t('checkout.differentBilling')}</span>
+                  </label>
+
+                  {!billingSameAsShipping && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-4">
+                      <p className="text-sm text-gray-600">{t('checkout.enterBillingAddress')}</p>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder={t('checkout.fullName') + ' *'}
+                          value={newBillingAddress.fullName}
+                          onChange={(e) => setNewBillingAddress(prev => ({ ...prev, fullName: e.target.value }))}
+                          className="input"
+                        />
+                        <div className="flex">
+                          <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm">+90</span>
+                          <input
+                            type="tel"
+                            placeholder="5XX XXX XX XX"
+                            value={newBillingAddress.phone}
+                            onChange={(e) => setNewBillingAddress(prev => ({ ...prev, phone: handlePhoneChange(e.target.value) }))}
+                            maxLength={13}
+                            className="input rounded-l-none flex-1"
+                          />
+                        </div>
+                      </div>
+                      <CityDistrictSelector
+                        city={newBillingAddress.city}
+                        district={newBillingAddress.district}
+                        onCityChange={(city) => setNewBillingAddress(prev => ({ ...prev, city, district: '' }))}
+                        onDistrictChange={(district) => setNewBillingAddress(prev => ({ ...prev, district }))}
+                        cityPlaceholder={t('common.selectCity')}
+                        districtPlaceholder={t('common.selectDistrict')}
+                      />
+                      <textarea
+                        placeholder={t('common.openAddress') + ' *'}
+                        rows={2}
+                        value={newBillingAddress.address}
+                        onChange={(e) => setNewBillingAddress(prev => ({ ...prev, address: e.target.value }))}
+                        className="input"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setStep(2)}
                     disabled={
-                      isAuthenticated 
-                        ? !selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)
-                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address)
+                      isAuthenticated
+                        ? (!selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)) ||
+                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
+                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address) ||
+                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
                     }
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >

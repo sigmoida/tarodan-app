@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Iyzipay = require('iyzipay');
@@ -9,6 +9,7 @@ const Iyzipay = require('iyzipay');
 
 @Injectable()
 export class IyzicoService {
+  private readonly logger = new Logger(IyzicoService.name);
   private readonly iyzipay: any;
   private readonly isConfigured: boolean;
 
@@ -28,9 +29,9 @@ export class IyzicoService {
         secretKey,
         uri: baseUrl,
       });
-      console.log('[IYZICO] Service initialized with API key:', apiKey.substring(0, 20) + '...');
+      this.logger.log('Iyzico service initialized');
     } else {
-      console.warn('⚠️ iyzico API credentials not configured');
+      this.logger.warn('Iyzico API credentials not configured');
     }
   }
 
@@ -93,22 +94,18 @@ export class IyzicoService {
       throw new BadRequestException('iyzico yapılandırılmamış');
     }
 
-    console.log('[IYZICO] Initializing checkout form...');
-    console.log('[IYZICO] Request:', JSON.stringify(request, null, 2));
+    this.logger.log('Initializing checkout form');
 
     return new Promise((resolve, reject) => {
       this.iyzipay.checkoutFormInitialize.create(request, (err: any, result: any) => {
         if (err) {
-          console.error('[IYZICO] Error:', err);
+          this.logger.error('Iyzico checkout form init error');
           reject(new BadRequestException(err.message || 'iyzico bağlantı hatası'));
           return;
         }
 
-        console.log('[IYZICO] Response:', JSON.stringify(result, null, 2));
-
         if (result.status === 'failure') {
-          console.error('[IYZICO] Error Code:', result.errorCode);
-          console.error('[IYZICO] Error Message:', result.errorMessage);
+          this.logger.warn('Iyzico checkout form init failed');
           reject(new BadRequestException(result.errorMessage || 'iyzico işlemi başarısız'));
           return;
         }
@@ -145,21 +142,18 @@ export class IyzicoService {
       throw new BadRequestException('iyzico yapılandırılmamış');
     }
 
-    console.log('[IYZICO] Retrieving checkout form result for token:', token);
+    this.logger.log('Retrieving checkout form result');
 
     return new Promise((resolve, reject) => {
       this.iyzipay.checkoutForm.retrieve({ token }, (err: any, result: any) => {
         if (err) {
-          console.error('[IYZICO] Error:', err);
+          this.logger.error('Iyzico retrieve checkout form error');
           reject(new BadRequestException(err.message || 'iyzico bağlantı hatası'));
           return;
         }
 
-        console.log('[IYZICO] Checkout result:', JSON.stringify(result, null, 2));
-
         if (result.status === 'failure') {
-          console.error('[IYZICO] Error Code:', result.errorCode);
-          console.error('[IYZICO] Error Message:', result.errorMessage);
+          this.logger.warn('Iyzico checkout result failure');
         }
 
         resolve(result);
@@ -196,17 +190,15 @@ export class IyzicoService {
       ip: request.ip || '127.0.0.1',
     };
 
-    console.log('[IYZICO] Creating refund:', JSON.stringify(refundRequest, null, 2));
+    this.logger.log('Creating refund');
 
     return new Promise((resolve, reject) => {
       this.iyzipay.refund.create(refundRequest, (err: any, result: any) => {
         if (err) {
-          console.error('[IYZICO] Refund error:', err);
+          this.logger.error('Iyzico refund error');
           reject(new BadRequestException(err.message || 'iyzico iade hatası'));
           return;
         }
-
-        console.log('[IYZICO] Refund result:', JSON.stringify(result, null, 2));
 
         if (result.status === 'failure') {
           reject(new BadRequestException(result.errorMessage || 'İade işlemi başarısız'));
@@ -252,7 +244,7 @@ export class IyzicoService {
     return new Promise((resolve, reject) => {
       this.iyzipay.installmentInfo.retrieve(request, (err: any, result: any) => {
         if (err) {
-          console.error('[IYZICO] Installment check error:', err);
+          this.logger.error('Iyzico installment check error');
           reject(new BadRequestException(err.message || 'Taksit sorgulama hatası'));
           return;
         }
@@ -284,17 +276,15 @@ export class IyzicoService {
       ip: request.ip || '127.0.0.1',
     };
 
-    console.log('[IYZICO] Cancelling payment:', JSON.stringify(cancelRequest, null, 2));
+    this.logger.log('Cancelling payment');
 
     return new Promise((resolve, reject) => {
       this.iyzipay.cancel.create(cancelRequest, (err: any, result: any) => {
         if (err) {
-          console.error('[IYZICO] Cancel error:', err);
+          this.logger.error('Iyzico cancel error');
           reject(new BadRequestException(err.message || 'İptal hatası'));
           return;
         }
-
-        console.log('[IYZICO] Cancel result:', JSON.stringify(result, null, 2));
 
         if (result.status === 'failure') {
           reject(new BadRequestException(result.errorMessage || 'İptal işlemi başarısız'));

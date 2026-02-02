@@ -94,7 +94,7 @@ export default function ReportModal({
       setSelectedReason('');
       setDescription('');
     } catch (error: any) {
-      console.error('Report submission failed:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Report submission failed:', error);
       const errorMsg = error.response?.data?.message;
       // Handle array of validation errors
       const displayMsg = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;

@@ -70,7 +70,8 @@ async function bootstrap() {
   }
 }
 
-bootstrap().catch((error) => {
-  console.error('Bootstrap error:', error);
+const bootstrapLogger = new Logger('Bootstrap');
+bootstrap().catch(() => {
+  bootstrapLogger.error('Bootstrap failed');
   process.exit(1);
 });

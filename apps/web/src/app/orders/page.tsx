@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api, ratingsApi } from '@/lib/api';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
@@ -59,13 +61,11 @@ const REVIEWABLE_STATUSES = ['completed', 'delivered'];
 
 export default function OrdersPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
   
-  // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
   const [reviewScore, setReviewScore] = useState(5);
@@ -74,7 +74,6 @@ export default function OrdersPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
   
-  // Status labels with translations
   const statusLabels: Record<string, { label: string; color: string }> = {
     pending_payment: { label: t('order.statusPending'), color: 'text-yellow-400 bg-yellow-400/10' },
     paid: { label: t('order.statusPaid'), color: 'text-green-400 bg-green-400/10' },
@@ -87,33 +86,31 @@ export default function OrdersPage() {
     refunded: { label: t('order.statusRefunded'), color: 'text-gray-400 bg-gray-400/10' },
   };
   
-  // Seller rating state
   const [sellerCommunication, setSellerCommunication] = useState(5);
   const [sellerShipping, setSellerShipping] = useState(5);
   const [sellerPackaging, setSellerPackaging] = useState(5);
   const [sellerReviewText, setSellerReviewText] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
-      return;
     }
-    loadOrders();
-  }, [isAuthenticated, filter]);
+  }, [isAuthenticated, authLoading, router]);
 
-  const loadOrders = async () => {
-    setLoading(true);
-    try {
+  const ordersQuery = useQuery({
+    queryKey: ['orders', filter],
+    queryFn: async (): Promise<Order[]> => {
       const response = await api.get('/orders', {
         params: { role: filter === 'all' ? undefined : filter },
       });
-      setOrders(response.data.orders || response.data.data || []);
-    } catch (error) {
-      console.error('Orders load error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data.orders || response.data.data || [];
+    },
+    enabled: !authLoading && isAuthenticated,
+    meta: { page: 'orders' },
+  });
+  const orders = ordersQuery.data ?? [];
+  const loading = ordersQuery.isLoading;
 
   const openReviewModal = (order: Order) => {
     setReviewingOrder(order);
@@ -164,9 +161,10 @@ export default function OrdersPage() {
 
       toast.success(t('review.reviewSubmitted'));
       setShowReviewModal(false);
-      setReviewedOrders(prev => new Set([...prev, reviewingOrder.id]));
+      setReviewedOrders(prev => new Set([...Array.from(prev), reviewingOrder.id]));
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error: any) {
-      console.error('Review submit error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Review submit error:', error);
       toast.error(error.response?.data?.message || t('common.operationFailed'));
     } finally {
       setSubmittingReview(false);
@@ -182,9 +180,8 @@ export default function OrdersPage() {
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

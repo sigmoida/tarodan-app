@@ -1,8 +1,34 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 
+/**
+ * Cache headers (browser / CDN) – sadece /public altındaki statik dosyalar.
+ * Next.js zaten _next/static/* için uzun cache veriyor (değiştirilmiyor).
+ *
+ * Public'e yeni statik path eklediğinde (örn. /fonts, /documents) bu listeye
+ * bir satır ekle; yoksa o path cache header almaz.
+ */
+function getCacheHeaders() {
+  const oneDay = 'public, max-age=86400, stale-while-revalidate=3600';
+  const oneWeek = 'public, max-age=604800, stale-while-revalidate=86400';
+  return [
+    { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
+    { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+    { source: '/tarodan-logo.jpg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+    { source: '/images/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+    // Yeni statik path: { source: '/yeni-klasor/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+  ];
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Heroicons: Sadece kullandığımız ikonlar (ok, menü, çöp kutusu vb.) bundle'a girer; kullanılmayanlar kesilir, JS küçülür.
+  experimental: {
+    optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
+  },
+  async headers() {
+    return getCacheHeaders();
+  },
   images: {
     remotePatterns: [
       {

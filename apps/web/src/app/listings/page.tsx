@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -63,8 +64,6 @@ export default function ListingsPage() {
     { value: 'İyi', label: t('product.conditionGood') },
     { value: 'Orta', label: t('product.conditionFair') },
   ];
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [showRecentSearches, setShowRecentSearches] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
@@ -95,13 +94,8 @@ export default function ListingsPage() {
     const urlMinPrice = searchParams.get('minPrice');
     const urlMaxPrice = searchParams.get('maxPrice');
     const urlSortBy = searchParams.get('sortBy');
-    const urlCategoryId = searchParams.get('categoryId');
 
-    // Update search query
-    if (urlSearch) {
-      setSearchQuery(urlSearch);
-    }
-    // Update filters from URL params
+    if (urlSearch) setSearchQuery(urlSearch);
     setFilters(prev => ({
       ...prev,
       tradeOnly: urlTradeOnly === 'true',
@@ -113,34 +107,20 @@ export default function ListingsPage() {
       maxPrice: urlMaxPrice || '',
       sortBy: urlSortBy || 'created_desc',
     }));
-    
-    if (urlCategoryId) {
-      // Category filter will be handled in fetchListings via URL param
-    }
   }, [searchParams]);
 
-  useEffect(() => {
-    fetchListings();
-  }, [filters, searchQuery]);
-
-  const fetchListings = async () => {
-    setIsLoading(true);
-    try {
-      // Get categoryId from URL if present
+  // Listings: React Query (cache + global error logging)
+  const { data: listings = [], isLoading } = useQuery({
+    queryKey: ['listings', searchQuery, filters, searchParams.get('categoryId') ?? ''],
+    queryFn: async (): Promise<Listing[]> => {
       const urlCategoryId = searchParams.get('categoryId');
-      
-      // Map condition to enum values if needed
       const conditionMap: Record<string, string> = {
         'Yeni': 'new',
         'Mükemmel': 'very_good',
         'İyi': 'good',
         'Orta': 'fair',
       };
-      const mappedCondition = filters.condition 
-        ? conditionMap[filters.condition] || filters.condition 
-        : undefined;
-
-      // Map sortBy to search API format
+      const mappedCondition = filters.condition ? conditionMap[filters.condition] || filters.condition : undefined;
       const sortByMap: Record<string, string> = {
         'created_desc': 'newest',
         'created_asc': 'oldest',
@@ -148,8 +128,6 @@ export default function ListingsPage() {
         'price_desc': 'price_desc',
       };
 
-      // İndirimdekiler açıksa her zaman DB kullan (oldPrice/discountPercent API'den gelsin)
-      const useDbOnly = filters.discountOnly === true;
       const buildListParams = (): Record<string, any> => {
         const p: Record<string, any> = { limit: 100, page: 1 };
         if (urlCategoryId) p.categoryId = urlCategoryId;
@@ -165,25 +143,23 @@ export default function ListingsPage() {
         return p;
       };
 
+      const useDbOnly = filters.discountOnly === true;
       if (useDbOnly) {
         const response = await listingsApi.getAll(buildListParams());
-        setListings(response.data.data || response.data.products || []);
-      } else if (searchQuery && searchQuery.trim()) {
+        return response.data.data || response.data.products || [];
+      }
+      if (searchQuery?.trim()) {
         try {
-          const esParams: Record<string, any> = {
-            pageSize: 100,
-            page: 1,
-          };
+          const esParams: Record<string, any> = { pageSize: 100, page: 1 };
           if (urlCategoryId) esParams.categoryId = urlCategoryId;
           if (mappedCondition) esParams.condition = mappedCondition;
           if (filters.minPrice) esParams.minPrice = Number(filters.minPrice);
           if (filters.maxPrice) esParams.maxPrice = Number(filters.maxPrice);
           if (filters.sortBy) esParams.sortBy = sortByMap[filters.sortBy] || 'relevance';
-
           const response = await searchApi.products(searchQuery.trim(), esParams);
           const results = response.data.results || response.data.data || [];
           if (results.length > 0) {
-            setListings(results.map((r: any) => ({
+            return results.map((r: any) => ({
               id: r.id,
               title: r.title,
               price: r.price,
@@ -199,35 +175,34 @@ export default function ListingsPage() {
               category: { name: r.categoryName },
               isTradeEnabled: r.isTradeEnabled || r.trade_available || false,
               rating: r.rating || (r.averageRating ? { average: r.averageRating, count: r.ratingCount || 0 } : undefined),
-            })));
-          } else {
-            const dbResponse = await listingsApi.getAll(buildListParams());
-            setListings(dbResponse.data.data || dbResponse.data.products || []);
+            }));
           }
-        } catch (esError) {
-          console.error('ES search failed, falling back to DB:', esError);
           const dbResponse = await listingsApi.getAll(buildListParams());
-          setListings(dbResponse.data.data || dbResponse.data.products || []);
+          return dbResponse.data.data || dbResponse.data.products || [];
+        } catch {
+          const dbResponse = await listingsApi.getAll(buildListParams());
+          return dbResponse.data.data || dbResponse.data.products || [];
         }
-      } else {
-        const response = await listingsApi.getAll(buildListParams());
-        setListings(response.data.data || response.data.products || []);
       }
-    } catch (error) {
-      console.error('Failed to fetch listings:', error);
-      setListings([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const params = buildListParams();
+      if (urlCategoryId) params.categoryId = urlCategoryId;
+      if (mappedCondition) params.condition = mappedCondition;
+      if (filters.minPrice) params.minPrice = Number(filters.minPrice);
+      if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice);
+      if (filters.brand) params.brand = filters.brand;
+      if (filters.scale) params.scale = filters.scale;
+      if (filters.tradeOnly) params.tradeOnly = true;
+      if (filters.sortBy) params.sortBy = filters.sortBy;
+      const response = await listingsApi.getAll(params);
+      return response.data.data || response.data.products || [];
+    },
+    meta: { page: 'listings' },
+  });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      addSearch(searchQuery.trim());
-    }
+    if (searchQuery.trim()) addSearch(searchQuery.trim());
     setShowRecentSearches(false);
-    fetchListings();
   };
   
   const handleRecentSearchClick = (query: string) => {
@@ -565,15 +540,14 @@ export default function ListingsPage() {
                 <Link href={`/listings/${listing.id}`} className="group block">
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 flex gap-4 p-4">
                     <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
-                      <Image
+                      <OptimizedImage
                         src={getImageUrl(listing.images?.[0])}
                         alt={listing.title}
                         fill
                         className="object-cover"
-                        unoptimized
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                        }}
+                        fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                        logContext={{ listingId: listing.id, page: 'listings' }}
+                        priority={index === 0}
                       />
                       {(listing.trade_available || listing.isTradeEnabled) && (
                         <div className="absolute top-1 right-1 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-lg flex items-center gap-0.5 shadow-sm">
@@ -644,15 +618,14 @@ export default function ListingsPage() {
                 <Link href={`/listings/${listing.id}`} className="group block w-full min-h-0 flex flex-col">
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 card-hover h-full flex flex-col min-h-[380px]">
                     <div className="relative aspect-square bg-gray-100 flex-shrink-0">
-                      <Image
+                      <OptimizedImage
                         src={getImageUrl(listing.images?.[0])}
                         alt={listing.title}
                         fill
                         className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                        unoptimized
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                        }}
+                        fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                        logContext={{ listingId: listing.id, page: 'listings' }}
+                        priority={index < 4}
                       />
                       {/* Trade Badge */}
                       {(listing.trade_available || listing.isTradeEnabled) && (

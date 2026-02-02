@@ -37,9 +37,10 @@ export default function CityDistrictSelector({
   const cities = getCityNames();
   const districts = city ? getDistrictsForCity(city) : [];
 
-  // Debug: Log when city prop changes
   useEffect(() => {
-    console.log('🔄 City prop changed to:', city);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 City prop changed to:', city);
+    }
   }, [city]);
 
   // Turkish character normalization for search
@@ -71,28 +72,20 @@ export default function CityDistrictSelector({
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      console.log('📍 handleClickOutside triggered, isSelectingRef:', isSelectingRef.current);
-      console.log('📍 event.target:', event.target);
-      
-      // Skip if we're in the middle of selecting
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📍 handleClickOutside triggered, isSelectingRef:', isSelectingRef.current);
+      }
       if (isSelectingRef.current) {
-        console.log('📍 Skipping close because isSelectingRef is true');
         isSelectingRef.current = false;
         return;
       }
-      
       const cityContains = cityDropdownRef.current?.contains(event.target as Node);
       const districtContains = districtDropdownRef.current?.contains(event.target as Node);
-      console.log('📍 cityDropdown contains target:', cityContains);
-      console.log('📍 districtDropdown contains target:', districtContains);
-      
       if (cityDropdownRef.current && !cityContains) {
-        console.log('📍 Closing city dropdown');
         setCityOpen(false);
         setCitySearch('');
       }
       if (districtDropdownRef.current && !districtContains) {
-        console.log('📍 Closing district dropdown');
         setDistrictOpen(false);
         setDistrictSearch('');
       }
@@ -103,18 +96,20 @@ export default function CityDistrictSelector({
   }, []);
 
   const selectCity = useCallback((selectedCity: string) => {
-    console.log('🏙️ selectCity called with:', selectedCity);
-    console.log('🏙️ Current city before change:', city);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🏙️ selectCity called with:', selectedCity, 'current city:', city);
+    }
     isSelectingRef.current = true;
     onCityChange(selectedCity);
     onDistrictChange('');
     setCityOpen(false);
     setCitySearch('');
-    console.log('🏙️ selectCity finished, cityOpen set to false');
   }, [onCityChange, onDistrictChange, city]);
 
   const selectDistrict = useCallback((selectedDistrict: string) => {
-    console.log('🏘️ selectDistrict called with:', selectedDistrict);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🏘️ selectDistrict called with:', selectedDistrict);
+    }
     isSelectingRef.current = true;
     onDistrictChange(selectedDistrict);
     setDistrictOpen(false);
@@ -166,13 +161,17 @@ export default function CityDistrictSelector({
                   <li
                     key={c}
                     onClick={(e) => {
-                      console.log('🖱️ City item CLICK:', c);
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🖱️ City item CLICK:', c);
+                      }
                       e.preventDefault();
                       e.stopPropagation();
                       selectCity(c);
                     }}
                     onMouseDown={(e) => {
-                      console.log('🖱️ City item MOUSEDOWN:', c);
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🖱️ City item MOUSEDOWN:', c);
+                      }
                       e.stopPropagation();
                     }}
                     className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-orange-50 select-none ${

@@ -2,7 +2,7 @@
  * Sentry Module
  * Error tracking and performance monitoring integration
  */
-import { Module, Global, OnModuleInit } from '@nestjs/common';
+import { Module, Global, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/node';
 import { SentryService } from './sentry.service';
@@ -15,6 +15,8 @@ import { SentryInterceptor } from './sentry.interceptor';
   exports: [SentryService, SentryInterceptor],
 })
 export class SentryModule implements OnModuleInit {
+  private readonly logger = new Logger(SentryModule.name);
+
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
@@ -47,9 +49,9 @@ export class SentryModule implements OnModuleInit {
           return breadcrumb;
         },
       });
-      console.log('Sentry initialized for environment:', environment);
+      this.logger.log('Sentry initialized');
     } else {
-      console.warn('Sentry DSN not configured, error tracking disabled');
+      this.logger.warn('Sentry DSN not configured, error tracking disabled');
     }
   }
 }

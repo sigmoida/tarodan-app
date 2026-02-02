@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import {
   PlusIcon,
@@ -53,10 +54,9 @@ export default function ProfileListingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading: authLoading, refreshUserData } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(searchParams.get('status') || '');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
@@ -67,88 +67,27 @@ export default function ProfileListingsPage() {
       router.push('/login?redirect=/profile/listings');
       return;
     }
-    if (isAuthenticated) {
-      fetchListings();
-    }
-  }, [isAuthenticated, authLoading, activeFilter]);
+  }, [authLoading, isAuthenticated, router]);
 
-  // Refresh listings when pathname changes (e.g., returning from edit/delete page)
-  useEffect(() => {
-    if (prevPathnameRef.current !== null && prevPathnameRef.current !== pathname && pathname === '/profile/listings' && isAuthenticated) {
-      // Page was navigated to, refresh listings
-      fetchListings();
-    }
-    prevPathnameRef.current = pathname;
-  }, [pathname, isAuthenticated]);
-
-  // Refresh listings when page becomes visible (e.g., after returning from edit/delete)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated) {
-        fetchListings();
-      }
-    };
-
-    const handleFocus = () => {
-      if (isAuthenticated) {
-        fetchListings();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [isAuthenticated]);
-
-  const fetchListings = async () => {
-    setIsLoading(true);
-    try {
+  const listingsQuery = useQuery({
+    queryKey: ['profile-listings', activeFilter],
+    queryFn: async (): Promise<Listing[]> => {
       const params: Record<string, any> = {};
-      if (activeFilter && activeFilter.trim() !== '') {
-        params.status = activeFilter;
-      }
-      
-      // Add cache busting to ensure fresh data
-      params._t = Date.now();
-      
+      if (activeFilter?.trim()) params.status = activeFilter;
       const response = await userApi.getMyProducts(params);
-      console.log('Listings API response:', response.data);
       let data = response.data?.data || response.data?.products || response.data || [];
-      
-      // Filter out deleted/inactive listings if no specific filter is active
-      if (!activeFilter || activeFilter.trim() === '') {
-        data = data.filter((listing: Listing) => {
-          // Exclude deleted, inactive, and draft listings from default view
-          return listing.status !== 'deleted' && 
-                 listing.status !== 'inactive' && 
-                 listing.status !== 'draft';
-        });
+      if (!activeFilter?.trim()) {
+        data = data.filter((listing: Listing) =>
+          listing.status !== 'deleted' && listing.status !== 'inactive' && listing.status !== 'draft'
+        );
       }
-      
-      setListings(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.error('Failed to fetch listings:', error);
-      
-      // Show more specific error message
-      if (error.response?.status === 401) {
-        toast.error('Oturum süresi dolmuş. Lütfen tekrar giriş yapın.');
-        router.push('/login?redirect=/profile/listings');
-      } else if (error.response?.status === 404) {
-        // No listings found - this is not an error
-        setListings([]);
-      } else {
-        // For other errors, show empty state instead of error toast
-        console.log('Using empty listings due to API error');
-        setListings([]);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'profile-listings' },
+  });
+  const listings = listingsQuery.data ?? [];
+  const isLoading = listingsQuery.isLoading;
 
   const getImageUrl = (listing: Listing): string => {
     if (!listing.images || listing.images.length === 0) {
@@ -159,20 +98,17 @@ export default function ProfileListingsPage() {
   };
 
   const handleDelete = async (listingId: string) => {
-    if (!confirm('Bu ilanı silmek istediğinize emin misiniz?')) {
-      return;
-    }
-
+    if (!confirm('Bu ilanı silmek istediğinize emin misiniz?')) return;
     setDeletingId(listingId);
     try {
       await api.delete(`/products/${listingId}`);
       toast.success('İlan silindi');
-      // Refresh user data to update listing count
-      await refreshUserData();
-      // Refresh listings
-      await fetchListings();
+      const { refreshUserData } = useAuthStore.getState();
+      await refreshUserData?.();
+      await queryClient.invalidateQueries({ queryKey: ['profile-listings'] });
+      await queryClient.invalidateQueries({ queryKey: ['listing', listingId] });
     } catch (error: any) {
-      console.error('Failed to delete listing:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to delete listing:', error);
       toast.error(error.response?.data?.message || 'İlan silinemedi');
     } finally {
       setDeletingId(null);
@@ -283,14 +219,13 @@ export default function ProfileListingsPage() {
                 >
                   <div className="relative">
                     <div className="aspect-square bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={getImageUrl(listing)}
                         alt={listing.title}
                         fill
                         className="object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
-                        }}
+                        fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
+                        logContext={{ listingId: listing.id, page: 'profile-listings' }}
                       />
                     </div>
                     <div className="absolute top-2 left-2">

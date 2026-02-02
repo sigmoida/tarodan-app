@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -89,10 +90,9 @@ const getStatusConfig = (locale: string) => ({
 
 export default function PaymentHistoryPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -112,42 +112,37 @@ export default function PaymentHistoryPage() {
       router.push('/login');
       return;
     }
-    loadPayments();
-  }, [isAuthenticated, pagination.page, filters]);
+  }, [isAuthenticated, router]);
 
-  const loadPayments = async () => {
-    setLoading(true);
-    try {
-      const params: any = {
-        page: pagination.page,
-        limit: pagination.limit,
-      };
+  const paymentsQuery = useQuery({
+    queryKey: ['profile-payments', pagination.page, filters],
+    queryFn: async (): Promise<PaymentListResponse> => {
+      const params: any = { page: pagination.page, limit: pagination.limit };
       if (filters.status) params.status = filters.status;
       if (filters.provider) params.provider = filters.provider;
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
-
       const response = await paymentsApi.getMyPayments(params);
-      const data: PaymentListResponse = response.data;
-      setPayments(data.payments || []);
-      setPagination(data.pagination || pagination);
-    } catch (error: any) {
-      console.error('Payment load error:', error);
-      toast.error(error.response?.data?.message || t('payment.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data;
+    },
+    enabled: isAuthenticated,
+    meta: { page: 'profile-payments' },
+  });
+  const data = paymentsQuery.data;
+  const payments = data?.payments ?? [];
+  const loading = paymentsQuery.isLoading;
+  useEffect(() => {
+    if (data?.pagination) setPagination(prev => ({ ...prev, ...data.pagination }));
+  }, [data?.pagination]);
+
+  const invalidatePayments = () => queryClient.invalidateQueries({ queryKey: ['profile-payments'] });
 
   const handleCancel = async (paymentId: string) => {
-    if (!confirm(t('payment.cancelConfirm'))) {
-      return;
-    }
-
+    if (!confirm(t('payment.cancelConfirm'))) return;
     try {
       await paymentsApi.cancel(paymentId);
       toast.success(t('payment.cancelled'));
-      loadPayments();
+      await invalidatePayments();
     } catch (error: any) {
       toast.error(error.response?.data?.message || t('payment.cancelFailed'));
     }
@@ -164,7 +159,7 @@ export default function PaymentHistoryPage() {
       if (response.data.paymentUrl) {
         window.location.href = response.data.paymentUrl;
       } else {
-        loadPayments();
+        await invalidatePayments();
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || t('payment.retryFailed'));

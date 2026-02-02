@@ -77,7 +77,7 @@ const ModerationPage = () => {
       const response = await adminApi.get('/admin/moderation/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Stats load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Stats load error:', error);
     }
   };
 
@@ -92,7 +92,7 @@ const ModerationPage = () => {
       setTotalPages(response.data.meta?.totalPages || 1);
       setTotal(response.data.meta?.total || 0);
     } catch (error) {
-      console.error('Queue load error:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Queue load error:', error);
       toast.error('Moderasyon kuyruğu yüklenemedi');
     } finally {
       setLoading(false);

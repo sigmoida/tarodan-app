@@ -25,8 +25,12 @@ export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Allow access for authenticated users OR guest checkout
-    if (!isAuthenticated && !isGuestCheckout) {
+    // Read guest from URL directly so we don't redirect before searchParams are ready (Next.js can delay them)
+    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+    const guestOk = isGuestCheckout || urlGuest;
+
+    // Allow access for authenticated users OR guest checkout (URL param)
+    if (!isAuthenticated && !guestOk) {
       router.push('/login');
       return;
     }
@@ -40,13 +44,13 @@ export default function PaymentSuccessPage() {
 
   const fetchPayment = async () => {
     try {
-      // Use guest endpoint if guest checkout
-      const response = isGuestCheckout 
+      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
     } catch (error) {
-      console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
     } finally {
       setIsLoading(false);
     }
@@ -126,35 +130,43 @@ export default function PaymentSuccessPage() {
             </div>
           )}
 
-          {/* Info Message */}
+          {/* Info Message: logged-in → Siparişlerim; guest → track-order with order no + email */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-blue-800">
               <strong>{locale === 'en' ? 'Information:' : 'Bilgilendirme:'}</strong>{' '}
-              {isGuestCheckout 
+              {isAuthenticated
                 ? (locale === 'en' 
-                    ? 'Order confirmation email has been sent to your email address.' 
-                    : 'Sipariş onay e-postası e-posta adresinize gönderildi.')
+                    ? <>Order confirmation email has been sent. You can track your order from the <Link href="/orders" className="underline font-medium">My Orders</Link> page.</>
+                    : <>Sipariş onay e-postası gönderildi. Sipariş durumunuzu <Link href="/orders" className="underline font-medium">Siparişlerim</Link> sayfasından takip edebilirsiniz.</>)
                 : (locale === 'en' 
-                    ? <>Order confirmation email has been sent to your email address. You can track your order status from the <Link href="/orders" className="underline font-medium">My Orders</Link> page.</>
-                    : <>Sipariş onay e-postası e-posta adresinize gönderildi. Sipariş durumunuzu <Link href="/orders" className="underline font-medium">Siparişlerim</Link> sayfasından takip edebilirsiniz.</>)
+                    ? <>Order confirmation email has been sent to your email. You can track your order from the <Link href="/track-order" className="underline font-medium">Track order</Link> page (use the order number from the email).</>
+                    : <>Sipariş onay e-postası e-posta adresinize gönderildi. Siparişinizi <Link href="/track-order" className="underline font-medium">Sipariş takip</Link> sayfasından (e-postadaki sipariş numarası ile) takip edebilirsiniz.</>)
               }
             </p>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons: logged-in → Siparişlerim (or order detail); guest → track-order */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {!isGuestCheckout && (
+            {isAuthenticated ? (
               <Link
-                href="/orders"
+                href={payment?.orderId ? `/orders/${payment.orderId}` : '/orders'}
                 className="btn-primary flex items-center justify-center gap-2"
               >
-                {locale === 'en' ? 'Go to My Orders' : 'Siparişlerime Git'}
+                {locale === 'en' ? 'View my order' : 'Siparişimi Görüntüle'}
+                <ArrowRightIcon className="w-5 h-5" />
+              </Link>
+            ) : (
+              <Link
+                href="/track-order"
+                className="btn-primary flex items-center justify-center gap-2"
+              >
+                {locale === 'en' ? 'Track my order' : 'Siparişimi takip et'}
                 <ArrowRightIcon className="w-5 h-5" />
               </Link>
             )}
             <Link
               href="/listings"
-              className={`${isGuestCheckout ? 'btn-primary' : 'btn-secondary'} flex items-center justify-center gap-2`}
+              className="btn-secondary flex items-center justify-center gap-2"
             >
               {locale === 'en' ? 'Continue Shopping' : 'Alışverişe Devam Et'}
             </Link>

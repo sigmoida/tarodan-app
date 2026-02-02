@@ -43,6 +43,10 @@ export interface OrderPaidPayload {
     district: string;
     zipCode: string;
   };
+  /** When true, email link should point to guest order track page */
+  isGuestOrder?: boolean;
+  /** Raw buyer email from order (guest@tarodan.system for guest) - used as fallback for track link */
+  buyerSystemEmail?: string;
 }
 
 export interface OrderShippedPayload {
@@ -144,23 +148,8 @@ export class EventService {
   async emitOrderCreated(payload: OrderCreatedPayload): Promise<void> {
     this.logger.log(`Emitting order.created event for order ${payload.orderNumber}`);
 
-    // Queue email to buyer - Order confirmation
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'order-created-buyer',
-      subject: `Siparişiniz alındı - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        productTitle: payload.productTitle,
-        totalAmount: payload.totalAmount,
-        orderId: payload.orderId,
-      },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    // Skip order-created-buyer email: buyer is already on site; they get order-paid + invoice after payment (2 emails total, industry standard).
+    // Only notify seller about new order.
 
     // Queue email to seller - New order notification
     await this.emailQueue.add('send-template', {
@@ -229,12 +218,15 @@ export class EventService {
       templateData: {
         orderNumber: payload.orderNumber,
         buyerName: payload.buyerName,
+        buyerEmail: payload.buyerEmail,
         productTitle: payload.productTitle,
         totalAmount: payload.totalAmount,
         paymentMethod: payload.paymentMethod,
         transactionId: payload.transactionId,
         orderId: payload.orderId,
         shippingAddress: payload.shippingAddress,
+        isGuestOrder: payload.isGuestOrder ?? false,
+        buyerSystemEmail: payload.buyerSystemEmail ?? '',
       },
     }, {
       priority: 1,
@@ -291,15 +283,7 @@ export class EventService {
       priority: 1,
     });
 
-    // Queue shipping creation job
-    await this.shippingQueue.add('create-shipment', {
-      orderId: payload.orderId,
-      orderNumber: payload.orderNumber,
-      sellerId: payload.sellerId,
-      shippingAddress: payload.shippingAddress,
-    }, {
-      priority: 2,
-    });
+    // Do NOT auto-create shipment here – order stays "Hazırlanıyor" until seller enters tracking / marks shipped
 
     // Queue analytics event
     await this.analyticsQueue.add('track-event', {

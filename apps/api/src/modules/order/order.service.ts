@@ -10,7 +10,7 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
-import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, Prisma } from '@prisma/client';
+import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -21,13 +21,16 @@ import { DiscountService, DiscountCalculator } from '../discount';
  * Contains full details about the applied commission rule
  */
 export interface CommissionResult {
-  commissionAmount: number;
-  ruleType: CommissionRuleType;
+  buyerFeeAmount: number;
+  sellerFeeAmount: number;
+  commissionAmount: number; // total = buyerFee + sellerFee
   ruleId: string | null;
   ruleName: string | null;
-  appliedRate: number;
-  wasMinApplied: boolean;
-  wasMaxApplied: boolean;
+  // Legacy fields for backward compatibility
+  ruleType?: CommissionRuleType;
+  appliedRate?: number;
+  wasMinApplied?: boolean;
+  wasMaxApplied?: boolean;
 }
 
 @Injectable()
@@ -126,114 +129,182 @@ export class OrderService {
     sellerId: string,
     categoryId?: string | null,
   ): Promise<CommissionResult> {
-    // Get seller info to determine seller type
+    // Get seller info including membership tier
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
-      select: { sellerType: true },
+      select: {
+        sellerType: true,
+        membership: {
+          include: {
+            tier: {
+              select: { type: true },
+            },
+          },
+        },
+      },
     });
 
-    const sellerType = seller?.sellerType || null;
+    // Map User.sellerType to CommissionSellerType
+    const commissionSellerType = this.mapSellerTypeForCommission(
+      seller?.sellerType ?? null,
+      seller?.membership?.tier?.type ?? null
+    );
 
-    // Fetch all active commission rules ordered by priority (descending)
+    // Fetch all active commission rules
     const rules = await this.prisma.commissionRule.findMany({
       where: { isActive: true },
-      orderBy: { priority: 'desc' },
+      include: { category: true },
     });
 
     this.logger.debug(`Found ${rules.length} active commission rules`);
 
-    // Find matching rule using priority-based hierarchy
-    let matchedRule = null;
+    // Match by specificity (deterministic order, priority within same specificity)
+    const matchedRule = this.findMatchingRule(rules, categoryId, commissionSellerType);
 
-    // 1. Try exact match: categoryId + sellerType (highest priority)
-    if (categoryId && sellerType) {
-      matchedRule = rules.find(
-        r => r.categoryId === categoryId && r.sellerType === sellerType
-      );
-      if (matchedRule) {
-        this.logger.debug(`Matched exact rule: category=${categoryId}, sellerType=${sellerType}`);
-      }
-    }
-
-    // 2. Try category-only match
-    if (!matchedRule && categoryId) {
-      matchedRule = rules.find(
-        r => r.categoryId === categoryId && r.sellerType === null
-      );
-      if (matchedRule) {
-        this.logger.debug(`Matched category rule: category=${categoryId}`);
-      }
-    }
-
-    // 3. Try seller-type-only match
-    if (!matchedRule && sellerType) {
-      matchedRule = rules.find(
-        r => r.categoryId === null && r.sellerType === sellerType
-      );
-      if (matchedRule) {
-        this.logger.debug(`Matched seller type rule: sellerType=${sellerType}`);
-      }
-    }
-
-    // 4. Fall back to default rule
     if (!matchedRule) {
-      matchedRule = rules.find(r => r.ruleType === CommissionRuleType.default);
-      if (matchedRule) {
-        this.logger.debug('Using default commission rule');
-      }
+      this.logger.warn('No matching commission rule found');
+      throw new BadRequestException('No matching commission rule found. Please ensure a default rule exists.');
     }
 
-    // If still no rule found, use hardcoded 5% default
-    if (!matchedRule) {
-      this.logger.warn('No commission rules found, using hardcoded 5% default');
-      return {
-        commissionAmount: Math.round(amount * 0.05 * 100) / 100,
-        ruleType: CommissionRuleType.default,
-        ruleId: null,
-        ruleName: 'System Default (5%)',
-        appliedRate: 5,
-        wasMinApplied: false,
-        wasMaxApplied: false,
-      };
+    // Calculate fees
+    const subtotal = amount;
+    const rawSellerFee = matchedRule.sellerRate
+      ? subtotal * (Number(matchedRule.sellerRate) / 100)
+      : 0;
+    const rawBuyerFee = matchedRule.buyerRate
+      ? subtotal * (Number(matchedRule.buyerRate) / 100)
+      : 0;
+
+    // Clamp per side independently
+    let sellerFee = this.clampAmount(
+      rawSellerFee,
+      matchedRule.sellerMin ? Number(matchedRule.sellerMin) : null,
+      matchedRule.sellerMax ? Number(matchedRule.sellerMax) : null
+    );
+    let buyerFee = this.clampAmount(
+      rawBuyerFee,
+      matchedRule.buyerMin ? Number(matchedRule.buyerMin) : null,
+      matchedRule.buyerMax ? Number(matchedRule.buyerMax) : null
+    );
+
+    // Apply appliesTo
+    if (matchedRule.appliesTo === CommissionAppliesTo.SELLER) {
+      buyerFee = 0;
+    }
+    if (matchedRule.appliesTo === CommissionAppliesTo.BUYER) {
+      sellerFee = 0;
     }
 
-    // Calculate commission
-    const appliedRate = Number(matchedRule.percentage);
-    let commission = amount * (appliedRate / 100);
-    let wasMinApplied = false;
-    let wasMaxApplied = false;
-
-    // Apply minimum limit if commission is below minimum
-    if (matchedRule.minCommission && commission < Number(matchedRule.minCommission)) {
-      commission = Number(matchedRule.minCommission);
-      wasMinApplied = true;
-      this.logger.debug(`Applied minimum commission: ${commission}`);
-    }
-
-    // Apply maximum limit if commission exceeds maximum
-    if (matchedRule.maxCommission && commission > Number(matchedRule.maxCommission)) {
-      commission = Number(matchedRule.maxCommission);
-      wasMaxApplied = true;
-      this.logger.debug(`Applied maximum commission: ${commission}`);
-    }
-
-    // Round to 2 decimal places
-    const commissionAmount = Math.round(commission * 100) / 100;
+    const totalCommission = sellerFee + buyerFee;
 
     this.logger.log(
-      `Commission calculated: amount=${amount}, rate=${appliedRate}%, ` +
-      `commission=${commissionAmount}, rule=${matchedRule.name}`
+      `Commission calculated: amount=${amount}, ` +
+      `sellerFee=${sellerFee}, buyerFee=${buyerFee}, ` +
+      `total=${totalCommission}, rule=${matchedRule.name}`
     );
 
     return {
-      commissionAmount,
-      ruleType: matchedRule.ruleType,
+      buyerFeeAmount: buyerFee,
+      sellerFeeAmount: sellerFee,
+      commissionAmount: totalCommission,
       ruleId: matchedRule.id,
       ruleName: matchedRule.name,
-      appliedRate,
-      wasMinApplied,
-      wasMaxApplied,
+      // Legacy fields for backward compatibility
+      ruleType: matchedRule.ruleType,
+      appliedRate: matchedRule.sellerRate ? Number(matchedRule.sellerRate) : (matchedRule.buyerRate ? Number(matchedRule.buyerRate) : 0),
     };
+  }
+
+  /**
+   * Find matching commission rule by specificity
+   * Order: 1) cat+type, 2) cat+ALL (kategori öncelikli), 3) type-only, 4) ALL+NULL
+   * Each level can only have one rule (validated in admin service)
+   */
+  private findMatchingRule(
+    rules: any[],
+    categoryId: string | null | undefined,
+    sellerType: CommissionSellerType
+  ): any | null {
+    // 1. categoryId + sellerType (most specific)
+    if (categoryId) {
+      const exact = rules.find(
+        r => r.categoryId === categoryId && r.sellerType === sellerType
+      );
+      if (exact) {
+        this.logger.debug(`Matched exact rule: category=${categoryId}, sellerType=${sellerType}`);
+        return exact;
+      }
+    }
+
+    // 2. categoryId + ALL (category priority - more specific than seller type)
+    if (categoryId) {
+      const catAll = rules.find(
+        r => r.categoryId === categoryId && r.sellerType === CommissionSellerType.ALL
+      );
+      if (catAll) {
+        this.logger.debug(`Matched category rule: category=${categoryId}, sellerType=ALL`);
+        return catAll;
+      }
+    }
+
+    // 3. categoryId IS NULL + sellerType
+    const typeOnly = rules.find(
+      r => r.categoryId === null && r.sellerType === sellerType
+    );
+    if (typeOnly) {
+      this.logger.debug(`Matched seller type rule: sellerType=${sellerType}`);
+      return typeOnly;
+    }
+
+    // 4. categoryId IS NULL + ALL (default)
+    const defaultRule = rules.find(
+      r => r.categoryId === null && r.sellerType === CommissionSellerType.ALL
+    );
+    
+    if (defaultRule) {
+      this.logger.debug('Using default commission rule (ALL+NULL)');
+      return defaultRule;
+    }
+
+    return null;
+  }
+
+  /**
+   * Clamp amount between min and max
+   */
+  private clampAmount(
+    raw: number,
+    min: number | null,
+    max: number | null
+  ): number {
+    let val = raw;
+    if (min != null && val < min) val = min;
+    if (max != null && val > max) val = max;
+    return Math.round(val * 100) / 100;
+  }
+
+  /**
+   * Map User.sellerType to CommissionSellerType
+   * individual/verified -> FREE
+   * platform -> BUSINESS
+   * Premium/Business membership -> PREMIUM
+   */
+  private mapSellerTypeForCommission(
+    userSellerType: SellerType | null,
+    membershipTier: MembershipTierType | null
+  ): CommissionSellerType {
+    // Premium/Business membership -> PREMIUM
+    if (membershipTier === MembershipTierType.premium || membershipTier === MembershipTierType.business) {
+      return CommissionSellerType.PREMIUM;
+    }
+
+    // Platform sellers -> BUSINESS
+    if (userSellerType === SellerType.platform) {
+      return CommissionSellerType.BUSINESS;
+    }
+
+    // Individual/Verified -> FREE
+    return CommissionSellerType.FREE;
   }
 
   /**
@@ -419,13 +490,24 @@ export class OrderService {
         throw new BadRequestException('Teslimat adresi gereklidir');
       }
 
-      // Validate billing address if provided
+      // Resolve billing address: inline object > saved address ID > same as shipping
       let billingAddress = shippingAddress;
-      if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
+      if (dto.billingAddress && dto.billingAddress.fullName?.trim() && dto.billingAddress.city?.trim() && dto.billingAddress.address?.trim()) {
+        // Inline billing address (no need to save in profile)
+        billingAddress = {
+          id: '',
+          title: 'Fatura Adresi',
+          fullName: dto.billingAddress.fullName.trim(),
+          phone: (dto.billingAddress.phone || shippingAddress.phone || '').trim(),
+          city: dto.billingAddress.city.trim(),
+          district: (dto.billingAddress.district || '').trim(),
+          address: dto.billingAddress.address.trim(),
+          zipCode: dto.billingAddress.zipCode?.trim() || null,
+        };
+      } else if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
         const billing = await tx.address.findUnique({
           where: { id: dto.billingAddressId },
         });
-
         if (!billing || billing.userId !== buyerId) {
           throw new BadRequestException('Geçersiz fatura adresi');
         }
@@ -471,10 +553,6 @@ export class OrderService {
       const totalDiscount = productDiscount + couponDiscount;
       const subtotal = originalPrice;
       const discountedPrice = productPrice - couponDiscount;
-      
-      // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(discountedPrice);
-      const totalAmount = discountedPrice + shippingCost;
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on discounted product price, not including shipping
@@ -483,6 +561,11 @@ export class OrderService {
         product.sellerId,
         product.categoryId, // Pass categoryId for priority-based matching
       );
+
+      // Calculate shipping cost (free shipping for orders >= 500 TL)
+      const shippingCost = this.calculateShippingCost(discountedPrice);
+      // Buyer fee is added to order total
+      const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -503,6 +586,28 @@ export class OrderService {
         data: updateData,
       });
 
+      // Build shippingAddress JSON; add billing snapshot when different from shipping
+      const shippingAddressJson: Record<string, unknown> = {
+        id: shippingAddress.id,
+        title: shippingAddress.title || 'Teslimat Adresi',
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        city: shippingAddress.city,
+        district: shippingAddress.district,
+        address: shippingAddress.address,
+        zipCode: shippingAddress.zipCode,
+      };
+      if (billingAddress !== shippingAddress) {
+        (shippingAddressJson as any).billingAddress = {
+          fullName: billingAddress.fullName,
+          phone: billingAddress.phone,
+          city: billingAddress.city,
+          district: billingAddress.district,
+          address: billingAddress.address,
+          zipCode: billingAddress.zipCode,
+        };
+      }
+
       // Create order with discount info
       const order = await tx.order.create({
         data: {
@@ -522,18 +627,11 @@ export class OrderService {
           } : undefined,
           shippingCost,
           commissionAmount: commissionResult.commissionAmount,
+          buyerFeeAmount: commissionResult.buyerFeeAmount,
+          sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: shippingAddressId,
-          shippingAddress: {
-            id: shippingAddress.id,
-            title: shippingAddress.title || 'Teslimat Adresi',
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
-          },
+          shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
         },
         include: {
           product: {
@@ -573,20 +671,21 @@ export class OrderService {
       // Emit order.created event (outside transaction but still in the method)
       // This sends notification emails and push notifications
       try {
+        const createdOrder = order as typeof order & { product: { title: string }; buyer: { email: string; displayName: string | null }; seller: { email: string | null; displayName: string | null } };
         await this.eventService.emitOrderCreated({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          buyerId: order.buyerId,
-          sellerId: order.sellerId,
-          productId: order.productId,
-          productTitle: order.product.title,
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+          buyerId: createdOrder.buyerId,
+          sellerId: createdOrder.sellerId,
+          productId: createdOrder.productId,
+          productTitle: createdOrder.product.title,
           totalAmount,
-          buyerEmail: order.buyer.email,
-          buyerName: order.buyer.displayName || order.buyer.email,
-          sellerEmail: order.seller.email || '',
-          sellerName: order.seller.displayName || 'Satıcı',
+          buyerEmail: createdOrder.buyer.email,
+          buyerName: createdOrder.buyer.displayName || createdOrder.buyer.email,
+          sellerEmail: createdOrder.seller.email || '',
+          sellerName: createdOrder.seller.displayName || 'Satıcı',
         });
-        this.logger.log(`order.created event emitted for order ${order.orderNumber}`);
+        this.logger.log(`order.created event emitted for order ${createdOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail the order creation
         this.logger.error(`Failed to emit order.created event: ${error}`);
@@ -700,6 +799,9 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      // Buyer fee is added to order total
+      const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount;
+
       // Create order
       const order = await tx.order.create({
         data: {
@@ -708,8 +810,10 @@ export class OrderService {
           buyerId,
           sellerId: offer.sellerId,
           offerId: dto.offerId,
-          totalAmount: offer.amount,
+          totalAmount,
           commissionAmount: commissionResult.commissionAmount,
+          buyerFeeAmount: commissionResult.buyerFeeAmount,
+          sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: dto.shippingAddressId,
           shippingAddress: shippingAddress ? {
@@ -906,10 +1010,6 @@ export class OrderService {
         throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
       }
 
-      // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(finalPrice);
-      const totalAmount = finalPrice + shippingCost;
-
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on product price, not including shipping
       const commissionResult = await this.calculateCommission(
@@ -918,8 +1018,37 @@ export class OrderService {
         product.categoryId, // Pass categoryId for priority-based matching
       );
 
+      // Calculate shipping cost (free shipping for orders >= 500 TL)
+      const shippingCost = this.calculateShippingCost(finalPrice);
+      // Buyer fee is added to order total
+      const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount;
+
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
+
+      // Build guest shippingAddress JSON; add billing when provided and different
+      const guestShippingJson: Record<string, unknown> = {
+        guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
+        guestEmail: dto.email?.trim(),
+        guestPhone: dto.phone?.trim(),
+        fullName: dto.shippingAddress.fullName.trim(),
+        phone: dto.shippingAddress.phone.trim(),
+        city: dto.shippingAddress.city.trim(),
+        district: dto.shippingAddress.district.trim(),
+        address: dto.shippingAddress.address.trim(),
+        zipCode: dto.shippingAddress.zipCode?.trim() || null,
+        isGuestOrder: true,
+      };
+      if (dto.billingAddress?.fullName?.trim() && dto.billingAddress?.city?.trim() && dto.billingAddress?.address?.trim()) {
+        (guestShippingJson as any).billingAddress = {
+          fullName: dto.billingAddress.fullName.trim(),
+          phone: dto.billingAddress.phone?.trim() || dto.shippingAddress.phone.trim(),
+          city: dto.billingAddress.city.trim(),
+          district: dto.billingAddress.district?.trim() || '',
+          address: dto.billingAddress.address.trim(),
+          zipCode: dto.billingAddress.zipCode?.trim() || null,
+        };
+      }
 
       // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
@@ -932,22 +1061,10 @@ export class OrderService {
           totalAmount,
           shippingCost,
           commissionAmount: commissionResult.commissionAmount,
+          buyerFeeAmount: commissionResult.buyerFeeAmount,
+          sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
-          shippingAddress: {
-            // Guest contact info
-            guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
-            guestEmail: dto.email?.trim(),
-            guestPhone: dto.phone?.trim(),
-            // Shipping address
-            fullName: dto.shippingAddress.fullName.trim(),
-            phone: dto.shippingAddress.phone.trim(),
-            city: dto.shippingAddress.city.trim(),
-            district: dto.shippingAddress.district.trim(),
-            address: dto.shippingAddress.address.trim(),
-            zipCode: dto.shippingAddress.zipCode?.trim() || null,
-            // Mark as guest order
-            isGuestOrder: true,
-          },
+          shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {
           product: {
@@ -1184,6 +1301,7 @@ export class OrderService {
     const allowedTransitions: Record<OrderStatus, { nextStatuses: OrderStatus[]; allowedBy: 'buyer' | 'seller' | 'system' }[]> = {
       [OrderStatus.pending_payment]: [
         { nextStatuses: [OrderStatus.paid], allowedBy: 'system' },
+        { nextStatuses: [OrderStatus.preparing], allowedBy: 'system' }, // Payment success → preparing (first state after purchase)
         { nextStatuses: [OrderStatus.cancelled], allowedBy: 'buyer' },
       ],
       [OrderStatus.paid]: [
