@@ -574,6 +574,7 @@ model Product {
   sellerId            String           @map("seller_id")
   categoryId          String           @map("category_id")
   title               String
+  slug                String?          @unique // Legacy: DB'de var, uyumluluk için şemada tutuluyor
   description         String?
   price               Decimal          @db.Decimal(10, 2)
   condition           ProductCondition

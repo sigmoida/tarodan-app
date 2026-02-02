@@ -20,7 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { tradesApi, listingsApi, userApi } from '@/lib/api';
+import { tradesApi, listingsApi, userApi, addressesApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -160,6 +160,8 @@ export default function TradeDetailPage() {
   const [counterCashPayer, setCounterCashPayer] = useState<'me' | 'them'>('me');
   const [counterMessage, setCounterMessage] = useState('');
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
+  const [shipAddressId, setShipAddressId] = useState('');
+  const [shipCarrier, setShipCarrier] = useState('aras');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -192,6 +194,50 @@ export default function TradeDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['trade', tradeId] }),
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
   ]);
+
+  const needToShip =
+    trade &&
+    user &&
+    ((user.id === trade.initiatorId && !trade.initiatorShipment && (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
+     (user.id === trade.receiverId && !trade.receiverShipment && (trade.status === 'accepted' || trade.status === 'initiator_shipped')));
+
+  const addressesQuery = useQuery({
+    queryKey: ['addresses'],
+    queryFn: async () => {
+      const res = await addressesApi.getAll();
+      const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: !!needToShip,
+    meta: { page: 'trade-ship-addresses' },
+  });
+  const addresses = addressesQuery.data ?? [];
+
+  useEffect(() => {
+    if (addresses.length > 0 && !shipAddressId) {
+      setShipAddressId(addresses[0].id);
+    }
+  }, [addresses, shipAddressId]);
+
+  const handleShipSubmit = async () => {
+    if (!trade || !shipAddressId || !shipCarrier) {
+      toast.error(locale === 'en' ? 'Please select address and carrier' : 'Lütfen adres ve kargo firması seçin');
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      await tradesApi.ship(trade.id, { fromAddressId: shipAddressId, carrier: shipCarrier });
+      toast.success(locale === 'en' ? 'Shipping info submitted' : 'Kargo bilgisi gönderildi');
+      setShipAddressId('');
+      setShipCarrier('aras');
+      await invalidateTrade();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to submit shipping:', error);
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to submit shipping' : 'Kargo bilgisi gönderilemedi'));
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   // Countdown timer effect
   useEffect(() => {
@@ -852,6 +898,63 @@ export default function TradeDetailPage() {
           <p className="text-sm text-orange-800">{statusConfig.description}</p>
         </div>
 
+        {/* Completed Trade Summary - only when status is completed */}
+        {trade.status === 'completed' && (
+          <div className="card p-6 mb-6 bg-green-50 border-2 border-green-200 rounded-xl">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                <CheckCircleIcon className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-green-800 mb-1">
+                  {t('trade.completedSummaryTitle')}
+                </h2>
+                <p className="text-green-700 text-sm mb-4">
+                  {t('trade.completedSummaryDesc')}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <div className="bg-white/60 rounded-lg px-3 py-2">
+                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide">{t('trade.createdAt')}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {trade.createdAt ? new Date(trade.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', { dateStyle: 'medium' }) : '—'}
+                    </p>
+                  </div>
+                  {trade.acceptedAt && (
+                    <div className="bg-white/60 rounded-lg px-3 py-2">
+                      <p className="text-xs font-medium text-green-700 uppercase tracking-wide">{t('trade.acceptedAt')}</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {new Date(trade.acceptedAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', { dateStyle: 'medium' })}
+                      </p>
+                    </div>
+                  )}
+                  {trade.completedAt && (
+                    <div className="bg-white/60 rounded-lg px-3 py-2">
+                      <p className="text-xs font-medium text-green-700 uppercase tracking-wide">{t('trade.completedAt')}</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {new Date(trade.completedAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', { dateStyle: 'medium' })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/trades"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-sm"
+                  >
+                    {t('trade.backToTrades')}
+                  </Link>
+                  <Link
+                    href="/listings"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-green-100 text-green-800 border border-green-300 rounded-lg font-medium transition-colors text-sm"
+                  >
+                    {t('trade.browseListings')}
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Countdown Timer */}
         {countdown && (
           <div className="card p-4 mb-6 bg-orange-50 border-orange-200">
@@ -862,6 +965,17 @@ export default function TradeDetailPage() {
                 <p className="text-sm text-orange-600">Lütfen süre dolmadan işleminizi tamamlayın</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Güvenli takas bilgisi - pending veya accepted durumunda */}
+        {(trade.status === 'pending' || trade.status === 'accepted') && (
+          <div className="card p-4 mb-6 bg-blue-50 border-blue-200">
+            <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+              <CheckCircleIcon className="w-5 h-5 text-blue-600" />
+              {t('trade.safeTradeTitle')}
+            </h3>
+            <p className="text-sm text-blue-800">{t('trade.safeTradeDesc')}</p>
           </div>
         )}
 
@@ -968,6 +1082,78 @@ export default function TradeDetailPage() {
                     : `${trade.receiverName} ödeyecek`}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kargo Bilgisi Gir - adres ve kargo firması seçimi */}
+        {needToShip && (
+          <div className="card p-6 mb-6 bg-purple-50 border-purple-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <TruckIcon className="w-5 h-5 text-purple-600" />
+              {locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              {locale === 'en' ? 'Select the address you will ship from and the carrier.' : 'Gönderim yapacağınız adresi ve kargo firmasını seçin.'}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Shipping address' : 'Gönderim adresi'}
+                </label>
+                <select
+                  value={shipAddressId}
+                  onChange={(e) => setShipAddressId(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">
+                    {addressesQuery.isLoading ? (locale === 'en' ? 'Loading...' : 'Yükleniyor...') : (locale === 'en' ? 'Select address' : 'Adres seçin')}
+                  </option>
+                  {addresses.map((addr: any) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.fullName || addr.title} – {addr.city} / {addr.district} {addr.address ? `– ${addr.address}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {addresses.length === 0 && !addressesQuery.isLoading && (
+                  <p className="text-sm text-amber-600 mt-2">
+                    {locale === 'en' ? 'No saved addresses. Add one in ' : 'Kayıtlı adres yok. '}
+                    <Link href="/profile/addresses" className="underline font-medium">{locale === 'en' ? 'Profile → Addresses' : 'Profil → Adresler'}</Link>
+                    {locale === 'en' ? '' : ' bölümünden ekleyebilirsiniz.'}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Carrier' : 'Kargo firması'}
+                </label>
+                <select
+                  value={shipCarrier}
+                  onChange={(e) => setShipCarrier(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="aras">Aras Kargo</option>
+                  <option value="yurtici">Yurtiçi Kargo</option>
+                  <option value="mng">MNG Kargo</option>
+                </select>
+              </div>
+              <button
+                onClick={handleShipSubmit}
+                disabled={isActionLoading || !shipAddressId || addresses.length === 0}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isActionLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {locale === 'en' ? 'Submitting...' : 'Gönderiliyor...'}
+                  </>
+                ) : (
+                  <>
+                    <TruckIcon className="w-5 h-5" />
+                    {locale === 'en' ? 'Submit Shipping Info' : 'Kargo Bilgisini Gönder'}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}

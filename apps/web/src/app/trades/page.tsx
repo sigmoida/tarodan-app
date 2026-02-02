@@ -160,7 +160,7 @@ export default function TradesPage() {
               {t('trade.noTrades')}
             </h2>
             <p className="text-gray-600 mb-6">
-              {t('trade.tradeRequiresLogin')}
+              {isAuthenticated ? t('trade.noTradesHint') : t('trade.tradeRequiresLogin')}
             </p>
             <Link
               href="/listings"

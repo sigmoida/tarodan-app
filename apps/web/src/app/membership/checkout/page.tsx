@@ -225,8 +225,8 @@ export default function MembershipCheckoutPage() {
           return;
         }
       } else if (paymentId) {
-        // Redirect to payment page
-        router.push(`/payment/${paymentId}`);
+        // Redirect to payment page (type=membership so success shows membership page, not order)
+        router.push(`/payment/${paymentId}?type=membership`);
         return;
       } else {
         // No payment needed (free tier)

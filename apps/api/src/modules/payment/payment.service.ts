@@ -218,7 +218,9 @@ export class PaymentService {
    */
   private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
     try {
-      const callbackUrl = `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/api/payment/callback/iyzico?paymentId=${payment.id}`;
+      const baseUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      const callbackUrl = `${baseUrl}/api/payment/callback/iyzico?paymentId=${payment.id}${isMembershipOrder ? '&type=membership' : ''}`;
       const shippingAddress = order.shippingAddress as any;
 
       // Check if this is a guest order
@@ -394,13 +396,15 @@ export class PaymentService {
         quantity: 1,
       }];
 
-      // Create PayTR iframe token
+      // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
+      const isMembershipOrder = order.productId?.startsWith?.('membership-');
       const result = await this.paytrService.processOrderPayment(
         order.id,
         Number(order.totalAmount),
         buyer,
         basketItems,
         1, // installment count
+        isMembershipOrder ? 'type=membership' : undefined,
       );
 
       // Update payment with provider reference
