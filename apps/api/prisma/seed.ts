@@ -290,26 +290,12 @@ async function main() {
   });
 
   const categoryData = [
-    { name: 'Hot Wheels', slug: 'hot-wheels', description: 'Hot Wheels diecast model araçlar', sortOrder: 1 },
-    { name: 'Hot Wheels Premium', slug: 'hot-wheels-premium', description: 'Hot Wheels Premium serisi', sortOrder: 2 },
-    { name: 'Hot Wheels RLC', slug: 'hot-wheels-rlc', description: 'Red Line Club exclusive modeller', sortOrder: 3 },
-    { name: 'Matchbox', slug: 'matchbox', description: 'Matchbox diecast model araçlar', sortOrder: 4 },
-    { name: 'Tomica', slug: 'tomica', description: 'Tomica diecast model araçlar', sortOrder: 5 },
-    { name: 'Tomica Limited Vintage', slug: 'tomica-limited-vintage', description: 'TLV serisi premium modeller', sortOrder: 6 },
-    { name: 'Majorette', slug: 'majorette', description: 'Majorette diecast model araçlar', sortOrder: 7 },
-    { name: 'M2 Machines', slug: 'm2-machines', description: 'M2 Machines detaylı modeller', sortOrder: 8 },
-    { name: 'Greenlight', slug: 'greenlight', description: 'Greenlight koleksiyon modelleri', sortOrder: 9 },
-    { name: 'Johnny Lightning', slug: 'johnny-lightning', description: 'Johnny Lightning modelleri', sortOrder: 10 },
-    { name: '1:18 Scale Models', slug: 'scale-118', description: '1:18 ölçekli premium model arabalar', sortOrder: 11 },
-    { name: '1:24 Scale Models', slug: 'scale-124', description: '1:24 ölçekli model arabalar', sortOrder: 12 },
-    { name: '1:43 Scale Models', slug: 'scale-143', description: '1:43 ölçekli koleksiyon arabaları', sortOrder: 13 },
-    { name: '1:64 Scale Models', slug: 'scale-164', description: '1:64 ölçekli model arabalar', sortOrder: 14 },
-    { name: 'Vintage Diecast', slug: 'vintage-diecast', description: 'Antika ve vintage diecast modeller', sortOrder: 15 },
-    { name: 'Limited Edition', slug: 'limited-edition', description: 'Sınırlı üretim koleksiyon modelleri', sortOrder: 16 },
-    { name: 'Muscle Cars', slug: 'muscle-cars', description: 'Amerikan kas arabaları', sortOrder: 17 },
-    { name: 'JDM Legends', slug: 'jdm-legends', description: 'Japon efsaneleri', sortOrder: 18 },
-    { name: 'European Classics', slug: 'european-classics', description: 'Avrupa klasikleri', sortOrder: 19 },
-    { name: 'Trucks & SUVs', slug: 'trucks-suvs', description: 'Kamyonlar ve SUV modelleri', sortOrder: 20 },
+    { name: 'Vintage', slug: 'vintage', description: 'Antika ve vintage diecast modeller', sortOrder: 1 },
+    { name: 'Spor', slug: 'sports', description: 'Spor arabalar ve yarış modelleri', sortOrder: 2 },
+    { name: 'Muscle', slug: 'muscle', description: 'Amerikan kas arabaları', sortOrder: 3 },
+    { name: 'Kamyon', slug: 'trucks', description: 'Kamyonlar ve SUV modelleri', sortOrder: 4 },
+    { name: 'F1', slug: 'f1', description: 'Formula 1 ve yarış arabaları', sortOrder: 5 },
+    { name: 'Custom', slug: 'custom', description: 'Özel tasarım ve modifiye modeller', sortOrder: 6 },
   ];
 
   const categories = await Promise.all(
@@ -441,9 +427,9 @@ async function main() {
       update: {},
       create: {
         id: 'vintage-rule',
-        name: 'Vintage Diecast Komisyonu',
+        name: 'Vintage Komisyonu',
         ruleType: CommissionRuleType.category,
-        categoryId: categories.find(c => c.slug === 'vintage-diecast')?.id,
+        categoryId: categories.find(c => c.slug === 'vintage')?.id,
         sellerType: CommissionSellerType.ALL,
         appliesTo: 'SELLER',
         sellerRate: 7.0,
@@ -453,13 +439,13 @@ async function main() {
       },
     }),
     prisma.commissionRule.upsert({
-      where: { id: 'limited-rule' },
+      where: { id: 'f1-rule' },
       update: {},
       create: {
-        id: 'limited-rule',
-        name: 'Limited Edition Komisyonu',
+        id: 'f1-rule',
+        name: 'F1 Komisyonu',
         ruleType: CommissionRuleType.category,
-        categoryId: categories.find(c => c.slug === 'limited-edition')?.id,
+        categoryId: categories.find(c => c.slug === 'f1')?.id,
         sellerType: CommissionSellerType.ALL,
         appliesTo: 'SELLER',
         sellerRate: 8.0,
@@ -805,103 +791,77 @@ async function main() {
   console.log('Creating products...');
 
   const productTemplates = [
-    // Hot Wheels
-    { title: 'Hot Wheels 2024 Nissan Skyline GT-R R34', cat: 'hot-wheels', price: [150, 450], cond: ProductCondition.new },
-    { title: 'Hot Wheels Super Treasure Hunt 2023', cat: 'hot-wheels', price: [500, 1500], cond: ProductCondition.new },
-    { title: 'Hot Wheels Toyota AE86 Trueno', cat: 'hot-wheels', price: [100, 300], cond: ProductCondition.like_new },
-    { title: 'Hot Wheels Mazda RX-7 FD', cat: 'hot-wheels', price: [80, 200], cond: ProductCondition.very_good },
-    { title: 'Hot Wheels Honda Civic EG6', cat: 'hot-wheels', price: [60, 150], cond: ProductCondition.good },
-    { title: 'Hot Wheels Porsche 911 GT3 RS', cat: 'hot-wheels', price: [120, 350], cond: ProductCondition.new },
-    { title: 'Hot Wheels BMW M3 E30', cat: 'hot-wheels', price: [90, 250], cond: ProductCondition.like_new },
-    { title: 'Hot Wheels Lamborghini Countach', cat: 'hot-wheels', price: [70, 180], cond: ProductCondition.very_good },
+    // Vintage Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Vintage 1960s Ferrari 275 GTB', cat: 'vintage', price: [8000, 15000], cond: ProductCondition.good },
+    { title: 'Matchbox 1965 James Bond Aston Martin', cat: 'vintage', price: [5000, 10000], cond: ProductCondition.fair },
+    { title: 'Tamiya Vintage Collection 1950s', cat: 'vintage', price: [3000, 7000], cond: ProductCondition.good },
+    { title: 'AUTOart Classic Mercedes 300SL Gullwing', cat: 'vintage', price: [10000, 18000], cond: ProductCondition.good },
+    { title: 'Kyosho Vintage Porsche 356', cat: 'vintage', price: [4000, 8000], cond: ProductCondition.like_new },
+    { title: 'Maisto Classic Corvette 1963', cat: 'vintage', price: [2000, 5000], cond: ProductCondition.good },
+    { title: 'Bburago Vintage Alfa Romeo', cat: 'vintage', price: [3000, 6000], cond: ProductCondition.fair },
+    { title: 'Greenlight Vintage Collection', cat: 'vintage', price: [2500, 5500], cond: ProductCondition.good },
+    { title: 'Majorette Vintage Set', cat: 'vintage', price: [1500, 3500], cond: ProductCondition.good },
+    { title: 'Tomica Limited Vintage Collection', cat: 'vintage', price: [6000, 12000], cond: ProductCondition.new },
+    { title: 'Minichamps Vintage Racing', cat: 'vintage', price: [5000, 10000], cond: ProductCondition.like_new },
     
-    // Hot Wheels Premium
-    { title: 'Hot Wheels Premium Fast & Furious Set', cat: 'hot-wheels-premium', price: [400, 800], cond: ProductCondition.new },
-    { title: 'Hot Wheels Premium Car Culture Japan Historics', cat: 'hot-wheels-premium', price: [250, 500], cond: ProductCondition.new },
-    { title: 'Hot Wheels Premium Boulevard Real Riders', cat: 'hot-wheels-premium', price: [200, 400], cond: ProductCondition.like_new },
+    // Spor Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Nissan Skyline GT-R R34', cat: 'sports', price: [150, 450], cond: ProductCondition.new },
+    { title: 'Hot Wheels Porsche 911 GT3 RS', cat: 'sports', price: [120, 350], cond: ProductCondition.new },
+    { title: 'Hot Wheels Lamborghini Aventador', cat: 'sports', price: [200, 500], cond: ProductCondition.new },
+    { title: 'Matchbox McLaren P1', cat: 'sports', price: [100, 300], cond: ProductCondition.new },
+    { title: 'Tamiya Toyota Supra MK4', cat: 'sports', price: [300, 600], cond: ProductCondition.new },
+    { title: 'AUTOart 1:18 Lamborghini Huracan', cat: 'sports', price: [4000, 6000], cond: ProductCondition.new },
+    { title: 'Kyosho 1:18 Nissan GT-R R35', cat: 'sports', price: [3500, 5500], cond: ProductCondition.new },
+    { title: 'Maisto 1:24 Ferrari F8 Tributo', cat: 'sports', price: [300, 600], cond: ProductCondition.new },
+    { title: 'Bburago 1:24 Lamborghini Aventador', cat: 'sports', price: [250, 500], cond: ProductCondition.new },
+    { title: 'Greenlight Sports Car Series', cat: 'sports', price: [150, 350], cond: ProductCondition.new },
+    { title: 'Majorette Porsche 911 Turbo', cat: 'sports', price: [40, 100], cond: ProductCondition.new },
+    { title: 'Tomica Honda NSX Type-R', cat: 'sports', price: [120, 300], cond: ProductCondition.new },
+    { title: 'Minichamps 1:43 Sports Car Collection', cat: 'sports', price: [500, 900], cond: ProductCondition.new },
     
-    // Hot Wheels RLC
-    { title: 'Hot Wheels RLC Datsun 510 Blue', cat: 'hot-wheels-rlc', price: [1500, 3000], cond: ProductCondition.new },
-    { title: 'Hot Wheels RLC 55 Chevy Bel Air Gasser', cat: 'hot-wheels-rlc', price: [1200, 2500], cond: ProductCondition.new },
-    { title: 'Hot Wheels RLC Mercedes 300 SL', cat: 'hot-wheels-rlc', price: [1800, 3500], cond: ProductCondition.like_new },
+    // Muscle Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Dodge Challenger R/T 1970', cat: 'muscle', price: [150, 350], cond: ProductCondition.new },
+    { title: 'Hot Wheels Ford Mustang Mach 1 1971', cat: 'muscle', price: [200, 450], cond: ProductCondition.new },
+    { title: 'Matchbox 1970 Ford Mustang Boss 429', cat: 'muscle', price: [150, 400], cond: ProductCondition.good },
+    { title: 'Greenlight Muscle Car Garage', cat: 'muscle', price: [120, 280], cond: ProductCondition.new },
+    { title: 'Greenlight Route 66 Muscle Collection', cat: 'muscle', price: [200, 450], cond: ProductCondition.like_new },
+    { title: 'Maisto Chevrolet Camaro SS 1969', cat: 'muscle', price: [180, 400], cond: ProductCondition.like_new },
+    { title: 'Bburago Dodge Charger 1970', cat: 'muscle', price: [160, 380], cond: ProductCondition.new },
+    { title: 'AUTOart 1:18 Plymouth Barracuda', cat: 'muscle', price: [3000, 5500], cond: ProductCondition.new },
+    { title: 'Kyosho 1:18 Ford Mustang GT500', cat: 'muscle', price: [2500, 4500], cond: ProductCondition.new },
     
-    // Matchbox
-    { title: 'Matchbox 1970 Ford Mustang Boss 429', cat: 'matchbox', price: [150, 400], cond: ProductCondition.good },
-    { title: 'Matchbox Land Rover Defender', cat: 'matchbox', price: [80, 200], cond: ProductCondition.new },
-    { title: 'Matchbox Jurassic World Set', cat: 'matchbox', price: [200, 450], cond: ProductCondition.new },
-    { title: 'Matchbox Volkswagen Beetle', cat: 'matchbox', price: [50, 120], cond: ProductCondition.very_good },
+    // Kamyon Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Ford F-150 Raptor 2023', cat: 'trucks', price: [150, 350], cond: ProductCondition.new },
+    { title: 'Matchbox Land Rover Defender', cat: 'trucks', price: [80, 200], cond: ProductCondition.new },
+    { title: 'Tamiya Toyota Land Cruiser J70', cat: 'trucks', price: [200, 450], cond: ProductCondition.like_new },
+    { title: 'Maisto Jeep Wrangler Rubicon', cat: 'trucks', price: [120, 280], cond: ProductCondition.new },
+    { title: 'Bburago Mercedes G-Class', cat: 'trucks', price: [180, 400], cond: ProductCondition.new },
+    { title: 'Greenlight Pickup Truck Series', cat: 'trucks', price: [100, 250], cond: ProductCondition.new },
+    { title: 'Majorette SUV Collection', cat: 'trucks', price: [50, 120], cond: ProductCondition.new },
+    { title: 'Tomica Toyota Hilux', cat: 'trucks', price: [80, 180], cond: ProductCondition.new },
+    { title: 'AUTOart 1:18 Ford F-150 Raptor', cat: 'trucks', price: [3500, 5500], cond: ProductCondition.new },
     
-    // Tomica
-    { title: 'Tomica Toyota AE86 Initial D Edition', cat: 'tomica', price: [300, 600], cond: ProductCondition.new },
-    { title: 'Tomica Nissan GT-R Nismo', cat: 'tomica', price: [100, 250], cond: ProductCondition.like_new },
-    { title: 'Tomica Honda NSX Type-R', cat: 'tomica', price: [120, 300], cond: ProductCondition.new },
-    { title: 'Tomica Mazda MX-5 Miata', cat: 'tomica', price: [60, 150], cond: ProductCondition.very_good },
+    // F1 Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Formula 1 Collection', cat: 'f1', price: [200, 500], cond: ProductCondition.new },
+    { title: 'Matchbox F1 Racing Set', cat: 'f1', price: [150, 400], cond: ProductCondition.new },
+    { title: 'Tamiya F1 Model Kit', cat: 'f1', price: [400, 800], cond: ProductCondition.new },
+    { title: 'AUTOart 1:18 F1 Championship Car', cat: 'f1', price: [5000, 9000], cond: ProductCondition.new },
+    { title: 'Kyosho 1:18 Formula 1', cat: 'f1', price: [4500, 8000], cond: ProductCondition.new },
+    { title: 'Maisto F1 Racing Collection', cat: 'f1', price: [300, 600], cond: ProductCondition.new },
+    { title: 'Bburago F1 Championship Series', cat: 'f1', price: [250, 500], cond: ProductCondition.new },
+    { title: 'Minichamps 1:43 F1 Racing', cat: 'f1', price: [600, 1200], cond: ProductCondition.new },
+    { title: 'Greenlight F1 Legends', cat: 'f1', price: [180, 400], cond: ProductCondition.new },
     
-    // Tomica Limited Vintage
-    { title: 'TLV Nissan Fairlady Z 432', cat: 'tomica-limited-vintage', price: [800, 1500], cond: ProductCondition.new },
-    { title: 'TLV Toyota Celica 2000GT', cat: 'tomica-limited-vintage', price: [600, 1200], cond: ProductCondition.like_new },
-    { title: 'TLV Mazda Savanna RX-3', cat: 'tomica-limited-vintage', price: [700, 1400], cond: ProductCondition.new },
-    
-    // Majorette
-    { title: 'Majorette Porsche 911 Turbo', cat: 'majorette', price: [40, 100], cond: ProductCondition.new },
-    { title: 'Majorette Lamborghini Aventador', cat: 'majorette', price: [50, 120], cond: ProductCondition.like_new },
-    { title: 'Majorette Racing Cars Set', cat: 'majorette', price: [100, 250], cond: ProductCondition.new },
-    
-    // M2 Machines
-    { title: 'M2 Machines 1957 Chevy Bel Air', cat: 'm2-machines', price: [200, 450], cond: ProductCondition.new },
-    { title: 'M2 Machines Ford Mustang 1965', cat: 'm2-machines', price: [180, 400], cond: ProductCondition.like_new },
-    { title: 'M2 Machines Auto-Haulers Set', cat: 'm2-machines', price: [350, 700], cond: ProductCondition.new },
-    
-    // Greenlight
-    { title: 'Greenlight Hollywood Series', cat: 'greenlight', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Greenlight Muscle Car Garage', cat: 'greenlight', price: [120, 280], cond: ProductCondition.new },
-    { title: 'Greenlight Route 66 Collection', cat: 'greenlight', price: [200, 450], cond: ProductCondition.like_new },
-    
-    // 1:18 Scale
-    { title: 'AutoArt 1:18 Porsche 911 GT3 RS', cat: 'scale-118', price: [4000, 6000], cond: ProductCondition.new },
-    { title: 'Kyosho 1:18 Nissan GT-R R35', cat: 'scale-118', price: [3500, 5500], cond: ProductCondition.new },
-    { title: 'Minichamps 1:18 BMW M3 E30', cat: 'scale-118', price: [2500, 4500], cond: ProductCondition.like_new },
-    { title: 'CMC 1:18 Ferrari 250 GTO', cat: 'scale-118', price: [8000, 15000], cond: ProductCondition.new },
-    
-    // 1:24 Scale
-    { title: 'Jada 1:24 Fast & Furious Supra', cat: 'scale-124', price: [400, 800], cond: ProductCondition.new },
-    { title: 'Maisto 1:24 Lamborghini Huracan', cat: 'scale-124', price: [300, 600], cond: ProductCondition.new },
-    { title: 'Welly 1:24 Porsche 911 Carrera', cat: 'scale-124', price: [200, 450], cond: ProductCondition.like_new },
-    
-    // 1:43 Scale
-    { title: 'Spark 1:43 Mercedes AMG GT', cat: 'scale-143', price: [500, 900], cond: ProductCondition.new },
-    { title: 'IXO 1:43 Ford GT40 Le Mans', cat: 'scale-143', price: [400, 750], cond: ProductCondition.new },
-    { title: 'Minichamps 1:43 Porsche 917K', cat: 'scale-143', price: [450, 850], cond: ProductCondition.like_new },
-    
-    // Vintage
-    { title: 'Dinky Toys 1960s Ferrari 275 GTB', cat: 'vintage-diecast', price: [8000, 15000], cond: ProductCondition.good },
-    { title: 'Corgi Toys 1965 James Bond Aston Martin', cat: 'vintage-diecast', price: [5000, 10000], cond: ProductCondition.fair },
-    { title: 'Lesney Matchbox 1950s Collection', cat: 'vintage-diecast', price: [3000, 7000], cond: ProductCondition.good },
-    
-    // Limited Edition
-    { title: 'Sınırlı Üretim GT-R Koleksiyon Seti', cat: 'limited-edition', price: [2000, 5000], cond: ProductCondition.new },
-    { title: 'Collector Edition Porsche 50th Anniversary', cat: 'limited-edition', price: [3000, 6000], cond: ProductCondition.new },
-    { title: 'Exclusive Ferrari F40 Signed Edition', cat: 'limited-edition', price: [5000, 10000], cond: ProductCondition.new },
-    
-    // Muscle Cars
-    { title: 'Dodge Challenger R/T 1970 Diecast', cat: 'muscle-cars', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Chevrolet Camaro SS 1969 Model', cat: 'muscle-cars', price: [180, 400], cond: ProductCondition.like_new },
-    { title: 'Ford Mustang Mach 1 1971', cat: 'muscle-cars', price: [200, 450], cond: ProductCondition.new },
-    
-    // JDM
-    { title: 'Nissan Silvia S15 Spec-R Model', cat: 'jdm-legends', price: [250, 500], cond: ProductCondition.new },
-    { title: 'Toyota Supra MK4 JZA80 Diecast', cat: 'jdm-legends', price: [300, 600], cond: ProductCondition.new },
-    { title: 'Mitsubishi Lancer Evo IX', cat: 'jdm-legends', price: [280, 550], cond: ProductCondition.like_new },
-    
-    // European
-    { title: 'Alfa Romeo 33 Stradale 1967', cat: 'european-classics', price: [1500, 3000], cond: ProductCondition.new },
-    { title: 'Jaguar E-Type 1961 Roadster', cat: 'european-classics', price: [1200, 2500], cond: ProductCondition.like_new },
-    { title: 'Mercedes-Benz 300SL Gullwing', cat: 'european-classics', price: [1800, 3500], cond: ProductCondition.new },
-    
-    // Trucks
-    { title: 'Ford F-150 Raptor 2023 Model', cat: 'trucks-suvs', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Jeep Wrangler Rubicon Diecast', cat: 'trucks-suvs', price: [120, 280], cond: ProductCondition.new },
-    { title: 'Toyota Land Cruiser J70 Series', cat: 'trucks-suvs', price: [200, 450], cond: ProductCondition.like_new },
+    // Custom Kategorisi - Anasayfadaki markalarla
+    { title: 'Hot Wheels Custom Modified Nissan Skyline', cat: 'custom', price: [300, 700], cond: ProductCondition.new },
+    { title: 'Hot Wheels Custom Paint Job Collection', cat: 'custom', price: [250, 600], cond: ProductCondition.new },
+    { title: 'Matchbox Custom Build Series', cat: 'custom', price: [150, 400], cond: ProductCondition.new },
+    { title: 'Tamiya Custom Drift Car', cat: 'custom', price: [500, 1000], cond: ProductCondition.new },
+    { title: 'Greenlight Custom Hot Rod', cat: 'custom', price: [200, 500], cond: ProductCondition.new },
+    { title: 'Maisto Custom Lowrider', cat: 'custom', price: [180, 450], cond: ProductCondition.new },
+    { title: 'Bburago Custom Tuning Series', cat: 'custom', price: [220, 550], cond: ProductCondition.new },
+    { title: 'Majorette Custom Racing', cat: 'custom', price: [100, 250], cond: ProductCondition.new },
+    { title: 'Tomica Custom Modified', cat: 'custom', price: [300, 650], cond: ProductCondition.new },
   ];
 
   const products: any[] = [];
