@@ -122,10 +122,15 @@ export class PayTRService {
       maxInstallment?: number;
       lang?: 'tr' | 'en';
       timeoutLimit?: number;
+      /** e.g. "type=membership" so success page redirects to membership success */
+      successQueryParams?: string;
     },
   ): Promise<{ token: string; iframeUrl: string }> {
     const paymentAmount = Math.round(amount * 100); // Convert to kuruş
-    const merchantOkUrl = `${this.configService.get('FRONTEND_URL')}/payment/success`;
+    const successBase = `${this.configService.get('FRONTEND_URL')}/payment/success`;
+    const merchantOkUrl = options?.successQueryParams
+      ? `${successBase}?${options.successQueryParams}`
+      : successBase;
     const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
 
     // Encode basket
@@ -538,6 +543,7 @@ export class PayTRService {
       quantity?: number;
     }>,
     installmentCount = 1,
+    successQueryParams?: string,
   ): Promise<{ token: string; iframeUrl: string }> {
     const paytrBuyer: PayTRBuyer = {
       name: buyer.name,
@@ -560,6 +566,7 @@ export class PayTRService {
       installmentCount,
       maxInstallment: 12,
       lang: 'tr',
+      successQueryParams,
     });
   }
 }

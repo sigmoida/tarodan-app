@@ -25,6 +25,7 @@ import {
   XCircleIcon,
   FireIcon,
   CurrencyDollarIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
@@ -209,8 +210,10 @@ export default function Navbar() {
     }
   };
 
-  // Reklam barı açık
-  const shouldShowAd = true;
+  // Premium ve Business üyeler için reklam gösterme
+  const membershipTier = user?.membershipTier || 'free';
+  const isAdFree = membershipTier === 'premium' || membershipTier === 'business';
+  const shouldShowAd = !isAdFree;
 
   // Detect mobile/desktop for responsive ads
   useEffect(() => {
@@ -519,10 +522,10 @@ export default function Navbar() {
               })}
             </div>
 
-            {/* Right Actions */}
+            {/* Right Actions - same wrapper (div) in both branches to avoid hydration mismatch */}
             <div className="flex items-center gap-4 ml-8">
-              {isAuthenticated ? (
-                <>
+              {showAuthUI ? (
+                <div className="flex items-center gap-4">
                   {/* Yeni İlan Ekle Butonu - Desktop */}
                   <Link
                     href="/listings/new"
@@ -544,9 +547,14 @@ export default function Navbar() {
                   </Link>
                   <Link
                     href="/favorites"
-                    className="p-2 text-white hover:text-orange-100 transition-colors hidden sm:block"
+                    className="p-2 text-white hover:text-orange-100 transition-colors relative hidden sm:block"
                   >
                     <HeartIcon className="w-6 h-6" />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                        {wishlistCount > 9 ? '9+' : wishlistCount}
+                      </span>
+                    )}
                   </Link>
                   <NotificationBell />
                   <Link
@@ -631,11 +639,18 @@ export default function Navbar() {
                           )}
                         </Link>
                         <Link
-                          href="/wishlist"
+                          href="/favorites"
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                         >
                           <HeartIcon className="w-5 h-5" />
                           {t('nav.favorites')}
+                        </Link>
+                        <Link
+                          href="/profile/membership"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                        >
+                          <SparklesIcon className="w-5 h-5" />
+                          {t('membership.title')}
                         </Link>
                       </div>
 
@@ -679,39 +694,38 @@ export default function Navbar() {
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-4">
-                    {/* İlan Ver butonu - Guest Desktop */}
-                    <button
-                      onClick={() => setShowAuthModal(true)}
-                      className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      <span>{t('nav.newListing')}</span>
-                    </button>
-                    <Link
-                      href="/login"
-                      className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
-                    >
-                      {t('common.login')}
-                    </Link>
-                    <Link
-                      href="/register"
-                      className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
-                    >
-                      {t('common.register')}
-                    </Link>
-                    <Link
-                      href="/cart"
-                      className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
-                    >
-                      <ShoppingCartIcon className="w-5 h-5" />
-                      {t('nav.cart')}
-                    </Link>
-                  </div>
-                </>
+                <div className="flex items-center gap-4">
+                  {/* İlan Ver - Guest Desktop (Link to avoid hydration mismatch: server/client must both render <a> first) */}
+                  <Link
+                    href="/listings/new"
+                    className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
+                    onClick={(e) => { e.preventDefault(); setShowAuthModal(true); }}
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    <span>{t('nav.newListing')}</span>
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
+                  >
+                    {t('common.login')}
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
+                  >
+                    {t('common.register')}
+                  </Link>
+                  <Link
+                    href="/cart"
+                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
+                  >
+                    <ShoppingCartIcon className="w-5 h-5" />
+                    {t('nav.cart')}
+                  </Link>
+                </div>
               )}
 
               {/* Mobile Menu Button */}
@@ -794,29 +808,18 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* Mobile Nav Links */}
+                {/* Mobile Nav Links - always use Link to avoid hydration mismatch */}
                 {NAV_LINKS.map((link) => {
-                  // Takaslar link requires auth for guests
-                  if (link.href === '/trades' && !isAuthenticated) {
-                    return (
-                      <button
-                        key={link.href}
-                        onClick={() => {
-                          setIsOpen(false);
-                          setShowTradesAuthModal(true);
-                        }}
-                        className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
-                      >
-                        {link.label}
-                      </button>
-                    );
-                  }
+                  const isGuestTrades = link.href === '/trades' && !showAuthUI;
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="block py-2 text-white hover:text-orange-100 font-medium"
-                      onClick={() => setIsOpen(false)}
+                      className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
+                      onClick={(e) => {
+                        if (isGuestTrades) { e.preventDefault(); setShowTradesAuthModal(true); }
+                        setIsOpen(false);
+                      }}
                     >
                       {link.label}
                     </Link>
@@ -825,7 +828,7 @@ export default function Navbar() {
 
                 {/* Mobile Auth Links */}
                 <div className="border-t border-orange-600 pt-4 mt-4">
-                  {isAuthenticated ? (
+                  {showAuthUI ? (
                     <div className="space-y-2">
                       {/* Yeni İlan Ekle Butonu - Mobile */}
                       <Link

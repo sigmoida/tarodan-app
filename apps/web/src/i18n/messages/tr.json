@@ -454,6 +454,7 @@
     "statusCancelled": "İptal Edildi",
     "statusCompleted": "Tamamlandı",
     "noTrades": "Henüz takas teklifiniz yok",
+    "noTradesHint": "İlanlara göz atıp takas teklifi gönderebilirsiniz.",
     "tradeRequiresLogin": "Takas tekliflerini görüntülemek ve teklif göndermek için giriş yapmanız gerekiyor.",
     "tradeSent": "Takas teklifi gönderildi!",
     "tradesLoadFailed": "Takaslar yüklenemedi",
@@ -474,7 +475,16 @@
     "counterOfferSent": "Karşı teklif gönderildi!",
     "waitingForCounterResponse": "Karşı teklif yanıtı bekleniyor",
     "counterOfferHistory": "Takas Geçmişi",
-    "sendCounterOffer": "Karşı Teklif Gönder"
+    "sendCounterOffer": "Karşı Teklif Gönder",
+    "completedSummaryTitle": "Takas Tamamlandı",
+    "completedSummaryDesc": "Bu takas başarıyla tamamlandı. Aşağıda özet bilgiler yer alır.",
+    "createdAt": "Oluşturulma",
+    "acceptedAt": "Kabul Tarihi",
+    "completedAt": "Tamamlanma Tarihi",
+    "backToTrades": "Takaslara Dön",
+    "browseListings": "İlanları İncele",
+    "safeTradeTitle": "Güvenli Takas",
+    "safeTradeDesc": "Takas teklifi kabul edildikten sonra her iki taraf da kargo bilgisini girer. Ürünler karşı tarafa ulaşana ve teslim onayı verilene kadar rezerve kalır. Bu süreç hem alıcı hem satıcı için güvenli bir takas sağlar."
   },
   "offer": {
     "makeOffer": "Teklif Ver",

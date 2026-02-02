@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const token = formData.get('token') as string;
     const paymentId = request.nextUrl.searchParams.get('paymentId') || '';
+    const isMembership = request.nextUrl.searchParams.get('type') === 'membership';
 
     const origin = request.nextUrl.origin || 'http://localhost:3000';
     
@@ -24,8 +25,9 @@ export async function POST(request: NextRequest) {
         const result = await verifyResponse.json();
 
         if (result.success || result.status === 'success') {
-          // Use 303 to force GET request
-          return NextResponse.redirect(new URL(`/payment/success?paymentId=${paymentId}&guest=true`, origin), 303);
+          // Üyelik ödemesi → membership success sayfasına, değilse sipariş success
+          const successPath = isMembership ? '/membership/success' : `/payment/success?paymentId=${paymentId}&guest=true`;
+          return NextResponse.redirect(new URL(successPath, origin), 303);
         } else {
           return NextResponse.redirect(new URL(`/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}&guest=true`, origin), 303);
         }
@@ -49,10 +51,12 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const paymentId = request.nextUrl.searchParams.get('paymentId');
+  const isMembership = request.nextUrl.searchParams.get('type') === 'membership';
   const origin = request.nextUrl.origin || 'http://localhost:3000';
 
   if (paymentId) {
-    return NextResponse.redirect(new URL(`/payment/success?paymentId=${paymentId}&guest=true`, origin));
+    const successPath = isMembership ? '/membership/success' : `/payment/success?paymentId=${paymentId}&guest=true`;
+    return NextResponse.redirect(new URL(successPath, origin));
   }
   return NextResponse.redirect(new URL('/payment/fail?error=Geçersiz%20istek&guest=true', origin));
 }

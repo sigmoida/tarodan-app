@@ -225,7 +225,7 @@ model User {
   isSeller               Boolean     @default(false) @map("is_seller")
   sellerType             SellerType? @map("seller_type")
   taxId                  String?     @map("tax_id") // For corporate sellers (Vergi No)
-  companyName            String?     @map("company_name") // For corporate sellers
+  companyName            String?     @unique @map("company_name") // For corporate sellers (unique for business accounts)
   fcmToken               String?     @map("fcm_token") // Push notifications
   acceptsMarketingEmails Boolean     @default(false) @map("accepts_marketing_emails") // Marketing email consent
   isBanned               Boolean     @default(false) @map("is_banned")
@@ -596,6 +596,7 @@ model Product {
   sellerId            String           @map("seller_id")
   categoryId          String           @map("category_id")
   title               String
+  slug                String?          @unique // Legacy: DB'de var, uyumluluk için şemada tutuluyor
   description         String?
   price               Decimal          @db.Decimal(10, 2)
   condition           ProductCondition

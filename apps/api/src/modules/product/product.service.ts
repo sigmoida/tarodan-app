@@ -237,6 +237,8 @@ export class ProductService {
           // IMPORTANT: Public listings MUST only show active products
           // Ignore any status parameter from query - only active products are visible publicly
           status: ProductStatus.active,
+          // Exclude membership virtual products (used only for payment processing)
+          NOT: { id: { startsWith: 'membership-' } },
           // Only show products with available stock (quantity > 0 or quantity is null for unlimited)
           AND: [
             {

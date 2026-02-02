@@ -343,6 +343,15 @@ export class SearchService implements OnModuleInit {
     // Status filter - only active products
     filter.push({ term: { status: ProductStatus.active } });
 
+    // Exclude membership virtual products (used only for payment processing)
+    filter.push({
+      bool: {
+        must_not: {
+          prefix: { id: 'membership-' },
+        },
+      },
+    });
+
     // Category filter
     if (categoryId) {
       filter.push({ term: { categoryId } });
@@ -554,9 +563,12 @@ export class SearchService implements OnModuleInit {
     });
 
     try {
-      // Get all active products
+      // Get all active products (exclude membership virtual products)
       const products = await this.prisma.product.findMany({
-        where: { status: ProductStatus.active },
+        where: {
+          status: ProductStatus.active,
+          NOT: { id: { startsWith: 'membership-' } },
+        },
         include: {
           category: { select: { id: true, name: true } },
           seller: { select: { id: true, displayName: true } },
@@ -675,7 +687,16 @@ export class SearchService implements OnModuleInit {
               },
             ],
             minimum_should_match: 1,
-            filter: [{ term: { status: ProductStatus.active } }],
+            filter: [
+              { term: { status: ProductStatus.active } },
+              {
+                bool: {
+                  must_not: {
+                    prefix: { id: 'membership-' },
+                  },
+                },
+              },
+            ],
           },
         },
         _source: ['title'],
@@ -702,6 +723,7 @@ export class SearchService implements OnModuleInit {
     const products = await this.prisma.product.findMany({
       where: {
         status: ProductStatus.active,
+        NOT: { id: { startsWith: 'membership-' } },
         title: { contains: query, mode: 'insensitive' },
       },
       select: { title: true },
@@ -729,7 +751,10 @@ export class SearchService implements OnModuleInit {
       sortBy = 'relevance',
     } = options;
 
-    const where: any = { status: ProductStatus.active };
+    const where: any = {
+      status: ProductStatus.active,
+      NOT: { id: { startsWith: 'membership-' } },
+    };
 
     if (query) {
       where.OR = [

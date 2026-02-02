@@ -218,7 +218,9 @@ export class PaymentService {
    */
   private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
     try {
-      const callbackUrl = `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/api/payment/callback/iyzico?paymentId=${payment.id}`;
+      const baseUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      const callbackUrl = `${baseUrl}/api/payment/callback/iyzico?paymentId=${payment.id}${isMembershipOrder ? '&type=membership' : ''}`;
       const shippingAddress = order.shippingAddress as any;
 
       // Check if this is a guest order
@@ -394,13 +396,15 @@ export class PaymentService {
         quantity: 1,
       }];
 
-      // Create PayTR iframe token
+      // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
+      const isMembershipOrder = order.productId?.startsWith?.('membership-');
       const result = await this.paytrService.processOrderPayment(
         order.id,
         Number(order.totalAmount),
         buyer,
         basketItems,
         1, // installment count
+        isMembershipOrder ? 'type=membership' : undefined,
       );
 
       // Update payment with provider reference
@@ -812,6 +816,65 @@ export class PaymentService {
               providerPaymentId: transactionId || payment.providerPaymentId,
             },
           });
+
+          // Save card information if provided in payment metadata
+          const paymentMetadata = payment.metadata as any;
+          if (paymentMetadata?.cardData) {
+            const cardData = paymentMetadata.cardData;
+            const cardNumber = cardData.number?.replace(/\s/g, '') || '';
+            
+            if (cardNumber.length >= 13) {
+              // Extract card brand
+              let cardBrand = 'Kart';
+              if (cardNumber.startsWith('4')) {
+                cardBrand = 'Visa';
+              } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {
+                cardBrand = 'Mastercard';
+              } else if (cardNumber.startsWith('3')) {
+                cardBrand = 'Amex';
+              } else if (cardNumber.startsWith('9')) {
+                cardBrand = 'Troy';
+              }
+
+              const lastFour = cardNumber.slice(-4);
+              
+              // Parse expiry (format: MM/YY)
+              const expiryParts = cardData.expiry?.split('/') || [];
+              const expiryMonth = parseInt(expiryParts[0] || '0', 10);
+              const expiryYear = 2000 + parseInt(expiryParts[1] || '0', 10);
+
+              // Check if card already exists
+              const existingCard = await tx.paymentMethod.findFirst({
+                where: {
+                  userId: payment.order.buyerId,
+                  lastFour,
+                  expiryMonth,
+                  expiryYear,
+                },
+              });
+
+              if (!existingCard) {
+                // Check if this is the first card (make it default)
+                const existingCount = await tx.paymentMethod.count({
+                  where: { userId: payment.order.buyerId },
+                });
+
+                await tx.paymentMethod.create({
+                  data: {
+                    userId: payment.order.buyerId,
+                    cardBrand,
+                    lastFour,
+                    expiryMonth,
+                    expiryYear,
+                    isDefault: existingCount === 0,
+                    tokenId: null, // Would be set from payment provider in real implementation
+                  },
+                });
+
+                this.logger.log(`Card saved for user ${payment.order.buyerId} after membership payment ${payment.id}`);
+              }
+            }
+          }
 
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }

@@ -20,11 +20,18 @@ export default function PaymentSuccessPage() {
   const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
   const isGuestCheckout = searchParams.get('guest') === 'true';
+  const isMembershipPayment = searchParams.get('type') === 'membership';
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Üyelik ödemesi için bu sayfa sipariş sayfası; doğru sayfaya yönlendir
+    if (isMembershipPayment) {
+      router.replace('/membership/success');
+      return;
+    }
+
     // Read guest from URL directly so we don't redirect before searchParams are ready (Next.js can delay them)
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
     const guestOk = isGuestCheckout || urlGuest;
@@ -40,7 +47,7 @@ export default function PaymentSuccessPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, isAuthenticated, isGuestCheckout]);
+  }, [paymentId, isAuthenticated, isGuestCheckout, isMembershipPayment, router]);
 
   const fetchPayment = async () => {
     try {

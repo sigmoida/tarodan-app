@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -13,6 +14,7 @@ interface Collection {
   name: string;
   slug: string;
   description?: string;
+  coverImageUrl?: string;
   isPublic: boolean;
   viewCount: number;
   likeCount: number;
@@ -139,16 +141,30 @@ export default function LikedCollectionsPage() {
               >
                 {/* Collection Preview Images */}
                 <Link href={`/collections/${collection.slug || collection.id}`}>
-                  <div className="h-48 bg-gray-700 relative">
-                    {collection.items && collection.items.length > 0 ? (
+                  <div className="h-48 bg-gray-700 relative overflow-hidden">
+                    {collection.coverImageUrl ? (
+                      // Show cover image if available
+                      <OptimizedImage
+                        src={collection.coverImageUrl}
+                        alt={collection.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Koleksiyon"
+                        logContext={{ collectionId: collection.id, page: 'collections-liked' }}
+                      />
+                    ) : collection.items && collection.items.length > 0 ? (
+                      // Show product images grid if no cover image
                       <div className="grid grid-cols-2 h-full">
                         {collection.items.slice(0, 4).map((item, index) => (
                           <div key={item.id} className="relative overflow-hidden">
-                            {item.product?.images?.[0] ? (
-                              <img
+                            {item.product?.images?.[0]?.url ? (
+                              <OptimizedImage
                                 src={item.product.images[0].url}
                                 alt={item.product.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
+                                logContext={{ productId: item.product.id, page: 'collections-liked-item' }}
                               />
                             ) : (
                               <div className="w-full h-full bg-gray-600 flex items-center justify-center">
@@ -165,13 +181,14 @@ export default function LikedCollectionsPage() {
                             ))}
                       </div>
                     ) : (
+                      // Empty state
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="text-6xl opacity-50">📦</span>
                       </div>
                     )}
 
                     {/* Item count badge */}
-                    <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs">
+                    <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs z-10">
                       {collection.itemCount || 0} {t('collection.items')}
                     </div>
                   </div>

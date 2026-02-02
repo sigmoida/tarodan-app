@@ -455,6 +455,7 @@
     "statusCancelled": "Cancelled",
     "statusCompleted": "Completed",
     "noTrades": "No trade offers yet",
+    "noTradesHint": "Browse listings and send a trade offer to get started.",
     "tradeRequiresLogin": "Login to view trade offers and send trade requests.",
     "tradeSent": "Trade offer sent!",
     "tradesLoadFailed": "Failed to load trades",
@@ -475,7 +476,16 @@
     "counterOfferSent": "Counter offer sent!",
     "waitingForCounterResponse": "Waiting for response to counter-offer",
     "counterOfferHistory": "Trade History",
-    "sendCounterOffer": "Send Counter Offer"
+    "sendCounterOffer": "Send Counter Offer",
+    "completedSummaryTitle": "Trade Completed",
+    "completedSummaryDesc": "This trade was completed successfully. Summary details are below.",
+    "createdAt": "Created",
+    "acceptedAt": "Accepted",
+    "completedAt": "Completed",
+    "backToTrades": "Back to Trades",
+    "browseListings": "Browse Listings",
+    "safeTradeTitle": "Safe Trade",
+    "safeTradeDesc": "After a trade is accepted, both parties enter shipping info. Items stay reserved until the other party receives them and confirms. This process ensures a safe trade for both sides."
   },
   "offer": {
     "makeOffer": "Make Offer",

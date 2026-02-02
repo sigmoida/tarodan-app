@@ -18,7 +18,10 @@ export class UserResolver {
       where: { id },
       include: {
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
         receivedRatings: true,
       },
@@ -56,7 +59,13 @@ export class UserResolver {
       ratings,
     ] = await Promise.all([
       this.prisma.product.count({ where: { sellerId: id } }),
-      this.prisma.product.count({ where: { sellerId: id, status: ProductStatus.active } }),
+      this.prisma.product.count({
+        where: {
+          sellerId: id,
+          status: ProductStatus.active,
+          NOT: { id: { startsWith: 'membership-' } },
+        },
+      }),
       this.prisma.order.count({ where: { sellerId: id, status: OrderStatus.completed } }),
       this.prisma.order.count({ where: { buyerId: id, status: OrderStatus.completed } }),
       this.prisma.trade.count({
@@ -95,7 +104,10 @@ export class UserResolver {
           where: { status: OrderStatus.completed },
         },
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
         receivedRatings: true,
       },

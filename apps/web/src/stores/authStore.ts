@@ -11,11 +11,16 @@ interface User {
   phone?: string;
   displayName: string;
   isVerified: boolean;
+  isEmailVerified?: boolean;
   isSeller: boolean;
   sellerType?: string;
   createdAt: Date;
   isAdmin?: boolean;
   role?: string;
+  
+  // Business account fields
+  companyName?: string;
+  taxId?: string;
   
   // Membership
   membershipTier: MembershipTier;
@@ -97,11 +102,14 @@ const mapApiUser = (apiUser: any): User => ({
   phone: apiUser.phone,
   displayName: apiUser.displayName || apiUser.display_name || '',
   isVerified: apiUser.isVerified || apiUser.is_verified || false,
+  isEmailVerified: apiUser.isEmailVerified || apiUser.is_email_verified || false,
   isSeller: apiUser.isSeller || apiUser.is_seller || false,
   sellerType: apiUser.sellerType || apiUser.seller_type,
   createdAt: apiUser.createdAt || apiUser.created_at,
   isAdmin: apiUser.isAdmin || apiUser.is_admin || apiUser.role === 'admin',
   role: apiUser.role,
+  companyName: apiUser.companyName || apiUser.company_name,
+  taxId: apiUser.taxId || apiUser.tax_id,
   membershipTier: extractMembershipTier(apiUser),
   membership: apiUser.membership,
   listingCount: apiUser.listingCount || apiUser.listing_count || apiUser._count?.products || 0,

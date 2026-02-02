@@ -25,7 +25,10 @@ export class CategoryResolver {
           orderBy: { sortOrder: 'asc' },
         },
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
       },
     });
@@ -46,7 +49,10 @@ export class CategoryResolver {
           orderBy: { sortOrder: 'asc' },
         },
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
       },
     });
@@ -86,7 +92,10 @@ export class CategoryResolver {
             orderBy: { sortOrder: 'asc' },
           },
           products: {
-            where: { status: ProductStatus.active },
+            where: {
+              status: ProductStatus.active,
+              NOT: { id: { startsWith: 'membership-' } },
+            },
           },
         },
       });
@@ -112,7 +121,10 @@ export class CategoryResolver {
         orderBy: { sortOrder: 'asc' },
         include: {
           products: {
-            where: { status: ProductStatus.active },
+            where: {
+              status: ProductStatus.active,
+              NOT: { id: { startsWith: 'membership-' } },
+            },
           },
         },
       });
@@ -154,17 +166,26 @@ export class CategoryResolver {
               orderBy: { sortOrder: 'asc' },
               include: {
                 products: {
-                  where: { status: ProductStatus.active },
+                  where: {
+                    status: ProductStatus.active,
+                    NOT: { id: { startsWith: 'membership-' } },
+                  },
                 },
               },
             },
             products: {
-              where: { status: ProductStatus.active },
+              where: {
+                status: ProductStatus.active,
+                NOT: { id: { startsWith: 'membership-' } },
+              },
             },
           },
         },
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
       },
     });
@@ -181,7 +202,10 @@ export class CategoryResolver {
       where: { isActive: true },
       include: {
         products: {
-          where: { status: ProductStatus.active },
+          where: {
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
         },
       },
     });

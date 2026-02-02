@@ -21,6 +21,7 @@ export default function PaymentPage() {
   const { isAuthenticated } = useAuthStore();
   const paymentId = params.id as string;
   const isGuestCheckout = searchParams.get('guest') === 'true';
+  const isMembershipPayment = searchParams.get('type') === 'membership';
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +82,11 @@ export default function PaymentPage() {
         if (paymentData.status === 'completed') {
           clearInterval(interval);
           toast.success('Ödeme başarıyla tamamlandı!');
-          router.push(`/payment/success?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
+          if (isMembershipPayment) {
+            router.push('/membership/success');
+          } else {
+            router.push(`/payment/success?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
+          }
         } else if (paymentData.status === 'failed') {
           clearInterval(interval);
           toast.error('Ödeme başarısız oldu');
@@ -129,7 +134,11 @@ export default function PaymentPage() {
 
   // If payment is already completed or failed, redirect
   if (payment.status === 'completed') {
-    router.push(`/payment/success?paymentId=${paymentId}`);
+    if (isMembershipPayment) {
+      router.push('/membership/success');
+    } else {
+      router.push(`/payment/success?paymentId=${paymentId}`);
+    }
     return null;
   }
 

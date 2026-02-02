@@ -1256,13 +1256,17 @@ export class CollectionService {
       return {
         collections: [],
         total: 0,
-        page,
-        pageSize,
+        page: 1,
+        pageSize: 20,
       };
     }
     
+    // Validate and sanitize page and pageSize parameters
+    const validPage = isNaN(page) || page < 1 ? 1 : Math.max(1, Math.floor(page));
+    const validPageSize = isNaN(pageSize) || pageSize < 1 ? 20 : Math.max(1, Math.min(Math.floor(pageSize), 100));
+    
     try {
-      const skip = (page - 1) * pageSize;
+      const skip = (validPage - 1) * validPageSize;
 
       const [likedCollections, total] = await Promise.all([
         this.prisma.collectionLike.findMany({
@@ -1298,7 +1302,7 @@ export class CollectionService {
           },
           orderBy: { createdAt: 'desc' },
           skip,
-          take: pageSize,
+          take: validPageSize,
         }),
         this.prisma.collectionLike.count({
           where: { userId },
@@ -1324,8 +1328,8 @@ export class CollectionService {
       return {
         collections,
         total,
-        page,
-        pageSize,
+        page: validPage,
+        pageSize: validPageSize,
       };
     } catch (error) {
       this.logger.error('getLikedCollections: database error');
@@ -1333,8 +1337,8 @@ export class CollectionService {
       return {
         collections: [],
         total: 0,
-        page,
-        pageSize,
+        page: validPage,
+        pageSize: validPageSize,
       };
     }
   }
