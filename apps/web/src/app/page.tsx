@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import OptimizedImage, { getOptimizedImageUrl } from '@/components/OptimizedImage';
 import { 
   ArrowRightIcon,
@@ -347,56 +348,45 @@ export default function Home() {
                   ? 'Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.'
                   : 'Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.'}
               </p>
+              {/* Hero CTA: always use Link (not button) so server/client DOM match and hydration succeeds */}
               <div className="flex flex-col sm:flex-row gap-4">
-                {isAuthenticated ? (
-                  <>
-                    <Link 
-                      href="/listings/new"
-                      className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
-                    >
-                      <span className="text-xl">+</span>
-                      {t('nav.newListing')}
-                    </Link>
-                    <Link 
-                      href="/collections"
-                      className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
-                    >
-                      {t('collection.createCollection')}
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        setAuthModalConfig({
-                          title: t('nav.loginToCreateListing'),
-                          message: t('nav.loginToCreateListingMsg'),
-                          icon: <PlusCircleIcon className="w-10 h-10 text-primary-500" />,
-                          redirectPath: '/listings/new',
-                        });
-                        setShowAuthModal(true);
-                      }}
-                      className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
-                    >
-                      <span className="text-xl">+</span>
-                      {t('nav.newListing')}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAuthModalConfig({
-                          title: t('collection.createCollection'),
-                          message: locale === 'en' ? 'Please login to create your digital garage and showcase your collection.' : 'Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor.',
-                          icon: <RectangleStackIcon className="w-10 h-10 text-primary-500" />,
-                          redirectPath: '/collections/new',
-                        });
-                        setShowAuthModal(true);
-                      }}
-                      className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
-                    >
-                      {t('collection.createCollection')}
-                    </button>
-                  </>
-                )}
+                <Link
+                  href="/listings/new"
+                  className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
+                  onClick={(e) => {
+                    if (!isAuthenticated) {
+                      e.preventDefault();
+                      setAuthModalConfig({
+                        title: t('nav.loginToCreateListing'),
+                        message: t('nav.loginToCreateListingMsg'),
+                        icon: <PlusCircleIcon className="w-10 h-10 text-primary-500" />,
+                        redirectPath: '/listings/new',
+                      });
+                      setShowAuthModal(true);
+                    }
+                  }}
+                >
+                  <span className="text-xl">+</span>
+                  {t('nav.newListing')}
+                </Link>
+                <Link
+                  href="/collections"
+                  className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
+                  onClick={(e) => {
+                    if (!isAuthenticated) {
+                      e.preventDefault();
+                      setAuthModalConfig({
+                        title: t('collection.createCollection'),
+                        message: locale === 'en' ? 'Please login to create your digital garage and showcase your collection.' : 'Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor.',
+                        icon: <RectangleStackIcon className="w-10 h-10 text-primary-500" />,
+                        redirectPath: '/collections/new',
+                      });
+                      setShowAuthModal(true);
+                    }
+                  }}
+                >
+                  {t('collection.createCollection')}
+                </Link>
                 <Link 
                   href="/listings"
                   className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"

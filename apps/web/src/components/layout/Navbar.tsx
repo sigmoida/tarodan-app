@@ -79,10 +79,11 @@ export default function Navbar() {
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
-  // Defer auth-dependent UI until after mount so server and first client render match (avoids hydration error).
+  // Defer auth-dependent UI until after hydration so server and first client render always match (avoids hydration error).
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setMounted(true);
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const showAuthUI = mounted && isAuthenticated;
@@ -360,7 +361,7 @@ export default function Navbar() {
         </>
       )}
       
-      <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
+      <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm" suppressHydrationWarning>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
@@ -475,52 +476,34 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Nav Links - Desktop */}
+          {/* Nav Links - Desktop - always use Link to avoid hydration mismatch (button vs a) */}
           <div className="hidden lg:flex items-center gap-6 mr-12">
             {NAV_LINKS.map((link) => {
-              // Takaslar link requires auth for guests (use showAuthUI so server/client match until mounted)
-              if (link.href === '/trades' && !showAuthUI) {
-                return (
-                  <button
-                    key={link.href}
-                    onClick={() => setShowTradesAuthModal(true)}
-                    className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
-                  >
-                    {link.label}
-                  </button>
-                );
-              }
-              // Show badge for trades if there are pending trades
-              if (link.href === '/trades' && pendingTradesCount > 0) {
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1"
-                  >
-                    {link.label}
-                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
-                      {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
-                    </span>
-                  </Link>
-                );
-              }
+              const isTrades = link.href === '/trades';
+              const isGuestTrades = isTrades && !showAuthUI;
+              const showBadge = isTrades && showAuthUI && pendingTradesCount > 0;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
+                  className={showBadge ? 'relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1' : 'text-white hover:text-orange-100 font-medium transition-colors text-sm'}
+                  onClick={isGuestTrades ? (e) => { e.preventDefault(); setShowTradesAuthModal(true); } : undefined}
                 >
                   {link.label}
+                  {showBadge && (
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                      {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </div>
 
-          {/* Right Actions */}
+          {/* Right Actions - same wrapper (div) in both branches to avoid hydration mismatch */}
           <div className="flex items-center gap-4 ml-8">
             {showAuthUI ? (
-              <>
+              <div className="flex items-center gap-4">
                 {/* Yeni İlan Ekle Butonu - Desktop */}
                 <Link
                   href="/listings/new"
@@ -682,18 +665,18 @@ export default function Navbar() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
-              <>
               <div className="flex items-center gap-4">
-                {/* İlan Ver butonu - Guest Desktop */}
-                <button
-                  onClick={() => setShowAuthModal(true)}
+                {/* İlan Ver - Guest Desktop (Link to avoid hydration mismatch: server/client must both render <a> first) */}
+                <Link
+                  href="/listings/new"
                   className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
+                  onClick={(e) => { e.preventDefault(); setShowAuthModal(true); }}
                 >
                   <PlusIcon className="w-4 h-4" />
                   <span>{t('nav.newListing')}</span>
-                </button>
+                </Link>
                 <Link
                   href="/login"
                     className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
@@ -714,7 +697,6 @@ export default function Navbar() {
                   {t('nav.cart')}
                 </Link>
               </div>
-              </>
             )}
 
             {/* Mobile Menu Button */}
@@ -797,29 +779,18 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* Mobile Nav Links */}
+              {/* Mobile Nav Links - always use Link to avoid hydration mismatch */}
               {NAV_LINKS.map((link) => {
-                // Takaslar link requires auth for guests (use showAuthUI for hydration safety)
-                if (link.href === '/trades' && !showAuthUI) {
-                  return (
-                    <button
-                      key={link.href}
-                      onClick={() => {
-                        setIsOpen(false);
-                        setShowTradesAuthModal(true);
-                      }}
-                      className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
-                    >
-                      {link.label}
-                    </button>
-                  );
-                }
+                const isGuestTrades = link.href === '/trades' && !showAuthUI;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block py-2 text-white hover:text-orange-100 font-medium"
-                    onClick={() => setIsOpen(false)}
+                    className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
+                    onClick={(e) => {
+                      if (isGuestTrades) { e.preventDefault(); setShowTradesAuthModal(true); }
+                      setIsOpen(false);
+                    }}
                   >
                     {link.label}
                   </Link>

@@ -103,9 +103,6 @@ export default function ListingDetailPage() {
   const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
   
-  const [listing, setListing] = useState<Listing | null>(null);
-  const effectivePrice = listing ? Number(listing.price) : 0;
-  const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -163,6 +160,7 @@ export default function ListingDetailPage() {
   });
   const listing = listingQuery.data ?? null;
   const isLoading = listingQuery.isLoading;
+  const effectivePrice = listing ? Number(listing.price) : 0;
 
   // Wishlist check: React Query (only when authenticated)
   const wishlistQuery = useQuery({
