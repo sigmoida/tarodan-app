@@ -154,32 +154,8 @@ export class EmailWorker {
   }
 
   private renderTemplate(template: string, data: Record<string, any>): string {
-    const baseStyle = `
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 600px;
-      margin: 0 auto;
-      background: #ffffff;
-      padding: 32px;
-    `;
-    const headerStyle = `color: #1a1a2e; margin-bottom: 24px;`;
-    const buttonStyle = `
-      display: inline-block;
-      padding: 14px 28px;
-      background-color: #4f46e5;
-      color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-    `;
-    const boxStyle = `
-      background: #f8fafc;
-      padding: 20px;
-      border-radius: 12px;
-      margin: 20px 0;
-      border: 1px solid #e2e8f0;
-    `;
-
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+
     // Guest: link with orderNumber + email so one click opens track page with order details
     const isGuest = data?.isGuestOrder === true || data?.buyerSystemEmail === 'guest@tarodan.system';
     const guestEmail = (data?.buyerEmail || '').trim().toLowerCase();
@@ -187,274 +163,477 @@ export class EmailWorker {
       ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ''}`
       : `${frontendUrl}/orders/${data?.orderId || ''}`;
 
-    // Email templates (Turkish)
+    // Professional email wrapper with logo and footer
+    const wrapEmail = (content: string, title: string) => `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
+          
+          <!-- Header with Logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 30px 40px; border-radius: 16px 16px 0 0; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
+                🚗 TARODAN
+              </h1>
+              <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.85);">
+                Türkiye'nin En Büyük Diecast Pazaryeri
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Main Content -->
+          <tr>
+            <td style="background-color: #ffffff; padding: 40px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+              ${content}
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1f2937; padding: 30px 40px; border-radius: 0 0 16px 16px; text-align: center;">
+              <p style="margin: 0 0 16px 0; font-size: 14px; color: #9ca3af;">
+                Sorularınız mı var? <a href="mailto:destek@tarodan.com" style="color: #f97316; text-decoration: none;">destek@tarodan.com</a>
+              </p>
+              <div style="margin-bottom: 16px;">
+                <a href="${frontendUrl}" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Ana Sayfa</a>
+                <a href="${frontendUrl}/listings" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">İlanlar</a>
+                <a href="${frontendUrl}/help" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Yardım</a>
+                <a href="${frontendUrl}/legal/privacy" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Gizlilik</a>
+              </div>
+              <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                © ${new Date().getFullYear()} Tarodan. Tüm hakları saklıdır.
+              </p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; color: #4b5563;">
+                Bu e-posta ${data?.to || 'size'} gönderilmiştir. 
+                <a href="${frontendUrl}/profile/settings" style="color: #f97316; text-decoration: none;">Bildirim tercihlerini yönet</a>
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    // Styled components
+    const primaryButton = (text: string, href: string) => `
+      <a href="${href}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);">
+        ${text}
+      </a>`;
+
+    const secondaryButton = (text: string, href: string) => `
+      <a href="${href}" style="display: inline-block; padding: 12px 24px; background-color: #f3f4f6; color: #374151; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; border: 1px solid #d1d5db;">
+        ${text}
+      </a>`;
+
+    const infoBox = (content: string) => `
+      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #f59e0b;">
+        ${content}
+      </div>`;
+
+    const detailsBox = (content: string) => `
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; margin: 24px 0; border: 1px solid #e2e8f0;">
+        ${content}
+      </div>`;
+
+    const successBox = (content: string) => `
+      <div style="background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #22c55e;">
+        ${content}
+      </div>`;
+
+    const warningBox = (content: string) => `
+      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #f59e0b;">
+        ${content}
+      </div>`;
+
+    const detailRow = (label: string, value: string, highlight?: boolean) => `
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 40%;">${label}</td>
+        <td style="padding: 8px 0; color: ${highlight ? '#f97316' : '#111827'}; font-size: 14px; font-weight: ${highlight ? '700' : '500'}; text-align: right;">${value}</td>
+      </tr>`;
+
+    const greeting = (name: string) => `
+      <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">
+        Merhaba <strong style="color: #111827;">${name || 'Değerli Üyemiz'}</strong>,
+      </p>`;
+
+    const title = (text: string, emoji?: string) => `
+      <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin: 0 0 16px 0; line-height: 1.3;">
+        ${emoji ? `${emoji} ` : ''}${text}
+      </h2>`;
+
+
+    // Email templates (Turkish) - Professional versions with wrapper
     const templates: Record<string, string> = {
-      welcome: `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">Tarodan'a Hoş Geldiniz!</h1>
-          <p>Merhaba ${data?.name || 'Değerli Üye'},</p>
-          <p>Tarodan koleksiyoner oyuncak platformuna hoş geldiniz. Artık binlerce koleksiyoner ürüne göz atabilir, alım satım yapabilirsiniz.</p>
-          <a href="${data?.verifyUrl || frontendUrl}" style="${buttonStyle}">E-postamı Doğrula</a>
-          <p style="margin-top: 20px;">İyi alışverişler dileriz!</p>
-          <p>Tarodan Ekibi</p>
-        </div>
-      `,
-      'order-confirmation': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">Sipariş Onayı</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Siparişiniz başarıyla oluşturuldu.</p>
-          <div style="${boxStyle}">
-            <p><strong>Sipariş No:</strong> ${data?.orderNumber || data?.orderId || ''}</p>
-            <p><strong>Toplam:</strong> ${this.formatPrice(data?.total || data?.totalAmount || 0)} TL</p>
-          </div>
-          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
-        </div>
-      `,
-      'order-created-buyer': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">🛒 Siparişiniz Alındı</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Siparişiniz başarıyla oluşturuldu. Ödeme işlemini tamamladıktan sonra satıcı siparişinizi hazırlamaya başlayacak.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Tutar:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
-          </div>
-          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Ödeme Yap</a>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Ödeme için siparişinizin 30 dakika içinde tamamlanması gerekmektedir.
+      welcome: wrapEmail(`
+        ${title('Tarodan\'a Hoş Geldiniz!', '🎉')}
+        ${greeting(data?.name)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Türkiye'nin en büyük diecast pazaryerine katıldığınız için teşekkür ederiz! 
+          Artık binlerce koleksiyon ürüne göz atabilir, alım satım yapabilir ve diğer koleksiyonerlerle güvenle takas yapabilirsiniz.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 14px; color: #166534;">
+            ✓ Hesabınız başarıyla oluşturuldu<br/>
+            ✓ E-postanızı doğrulayarak tüm özelliklere erişebilirsiniz
           </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('E-postamı Doğrula', data?.verifyUrl || frontendUrl)}
         </div>
-      `,
-      'order-created-seller': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">🎉 Yeni Sipariş!</h1>
-          <p>Merhaba ${data?.sellerName || ''},</p>
-          <p>Tebrikler! Ürününüz için yeni bir sipariş aldınız.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Tutar:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
-          </div>
-          <p>Ödeme onaylandıktan sonra ürünü kargoya hazırlamanız için bilgilendirileceksiniz.</p>
-          <a href="${frontendUrl}/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Siparişi Görüntüle</a>
+        <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0 0;">
+          İyi alışverişler dileriz!<br/>
+          <strong style="color: #f97316;">Tarodan Ekibi</strong>
+        </p>
+      `, "Tarodan'a Hoş Geldiniz!"),
+
+      'order-confirmation': wrapEmail(`
+        ${title('Sipariş Onayı', '✅')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz başarıyla oluşturuldu! Aşağıda sipariş detaylarınızı bulabilirsiniz.
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || data?.orderId || ''))}
+            ${detailRow('Toplam Tutar', this.formatPrice(data?.total || data?.totalAmount || 0) + ' TL', true)}
+          </table>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
         </div>
-      `,
-      'order-paid': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">✅ Ödeme Alındı</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Siparişiniz için ödeme başarıyla alındı. Satıcı siparişinizi hazırlamaya başladı.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ödenen Tutar:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
-            <p style="margin: 8px 0;"><strong>İşlem No:</strong> ${data?.transactionId || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ödeme Yöntemi:</strong> ${data?.paymentMethod || 'Kredi Kartı'}</p>
-          </div>
-          ${data?.shippingAddress ? `
-          <div style="${boxStyle}">
-            <p style="margin: 0 0 8px 0; font-weight: 600;">Teslimat Adresi:</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.fullName || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.address || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.district || ''}, ${data.shippingAddress.city || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.zipCode || ''}</p>
-            <p style="margin: 4px 0;">Tel: ${data.shippingAddress.phone || ''}</p>
-          </div>
-          ` : ''}
-          <a href="${orderPaidTrackUrl}" style="${buttonStyle}">Siparişi Takip Et</a>
+      `, 'Sipariş Onayı'),
+
+      'order-created-buyer': wrapEmail(`
+        ${title('Siparişiniz Alındı', '🛒')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz başarıyla oluşturuldu ve ödemeniz alındı. Satıcı siparişinizi hazırlamaya başlayacak.
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Tutar', this.formatPrice(data?.totalAmount || 0) + ' TL', true)}
+          </table>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
         </div>
-      `,
-      'order-paid-seller': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">💰 Ödeme Alındı - Kargoya Hazırlayın</h1>
-          <p>Merhaba ${data?.sellerName || ''},</p>
-          <p>Siparişiniz için ödeme alındı. Lütfen ürünü <strong>en geç 3 iş günü</strong> içinde kargoya veriniz.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Satış Tutarı:</strong> ${this.formatPrice(data?.totalAmount || 0)} TL</p>
-            <p style="margin: 8px 0;"><strong>Komisyon:</strong> ${this.formatPrice(data?.commissionAmount || 0)} TL</p>
-            <p style="margin: 8px 0; font-weight: 600; color: #059669;"><strong>Net Kazancınız:</strong> ${this.formatPrice(data?.netAmount || (data?.totalAmount - data?.commissionAmount) || 0)} TL</p>
-          </div>
-          ${data?.shippingAddress ? `
-          <div style="${boxStyle}">
-            <p style="margin: 0 0 8px 0; font-weight: 600;">Gönderilecek Adres:</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.fullName || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.address || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.district || ''}, ${data.shippingAddress.city || ''}</p>
-            <p style="margin: 4px 0;">${data.shippingAddress.zipCode || ''}</p>
-            <p style="margin: 4px 0;">Tel: ${data.shippingAddress.phone || ''}</p>
-          </div>
-          ` : ''}
-          <a href="${frontendUrl}/seller/orders/${data?.orderId || ''}" style="${buttonStyle}">Kargo Bilgisi Gir</a>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
+        ${infoBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            📦 Siparişiniz hazırlandığında ve kargoya verildiğinde size e-posta ile bilgi vereceğiz.
           </p>
-        </div>
-      `,
-      'order-shipped': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">📦 Siparişiniz Kargoya Verildi</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Siparişiniz kargoya verildi ve yolda! Kargo takip bilgileri aşağıdadır:</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-            <p style="margin: 8px 0;"><strong>Kargo Firması:</strong> ${data?.provider || ''}</p>
-            <p style="margin: 8px 0;"><strong>Takip No:</strong> ${data?.trackingNumber || ''}</p>
-            ${data?.estimatedDelivery ? `<p style="margin: 8px 0;"><strong>Tahmini Teslimat:</strong> ${data.estimatedDelivery}</p>` : ''}
-          </div>
-          ${data?.trackingUrl ? `
-          <a href="${data.trackingUrl}" style="${buttonStyle}">Kargoyu Takip Et</a>
-          ` : ''}
-        </div>
-      `,
-      'order-delivered': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">🎁 Siparişiniz Teslim Edildi</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Siparişiniz başarıyla teslim edildi! Ürününüzü beğeneceğinizi umuyoruz.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-          </div>
-          <p>Lütfen ürünü kontrol edin ve sipariş durumunu onaylayın. Onaylamanızın ardından satıcıya ödeme aktarılacaktır.</p>
-          <a href="${frontendUrl}/orders/${data?.orderId || ''}" style="${buttonStyle}">Teslimatı Onayla</a>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Not: 7 gün içinde onay vermezseniz, teslimat otomatik olarak onaylanacaktır.
+        `)}
+      `, 'Siparişiniz Alındı'),
+
+      'order-created-seller': wrapEmail(`
+        ${title('Yeni Sipariş!', '🎉')}
+        ${greeting(data?.sellerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Tebrikler! Ürününüz için yeni bir sipariş aldınız.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            💰 Yeni satış bildirimi
           </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Tutar', this.formatPrice(data?.totalAmount || 0) + ' TL', true)}
+          </table>
+        `)}
+        <p style="font-size: 14px; color: #6b7280; margin: 20px 0;">
+          Ödeme onaylandıktan sonra ürünü kargoya hazırlamanız için bilgilendirileceksiniz.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/seller/orders/${data?.orderId || ''}`)}
         </div>
-      `,
-      'password-reset': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">Şifre Sıfırlama</h1>
-          <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
-          <a href="${data?.resetUrl || ''}" style="${buttonStyle}">Şifremi Sıfırla</a>
-          <p style="margin-top: 20px; color: #666;">Bu bağlantı 1 saat geçerlidir.</p>
-          <p style="color: #666;">Bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+      `, 'Yeni Sipariş!'),
+
+      'order-paid': wrapEmail(`
+        ${title('Ödeme Alındı', '✅')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz için ödeme başarıyla alındı. Satıcı siparişinizi hazırlamaya başladı.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ Ödeme başarıyla tamamlandı
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Ödenen Tutar', this.formatPrice(data?.totalAmount || 0) + ' TL', true)}
+            ${detailRow('İşlem No', data?.transactionId || '')}
+            ${detailRow('Ödeme Yöntemi', data?.paymentMethod || 'Kredi Kartı')}
+          </table>
+        `)}
+        ${data?.shippingAddress ? `
+        ${detailsBox(`
+          <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">📍 Teslimat Adresi</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.fullName || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.address || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.district || ''}, ${data.shippingAddress.city || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.zipCode || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">Tel: ${data.shippingAddress.phone || ''}</p>
+        `)}` : ''}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Takip Et', orderPaidTrackUrl)}
         </div>
-      `,
-      'offer-received': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">💰 Yeni Teklif Aldınız!</h1>
-          <p>Merhaba ${data?.sellerName || ''},</p>
-          <p>Ürününüz için yeni bir teklif aldınız.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Ürün Fiyatı:</strong> ${this.formatPrice(data?.productPrice || 0)} TL</p>
-            <p style="margin: 8px 0; font-size: 18px; color: #059669;"><strong>Teklif Tutarı:</strong> ${this.formatPrice(data?.offerAmount || 0)} TL</p>
-            <p style="margin: 8px 0;"><strong>Teklif Veren:</strong> ${data?.buyerName || ''}</p>
-          </div>
-          <p style="color: #dc2626; font-weight: 500;">
+      `, 'Ödeme Alındı'),
+
+      'order-paid-seller': wrapEmail(`
+        ${title('Ödeme Alındı - Kargoya Hazırlayın', '💰')}
+        ${greeting(data?.sellerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz için ödeme alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ Ödeme hesabınıza yansıyacak
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Satış Tutarı', this.formatPrice(data?.totalAmount || 0) + ' TL')}
+            ${detailRow('Komisyon', '-' + this.formatPrice(data?.commissionAmount || 0) + ' TL')}
+            ${detailRow('Net Kazancınız', this.formatPrice(data?.netAmount || (data?.totalAmount - data?.commissionAmount) || 0) + ' TL', true)}
+          </table>
+        `)}
+        ${data?.shippingAddress ? `
+        ${detailsBox(`
+          <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">📦 Gönderilecek Adres</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.fullName || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.address || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.district || ''}, ${data.shippingAddress.city || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.zipCode || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">Tel: ${data.shippingAddress.phone || ''}</p>
+        `)}` : ''}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Kargo Bilgisi Gir', `${frontendUrl}/seller/orders/${data?.orderId || ''}`)}
+        </div>
+        ${infoBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
+          </p>
+        `)}
+      `, 'Ödeme Alındı - Kargoya Hazırlayın'),
+
+      'order-shipped': wrapEmail(`
+        ${title('Siparişiniz Kargoya Verildi', '📦')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Harika haber! Siparişiniz kargoya verildi ve yolda. Kargo takip bilgileri aşağıdadır:
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Kargo Firması', data?.provider || '')}
+            ${detailRow('Takip No', data?.trackingNumber || '', true)}
+            ${data?.estimatedDelivery ? detailRow('Tahmini Teslimat', data.estimatedDelivery) : ''}
+          </table>
+        `)}
+        ${data?.trackingUrl ? `
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Kargoyu Takip Et', data.trackingUrl)}
+        </div>` : ''}
+      `, 'Siparişiniz Kargoya Verildi'),
+
+      'order-delivered': wrapEmail(`
+        ${title('Siparişiniz Teslim Edildi', '🎁')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz başarıyla teslim edildi! Ürününüzü beğeneceğinizi umuyoruz.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ Teslimat tamamlandı
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          </table>
+        `)}
+        <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">
+          Lütfen ürünü kontrol edin ve sipariş durumunu onaylayın. Onaylamanızın ardından satıcıya ödeme aktarılacaktır.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Teslimatı Onayla', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+        </div>
+        ${infoBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ⏰ Not: 7 gün içinde onay vermezseniz, teslimat otomatik olarak onaylanacaktır.
+          </p>
+        `)}
+      `, 'Siparişiniz Teslim Edildi'),
+
+      'password-reset': wrapEmail(`
+        ${title('Şifre Sıfırlama Talebi', '🔐')}
+        ${greeting(data?.name)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Hesabınız için şifre sıfırlama talebinde bulundunuz. Şifrenizi sıfırlamak için aşağıdaki butona tıklayın.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Şifremi Sıfırla', data?.resetUrl || '')}
+        </div>
+        ${warningBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ⚠️ Bu bağlantı 1 saat geçerlidir. Eğer bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.
+          </p>
+        `)}
+      `, 'Şifre Sıfırlama'),
+
+      'offer-received': wrapEmail(`
+        ${title('Yeni Teklif Aldınız!', '💰')}
+        ${greeting(data?.sellerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Ürününüz için yeni bir teklif aldınız!
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Ürün Fiyatı', this.formatPrice(data?.productPrice || 0) + ' TL')}
+            ${detailRow('Teklif Tutarı', this.formatPrice(data?.offerAmount || 0) + ' TL', true)}
+            ${detailRow('Teklif Veren', data?.buyerName || '')}
+          </table>
+        `)}
+        ${warningBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
             ⏰ Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString('tr-TR') : '24 saat içinde'} dolacak.
           </p>
-          <div style="margin-top: 20px;">
-            <a href="${frontendUrl}/seller/offers/${data?.offerId || ''}" style="${buttonStyle}">Teklifi İncele</a>
-          </div>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Teklifi kabul etmek, reddetmek veya karşı teklif vermek için yukarıdaki butona tıklayın.
-          </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Teklifi İncele', `${frontendUrl}/seller/offers/${data?.offerId || ''}`)}
         </div>
-      `,
-      'offer-accepted': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">🎉 Teklifiniz Kabul Edildi!</h1>
-          <p>Merhaba ${data?.buyerName || ''},</p>
-          <p>Tebrikler! <strong>${data?.productTitle || ''}</strong> ürünü için verdiğiniz teklif satıcı tarafından kabul edildi.</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0;"><strong>Ürün:</strong> ${data?.productTitle || ''}</p>
-            <p style="margin: 8px 0;"><strong>Kabul Edilen Tutar:</strong> ${this.formatPrice(data?.offerAmount || 0)} TL</p>
-            <p style="margin: 8px 0;"><strong>Satıcı:</strong> ${data?.sellerName || ''}</p>
-            <p style="margin: 8px 0;"><strong>Sipariş No:</strong> ${data?.orderNumber || ''}</p>
-          </div>
-          <p style="color: #dc2626; font-weight: 500;">
+        <p style="font-size: 14px; color: #6b7280; text-align: center;">
+          Teklifi kabul etmek, reddetmek veya karşı teklif vermek için yukarıdaki butona tıklayın.
+        </p>
+      `, 'Yeni Teklif Aldınız!'),
+
+      'offer-accepted': wrapEmail(`
+        ${title('Teklifiniz Kabul Edildi!', '🎉')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Tebrikler! <strong>${data?.productTitle || ''}</strong> ürünü için verdiğiniz teklif satıcı tarafından kabul edildi.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ Teklifiniz onaylandı
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Ürün', data?.productTitle || '')}
+            ${detailRow('Kabul Edilen Tutar', this.formatPrice(data?.offerAmount || 0) + ' TL', true)}
+            ${detailRow('Satıcı', data?.sellerName || '')}
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          </table>
+        `)}
+        ${warningBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
             ⚠️ Siparişinizi tamamlamak için ödeme yapmanız gerekmektedir.
           </p>
-          <div style="margin-top: 20px;">
-            <a href="${frontendUrl}/orders/${data?.orderId || ''}/payment" style="${buttonStyle}">Ödeme Yap</a>
-          </div>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Not: Ödeme işlemi 30 dakika içinde tamamlanmazsa sipariş iptal edilebilir ve ürün tekrar satışa çıkarılabilir.
-          </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Ödeme Yap', `${frontendUrl}/orders/${data?.orderId || ''}/payment`)}
         </div>
-      `,
-      'wishlist-price-change': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">${data?.isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}</h1>
-          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
-          <p>İstek listenizdeki bir ürünün fiyatı değişti:</p>
-          <div style="${boxStyle}">
-            <p style="margin: 8px 0; font-size: 18px; font-weight: 600;"><strong>${data?.productTitle || ''}</strong></p>
-            <p style="margin: 8px 0;"><strong>Eski Fiyat:</strong> <span style="text-decoration: line-through; color: #64748b;">${this.formatPrice(data?.oldPrice || 0)} TL</span></p>
-            <p style="margin: 8px 0; font-size: 20px; color: ${data?.isPriceDrop ? '#059669' : '#dc2626'}; font-weight: 600;">
-              <strong>Yeni Fiyat:</strong> ${this.formatPrice(data?.newPrice || 0)} TL
-            </p>
-            <p style="margin: 8px 0; color: ${data?.isPriceDrop ? '#059669' : '#dc2626'};">
-              <strong>${data?.isPriceDrop ? 'İndirim:' : 'Artış:'}</strong> ${data?.priceChange || 0} TL (${data?.priceChangePercent || 0}%)
-            </p>
-          </div>
-          ${data?.isPriceDrop ? `
-          <p style="color: #059669; font-weight: 500; margin: 20px 0;">
+        ${infoBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ℹ️ Not: Ödeme işlemi 30 dakika içinde tamamlanmazsa sipariş iptal edilebilir.
+          </p>
+        `)}
+      `, 'Teklifiniz Kabul Edildi!'),
+
+      'wishlist-price-change': wrapEmail(`
+        ${title(data?.isPriceDrop ? 'Fiyat Düştü!' : 'Fiyat Değişti!', data?.isPriceDrop ? '🎉' : '📈')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          İstek listenizdeki bir ürünün fiyatı değişti:
+        </p>
+        ${detailsBox(`
+          <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #111827;">${data?.productTitle || ''}</p>
+          <table width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Eski Fiyat</td>
+              <td style="padding: 8px 0; color: #9ca3af; font-size: 14px; text-decoration: line-through; text-align: right;">${this.formatPrice(data?.oldPrice || 0)} TL</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Yeni Fiyat</td>
+              <td style="padding: 8px 0; color: ${data?.isPriceDrop ? '#16a34a' : '#dc2626'}; font-size: 18px; font-weight: 700; text-align: right;">${this.formatPrice(data?.newPrice || 0)} TL</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">${data?.isPriceDrop ? 'İndirim' : 'Artış'}</td>
+              <td style="padding: 8px 0; color: ${data?.isPriceDrop ? '#16a34a' : '#dc2626'}; font-size: 14px; font-weight: 600; text-align: right;">${data?.priceChange || 0} TL (%${data?.priceChangePercent || 0})</td>
+            </tr>
+          </table>
+        `)}
+        ${data?.isPriceDrop ? successBox(`
+          <p style="margin: 0; font-size: 14px; color: #166534;">
             🎉 Bu ürünün fiyatı düştü! Hemen almak için aşağıdaki butona tıklayın.
           </p>
-          ` : `
-          <p style="color: #dc2626; font-weight: 500; margin: 20px 0;">
-            ⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.
-          </p>
-          `}
-          <a href="${data?.productUrl || frontendUrl}" style="${buttonStyle}">Ürünü Görüntüle</a>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
-          </p>
+        `) : ''}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Ürünü Görüntüle', data?.productUrl || frontendUrl)}
         </div>
-      `,
-      'marketing-newsletter': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">📰 Tarodan Haftalık Bülteni</h1>
-          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
-          <p>Bu hafta en çok ilgi gören ürünler:</p>
-          ${data?.trendingProducts?.length > 0 ? `
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
-            ${data.trendingProducts.map((product: any) => `
-              <div style="${boxStyle}">
-                ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ''}
-                <p style="font-weight: 600; margin: 8px 0;">${product.title}</p>
-                <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${this.formatPrice(product.price)} TL</p>
-                <a href="${product.productUrl}" style="${buttonStyle}">İncele</a>
-              </div>
-            `).join('')}
-          </div>
-          ` : '<p>Bu hafta öne çıkan ürün bulunmamaktadır.</p>'}
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            <a href="${data?.unsubscribeUrl || `${frontendUrl}/profile/settings`}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
-          </p>
-        </div>
-      `,
-      'marketing-monthly': `
-        <div style="${baseStyle}">
-          <h1 style="${headerStyle}">🎁 Tarodan Aylık Özel Fırsatlar</h1>
-          <p>Merhaba ${data?.userName || 'Değerli Üye'},</p>
-          <p>Bu ay sizin için özel olarak seçtiğimiz ürünler:</p>
-          ${data?.featuredProducts?.length > 0 ? `
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
-            ${data.featuredProducts.map((product: any) => `
-              <div style="${boxStyle}">
-                ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ''}
-                <p style="font-weight: 600; margin: 8px 0;">${product.title}</p>
-                <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${this.formatPrice(product.price)} TL</p>
-                <a href="${product.productUrl}" style="${buttonStyle}">İncele</a>
-              </div>
-            `).join('')}
-          </div>
-          ` : '<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>'}
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-            <a href="${data?.unsubscribeUrl || `${frontendUrl}/profile/settings`}" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
-          </p>
-        </div>
-      `,
+      `, data?.isPriceDrop ? 'Fiyat Düştü!' : 'Fiyat Değişti!'),
+
+      'marketing-newsletter': wrapEmail(`
+        ${title('Tarodan Haftalık Bülteni', '📰')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Bu hafta en çok ilgi gören ürünler:
+        </p>
+        ${data?.trendingProducts?.length > 0 ? `
+        <div style="margin: 24px 0;">
+          ${data.trendingProducts.map((product: any) => `
+            <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0;">
+              <p style="font-weight: 600; margin: 0 0 8px 0; color: #111827;">${product.title}</p>
+              <p style="color: #f97316; font-size: 18px; font-weight: 700; margin: 0 0 12px 0;">${this.formatPrice(product.price)} TL</p>
+              <a href="${product.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele →</a>
+            </div>
+          `).join('')}
+        </div>` : '<p>Bu hafta öne çıkan ürün bulunmamaktadır.</p>'}
+      `, 'Tarodan Haftalık Bülteni'),
+
+      'marketing-monthly': wrapEmail(`
+        ${title('Tarodan Aylık Özel Fırsatlar', '🎁')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Bu ay sizin için özel olarak seçtiğimiz ürünler:
+        </p>
+        ${data?.featuredProducts?.length > 0 ? `
+        <div style="margin: 24px 0;">
+          ${data.featuredProducts.map((product: any) => `
+            <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0;">
+              <p style="font-weight: 600; margin: 0 0 8px 0; color: #111827;">${product.title}</p>
+              <p style="color: #f97316; font-size: 18px; font-weight: 700; margin: 0 0 12px 0;">${this.formatPrice(product.price)} TL</p>
+              <a href="${product.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele →</a>
+            </div>
+          `).join('')}
+        </div>` : '<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>'}
+      `, 'Tarodan Aylık Özel Fırsatlar'),
     };
 
-    return templates[template] || `<p>${JSON.stringify(data)}</p>`;
+    return templates[template] || wrapEmail(`<p>${JSON.stringify(data)}</p>`, 'Tarodan Bildirim');
   }
 
   /**
@@ -467,3 +646,4 @@ export class EmailWorker {
     }).format(amount);
   }
 }
+

@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { formatTradeStatus } from '@/lib/format';
 
 interface TradeItem {
   id: string;
@@ -42,7 +43,7 @@ export default function TradesPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
-  
+
   const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
     pending: { label: t('trade.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
     accepted: { label: t('trade.statusAccepted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
@@ -70,9 +71,9 @@ export default function TradesPage() {
       let allTrades = response.data.data || response.data.trades || [];
       if (statusFilter) {
         if (statusFilter === 'shipped') {
-          allTrades = allTrades.filter((trade: Trade) => 
-            trade.status === 'initiator_shipped' || 
-            trade.status === 'receiver_shipped' || 
+          allTrades = allTrades.filter((trade: Trade) =>
+            trade.status === 'initiator_shipped' ||
+            trade.status === 'receiver_shipped' ||
             trade.status === 'both_shipped'
           );
         } else {
@@ -88,7 +89,11 @@ export default function TradesPage() {
   const isLoading = tradesQuery.isLoading;
 
   const getStatusBadge = (status: string) => {
-    const config = statusConfig[status] || statusConfig.pending;
+    const config = statusConfig[status] || {
+      label: formatTradeStatus(status, locale),
+      color: 'bg-gray-100 text-gray-800',
+      icon: ClockIcon
+    };
     const Icon = config.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
@@ -139,11 +144,10 @@ export default function TradesPage() {
               <button
                 key={f.value || 'all'}
                 onClick={() => setStatusFilter(f.value)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  statusFilter === f.value
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${statusFilter === f.value
                     ? 'bg-orange-500 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                }`}
+                  }`}
               >
                 {Icon && <Icon className="w-4 h-4" />}
                 {f.label}
@@ -173,12 +177,12 @@ export default function TradesPage() {
           <div className="space-y-4">
             {trades.map((trade) => {
               const isSent = trade.initiatorId === user?.id;
-              const otherUserName = isSent 
+              const otherUserName = isSent
                 ? (trade.receiverName || trade.receiver?.displayName || t('common.name'))
                 : (trade.initiatorName || trade.initiator?.displayName || t('common.name'));
               const myItems = isSent ? trade.initiatorItems : trade.receiverItems;
               const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
-              
+
               const getItemImage = (item: TradeItem): string => {
                 return item.productImage || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
               };
@@ -189,7 +193,7 @@ export default function TradesPage() {
 
               const myTotal = calculateTotalValue(myItems);
               const theirTotal = calculateTotalValue(theirItems);
-              
+
               return (
                 <Link
                   key={trade.id}

@@ -42,7 +42,7 @@ export class AdminService {
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
-  ) {}
+  ) { }
 
   // ==================== COMMISSION RULES ====================
 
@@ -115,7 +115,7 @@ export class AdminService {
     });
 
     if (existingRule) {
-      const categoryName = categoryId 
+      const categoryName = categoryId
         ? (await this.prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name || 'Kategori'
         : 'Tüm Kategoriler';
       const sellerTypeName = dto.sellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : dto.sellerType;
@@ -216,14 +216,14 @@ export class AdminService {
     }
 
     // Determine final categoryId and sellerType
-    const finalCategoryId = dto.categoryId !== undefined 
+    const finalCategoryId = dto.categoryId !== undefined
       ? (dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null)
       : existing.categoryId;
     const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
 
     // Check if changing categoryId or sellerType would conflict with another rule
     if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
-        (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
+      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
       const conflictingRule = await this.prisma.commissionRule.findFirst({
         where: {
           categoryId: finalCategoryId,
@@ -234,7 +234,7 @@ export class AdminService {
       });
 
       if (conflictingRule) {
-        const categoryName = finalCategoryId 
+        const categoryName = finalCategoryId
           ? (await this.prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } }))?.name || 'Kategori'
           : 'Tüm Kategoriler';
         const sellerTypeName = finalSellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : finalSellerType;
@@ -352,7 +352,7 @@ export class AdminService {
     settings.forEach((setting) => {
       // For prices and percentages, use parseFloat; for limits, use parseInt
       const isPriceOrPercentage = setting.settingKey.includes('_price') || setting.settingKey.includes('_percentage');
-      const value = isPriceOrPercentage 
+      const value = isPriceOrPercentage
         ? parseFloat(setting.settingValue)
         : parseInt(setting.settingValue, 10);
       if (!isNaN(value)) {
@@ -395,15 +395,15 @@ export class AdminService {
     });
 
     // If this is a membership price setting, also update the MembershipTier
-    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' || 
-        dto.key === 'yearly_discount_percentage') {
+    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' ||
+      dto.key === 'yearly_discount_percentage') {
       try {
         // Get discount percentage
         const discountSetting = await this.prisma.platformSetting.findUnique({
           where: { settingKey: 'yearly_discount_percentage' },
         });
-        const discountPercentage = discountSetting 
-          ? parseFloat(discountSetting.settingValue) 
+        const discountPercentage = discountSetting
+          ? parseFloat(discountSetting.settingValue)
           : (dto.key === 'yearly_discount_percentage' ? parseFloat(dto.value) : 20);
         const finalDiscount = isNaN(discountPercentage) ? 20 : discountPercentage;
 
@@ -412,16 +412,16 @@ export class AdminService {
           const premiumMonthlySetting = await this.prisma.platformSetting.findUnique({
             where: { settingKey: 'premium_monthly_price' },
           });
-          const premiumMonthly = premiumMonthlySetting 
+          const premiumMonthly = premiumMonthlySetting
             ? parseFloat(premiumMonthlySetting.settingValue)
             : (dto.key === 'premium_monthly_price' ? parseFloat(dto.value) : null);
-          
+
           if (premiumMonthly !== null && !isNaN(premiumMonthly)) {
             const premiumYearly = premiumMonthly * 12 * (1 - finalDiscount / 100);
             const premiumTier = await this.prisma.membershipTier.findUnique({
               where: { type: 'premium' },
             });
-            
+
             if (premiumTier) {
               await this.prisma.membershipTier.update({
                 where: { id: premiumTier.id },
@@ -440,16 +440,16 @@ export class AdminService {
           const businessMonthlySetting = await this.prisma.platformSetting.findUnique({
             where: { settingKey: 'business_monthly_price' },
           });
-          const businessMonthly = businessMonthlySetting 
+          const businessMonthly = businessMonthlySetting
             ? parseFloat(businessMonthlySetting.settingValue)
             : (dto.key === 'business_monthly_price' ? parseFloat(dto.value) : null);
-          
+
           if (businessMonthly !== null && !isNaN(businessMonthly)) {
             const businessYearly = businessMonthly * 12 * (1 - finalDiscount / 100);
             const businessTier = await this.prisma.membershipTier.findUnique({
               where: { type: 'business' },
             });
-            
+
             if (businessTier) {
               await this.prisma.membershipTier.update({
                 where: { id: businessTier.id },
@@ -656,15 +656,15 @@ export class AdminService {
 
     // Combine and sort all orders (as buyer and seller)
     const allOrders = [
-      ...user.buyerOrders.map((o) => ({ 
-        ...o, 
+      ...user.buyerOrders.map((o) => ({
+        ...o,
         role: 'buyer' as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         otherParty: o.seller,
       })),
-      ...user.sellerOrders.map((o) => ({ 
-        ...o, 
+      ...user.sellerOrders.map((o) => ({
+        ...o,
         role: 'seller' as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
@@ -1228,9 +1228,9 @@ export class AdminService {
     const categoryIds = [...new Set(byCategory.map((c) => c.categoryId).filter(Boolean))] as string[];
     const categories = categoryIds.length > 0
       ? await this.prisma.category.findMany({
-          where: { id: { in: categoryIds } },
-          select: { id: true, name: true },
-        })
+        where: { id: { in: categoryIds } },
+        select: { id: true, name: true },
+      })
       : [];
     const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
     const categoryDistribution = byCategory
@@ -1294,8 +1294,8 @@ export class AdminService {
     const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
     const endDate = new Date(endDateRaw);
     endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
@@ -1339,8 +1339,8 @@ export class AdminService {
       date,
       totalSales: Math.round(data.totalSales * 100) / 100,
       orderCount: data.orderCount,
-      averageOrderValue: data.orderCount > 0 
-        ? Math.round((data.totalSales / data.orderCount) * 100) / 100 
+      averageOrderValue: data.orderCount > 0
+        ? Math.round((data.totalSales / data.orderCount) * 100) / 100
         : 0,
     }));
 
@@ -1371,8 +1371,8 @@ export class AdminService {
     const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
     const endDate = new Date(endDateRaw);
     endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
@@ -1433,8 +1433,8 @@ export class AdminService {
     const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
     const endDate = new Date(endDateRaw);
     endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
@@ -1469,7 +1469,7 @@ export class AdminService {
 
     // Group new users by date
     const groupedData = new Map<string, { newUsers: number; newSellers: number; activeUsers: Set<string> }>();
-    
+
     users.forEach((user) => {
       const dateKey = this.getDateKey(user.createdAt, query.groupBy);
       const existing = groupedData.get(dateKey) || { newUsers: 0, newSellers: 0, activeUsers: new Set() };
@@ -1541,26 +1541,26 @@ export class AdminService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        buyer: { 
-          select: { 
-            id: true, 
-            displayName: true, 
-            email: true, 
+        buyer: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
             phone: true,
             isVerified: true,
-          } 
+          }
         },
-        seller: { 
-          select: { 
-            id: true, 
-            displayName: true, 
-            email: true, 
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
             phone: true,
             isVerified: true,
             sellerType: true,
-          } 
+          }
         },
-        product: { 
+        product: {
           include: {
             images: { orderBy: { sortOrder: 'asc' } },
             category: { select: { id: true, name: true } },
@@ -1631,10 +1631,10 @@ export class AdminService {
       if (product && product.status !== ProductStatus.sold) {
         // Update product status to SOLD
         // If stock is 0, set product to inactive instead
-        const updateData: any = { 
-          status: product.quantity !== null && product.quantity === 0 
-            ? ProductStatus.inactive 
-            : ProductStatus.sold 
+        const updateData: any = {
+          status: product.quantity !== null && product.quantity === 0
+            ? ProductStatus.inactive
+            : ProductStatus.sold
         };
 
         await this.prisma.product.update({
@@ -1650,7 +1650,7 @@ export class AdminService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { 
+      data: {
         status: dto.status as OrderStatus,
         version: { increment: 1 },
       },
@@ -1765,8 +1765,8 @@ export class AdminService {
    */
   async generateSalesReport(query: ReportQueryDto) {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const orders = await this.prisma.order.findMany({
@@ -1777,11 +1777,11 @@ export class AdminService {
       include: {
         buyer: { select: { displayName: true, email: true } },
         seller: { select: { displayName: true, email: true } },
-        product: { 
-          select: { 
-            title: true, 
-            category: { select: { name: true } } 
-          } 
+        product: {
+          select: {
+            title: true,
+            category: { select: { name: true } }
+          }
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -1813,7 +1813,7 @@ export class AdminService {
     // For CSV format
     if (query.format === 'csv') {
       const headers = 'Order Number,Date,Buyer,Buyer Email,Seller,Seller Email,Product,Category,Amount,Commission,Status\n';
-      const rows = reportData.map((r) => 
+      const rows = reportData.map((r) =>
         `${r.orderNumber},${r.date},${r.buyer},${r.buyerEmail},${r.seller},${r.sellerEmail},"${r.product}",${r.category},${r.amount},${r.commission},${r.status}`
       ).join('\n');
       return { format: 'csv', content: headers + rows, summary };
@@ -1821,9 +1821,9 @@ export class AdminService {
 
     // For PDF, return structured data (actual PDF generation would require a library like pdfkit)
     if (query.format === 'pdf') {
-      return { 
-        format: 'pdf', 
-        data: reportData, 
+      return {
+        format: 'pdf',
+        data: reportData,
         summary,
         message: 'PDF generation requires frontend implementation with the provided data',
       };
@@ -2104,8 +2104,8 @@ export class AdminService {
    */
   async getCommissionReport(query: ReportQueryDto) {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get orders with commission
@@ -2115,17 +2115,17 @@ export class AdminService {
         status: { in: [OrderStatus.completed, OrderStatus.delivered] },
       },
       include: {
-        seller: { 
-          select: { 
-            id: true, 
-            displayName: true, 
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
             sellerType: true,
-          } 
+          }
         },
-        product: { 
-          select: { 
-            category: { select: { id: true, name: true } } 
-          } 
+        product: {
+          select: {
+            category: { select: { id: true, name: true } }
+          }
         },
       },
     });
@@ -2190,8 +2190,8 @@ export class AdminService {
       totalSales: orders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
       totalCommission: orders.reduce((sum, o) => sum + Number(o.commissionAmount), 0),
       averageCommissionRate: orders.length > 0
-        ? Math.round((orders.reduce((sum, o) => sum + Number(o.commissionAmount), 0) / 
-            orders.reduce((sum, o) => sum + Number(o.totalAmount), 0)) * 10000) / 100
+        ? Math.round((orders.reduce((sum, o) => sum + Number(o.commissionAmount), 0) /
+          orders.reduce((sum, o) => sum + Number(o.totalAmount), 0)) * 10000) / 100
         : 0,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
@@ -2212,8 +2212,8 @@ export class AdminService {
    */
   async getCommissionRevenue(query: AnalyticsQueryDto) {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [totalCommission, commissionByMonth, commissionByCategory] = await Promise.all([
@@ -2291,8 +2291,8 @@ export class AdminService {
    */
   async generateCustomReport(query: ReportQueryDto) {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
+    const startDate = query.startDate
+      ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get comprehensive stats for the period
@@ -2593,7 +2593,7 @@ export class AdminService {
     if (!type || type === 'review') {
       const [reviews, reviewCount] = await Promise.all([
         this.prisma.rating.findMany({
-          where: { 
+          where: {
             comment: { not: null },
           },
           include: {
@@ -2605,7 +2605,7 @@ export class AdminService {
           take: type === 'review' ? pageSize : 10,
         }),
         this.prisma.rating.count({
-          where: { 
+          where: {
             comment: { not: null },
           },
         }),
@@ -2711,7 +2711,7 @@ export class AdminService {
 
         await this.prisma.message.update({
           where: { id: itemId },
-          data: { 
+          data: {
             status: 'approved',
             reviewedById: adminId,
             reviewedAt: new Date(),
@@ -2777,7 +2777,7 @@ export class AdminService {
         // Mark as rejected and hide content
         await this.prisma.message.update({
           where: { id: itemId },
-          data: { 
+          data: {
             status: 'rejected',
             filteredContent: '[Bu mesaj moderatör tarafından kaldırıldı]',
             flaggedReason: reason,
@@ -4192,4 +4192,180 @@ export class AdminService {
       return { success: true, productId, deleted: false, status: 'inactive' };
     }
   }
+
+  // ==================== BRAND MANAGEMENT ====================
+
+  /**
+   * Get all brands
+   */
+  async getBrands() {
+    const brands = await this.prisma.brand.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+
+    return {
+      data: brands.map((b) => ({
+        id: b.id,
+        name: b.name,
+        slug: b.slug,
+        logo: b.logo,
+        description: b.description,
+        website: b.website,
+        sortOrder: b.sortOrder,
+        isActive: b.isActive,
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+      })),
+    };
+  }
+
+  /**
+   * Create a new brand
+   */
+  async createBrand(
+    adminId: string,
+    dto: {
+      name: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    // Generate slug from name
+    const slug = dto.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+
+    // Check if brand with same name or slug exists
+    const existing = await this.prisma.brand.findFirst({
+      where: {
+        OR: [
+          { name: { equals: dto.name, mode: 'insensitive' } },
+          { slug },
+        ],
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Bu isimde bir marka zaten mevcut');
+    }
+
+    const brand = await this.prisma.brand.create({
+      data: {
+        name: dto.name,
+        slug,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'brand_create', 'Brand', brand.id, null, brand);
+
+    this.logger.log(`Brand created: ${brand.name} (${brand.id}) by admin ${adminId}`);
+
+    return brand;
+  }
+
+  /**
+   * Update brand
+   */
+  async updateBrand(
+    adminId: string,
+    brandId: string,
+    dto: {
+      name?: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    const existing = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Marka bulunamadı');
+    }
+
+    // If name is being changed, check for duplicates and update slug
+    let slug = existing.slug;
+    if (dto.name && dto.name !== existing.name) {
+      slug = dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+
+      const duplicate = await this.prisma.brand.findFirst({
+        where: {
+          OR: [
+            { name: { equals: dto.name, mode: 'insensitive' } },
+            { slug },
+          ],
+          NOT: { id: brandId },
+        },
+      });
+
+      if (duplicate) {
+        throw new BadRequestException('Bu isimde bir marka zaten mevcut');
+      }
+    }
+
+    const updated = await this.prisma.brand.update({
+      where: { id: brandId },
+      data: {
+        name: dto.name,
+        slug: dto.name ? slug : undefined,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'brand_update', 'Brand', brandId, existing, updated);
+
+    this.logger.log(`Brand updated: ${updated.name} (${updated.id}) by admin ${adminId}`);
+
+    return updated;
+  }
+
+  /**
+   * Delete brand
+   */
+  async deleteBrand(adminId: string, brandId: string) {
+    const existing = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Marka bulunamadı');
+    }
+
+    await this.prisma.brand.delete({
+      where: { id: brandId },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'brand_delete', 'Brand', brandId, existing, null);
+
+    this.logger.log(`Brand deleted: ${existing.name} (${existing.id}) by admin ${adminId}`);
+
+    return { success: true };
+  }
 }
+

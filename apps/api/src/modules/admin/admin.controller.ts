@@ -65,7 +65,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly advertisementService: AdvertisementService,
     private readonly mediaService: MediaService,
-  ) {}
+  ) { }
 
   // ==================== COMMISSION RULES ====================
 
@@ -815,6 +815,53 @@ export class AdminController {
     },
   ) {
     return this.adminService.updateMembershipTier(adminId, id, body);
+  }
+
+  // ==================== BRAND MANAGEMENT ====================
+
+  @Get('brands')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all brands' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of brands' })
+  async getBrands() {
+    return this.adminService.getBrands();
+  }
+
+  @Post('brands')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new brand' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Brand created' })
+  async createBrand(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name: string; logo?: string; description?: string; website?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.createBrand(adminId, body);
+  }
+
+  @Patch('brands/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update brand' })
+  @ApiParam({ name: 'id', description: 'Brand ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Brand updated' })
+  async updateBrand(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name?: string; logo?: string; description?: string; website?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.updateBrand(adminId, id, body);
+  }
+
+  @Delete('brands/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete brand' })
+  @ApiParam({ name: 'id', description: 'Brand ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Brand deleted' })
+  async deleteBrand(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteBrand(adminId, id);
   }
 
   // ==================== ADVERTISEMENT MANAGEMENT ====================

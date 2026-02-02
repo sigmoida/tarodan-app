@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import {
   Squares2X2Icon,
   Bars3Icon,
+  ViewColumnsIcon,
 } from '@heroicons/react/24/outline';
 import {
   Squares2X2Icon as GridIconSolid,
   Bars3Icon as ListIconSolid,
+  ViewColumnsIcon as ViewColumnsIconSolid,
 } from '@heroicons/react/24/solid';
 
-export type ProductLayout = 'grid-3' | 'grid-4' | 'list';
+export type ProductLayout = 'grid-4' | 'grid-6' | 'list';
 
 interface ProductLayoutSelectorProps {
   layout: ProductLayout;
@@ -27,7 +29,7 @@ export default function ProductLayoutSelector({
   useEffect(() => {
     if (storageKey) {
       const saved = localStorage.getItem(storageKey) as ProductLayout | null;
-      if (saved && ['grid-3', 'grid-4', 'list'].includes(saved)) {
+      if (saved && ['grid-4', 'grid-6', 'list'].includes(saved)) {
         onLayoutChange(saved);
       }
     }
@@ -42,22 +44,22 @@ export default function ProductLayoutSelector({
 
   const layouts: Array<{ value: ProductLayout; icon: React.ReactNode; label: string }> = [
     {
-      value: 'grid-3',
-      icon: layout === 'grid-3' ? (
-        <GridIconSolid className="w-5 h-5" />
-      ) : (
-        <Squares2X2Icon className="w-5 h-5" />
-      ),
-      label: '3\'lü',
-    },
-    {
       value: 'grid-4',
       icon: layout === 'grid-4' ? (
-        <GridIconSolid className="w-5 h-5" />
+        <Squares2X2Icon className="w-5 h-5" />
       ) : (
         <Squares2X2Icon className="w-5 h-5" />
       ),
       label: '4\'lü',
+    },
+    {
+      value: 'grid-6',
+      icon: layout === 'grid-6' ? (
+        <ViewColumnsIconSolid className="w-5 h-5" />
+      ) : (
+        <ViewColumnsIcon className="w-5 h-5" />
+      ),
+      label: '6\'şarlı',
     },
     {
       value: 'list',
@@ -71,16 +73,15 @@ export default function ProductLayoutSelector({
   ];
 
   return (
-    <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
       {layouts.map((item) => (
         <button
           key={item.value}
           onClick={() => onLayoutChange(item.value)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-md transition-all ${
-            layout === item.value
-              ? 'bg-white text-orange-500 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-          }`}
+          className={`flex items-center justify-center p-2 rounded-md transition-all ${layout === item.value
+            ? 'bg-white text-orange-500 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
           title={item.label}
         >
           {item.icon}
@@ -89,3 +90,4 @@ export default function ProductLayoutSelector({
     </div>
   );
 }
+

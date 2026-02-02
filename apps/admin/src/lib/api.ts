@@ -20,7 +20,7 @@ api.interceptors.request.use(
         console.warn('No admin token found in localStorage');
       }
     }
-    
+
     // Log request in development
     if (process.env.NODE_ENV === 'development') {
       console.log('API Request:', {
@@ -31,7 +31,7 @@ api.interceptors.request.use(
         hasAuth: !!config.headers.Authorization,
       });
     }
-    
+
     return config;
   },
   (error) => {
@@ -81,22 +81,22 @@ export const adminApi = {
   getRecentOrders: (limit?: number) => api.get('/admin/dashboard/recent-orders', { params: { limit } }),
   getPendingActions: () => api.get('/admin/dashboard/pending-actions'),
   getIdentityVerificationRequests: () => api.get('/admin/users/verification-requests'),
-  
+
   // Analytics
-  getSalesAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) => 
+  getSalesAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) =>
     api.get('/admin/analytics/sales', { params }),
-  getRevenueAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) => 
+  getRevenueAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) =>
     api.get('/admin/analytics/revenue', { params }),
-  getUserAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) => 
+  getUserAnalytics: (params?: { startDate?: string; endDate?: string; groupBy?: string }) =>
     api.get('/admin/analytics/users', { params }),
-  
+
   // Users
   getUsers: (params?: any) => api.get('/admin/users', { params }),
   getUser: (id: string) => api.get(`/admin/users/${id}`),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
-  
+
   // Products
   getProducts: (params?: any) => api.get('/admin/products', { params }),
   getProduct: (id: string) => api.get(`/admin/products/${id}`),
@@ -108,40 +108,40 @@ export const adminApi = {
   bulkApproveProducts: (ids: string[], note?: string) => api.post('/admin/products/bulk-approve', { ids, note }),
   bulkRejectProducts: (ids: string[], reason: string) => api.post('/admin/products/bulk-reject', { ids, reason }),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
-  
+
   // Orders
   getOrders: (params?: any) => api.get('/admin/orders', { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
-  
+
   // Trades
   getTrades: (params?: any) => api.get('/admin/trades', { params }),
   getTrade: (id: string) => api.get(`/admin/trades/${id}`),
   resolveTrade: (id: string, resolution: any) => api.post(`/admin/trades/${id}/resolve`, resolution),
-  
+
   // Messages
   getMessages: (params?: any) => api.get('/admin/messages', { params }),
   getMessage: (id: string) => api.get(`/admin/messages/${id}`),
   approveMessage: (id: string, notes?: string) => api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
   rejectMessage: (id: string, reason: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
-  
+
   // Support Tickets
   getTickets: (params?: any) => api.get('/admin/support-tickets', { params }),
   getTicket: (id: string) => api.get(`/admin/support-tickets/${id}`),
   updateTicket: (id: string, data: any) => api.patch(`/admin/support-tickets/${id}`, data),
   replyToTicket: (id: string, message: string) => api.post(`/admin/support-tickets/${id}/reply`, { message }),
-  
+
   // Reports
-  getSalesReport: (params?: { startDate?: string; endDate?: string; format?: string }) => 
+  getSalesReport: (params?: { startDate?: string; endDate?: string; format?: string }) =>
     api.get('/admin/reports/sales', { params }),
-  getCommissionReport: (params?: { startDate?: string; endDate?: string }) => 
+  getCommissionReport: (params?: { startDate?: string; endDate?: string }) =>
     api.get('/admin/reports/commission', { params }),
   getUserReport: (params?: any) => api.get('/admin/reports/users', { params }),
   getTradeReport: (params?: any) => api.get('/admin/reports/trades', { params }),
   getProductReport: (params?: any) => api.get('/admin/reports/products', { params }),
   exportReport: (type: string, format: string, params?: any) =>
     api.get(`/admin/reports/${type}`, { params: { ...params, format }, responseType: 'json' }),
-  
+
   // Settings
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.patch('/admin/settings', data),
@@ -150,17 +150,23 @@ export const adminApi = {
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),
   deleteCommissionRule: (id: string) => api.delete(`/admin/commission-rules/${id}`),
-  
+
   // Membership Tiers
   getMembershipTiers: () => api.get('/admin/membership-tiers'),
   updateMembershipTier: (id: string, data: any) => api.patch(`/admin/membership-tiers/${id}`, data),
-  
+
   // Categories
   getCategories: () => api.get('/admin/categories'),
   createCategory: (data: any) => api.post('/admin/categories', data),
   updateCategory: (id: string, data: any) => api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
-  
+
+  // Brands
+  getBrands: () => api.get('/admin/brands'),
+  createBrand: (data: any) => api.post('/admin/brands', data),
+  updateBrand: (id: string, data: any) => api.patch(`/admin/brands/${id}`, data),
+  deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
+
   // Advertisements
   getAds: () => api.get('/admin/ads'),
   createAd: (data: any) => api.post('/admin/ads', data),
@@ -177,7 +183,7 @@ export const adminApi = {
 
   // Audit Logs
   getAuditLogs: (params?: any) => api.get('/admin/audit-logs', { params }),
-  
+
   // Payments
   getPayments: (params?: {
     status?: string;

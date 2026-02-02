@@ -20,6 +20,8 @@ import {
   UserCircleIcon,
   MegaphoneIcon,
   ChatBubbleLeftRightIcon,
+  TagIcon,
+  SwatchIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -28,6 +30,8 @@ const navigation = [
   { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon },
   { name: 'Kullanıcılar', href: '/users', icon: UsersIcon },
   { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
+  { name: 'Kategoriler', href: '/categories', icon: TagIcon },
+  { name: 'Markalar', href: '/brands', icon: SwatchIcon },
   { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
   { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon },
   { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },

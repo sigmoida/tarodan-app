@@ -548,6 +548,28 @@ model Category {
   @@map("categories")
 }
 
+// =============================================================================
+// BRANDS - Admin Managed Brand List
+// =============================================================================
+
+model Brand {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  logo        String?  // URL to brand logo
+  description String?
+  website     String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("brands")
+}
+
+
 model Product {
   id             String           @id @default(uuid())
   sellerId       String           @map("seller_id")

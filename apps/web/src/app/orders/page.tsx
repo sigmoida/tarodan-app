@@ -10,6 +10,7 @@ import { api, ratingsApi } from '@/lib/api';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
+import { formatOrderStatus } from '@/lib/format';
 
 interface Order {
   id: string;
@@ -64,7 +65,7 @@ export default function OrdersPage() {
   const { t, locale } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
-  
+
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
   const [reviewScore, setReviewScore] = useState(5);
@@ -72,7 +73,7 @@ export default function OrdersPage() {
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
-  
+
   const statusLabels: Record<string, { label: string; color: string }> = {
     pending_payment: { label: t('order.statusPending'), color: 'text-yellow-400 bg-yellow-400/10' },
     paid: { label: t('order.statusPaid'), color: 'text-green-400 bg-green-400/10' },
@@ -84,7 +85,7 @@ export default function OrdersPage() {
     refund_requested: { label: t('order.refundStarted'), color: 'text-orange-400 bg-orange-400/10' },
     refunded: { label: t('order.statusRefunded'), color: 'text-gray-400 bg-gray-400/10' },
   };
-  
+
   const [sellerCommunication, setSellerCommunication] = useState(5);
   const [sellerShipping, setSellerShipping] = useState(5);
   const [sellerPackaging, setSellerPackaging] = useState(5);
@@ -126,7 +127,7 @@ export default function OrdersPage() {
   const submitReview = async () => {
     const productId = reviewingOrder?.product?.id || reviewingOrder?.items?.[0]?.product?.id;
     const sellerId = reviewingOrder?.seller?.id;
-    
+
     if (!reviewingOrder || !productId) {
       toast.error(t('order.orderNotFound'));
       return;
@@ -147,7 +148,7 @@ export default function OrdersPage() {
       if (sellerId) {
         const avgSellerScore = Math.round((sellerCommunication + sellerShipping + sellerPackaging) / 3);
         const scoreBreakdown = `İletişim: ${sellerCommunication}/5, Kargo: ${sellerShipping}/5, Paketleme: ${sellerPackaging}/5`;
-        const fullComment = sellerReviewText 
+        const fullComment = sellerReviewText
           ? `${sellerReviewText}\n\n${scoreBreakdown}`
           : scoreBreakdown;
         await ratingsApi.createUserRating({
@@ -193,11 +194,10 @@ export default function OrdersPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  filter === f
+                className={`px-4 py-2 rounded-lg transition-colors ${filter === f
                     ? 'bg-primary-500 text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                }`}
+                  }`}
               >
                 {f === 'buyer' ? t('profile.totalPurchases') : f === 'seller' ? t('profile.totalSales') : t('common.all')}
               </button>
@@ -223,7 +223,7 @@ export default function OrdersPage() {
           <div className="space-y-4">
             {orders.map((order) => {
               const status = statusLabels[order.status] || {
-                label: order.status,
+                label: formatOrderStatus(order.status, locale),
                 color: 'text-gray-600 bg-gray-100',
               };
 
@@ -249,7 +249,7 @@ export default function OrdersPage() {
                       const productInfo = order.product || order.items?.[0]?.product;
                       const productImage = productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
                       const orderPrice = Number(order.totalAmount) || Number(order.amount) || order.items?.[0]?.price || 0;
-                      
+
                       return productInfo ? (
                         <div className="flex items-center gap-4">
                           <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
@@ -319,7 +319,7 @@ export default function OrdersPage() {
                       {t('common.details')}
                     </Link>
                     {canReview(order) && (
-                      <button 
+                      <button
                         onClick={() => openReviewModal(order)}
                         className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors text-sm flex items-center gap-1"
                       >
@@ -344,13 +344,13 @@ export default function OrdersPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
               <h2 className="text-xl font-bold text-gray-900 mb-4">{t('review.reviewOrder')}</h2>
-              
+
               {/* Product Section */}
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                   📦 {t('review.productReview')}
                 </h3>
-                
+
                 {(reviewingOrder.product || reviewingOrder.items?.[0]?.product) && (
                   <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl overflow-hidden">
@@ -428,7 +428,7 @@ export default function OrdersPage() {
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                   👤 {t('review.sellerReview')}
                 </h3>
-                
+
                 {reviewingOrder.seller && (
                   <p className="text-sm text-gray-600 mb-4">
                     {t('product.seller')}: <span className="font-medium text-gray-900">{reviewingOrder.seller.displayName}</span>
@@ -499,7 +499,7 @@ export default function OrdersPage() {
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Seller Review Text */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">

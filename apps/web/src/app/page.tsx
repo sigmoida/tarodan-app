@@ -5,7 +5,7 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import OptimizedImage, { getOptimizedImageUrl } from '@/components/OptimizedImage';
-import { 
+import {
   ArrowRightIcon,
   HandThumbUpIcon,
   StarIcon,
@@ -24,6 +24,11 @@ const AuthRequiredModal = dynamic(
 import { RectangleStackIcon, PlusCircleIcon, ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
+
+// New professional homepage components
+import HeroSlider from '@/components/home/HeroSlider';
+import TrustBadges from '@/components/home/TrustBadges';
+import ManufacturersSlider from '@/components/home/ManufacturersSlider';
 
 interface Category {
   id: string;
@@ -267,10 +272,10 @@ export default function Home() {
   };
 
   const getProductTag = (product: Product): string | null => {
-    const daysSinceCreation = product.createdAt 
+    const daysSinceCreation = product.createdAt
       ? Math.floor((new Date().getTime() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24))
       : 100;
-    
+
     if (daysSinceCreation < 7) return locale === 'en' ? 'New' : 'Yeni';
     if (product.viewCount && product.viewCount > 1000) return locale === 'en' ? 'Rare' : 'Nadir';
     return null;
@@ -295,105 +300,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="relative bg-white text-orange-500 py-20 md:py-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-white opacity-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(249,115,22,0.1)_0%,transparent_70%)]" />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Text Content */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-orange-500">
-                {locale === 'en' ? (
-                  <>Turkey's Largest<br />Diecast Marketplace</>
-                ) : (
-                  <>Türkiye'nin en büyük<br />Diecast pazaryeri</>
-                )}
-              </h1>
-              <p className="text-lg md:text-xl text-gray-700 mb-8 max-w-xl">
-                {locale === 'en' 
-                  ? 'Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.'
-                  : 'Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.'}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                {isAuthenticated ? (
-                  <>
-                    <Link 
-                      href="/listings/new"
-                      className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
-                    >
-                      <span className="text-xl">+</span>
-                      {t('nav.newListing')}
-                    </Link>
-                    <Link 
-                      href="/collections"
-                      className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
-                    >
-                      {t('collection.createCollection')}
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        setAuthModalConfig({
-                          title: t('nav.loginToCreateListing'),
-                          message: t('nav.loginToCreateListingMsg'),
-                          icon: <PlusCircleIcon className="w-10 h-10 text-primary-500" />,
-                          redirectPath: '/listings/new',
-                        });
-                        setShowAuthModal(true);
-                      }}
-                      className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500 shadow-lg"
-                    >
-                      <span className="text-xl">+</span>
-                      {t('nav.newListing')}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAuthModalConfig({
-                          title: t('collection.createCollection'),
-                          message: locale === 'en' ? 'Please login to create your digital garage and showcase your collection.' : 'Dijital garajınızı oluşturmak ve koleksiyonunuzu sergilemek için giriş yapmanız gerekiyor.',
-                          icon: <RectangleStackIcon className="w-10 h-10 text-primary-500" />,
-                          redirectPath: '/collections/new',
-                        });
-                        setShowAuthModal(true);
-                      }}
-                      className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
-                    >
-                      {t('collection.createCollection')}
-                    </button>
-                  </>
-                )}
-                <Link 
-                  href="/listings"
-                  className="bg-transparent text-orange-500 px-8 py-4 rounded-xl font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 border-2 border-orange-500"
-                >
-                  Pazaryerini incele
-                </Link>
-              </div>
-            </motion.div>
+      {/* Hero Slider - Professional rotating banner */}
+      <HeroSlider />
 
-            {/* Image */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="relative h-64 md:h-96"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-100/50 to-transparent rounded-3xl backdrop-blur-sm" />
-              <div className="relative h-full bg-orange-50 rounded-3xl flex items-center justify-center border-2 border-orange-200">
-                <div className="text-8xl md:text-9xl">🚗</div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+      {/* Trust Badges - Güvence ikonları bar'ı */}
+      <TrustBadges />
+
+      {/* Diecast Üreticileri - Yatay kaydırılabilir slider */}
+      <ManufacturersSlider />
 
       {/* Markalar Section */}
       <section className="py-12 bg-white">
@@ -403,14 +317,14 @@ export default function Home() {
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
               <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Brands' : 'Markalar'}</h2>
             </div>
-            <Link 
+            <Link
               href="/listings"
               className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
               {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
-          
+
           <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
             {BRANDS.map((brand) => (
               <Link
@@ -437,14 +351,14 @@ export default function Home() {
               <div className="w-1 h-8 bg-orange-500 rounded"></div>
               <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Scale' : 'Boyut'}</h2>
             </div>
-            <Link 
+            <Link
               href="/listings"
               className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
             >
               {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
             </Link>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
             {SCALES.map((scale) => {
               const scaleValue = scale.match(/\d+:\d+/)?.[0];
@@ -452,7 +366,7 @@ export default function Home() {
                 <Link
                   key={scale}
                   href={`/listings?scale=${scaleValue}`}
-                  className="px-4 py-2 bg-yellow-100 text-gray-800 rounded-lg hover:bg-orange-200 transition-colors font-medium"
+                  className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium"
                 >
                   {scale}
                 </Link>
@@ -479,7 +393,7 @@ export default function Home() {
                 onLayoutChange={setProductLayout}
                 storageKey="homepage-product-layout"
               />
-              <Link 
+              <Link
                 href="/listings?sortBy=viewCount"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
@@ -487,13 +401,13 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          
+
           <div className={
-            productLayout === 'grid-3'
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
-              : productLayout === 'grid-4'
+            productLayout === 'grid-4'
               ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'
-              : 'space-y-4'
+              : productLayout === 'grid-6'
+                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4'
+                : 'space-y-4'
           }>
             {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
@@ -517,9 +431,8 @@ export default function Home() {
                         />
                         {tag && (
                           <div className="absolute top-2 right-2">
-                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
-                              tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
-                            }`}>
+                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                              }`}>
                               {tag}
                             </span>
                           </div>
@@ -601,9 +514,8 @@ export default function Home() {
                         </div>
                         {tag && (
                           <div className="absolute top-3 right-3">
-                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${
-                              tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
-                            }`}>
+                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                              }`}>
                               {tag}
                             </span>
                           </div>
@@ -638,7 +550,7 @@ export default function Home() {
                 <div className="w-1 h-8 bg-orange-500 rounded"></div>
                 <h2 className="text-2xl md:text-3xl font-bold">{locale === 'en' ? 'Top Collections' : 'En İyi Koleksiyonlar'}</h2>
               </div>
-              <Link 
+              <Link
                 href="/collections"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
@@ -658,7 +570,7 @@ export default function Home() {
                   >
                     <ChevronLeftIcon className="w-6 h-6" />
                   </button>
-                  
+
                   <button
                     onClick={handleNextCollection}
                     className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center transition-all hover:bg-orange-500 hover:text-white text-orange-500"
@@ -671,9 +583,9 @@ export default function Home() {
 
               {/* Collections Carousel */}
               <div className="overflow-hidden px-14">
-                <div 
+                <div
                   className="flex transition-transform duration-500 ease-in-out gap-6"
-                  style={{ 
+                  style={{
                     transform: `translateX(calc(-${currentCollectionIndex * 100}% - ${currentCollectionIndex * 1.5}rem))`
                   }}
                 >
@@ -771,9 +683,8 @@ export default function Home() {
                     <button
                       key={index}
                       onClick={() => setCurrentCollectionIndex(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentCollectionIndex ? 'bg-orange-500 w-8' : 'bg-gray-300'
-                      }`}
+                      className={`w-2 h-2 rounded-full transition-all ${index === currentCollectionIndex ? 'bg-orange-500 w-8' : 'bg-gray-300'
+                        }`}
                       aria-label={`Go to collection ${index + 1}`}
                     />
                   ))}
@@ -801,7 +712,7 @@ export default function Home() {
                   👑 Business
                 </span>
               </div>
-              <Link 
+              <Link
                 href="/listings"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
@@ -837,7 +748,7 @@ export default function Home() {
                     <p className="text-sm text-gray-600 mb-4 text-center md:text-left">
                       {companyOfWeek.bio || (locale === 'en' ? 'Premium Diecast vehicle buying and selling' : 'Premium Diecast araçların alım ve satımı')}
                     </p>
-                    
+
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-2 w-full mb-4">
                       <div className="bg-orange-50 rounded-lg p-2 text-center">
@@ -867,7 +778,7 @@ export default function Home() {
                         </span>
                       </div>
                     )}
-                    
+
                     <Link
                       href={`/seller/${companyOfWeek.id}`}
                       className="w-full text-center bg-gradient-to-r from-orange-500 to-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition-all"
@@ -911,7 +822,7 @@ export default function Home() {
                       </Link>
                     ))}
                   </div>
-                  
+
                   {/* Collections Preview */}
                   {companyOfWeek.collections && companyOfWeek.collections.length > 0 && (
                     <div className="mt-6">
@@ -950,9 +861,9 @@ export default function Home() {
                   )}
                 </div>
               </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       )}
 
       {/* Section Divider - Gradient Line */}

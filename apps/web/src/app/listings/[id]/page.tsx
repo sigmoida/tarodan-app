@@ -27,6 +27,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
+import { formatCondition } from '@/lib/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
@@ -89,14 +90,14 @@ export default function ListingDetailPage() {
   const queryClient = useQueryClient();
   const id = params.id as string;
   const { t, locale } = useTranslation();
-  
+
   const { addToCart, items: cartItems, removeFromCart } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
-  
+
   // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
   const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
-  
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -192,7 +193,7 @@ export default function ListingDetailPage() {
   const reviews = reviewsQuery.data?.reviews ?? [];
   const reviewStats = reviewsQuery.data?.stats ?? null;
   const reviewsLoading = reviewsQuery.isLoading;
-  
+
   // Check if product is in cart
   const cartItem = listing ? cartItems.find(item => item.productId === listing.id) : null;
   const isInCart = !!cartItem;
@@ -208,7 +209,7 @@ export default function ListingDetailPage() {
   // Calculate images array early so it can be used in useEffect hooks
   const images = useMemo(() => {
     if (!listing) return ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
-    return listing.images?.length 
+    return listing.images?.length
       ? listing.images.map(img => getImageUrl(img))
       : ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
   }, [listing]);
@@ -225,7 +226,7 @@ export default function ListingDetailPage() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLightboxOpen) return;
-      
+
       if (e.key === 'ArrowLeft') {
         setLightboxImageIndex((i) => (i > 0 ? i - 1 : images.length - 1));
         setZoomLevel(1);
@@ -254,13 +255,13 @@ export default function ListingDetailPage() {
 
   const handleAddToCart = async () => {
     if (!listing) return;
-    
+
     // Check if product is available
     if (listing.status && listing.status !== 'active') {
       toast.error(t('product.productNotForSale'));
       return;
     }
-    
+
     setIsAddingToCart(true);
     try {
       await addToCart({
@@ -283,7 +284,7 @@ export default function ListingDetailPage() {
 
   const handleRemoveFromCart = async () => {
     if (!cartItem) return;
-    
+
     setIsAddingToCart(true);
     try {
       await removeFromCart(cartItem.id);
@@ -305,7 +306,7 @@ export default function ListingDetailPage() {
 
   const handleBuyNow = () => {
     if (!listing) return;
-    
+
     // Check if product is available for purchase
     if (listing.status && listing.status !== 'active') {
       if (listing.status === 'reserved') {
@@ -317,7 +318,7 @@ export default function ListingDetailPage() {
       }
       return;
     }
-    
+
     router.push(`/checkout?productId=${listing.id}`);
   };
 
@@ -331,17 +332,17 @@ export default function ListingDetailPage() {
       setShowAuthModal(true);
       return;
     }
-    
+
     if (!listing || listing.status !== 'active') {
       toast.error(t('product.productNotForSale'));
       return;
     }
-    
+
     if (isOwner) {
       toast.error(t('product.cannotOfferOwn'));
       return;
     }
-    
+
     setOfferAmount('');
     setOfferMessage('');
     setShowOfferModal(true);
@@ -349,24 +350,24 @@ export default function ListingDetailPage() {
 
   const handleSubmitOffer = async () => {
     if (!listing) return;
-    
+
     const amount = parseFloat(offerAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error(t('product.enterValidAmount'));
       return;
     }
-    
+
     const minOffer = Number(listing.price) * 0.5; // Minimum %50
     if (amount < minOffer) {
       toast.error(`Min: ${minOffer.toFixed(2)} TL (50%)`);
       return;
     }
-    
+
     if (amount >= Number(listing.price)) {
       toast.error(t('product.offerMustBeLower'));
       return;
     }
-    
+
     setIsSubmittingOffer(true);
     try {
       await offersApi.create({
@@ -387,7 +388,7 @@ export default function ListingDetailPage() {
   };
 
   const isOwner = isAuthenticated && user?.id && listing && (
-    listing.sellerId === user.id || 
+    listing.sellerId === user.id ||
     listing.seller?.id === user.id
   );
 
@@ -396,7 +397,7 @@ export default function ListingDetailPage() {
       toast.error(t('product.loginToAddCollection'));
       return;
     }
-    
+
     if (!limits?.canCreateCollections) {
       toast.error(t('product.collectionFeatureNotAvailable'));
       router.push('/pricing');
@@ -419,7 +420,7 @@ export default function ListingDetailPage() {
 
   const handleAddToCollection = async (collectionId: string) => {
     if (!listing) return;
-    
+
     setAddingToCollection(true);
     try {
       await collectionsApi.addItem(collectionId, { productId: listing.id });
@@ -443,12 +444,12 @@ export default function ListingDetailPage() {
       setShowAuthModal(true);
       return;
     }
-    
+
     if (isOwner) {
       toast.error(t('product.cannotFavoriteOwn'));
       return;
     }
-    
+
     try {
       if (isFavorite) {
         await wishlistApi.remove(id);
@@ -475,9 +476,9 @@ export default function ListingDetailPage() {
     const url = encodeURIComponent(window.location.href);
     const title = encodeURIComponent(listing?.title || 'Check this out on Tarodan!');
     const text = encodeURIComponent(`${listing?.title} - ${listing?.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
-    
+
     let shareUrl = '';
-    
+
     switch (platform) {
       case 'twitter':
         shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
@@ -514,7 +515,7 @@ export default function ListingDetailPage() {
         setShowShareMenu(false);
         return;
     }
-    
+
     if (shareUrl) {
       window.open(shareUrl, '_blank', 'width=600,height=400');
     }
@@ -583,59 +584,59 @@ export default function ListingDetailPage() {
   // Magnifier handlers - optimized with requestAnimationFrame
   const handleMagnifierMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!imageContainerRef) return;
-    
+
     // Cancel previous animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-    
+
     // Use requestAnimationFrame to throttle updates
     animationFrameRef.current = requestAnimationFrame(() => {
       if (!imageContainerRef) return;
-      
+
       const rect = imageContainerRef.getBoundingClientRect();
       const magnifierSize = 150;
       const halfSize = magnifierSize / 2;
-      
+
       // Check if mouse is over navigation buttons
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      
+
       // Button dimensions and positions
       const buttonSize = 40; // w-10 h-10 = 40px
       const buttonOffset = 16; // left-4/right-4 = 16px
       const centerY = rect.height / 2;
-      
+
       // Check if mouse is over left button (left-4, centered vertically)
-      const isOverLeftButton = mouseX >= buttonOffset && 
-                               mouseX <= buttonOffset + buttonSize &&
-                               mouseY >= centerY - buttonSize / 2 &&
-                               mouseY <= centerY + buttonSize / 2;
-      
+      const isOverLeftButton = mouseX >= buttonOffset &&
+        mouseX <= buttonOffset + buttonSize &&
+        mouseY >= centerY - buttonSize / 2 &&
+        mouseY <= centerY + buttonSize / 2;
+
       // Check if mouse is over right button (right-4, centered vertically)
       const isOverRightButton = mouseX >= rect.width - buttonOffset - buttonSize &&
-                                mouseX <= rect.width - buttonOffset &&
-                                mouseY >= centerY - buttonSize / 2 &&
-                                mouseY <= centerY + buttonSize / 2;
-      
+        mouseX <= rect.width - buttonOffset &&
+        mouseY >= centerY - buttonSize / 2 &&
+        mouseY <= centerY + buttonSize / 2;
+
       // Don't show magnifier if over navigation buttons
       if (isOverLeftButton || isOverRightButton) {
         setShowMagnifier(false);
         return;
       }
-      
+
       let x = mouseX;
       let y = mouseY;
-      
+
       // Büyüteci resmin kenarlarında sınırla
       x = Math.max(halfSize, Math.min(rect.width - halfSize, x));
       y = Math.max(halfSize, Math.min(rect.height - halfSize, y));
-      
+
       // Check if mouse is within image bounds
       if (mouseX >= 0 && mouseX <= rect.width && mouseY >= 0 && mouseY <= rect.height) {
         setMagnifierPosition({ x, y });
         setShowMagnifier(true);
-        
+
         // Directly update background position for smooth tracking
         if (zoomPreviewRef.current) {
           const zoomLevel = 3;
@@ -691,7 +692,7 @@ export default function ListingDetailPage() {
           {/* Image Gallery */}
           <div className="relative">
             {/* Küçük Resim + Büyüteç */}
-            <div 
+            <div
               ref={setImageContainerRef}
               className="relative aspect-square bg-white rounded-2xl overflow-visible shadow-sm cursor-zoom-in"
               onClick={() => openLightbox(activeImageIndex)}
@@ -726,7 +727,7 @@ export default function ListingDetailPage() {
                   }}
                 />
               )}
-              
+
               {isTradeAvailable && (
                 <div className="absolute top-4 left-4 badge badge-trade text-base z-10">
                   <ArrowsRightLeftIcon className="w-5 h-5 mr-1" />
@@ -793,9 +794,8 @@ export default function ListingDetailPage() {
                       setActiveImageIndex(index);
                       openLightbox(index);
                     }}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                      index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
-                    }`}
+                    className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
+                      }`}
                   >
                     <OptimizedImage src={img} alt="" fill className="object-cover" logContext={{ page: 'listing-detail-thumb' }} />
                   </button>
@@ -806,11 +806,11 @@ export default function ListingDetailPage() {
 
           {/* Lightbox Modal */}
           {isLightboxOpen && (
-            <div 
+            <div
               className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
               onClick={closeLightbox}
             >
-              <div 
+              <div
                 className="relative max-w-7xl w-full h-full flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -841,7 +841,7 @@ export default function ListingDetailPage() {
                 </div>
 
                 {/* Image Container */}
-                <div 
+                <div
                   className="flex-1 flex items-center justify-center overflow-hidden"
                   onWheel={handleWheel}
                   onMouseDown={handleMouseDown}
@@ -906,16 +906,15 @@ export default function ListingDetailPage() {
                           setZoomLevel(1);
                           setPanPosition({ x: 0, y: 0 });
                         }}
-                        className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                          index === lightboxImageIndex 
-                            ? 'border-orange-500' 
+                        className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === lightboxImageIndex
+                            ? 'border-orange-500'
                             : 'border-white/20 hover:border-white/40'
-                        }`}
+                          }`}
                       >
-                        <OptimizedImage 
-                          src={img} 
-                          alt="" 
-                          fill 
+                        <OptimizedImage
+                          src={img}
+                          alt=""
+                          fill
                           className="object-cover"
                           logContext={{ page: 'listing-detail-lightbox-thumb' }}
                         />
@@ -950,7 +949,7 @@ export default function ListingDetailPage() {
                 </div>
               </div>
             )}
-            
+
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
@@ -982,7 +981,7 @@ export default function ListingDetailPage() {
                   >
                     <ShareIcon className="w-6 h-6 text-gray-400" />
                   </button>
-                  
+
                   {/* Share Dropdown */}
                   {showShareMenu && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
@@ -1097,8 +1096,8 @@ export default function ListingDetailPage() {
               )}
               {listing.condition && (
                 <div className="text-center">
-                  <p className="text-sm text-gray-500">Durum</p>
-                  <p className="font-semibold">{listing.condition}</p>
+                  <p className="text-sm text-gray-500">{locale === 'en' ? 'Condition' : 'Durum'}</p>
+                  <p className="font-semibold">{formatCondition(listing.condition, locale)}</p>
                 </div>
               )}
               {listing.year && (
@@ -1227,29 +1226,26 @@ export default function ListingDetailPage() {
 
             {/* Product Status Banner */}
             {listing.status && listing.status !== 'active' && (
-              <div className={`rounded-xl p-4 mb-4 ${
-                listing.status === 'reserved' 
-                  ? 'bg-yellow-50 border border-yellow-200' 
-                  : listing.status === 'sold' 
+              <div className={`rounded-xl p-4 mb-4 ${listing.status === 'reserved'
+                  ? 'bg-yellow-50 border border-yellow-200'
+                  : listing.status === 'sold'
                     ? 'bg-red-50 border border-red-200'
                     : 'bg-gray-50 border border-gray-200'
-              }`}>
+                }`}>
                 <div className="flex items-center gap-3">
-                  <ExclamationTriangleIcon className={`w-6 h-6 ${
-                    listing.status === 'reserved' 
-                      ? 'text-yellow-600' 
-                      : listing.status === 'sold' 
+                  <ExclamationTriangleIcon className={`w-6 h-6 ${listing.status === 'reserved'
+                      ? 'text-yellow-600'
+                      : listing.status === 'sold'
                         ? 'text-red-600'
                         : 'text-gray-600'
-                  }`} />
+                    }`} />
                   <div>
-                    <p className={`font-semibold ${
-                      listing.status === 'reserved' 
-                        ? 'text-yellow-800' 
-                        : listing.status === 'sold' 
+                    <p className={`font-semibold ${listing.status === 'reserved'
+                        ? 'text-yellow-800'
+                        : listing.status === 'sold'
                           ? 'text-red-800'
                           : 'text-gray-800'
-                    }`}>
+                      }`}>
                       {listing.status === 'reserved' && t('product.statusReserved')}
                       {listing.status === 'sold' && t('product.statusSold')}
                       {listing.status === 'pending' && t('product.statusPending')}
@@ -1294,7 +1290,7 @@ export default function ListingDetailPage() {
                     <PencilIcon className="w-6 h-6" />
                     Düzenle
                   </Link>
-                  
+
                   {limits?.canCreateCollections && (
                     <button
                       onClick={handleOpenCollectionModal}
@@ -1312,11 +1308,10 @@ export default function ListingDetailPage() {
                 <button
                   onClick={handleBuyNow}
                   disabled={listing.status !== 'active'}
-                  className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${
-                    listing.status === 'active' 
-                      ? 'btn-primary' 
+                  className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${listing.status === 'active'
+                      ? 'btn-primary'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
-                  }`}
+                    }`}
                 >
                   <BoltIcon className="w-6 h-6" />
                   {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
@@ -1349,9 +1344,8 @@ export default function ListingDetailPage() {
                         router.push(`/trades/new?listing=${listing.id}`);
                       }}
                       disabled={listing.status !== 'active'}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${
-                        listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                        }`}
                     >
                       <ArrowsRightLeftIcon className="w-5 h-5" />
                       {t('product.trade')}
@@ -1360,11 +1354,10 @@ export default function ListingDetailPage() {
                   <button
                     onClick={handleMakeOffer}
                     disabled={listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${
-                      listing.status !== 'active'
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status !== 'active'
                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
                         : 'btn-secondary'
-                    }`}
+                      }`}
                   >
                     <BoltIcon className="w-5 h-5" />
                     {t('product.makeOffer')}
@@ -1372,17 +1365,16 @@ export default function ListingDetailPage() {
                   <button
                     onClick={handleCartToggle}
                     disabled={isAddingToCart || listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 ${
-                      listing.status !== 'active' 
+                    className={`flex-1 flex items-center justify-center gap-2 ${listing.status !== 'active'
                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
-                        : isInCart 
-                          ? 'btn-secondary bg-red-50 border-red-200 text-red-600' 
+                        : isInCart
+                          ? 'btn-secondary bg-red-50 border-red-200 text-red-600'
                           : 'btn-secondary'
-                    }`}
+                      }`}
                   >
                     <ShoppingCartIcon className="w-5 h-5" />
-                    {isAddingToCart 
-                      ? (isInCart ? t('product.removing') : t('product.adding')) 
+                    {isAddingToCart
+                      ? (isInCart ? t('product.removing') : t('product.adding'))
                       : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
                     }
                   </button>
@@ -1422,11 +1414,10 @@ export default function ListingDetailPage() {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <StarIcon
                       key={star}
-                      className={`w-5 h-5 ${
-                        star <= (reviewStats.averageRating || 0)
+                      className={`w-5 h-5 ${star <= (reviewStats.averageRating || 0)
                           ? 'text-yellow-400 fill-yellow-400'
                           : 'text-gray-300'
-                      }`}
+                        }`}
                     />
                   ))}
                 </div>
@@ -1470,19 +1461,18 @@ export default function ListingDetailPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">
-                          {review.isAnonymous || (!review.userName && !review.user?.displayName) 
-                            ? (locale === 'en' ? 'Anonymous' : 'Anonim') 
+                          {review.isAnonymous || (!review.userName && !review.user?.displayName)
+                            ? (locale === 'en' ? 'Anonymous' : 'Anonim')
                             : (review.userName || review.user?.displayName)}
                         </span>
                         <div className="flex">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <StarIcon
                               key={star}
-                              className={`w-4 h-4 ${
-                                star <= (review.score || 0)
+                              className={`w-4 h-4 ${star <= (review.score || 0)
                                   ? 'text-yellow-400 fill-yellow-400'
                                   : 'text-gray-300'
-                              }`}
+                                }`}
                             />
                           ))}
                         </div>
@@ -1512,7 +1502,7 @@ export default function ListingDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
             <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addToCollection')}</h2>
-            
+
             {loadingCollections ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -1540,7 +1530,7 @@ export default function ListingDetailPage() {
                   ) : (
                     <p className="text-gray-600 text-center py-8">{t('collection.noCollections')}</p>
                   )}
-                  
+
                   {/* New Collection Button */}
                   <button
                     onClick={() => {
@@ -1601,7 +1591,7 @@ export default function ListingDetailPage() {
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1614,7 +1604,7 @@ export default function ListingDetailPage() {
                   {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
                 </p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {locale === 'en' ? 'Your Offer Amount (TL)' : 'Teklif Tutarınız (TL)'}
@@ -1629,7 +1619,7 @@ export default function ListingDetailPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {locale === 'en' ? 'Message (Optional)' : 'Mesaj (Opsiyonel)'}
@@ -1646,7 +1636,7 @@ export default function ListingDetailPage() {
                   {offerMessage.length}/500 {locale === 'en' ? 'characters' : 'karakter'}
                 </p>
               </div>
-              
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowOfferModal(false)}
