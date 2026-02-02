@@ -33,7 +33,7 @@ export class ProductService {
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
     private readonly discountService: DiscountService,
-  ) {}
+  ) { }
 
   /**
    * Create a new product
@@ -86,7 +86,7 @@ export class ProductService {
     if (!seller.isSeller) {
       await this.prisma.user.update({
         where: { id: sellerId },
-        data: { 
+        data: {
           isSeller: true,
           sellerType: 'individual', // Default to individual seller
         },
@@ -112,11 +112,11 @@ export class ProductService {
       where: { settingKey: 'max_product_price' },
     });
 
-    const minPrice = minPriceSetting?.settingValue 
-      ? parseFloat(minPriceSetting.settingValue) 
+    const minPrice = minPriceSetting?.settingValue
+      ? parseFloat(minPriceSetting.settingValue)
       : null;
-    const maxPrice = maxPriceSetting?.settingValue 
-      ? parseFloat(maxPriceSetting.settingValue) 
+    const maxPrice = maxPriceSetting?.settingValue
+      ? parseFloat(maxPriceSetting.settingValue)
       : null;
 
     if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
@@ -145,11 +145,11 @@ export class ProductService {
         isTradeEnabled: dto.isTradeEnabled || false,
         images: dto.imageUrls?.length
           ? {
-              create: dto.imageUrls.map((url, index) => ({
-                url,
-                sortOrder: index,
-              })),
-            }
+            create: dto.imageUrls.map((url, index) => ({
+              url,
+              sortOrder: index,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -319,7 +319,7 @@ export class ProductService {
         // Build order by
         let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
         const useScoring = !sortBy; // Use scoring only if no explicit sortBy is provided
-        
+
         switch (sortBy) {
           case 'price_asc':
             orderBy = { price: 'asc' };
@@ -354,26 +354,26 @@ export class ProductService {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 }, // Only first image for list
             seller: useScoring
               ? {
-                  include: {
-                    membership: {
-                      include: {
-                        tier: {
-                          select: {
-                            type: true,
-                          },
+                include: {
+                  membership: {
+                    include: {
+                      tier: {
+                        select: {
+                          type: true,
                         },
                       },
                     },
                   },
-                }
-              : {
-                  select: {
-                    id: true,
-                    displayName: true,
-                    isVerified: true,
-                    sellerType: true,
-                  },
                 },
+              }
+              : {
+                select: {
+                  id: true,
+                  displayName: true,
+                  isVerified: true,
+                  sellerType: true,
+                },
+              },
             category: {
               select: {
                 id: true,
@@ -578,7 +578,7 @@ export class ProductService {
         where: { id: sellerId },
         include: { membership: { include: { tier: true } } },
       });
-      
+
       if (!seller?.membership?.tier?.canTrade) {
         throw new BadRequestException('Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.');
       }
@@ -1023,14 +1023,14 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const where: Prisma.ProductWhereInput = {
       sellerId,
-      ...(status && status.trim() !== '' 
-        ? { status: status as ProductStatus } 
-        : { 
-            // Exclude inactive, draft, and deleted listings from default view
-            status: { 
-              notIn: [ProductStatus.inactive, ProductStatus.draft] 
-            } 
+      ...(status && status.trim() !== ''
+        ? { status: status as ProductStatus }
+        : {
+          // Exclude inactive, draft, and deleted listings from default view
+          status: {
+            notIn: [ProductStatus.inactive, ProductStatus.draft]
           }
+        }
       ),
     };
 
@@ -1084,7 +1084,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     let sellerListingsCount = 0;
     let sellerRating = null;
     let sellerTotalRatings = 0;
-    
+
     if (product.seller?.id) {
       sellerListingsCount = await this.prisma.product.count({
         where: {
@@ -1159,22 +1159,22 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       },
       seller: product.seller
         ? {
-            id: product.seller.id,
-            displayName: product.seller.displayName,
-            isVerified: product.seller.isVerified,
-            sellerType: product.seller.sellerType,
-            listings_count: sellerListingsCount,
-            productsCount: sellerListingsCount,
-            rating: sellerRating,
-            totalRatings: sellerTotalRatings,
-          }
+          id: product.seller.id,
+          displayName: product.seller.displayName,
+          isVerified: product.seller.isVerified,
+          sellerType: product.seller.sellerType,
+          listings_count: sellerListingsCount,
+          productsCount: sellerListingsCount,
+          rating: sellerRating,
+          totalRatings: sellerTotalRatings,
+        }
         : undefined,
       category: product.category
         ? {
-            id: product.category.id,
-            name: product.category.name,
-            slug: product.category.slug,
-          }
+          id: product.category.id,
+          name: product.category.name,
+          slug: product.category.slug,
+        }
         : undefined,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
@@ -1328,20 +1328,20 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
    */
   private isBot(userAgent?: string): boolean {
     if (!userAgent) return true; // No user agent is suspicious
-    
+
     const botPatterns = [
       'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget',
       'python-requests', 'java/', 'go-http-client', 'libwww',
       'httpunit', 'nutch', 'linkwalker', 'archiver', 'fetch',
       'slurp', 'yandex', 'bingbot', 'googlebot', 'baiduspider'
     ];
-    
+
     const ua = userAgent.toLowerCase();
     return botPatterns.some(pattern => ua.includes(pattern));
   }
 
   async incrementViewCount(
-    productId: string, 
+    productId: string,
     userId?: string,
     clientIp?: string,
     userAgent?: string
@@ -1424,69 +1424,69 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
       // Get all listing counts by status (exclude inactive and draft)
       const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
-      this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
-      // Total should exclude inactive and draft listings
-      this.prisma.product.count({ 
-        where: { 
-          sellerId,
-          status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
-        } 
-      }),
-    ]);
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
+        // Total should exclude inactive and draft listings
+        this.prisma.product.count({
+          where: {
+            sellerId,
+            status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
+          }
+        }),
+      ]);
 
-    // Active listings = pending + active + reserved (counts against limit)
-    const activeListings = pending + active + reserved;
+      // Active listings = pending + active + reserved (counts against limit)
+      const activeListings = pending + active + reserved;
 
-    // Get membership limits
-    const limits = await this.membershipService.getUserLimits(sellerId);
+      // Get membership limits
+      const limits = await this.membershipService.getUserLimits(sellerId);
 
-    // For free tier, use maxFreeListings (which includes platform setting override)
-    // For other tiers, use maxTotalListings
-    const maxLimit = limits.tierType === MembershipTierType.free ? limits.maxFreeListings : limits.maxTotalListings;
-    const remainingLimit = limits.tierType === MembershipTierType.free ? limits.remainingFreeListings : limits.remainingTotalListings;
+      // For free tier, use maxFreeListings (which includes platform setting override)
+      // For other tiers, use maxTotalListings
+      const maxLimit = limits.tierType === MembershipTierType.free ? limits.maxFreeListings : limits.maxTotalListings;
+      const remainingLimit = limits.tierType === MembershipTierType.free ? limits.remainingFreeListings : limits.remainingTotalListings;
 
-    return {
-      // Counts by status
-      counts: {
-        pending,
-        active,
-        reserved,
-        sold,
-        rejected,
-        inactive,
-        total, // Total excluding inactive and draft
-        activeListings, // This counts against the limit
-      },
-      // Membership limits
-      limits: {
-        tierName: limits.tierName,
-        tierType: limits.tierType,
-        maxFreeListings: limits.maxFreeListings,       // Tier's total max free listings
-        maxTotalListings: limits.maxTotalListings,     // Tier's total max listings
-        remainingFreeListings: limits.remainingFreeListings,
-        remainingTotalListings: limits.remainingTotalListings,
-        maxImagesPerListing: limits.maxImages,
-        canCreateListing: limits.canCreateListing,
-        canUseFreeSlot: limits.canUseFreeSlot,
-        canTrade: limits.canTrade,
-        canCreateCollection: limits.canCreateCollection,
-      },
-      // Quick summary for UI
-      summary: {
-        used: activeListings,
-        max: maxLimit,                  // Use maxFreeListings for free tier, maxTotalListings for others
-        remaining: remainingLimit,
-        canCreate: limits.canCreateListing,
-        percentUsed: maxLimit > 0 
-          ? Math.round((activeListings / maxLimit) * 100) 
-          : 0,
-      },
-    };
+      return {
+        // Counts by status
+        counts: {
+          pending,
+          active,
+          reserved,
+          sold,
+          rejected,
+          inactive,
+          total, // Total excluding inactive and draft
+          activeListings, // This counts against the limit
+        },
+        // Membership limits
+        limits: {
+          tierName: limits.tierName,
+          tierType: limits.tierType,
+          maxFreeListings: limits.maxFreeListings,       // Tier's total max free listings
+          maxTotalListings: limits.maxTotalListings,     // Tier's total max listings
+          remainingFreeListings: limits.remainingFreeListings,
+          remainingTotalListings: limits.remainingTotalListings,
+          maxImagesPerListing: limits.maxImages,
+          canCreateListing: limits.canCreateListing,
+          canUseFreeSlot: limits.canUseFreeSlot,
+          canTrade: limits.canTrade,
+          canCreateCollection: limits.canCreateCollection,
+        },
+        // Quick summary for UI
+        summary: {
+          used: activeListings,
+          max: maxLimit,                  // Use maxFreeListings for free tier, maxTotalListings for others
+          remaining: remainingLimit,
+          canCreate: limits.canCreateListing,
+          percentUsed: maxLimit > 0
+            ? Math.round((activeListings / maxLimit) * 100)
+            : 0,
+        },
+      };
     } catch (error) {
       this.logger.error(`Error in getSellerListingStats for sellerId ${sellerId}:`, error);
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
@@ -1494,5 +1494,43 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }
       throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
     }
+  }
+
+  /**
+   * Get dynamic filters (categories, brands, etc.)
+   */
+  async getFilters() {
+    // 1. Categories
+    const categories = await this.prisma.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, parentId: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // 2. Brands
+    const brands = await this.prisma.brand.findMany({
+      where: { isActive: true },
+      select: { name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // 3. Scales & Manufacturers (Static for now, but served from API)
+    const scales = [
+      '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
+      '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'
+    ];
+
+    const manufacturers = [
+      'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
+      'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
+      'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL'
+    ];
+
+    return {
+      categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
+      brands: brands.map(b => b.name),
+      scales,
+      manufacturers,
+    };
   }
 }

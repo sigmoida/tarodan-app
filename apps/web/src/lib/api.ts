@@ -31,7 +31,7 @@ api.interceptors.response.use(
 
       if (typeof window !== 'undefined') {
         const refreshToken = localStorage.getItem('refresh_token');
-        
+
         // Try to refresh token if we have a refresh token
         if (refreshToken && originalRequest.url !== '/auth/refresh') {
           try {
@@ -40,16 +40,16 @@ api.interceptors.response.use(
               headers: { 'Content-Type': 'application/json' },
             });
             const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
-            
+
             // Update tokens in localStorage
             localStorage.setItem('auth_token', accessToken);
             if (newRefreshToken) {
               localStorage.setItem('refresh_token', newRefreshToken);
             }
-            
+
             // Update the original request with new token
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-            
+
             // Retry the original request
             return api(originalRequest);
           } catch (refreshError) {
@@ -57,7 +57,7 @@ api.interceptors.response.use(
             const hadToken = localStorage.getItem('auth_token');
             localStorage.removeItem('auth_token');
             localStorage.removeItem('refresh_token');
-            
+
             // Only auto-redirect for expired sessions; never redirect on public/guest pages
             if (hadToken) {
               const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
@@ -78,7 +78,7 @@ api.interceptors.response.use(
                 }
               }
             }
-            
+
             return Promise.reject(refreshError);
           }
         } else {
@@ -86,7 +86,7 @@ api.interceptors.response.use(
           const hadToken = localStorage.getItem('auth_token');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
-          
+
           // Only auto-redirect for expired sessions; never redirect on public/guest pages
           if (hadToken) {
             const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
@@ -130,6 +130,7 @@ export const authApi = {
 
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
+  getFilters: () => api.get('/products/filters'),
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
@@ -373,7 +374,7 @@ export const collectionsApi = {
     },
   ) => {
     const formData = new FormData();
-    
+
     // Add all data fields to FormData
     if (data.productId) formData.append('productId', data.productId);
     if (data.customTitle) formData.append('customTitle', data.customTitle);
@@ -385,12 +386,12 @@ export const collectionsApi = {
     if (data.customImageUrl) formData.append('customImageUrl', data.customImageUrl);
     if (data.sortOrder !== undefined) formData.append('sortOrder', data.sortOrder.toString());
     if (data.isFeatured !== undefined) formData.append('isFeatured', data.isFeatured.toString());
-    
+
     // Add image file if provided
     if (data.imageFile) {
       formData.append('image', data.imageFile);
     }
-    
+
     return api.post(`/collections/${id}/items`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -444,21 +445,21 @@ export const offersApi = {
 // Ratings
 export const ratingsApi = {
   // User ratings
-  getUserRatings: (userId: string, params?: Record<string, any>) => 
+  getUserRatings: (userId: string, params?: Record<string, any>) =>
     api.get(`/ratings/users/${userId}`, { params }),
-  getUserStats: (userId: string) => 
+  getUserStats: (userId: string) =>
     api.get(`/ratings/users/${userId}/stats`),
   createUserRating: (data: { receiverId: string; orderId?: string; tradeId?: string; score: number; comment?: string }) =>
     api.post('/ratings/users', data),
-    
+
   // Product ratings
-  getProductRatings: (productId: string, params?: Record<string, any>) => 
+  getProductRatings: (productId: string, params?: Record<string, any>) =>
     api.get(`/ratings/products/${productId}`, { params }),
-  getProductStats: (productId: string) => 
+  getProductStats: (productId: string) =>
     api.get(`/ratings/products/${productId}/stats`),
   createProductRating: (data: { productId: string; orderId: string; score: number; title?: string; review?: string; images?: string[] }) =>
     api.post('/ratings/products', data),
-  markHelpful: (ratingId: string) => 
+  markHelpful: (ratingId: string) =>
     api.post(`/ratings/products/${ratingId}/helpful`),
 };
 

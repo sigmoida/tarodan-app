@@ -40,7 +40,7 @@ import { JwtAuthGuard, Public, CurrentUser } from '../auth';
 export class ProductController {
   private readonly logger = new Logger(ProductController.name);
 
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: ProductService) { }
 
   /**
    * GET /products
@@ -72,6 +72,18 @@ export class ProductController {
   }
 
   /**
+   * GET /products/filters
+   * Get dynamic filters (categories, brands, scales, manufacturers)
+   */
+  @Get('filters')
+  @Public()
+  @ApiOperation({ summary: 'Filtre seçenekleri (Categoriler, Markalar, vb.)' })
+  @ApiResponse({ status: 200, description: 'Filtre listeleri' })
+  async getFilters() {
+    return this.productService.getFilters();
+  }
+
+  /**
    * GET /products/my
    * Get seller's own products (all statuses)
    */
@@ -99,7 +111,7 @@ export class ProductController {
   @Get('my/stats')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'İlan istatistikleri ve limitleri',
     description: 'Kullanıcının ilan sayıları, üyelik limitleri ve kalan haklarını döner'
   })
@@ -270,8 +282,8 @@ export class ProductController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Ürünü beğen' })
   @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Ürün beğenildi',
     schema: {
       type: 'object',
@@ -302,8 +314,8 @@ export class ProductController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Beğeniyi kaldır' })
   @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Beğeni kaldırıldı',
     schema: {
       type: 'object',
@@ -333,8 +345,8 @@ export class ProductController {
   @Public()
   @ApiOperation({ summary: 'Görüntülenme sayısını artır' })
   @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Görüntülenme sayısı artırıldı',
     schema: {
       type: 'object',
@@ -355,7 +367,7 @@ export class ProductController {
     @Req() req?: any,
   ) {
     // Get real IP from headers if behind proxy
-    const clientIp = 
+    const clientIp =
       req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
       req?.headers?.['x-real-ip'] ||
       ip ||
@@ -372,8 +384,8 @@ export class ProductController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Ürün istatistikleri (satıcı için)' })
   @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Ürün istatistikleri',
     schema: {
       type: 'object',
@@ -408,8 +420,8 @@ export class ProductController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kullanıcı bu ürünü beğenmiş mi?' })
   @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Beğeni durumu',
     schema: {
       type: 'object',

@@ -209,7 +209,7 @@ const CATEGORY_BAR_ITEMS = {
     tr: [
         { label: 'Yeni Gelenler', href: '/listings?sortBy=createdAt&sortOrder=desc' },
         { label: 'Çok Satanlar', href: '/listings?sortBy=viewCount&sortOrder=desc' },
-        { label: 'İndirimler', href: '/listings?onSale=true' },
+        { label: 'İndirimler', href: '/listings?discountOnly=true' },
         { label: 'Modeller', dropdown: 'models' },
         { label: 'Markalar', dropdown: 'brands' },
         { label: 'Üreticiler', dropdown: 'manufacturers' },
@@ -218,7 +218,7 @@ const CATEGORY_BAR_ITEMS = {
     en: [
         { label: 'New Arrivals', href: '/listings?sortBy=createdAt&sortOrder=desc' },
         { label: 'Best Sellers', href: '/listings?sortBy=viewCount&sortOrder=desc' },
-        { label: 'On Sale', href: '/listings?onSale=true' },
+        { label: 'On Sale', href: '/listings?discountOnly=true' },
         { label: 'Models', dropdown: 'models' },
         { label: 'Brands', dropdown: 'brands' },
         { label: 'Manufacturers', dropdown: 'manufacturers' },
