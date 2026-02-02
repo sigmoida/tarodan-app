@@ -16,6 +16,7 @@ import {
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
+  BusinessRegisterDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
@@ -48,6 +49,24 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Email zaten kayıtlı' })
   async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
+  }
+
+  /**
+   * POST /auth/register/business
+   * Register a new business account
+   */
+  @Post('register/business')
+  @Public()
+  @ApiOperation({ summary: 'Yeni şirket hesabı kaydı' })
+  @ApiResponse({
+    status: 201,
+    description: 'Şirket hesabı kaydı başarılı',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Geçersiz veri' })
+  @ApiResponse({ status: 409, description: 'Email, telefon veya vergi kimlik numarası zaten kayıtlı' })
+  async registerBusiness(@Body() dto: BusinessRegisterDto): Promise<AuthResponseDto> {
+    return this.authService.registerBusiness(dto);
   }
 
   /**

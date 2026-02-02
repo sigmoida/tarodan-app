@@ -6,10 +6,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
-import { HeartIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { HeartIcon, TrashIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { wishlistApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
 import { useTranslation } from '@/i18n';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
@@ -30,6 +31,7 @@ export default function FavoritesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { addToCart } = useCartStore();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -66,7 +68,28 @@ export default function FavoritesPage() {
       ]);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to remove from favorites:', error);
-      toast.error(t('common.operationFailed'));
+      const message = error?.response?.data?.message || t('common.operationFailed');
+      toast.error(message);
+    }
+  };
+
+  const handleAddToCart = async (item: WishlistItem) => {
+    try {
+      await addToCart({
+        productId: item.productId,
+        title: item.productTitle,
+        price: item.productPrice,
+        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: {
+          id: item.sellerId,
+          displayName: item.sellerName,
+        },
+      });
+      toast.success(t('product.addedToCart'));
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to add to cart:', error);
+      const message = error?.response?.data?.message || t('common.operationFailed');
+      toast.error(message);
     }
   };
 
@@ -164,7 +187,7 @@ export default function FavoritesPage() {
                         {item.productTitle || 'Product'}
                       </h3>
                     </Link>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <p className="text-xl font-bold text-primary-500">
                         {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
@@ -174,6 +197,13 @@ export default function FavoritesPage() {
                         </span>
                       )}
                     </div>
+                    <button
+                      onClick={() => handleAddToCart(item)}
+                      className="w-full btn-primary text-sm py-2 flex items-center justify-center gap-2"
+                    >
+                      <ShoppingCartIcon className="w-4 h-4" />
+                      {t('product.addToCart')}
+                    </button>
                   </div>
                 </motion.div>
               );

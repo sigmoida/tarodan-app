@@ -452,16 +452,37 @@ export default function ListingDetailPage() {
         await wishlistApi.remove(id);
         toast.success(t('product.removedFromFavorites'));
       } else {
-        await wishlistApi.add(id);
-        toast.success(t('product.addToFavorites'));
+        const response = await wishlistApi.add(id);
+        // API response'unu kontrol et
+        if (response?.data || response?.status === 200 || response?.status === 201) {
+          toast.success(t('product.addToFavorites'));
+        } else {
+          throw new Error('Unexpected response format');
+        }
       }
+      // State'i hemen güncelle
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['wishlist-check', id] }),
         queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
         queryClient.invalidateQueries({ queryKey: ['listing', id] }),
       ]);
     } catch (error: any) {
-      const message = error?.response?.data?.message || t('common.operationFailed');
+      // Daha detaylı error handling
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Toggle favorite error:', error);
+      }
+      
+      // 409 (Conflict) - zaten favorilerde ise başarılı say
+      if (error?.response?.status === 409) {
+        toast.success(t('product.addToFavorites'));
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['wishlist-check', id] }),
+          queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
+        ]);
+        return;
+      }
+      
+      const message = error?.response?.data?.message || error?.message || t('common.operationFailed');
       toast.error(message);
     }
   };

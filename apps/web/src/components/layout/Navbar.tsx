@@ -25,6 +25,7 @@ import {
   XCircleIcon,
   FireIcon,
   CurrencyDollarIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
@@ -208,8 +209,10 @@ export default function Navbar() {
     }
   };
 
-  // Reklam barı her durumda göster (giriş yapılsa da kalır; Premium/Business için de gösterilebilir)
-  const shouldShowAd = true;
+  // Premium ve Business üyeler için reklam gösterme
+  const membershipTier = user?.membershipTier || 'free';
+  const isAdFree = membershipTier === 'premium' || membershipTier === 'business';
+  const shouldShowAd = !isAdFree;
 
   // Detect mobile/desktop for responsive ads
   useEffect(() => {
@@ -617,11 +620,18 @@ export default function Navbar() {
                         )}
                       </Link>
                       <Link
-                        href="/wishlist"
+                        href="/favorites"
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
                       >
                         <HeartIcon className="w-5 h-5" />
                         {t('nav.favorites')}
+                      </Link>
+                      <Link
+                        href="/profile/membership"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                      >
+                        <SparklesIcon className="w-5 h-5" />
+                        {t('membership.title')}
                       </Link>
                     </div>
                     

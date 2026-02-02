@@ -269,6 +269,18 @@ export class MembershipService {
       throw new BadRequestException('Bu üyelik tipi aktif değil');
     }
 
+    // Business tier can only be subscribed by corporate accounts (users with companyName and taxId)
+    if (dto.tierType === MembershipTierType.business) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { companyName: true, taxId: true },
+      });
+
+      if (!user || !user.companyName || !user.taxId) {
+        throw new ForbiddenException('Business üyelik sadece şirket hesapları için geçerlidir');
+      }
+    }
+
     // Check if user already has this tier
     const existingMembership = await this.prisma.userMembership.findUnique({
       where: { userId },

@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma';
-import { RegisterDto, LoginDto, AuthResponseDto, TokensDto } from './dto';
+import { RegisterDto, BusinessRegisterDto, LoginDto, AuthResponseDto, TokensDto } from './dto';
 import { JwtPayload } from './interfaces';
 import { SellerType } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
@@ -247,6 +247,93 @@ export class AuthService {
     });
 
     return { message: 'Email adresiniz başarıyla doğrulandı!' };
+  }
+
+  /**
+   * Register a new business account
+   * POST /auth/register/business
+   */
+  async registerBusiness(dto: BusinessRegisterDto): Promise<AuthResponseDto> {
+    // Check if email already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Bu email adresi zaten kayıtlı');
+    }
+
+    // Check if phone already exists
+    const existingPhone = await this.prisma.user.findUnique({
+      where: { phone: dto.phone },
+    });
+
+    if (existingPhone) {
+      throw new ConflictException('Bu telefon numarası zaten kayıtlı');
+    }
+
+    // Check if company name already exists (must be unique for business accounts)
+    const existingCompanyName = await this.prisma.user.findFirst({
+      where: { 
+        companyName: dto.companyName,
+      },
+    });
+
+    if (existingCompanyName) {
+      throw new ConflictException('Bu şirket adı zaten kayıtlı');
+    }
+
+    // Check if tax ID already exists
+    if (dto.taxId) {
+      const existingTaxId = await this.prisma.user.findFirst({
+        where: { taxId: dto.taxId },
+      });
+
+      if (existingTaxId) {
+        throw new ConflictException('Bu vergi kimlik numarası zaten kayıtlı');
+      }
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    // Create business user
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        phone: dto.phone,
+        passwordHash,
+        displayName: dto.companyName,
+        companyName: dto.companyName,
+        taxId: dto.taxId,
+        isSeller: true, // Business accounts are always sellers
+        sellerType: SellerType.individual, // Business accounts use individual type (distinguished by companyName/taxId)
+        isVerified: false, // Email verification required
+        isEmailVerified: false,
+        acceptsMarketingEmails: dto.acceptsMarketingEmails ?? false,
+      },
+    });
+
+    // Send email verification
+    await this.sendEmailVerification(user.id, user.email);
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone ?? undefined,
+        displayName: user.displayName,
+        isVerified: user.isVerified,
+        isSeller: user.isSeller,
+        sellerType: user.sellerType ?? undefined,
+        createdAt: user.createdAt,
+      },
+      tokens,
+      message: 'Şirket hesabı başarıyla oluşturuldu! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.',
+    };
   }
 
   /**

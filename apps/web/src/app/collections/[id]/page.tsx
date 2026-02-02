@@ -334,82 +334,90 @@ export default function CollectionDetailPage() {
         </Link>
 
         {/* Collection Header */}
-        <div className="mb-8">
-          {/* Cover Image */}
-          <div className="aspect-video bg-gray-700 rounded-xl overflow-hidden mb-6 relative">
-            {collection.coverImageUrl ? (
-              <OptimizedImage
-                src={collection.coverImageUrl}
-                alt={collection.name}
-                fill
-                className="object-cover"
-                fallbackSrc="https://placehold.co/1200x400/f3f4f6/9ca3af?text=Koleksiyon"
-                logContext={{ collectionId: collection.id, page: 'collection-detail-cover' }}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-6xl">
-                🚗
-              </div>
-            )}
+        <div className="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm relative">
+          {/* Like Button - Top Right */}
+          {!isOwner && (
             <div className="absolute top-4 right-4">
-              {collection.isPublic ? (
-                <span className="px-3 py-1 bg-green-500/80 text-white text-sm rounded-full">
-                  {t('collection.isPublic')}
-                </span>
-              ) : (
-                <span className="px-3 py-1 bg-gray-600/80 text-white text-sm rounded-full">
-                  {t('collection.isPrivate')}
-                </span>
-              )}
+              <button
+                onClick={handleLike}
+                className={`p-2 rounded-lg transition-colors ${
+                  isLiked
+                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                {isLiked ? (
+                  <HeartIconSolid className="w-6 h-6" />
+                ) : (
+                  <HeartIcon className="w-6 h-6" />
+                )}
+              </button>
             </div>
-          </div>
+          )}
 
-          {/* Collection Info */}
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">{collection.name}</h1>
-              {collection.description && (
-                <p className="text-gray-400 text-lg mb-4">{collection.description}</p>
-              )}
-              <div className="flex items-center gap-6 text-sm text-gray-400">
-                <span>@{collection.userName}</span>
-                <span className="flex items-center gap-1">
-                  <EyeIcon className="w-4 h-4" />
-                  {collection.viewCount} {t('collection.views')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <HeartIcon className="w-4 h-4" />
-                  {collection.likeCount} {t('collection.likes')}
-                </span>
-                <span>{collection.itemCount} {t('collection.products')}</span>
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Cover Image - Left, Smaller */}
+            <div className="flex-shrink-0">
+              <div className="w-48 h-48 md:w-56 md:h-56 bg-gray-700 rounded-xl overflow-hidden relative">
+                {collection.coverImageUrl ? (
+                  <OptimizedImage
+                    src={collection.coverImageUrl}
+                    alt={collection.name}
+                    fill
+                    className="object-cover"
+                    fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
+                    logContext={{ collectionId: collection.id, page: 'collection-detail-cover' }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-5xl">
+                    🚗
+                  </div>
+                )}
+                <div className="absolute top-2 right-2">
+                  {collection.isPublic ? (
+                    <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-full font-medium">
+                      {t('collection.isPublic')}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-600/90 text-white text-xs rounded-full font-medium">
+                      {t('collection.isPrivate')}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3">
+            {/* Collection Info - Right */}
+            <div className="flex-1 flex flex-col justify-between">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-3 text-gray-900">{collection.name}</h1>
+                {collection.description && (
+                  <p className="text-gray-600 text-base mb-4 leading-relaxed">{collection.description}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
+                  <span className="font-medium">@{collection.userName}</span>
+                  <span className="flex items-center gap-1.5">
+                    <EyeIcon className="w-4 h-4" />
+                    {collection.viewCount} {t('collection.views')}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <HeartIcon className="w-4 h-4" />
+                    {collection.likeCount} {t('collection.likes')}
+                  </span>
+                  <span className="font-medium">{collection.itemCount} {t('collection.products')}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
               {isOwner && collection && (
-                <Link
-                  href={`/collections/${collectionIdOrSlug}/edit`}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
-                >
-                  {t('collection.edit')}
-                </Link>
-              )}
-              {!isOwner && (
-                <button
-                  onClick={handleLike}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isLiked
-                      ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                      : 'bg-gray-700 hover:bg-gray-600 text-white'
-                  }`}
-                >
-                  {isLiked ? (
-                    <HeartIconSolid className="w-6 h-6" />
-                  ) : (
-                    <HeartIcon className="w-6 h-6" />
-                  )}
-                </button>
+                <div className="flex items-center gap-3 mt-4">
+                  <Link
+                    href={`/collections/${collectionIdOrSlug}/edit`}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
+                  >
+                    {t('collection.edit')}
+                  </Link>
+                </div>
               )}
             </div>
           </div>

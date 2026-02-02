@@ -44,7 +44,10 @@ export class ProductResolver {
   ): Promise<PaginatedProductsType> {
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = {
+      // Exclude membership virtual products (used only for payment processing)
+      NOT: { id: { startsWith: 'membership-' } },
+    };
 
     if (categoryId) where.categoryId = categoryId;
     if (status) where.status = status;
@@ -101,7 +104,10 @@ export class ProductResolver {
     @Args('limit', { type: () => Int, defaultValue: 10 }) limit: number,
   ): Promise<ProductType[]> {
     const products = await this.prisma.product.findMany({
-      where: { status: ProductStatus.active },
+      where: {
+        status: ProductStatus.active,
+        NOT: { id: { startsWith: 'membership-' } },
+      },
       orderBy: { viewCount: 'desc' },
       take: limit,
       include: {
@@ -121,7 +127,10 @@ export class ProductResolver {
     @Args('limit', { type: () => Int, defaultValue: 10 }) limit: number,
   ): Promise<ProductType[]> {
     const products = await this.prisma.product.findMany({
-      where: { status: ProductStatus.active },
+      where: {
+        status: ProductStatus.active,
+        NOT: { id: { startsWith: 'membership-' } },
+      },
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {

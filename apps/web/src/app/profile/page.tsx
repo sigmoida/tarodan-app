@@ -289,7 +289,7 @@ export default function ProfilePage() {
   const quickActions = [
     { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', color: 'text-orange-500' },
     { icon: TagIcon, label: t('order.myOrders'), href: '/orders', color: 'text-blue-500' },
-    { icon: HeartIcon, label: t('nav.favorites'), href: '/wishlist', color: 'text-red-500' },
+    { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', color: 'text-red-500' },
     { icon: ChatBubbleLeftRightIcon, label: t('nav.messages'), href: '/messages', color: 'text-green-500' },
   ];
 
@@ -301,9 +301,10 @@ export default function ProfilePage() {
         { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', desc: 'İlanlarınızı yönetin' },
         { icon: TagIcon, label: t('order.myOrders'), href: '/orders', desc: 'Sipariş geçmişiniz' },
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
-        { icon: HeartIcon, label: t('nav.favorites'), href: '/wishlist', desc: 'Favori ürünleriniz' },
+        { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', desc: 'Favori ürünleriniz' },
         { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz', badge: pendingCounts.trades },
         { icon: ReceiptPercentIcon, label: 'İndirimlerim', href: '/profile/discounts', desc: 'İndirim ve kampanyalarınız', sellerOnly: true },
+        { icon: SparklesIcon, label: t('membership.title'), href: '/profile/membership', desc: 'Üyelik planınızı yönetin' },
       ],
     },
     {

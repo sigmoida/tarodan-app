@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 export default function LoginPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const { login, isAuthenticated } = useAuthStore();
+  const { login, isAuthenticated, user } = useAuthStore();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,14 +25,9 @@ export default function LoginPage() {
   // Redirect if already authenticated (prefer sessionStorage so redirect is not lost when URL is stripped)
   useEffect(() => {
     if (isAuthenticated && typeof window !== 'undefined') {
-      let redirect: string | null = null;
-      try {
-        redirect = sessionStorage.getItem('login_redirect');
-        if (redirect) sessionStorage.removeItem('login_redirect');
-      } catch (_) {}
-      if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
-      const target = redirect && redirect.startsWith('/') ? redirect : '/';
-      window.location.href = target;
+      // Don't auto-redirect if we're in the middle of login process
+      // The login handler will handle redirect after business check
+      return;
     }
   }, [isAuthenticated]);
 
@@ -47,13 +42,49 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast.success(t('auth.loginSuccess'));
+      
+      // Check for business account warning BEFORE redirect
+      try {
+        const userResponse = await api.get('/users/me');
+        const currentUser = userResponse.data?.user || userResponse.data;
+        
+        // Extract membership tier (handle different formats)
+        const membershipTier = currentUser?.membership?.tier?.type || 
+                               currentUser?.membership?.tier?.name || 
+                               currentUser?.membershipTier || 
+                               'free';
+        const normalizedTier = String(membershipTier).toLowerCase();
+        const isBusinessTier = normalizedTier.includes('business') || normalizedTier === 'business';
+        
+        // Check if business account needs membership - FORCE redirect to membership page
+        if (currentUser?.isEmailVerified && 
+            currentUser?.companyName && 
+            currentUser?.taxId &&
+            !isBusinessTier) {
+          // Force redirect to membership page - don't allow navigation elsewhere
+          router.push('/profile/membership?required=true');
+          return; // Don't continue with normal redirect
+        }
+      } catch (error) {
+        // Ignore errors in business check, continue with redirect
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Business account check failed:', error);
+        }
+      }
+      
+      // Get redirect URL
       let redirect: string | null = null;
       try {
         redirect = sessionStorage.getItem('login_redirect');
         if (redirect) sessionStorage.removeItem('login_redirect');
       } catch (_) {}
       if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
-      window.location.href = redirect && redirect.startsWith('/') ? redirect : '/';
+      const target = redirect && redirect.startsWith('/') ? redirect : '/';
+      
+      // Small delay to ensure toast is shown before redirect
+      setTimeout(() => {
+        router.push(target);
+      }, 1000);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
         console.error('[Login] Login error:', error);

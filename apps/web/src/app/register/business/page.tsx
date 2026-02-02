@@ -5,45 +5,69 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
-  UserIcon, 
+  BuildingOfficeIcon,
   EnvelopeIcon, 
   LockClosedIcon, 
   EyeIcon, 
   EyeSlashIcon,
   PhoneIcon,
-  CalendarIcon,
+  IdentificationIcon,
+  MapPinIcon,
+  HashtagIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
 
-export default function RegisterPage() {
+// Turkish cities (major ones)
+const TURKISH_CITIES = [
+  'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin',
+  'Aydın', 'Balıkesir', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa',
+  'Çanakkale', 'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Edirne', 'Elazığ', 'Erzincan',
+  'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Isparta',
+  'İçel (Mersin)', 'İstanbul', 'İzmir', 'Kars', 'Kastamonu', 'Kayseri', 'Kırklareli', 'Kırşehir',
+  'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Kahramanmaraş', 'Mardin', 'Muğla',
+  'Muş', 'Nevşehir', 'Niğde', 'Ordu', 'Rize', 'Sakarya', 'Samsun', 'Siirt',
+  'Sinop', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Şanlıurfa', 'Uşak',
+  'Van', 'Yozgat', 'Zonguldak', 'Aksaray', 'Bayburt', 'Karaman', 'Kırıkkale', 'Batman',
+  'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük', 'Kilis', 'Osmaniye', 'Düzce'
+];
+
+// Company types
+const COMPANY_TYPES = [
+  'Limited Şirket',
+  'Anonim Şirket',
+  'Kollektif Şirket',
+  'Komandit Şirket',
+  'Şahıs İşletmesi',
+  'Diğer'
+];
+
+export default function BusinessRegisterPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const { register, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   
-  // All useState hooks must be declared before any early returns
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
-  const [birthDate, setBirthDate] = useState('');
+  const [email, setEmail] = useState('');
+  const [companyType, setCompanyType] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [acceptMarketing, setAcceptMarketing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 
   // Phone number formatting helper
   const formatPhoneNumber = (value: string): string => {
-    // Remove all non-digits
     const digits = value.replace(/\D/g, '');
-    // Limit to 10 digits
     const limited = digits.slice(0, 10);
-    // Format as XXX XXX XX XX
     if (limited.length <= 3) return limited;
     if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
     if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
@@ -55,13 +79,6 @@ export default function RegisterPage() {
     setPhone(formatted);
   };
 
-  // Calculate minimum birth date (18 years ago)
-  const getMaxBirthDate = (): string => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() - 18);
-    return today.toISOString().split('T')[0];
-  };
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -69,7 +86,6 @@ export default function RegisterPage() {
     }
   }, [isAuthenticated, router]);
 
-  // Block rendering for authenticated users - show loading or redirect message
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -93,11 +109,10 @@ export default function RegisterPage() {
     );
   }
 
-  // Registration success - show verification pending screen
+  // Registration success screen
   if (registrationSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
-        {/* Header */}
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
@@ -109,7 +124,6 @@ export default function RegisterPage() {
           </Link>
         </header>
 
-        {/* Main Content */}
         <main className="flex-1 flex items-center justify-center px-4 py-8">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -153,14 +167,6 @@ export default function RegisterPage() {
               </ol>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-amber-800">
-                💡 {locale === 'en' 
-                  ? "Can't find the email? Check your spam/junk folder." 
-                  : "E-postayı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin."}
-              </p>
-            </div>
-
             <div className="space-y-3">
               <Link
                 href="/login"
@@ -186,7 +192,6 @@ export default function RegisterPage() {
           </motion.div>
         </main>
 
-        {/* Footer */}
         <footer className="p-6 text-center">
           <p className="text-sm text-gray-400">
             © {new Date().getFullYear()} Tarodan. {locale === 'en' ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
@@ -199,29 +204,8 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!displayName.trim() || !email.trim() || !password.trim()) {
-      toast.error(locale === 'en' ? 'Please fill in all fields' : 'Tüm alanları doldurun');
-      return;
-    }
-
-    // Birth date validation - must be 18+
-    if (!birthDate) {
-      toast.error(locale === 'en' ? 'Please enter your birth date' : 'Lütfen doğum tarihinizi girin');
-      return;
-    }
-
-    const birthDateObj = new Date(birthDate);
-    const today = new Date();
-    let age = today.getFullYear() - birthDateObj.getFullYear();
-    const monthDiff = today.getMonth() - birthDateObj.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
-      age--;
-    }
-    
-    if (age < 18) {
-      toast.error(locale === 'en' 
-        ? 'You must be at least 18 years old to register. If you are under 18, please ask your parent or guardian to create an account.'
-        : 'Kayıt olmak için 18 yaşından büyük olmalısınız. 18 yaşından küçükseniz, lütfen ebeveyn veya vasinizden hesap oluşturmasını isteyin.');
+    if (!companyName.trim() || !email.trim() || !phone.trim() || !taxId.trim() || !city.trim() || !password.trim()) {
+      toast.error(locale === 'en' ? 'Please fill in all required fields' : 'Lütfen tüm zorunlu alanları doldurun');
       return;
     }
 
@@ -247,19 +231,21 @@ export default function RegisterPage() {
       return;
     }
 
-    // Format phone for API (remove spaces, add country code if needed)
+    // Format phone for API
     const formattedPhone = phone ? '+90' + phone.replace(/\s/g, '') : undefined;
 
     setIsLoading(true);
     try {
-      // Use API directly instead of authStore.register to avoid auto-login
-      await api.post('/auth/register', {
-        displayName,
+      await api.post('/auth/register/business', {
+        companyName,
         email,
         password,
         phone: formattedPhone,
-        birthDate,
-        acceptsMarketingEmails: acceptMarketing,
+        companyType,
+        taxId,
+        city,
+        district: district || undefined,
+        acceptsMarketingEmails: false,
       });
       setRegisteredEmail(email);
       setRegistrationSuccess(true);
@@ -281,95 +267,82 @@ export default function RegisterPage() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="text-8xl mb-8">🚗</div>
+            <div className="text-8xl mb-8">🏢</div>
             <h2 className="text-3xl font-bold mb-4">
-              {locale === 'en' ? 'Grow Your Collection' : 'Koleksiyonunuzu Büyütün'}
+              {locale === 'en' ? 'Business Account' : 'Şirket Hesabı'}
             </h2>
             <p className="text-gray-300 text-lg">
               {locale === 'en' 
-                ? 'Sign up for free, publish your first 5 listings for free. Enrich your collection with the trade feature.'
-                : 'Ücretsiz üye olun, ilk 5 ilanınızı ücretsiz yayınlayın. Takas özelliğiyle koleksiyonunuzu zenginleştirin.'}
+                ? 'Create a business account to access advanced features and manage your company listings.'
+                : 'Gelişmiş özelliklere erişmek ve şirket ilanlarınızı yönetmek için şirket hesabı oluşturun.'}
             </p>
-            
-            <div className="mt-12 grid grid-cols-3 gap-6 text-center">
-              <div>
-                <p className="text-4xl font-bold">10K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Listings' : 'İlan'}</p>
-              </div>
-              <div>
-                <p className="text-4xl font-bold">5K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Members' : 'Üye'}</p>
-              </div>
-              <div>
-                <p className="text-4xl font-bold">2K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Trades' : 'Takas'}</p>
-              </div>
-            </div>
           </motion.div>
         </div>
       </div>
 
       {/* Right - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
+          className="w-full max-w-2xl"
         >
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-8">
               <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
-                <span className="text-white text-2xl">🚗</span>
+                <span className="text-white text-2xl">🏢</span>
               </div>
               <span className="font-display font-bold text-2xl">
                 TARODAN
               </span>
             </Link>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {t('auth.createAccount')}
+              {locale === 'en' ? 'Business Account Registration' : 'Şirket Hesabı Kaydı'}
             </h1>
             <p className="text-gray-600">
-              {locale === 'en' ? 'Join the collectors' : 'Koleksiyonerlere katılın'}
+              {locale === 'en' ? 'Create your business account' : 'Şirket hesabınızı oluşturun'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5 bg-white rounded-xl shadow-lg p-6 md:p-8">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {locale === 'en' ? 'Full Name' : 'Ad Soyad'}
+                {locale === 'en' ? 'Company Name' : 'Şirket İsmi'} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder={locale === 'en' ? 'Company Name' : 'Şirket İsmi'}
                   className="input pl-12"
+                  required
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('auth.email')}
-              </label>
-              <div className="relative">
-                <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-                  className="input pl-12"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('auth.phone')}
+                  {t('auth.email')} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+                    className="input pl-12"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('auth.phone')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative flex">
                   <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-xl text-gray-500 text-sm font-medium">
@@ -382,74 +355,138 @@ export default function RegisterPage() {
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
                     className="input rounded-l-none flex-1 pl-3"
+                    required
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {locale === 'en' ? '10 digits without country code' : 'Ülke kodu olmadan 10 rakam'}
-                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Company Type' : 'Şirket Türü'} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
+                  <select
+                    value={companyType}
+                    onChange={(e) => setCompanyType(e.target.value)}
+                    className="input pl-12 appearance-none"
+                    required
+                  >
+                    <option value="">{locale === 'en' ? 'Select Company Type' : 'Şirket Türü Seçin'}</option>
+                    {COMPANY_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('auth.birthDate')} <span className="text-red-500">*</span>
+                  {locale === 'en' ? 'Tax ID Number' : 'Vergi Kimlik Numarası'} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <HashtagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    max={getMaxBirthDate()}
-                    required
+                    type="text"
+                    value={taxId}
+                    onChange={(e) => setTaxId(e.target.value.replace(/\D/g, ''))}
+                    placeholder={locale === 'en' ? '10-11 digits' : '10-11 haneli'}
+                    maxLength={11}
                     className="input pl-12"
+                    required
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {locale === 'en' ? 'You must be at least 18 years old' : '18 yaşından büyük olmalısınız'}
-                </p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('auth.password')}
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input pl-12 pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'City' : 'İl'} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
+                  <select
+                    value={city}
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      setDistrict(''); // Reset district when city changes
+                    }}
+                    className="input pl-12 appearance-none"
+                    required
+                  >
+                    <option value="">{locale === 'en' ? 'Select City' : 'İl Seçin'}</option>
+                    {TURKISH_CITIES.map((cityName) => (
+                      <option key={cityName} value={cityName}>{cityName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'District' : 'İlçe'} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    placeholder={locale === 'en' ? 'District' : 'İlçe'}
+                    className="input pl-12"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('auth.confirmPassword')}
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input pl-12"
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('auth.password')} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input pl-12 pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <EyeIcon className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('auth.confirmPassword')} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input pl-12"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
@@ -459,6 +496,7 @@ export default function RegisterPage() {
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
                 className="w-5 h-5 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                required
               />
               <span className="text-sm text-gray-600">
                 {locale === 'en' ? (
@@ -488,49 +526,30 @@ export default function RegisterPage() {
               </span>
             </label>
 
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={acceptMarketing}
-                onChange={(e) => setAcceptMarketing(e.target.checked)}
-                className="w-5 h-5 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-600">
-                {locale === 'en' 
-                  ? 'I want to receive promotional emails, campaigns and special offers.'
-                  : 'Reklam ve kampanya e-postalarını, özel teklifleri almak istiyorum.'}
-              </span>
-            </label>
-
             <button
               type="submit"
               disabled={isLoading}
               className="btn-primary w-full"
             >
               {isLoading 
-                ? (locale === 'en' ? 'Signing up...' : 'Kayıt yapılıyor...') 
-                : t('common.register')}
+                ? (locale === 'en' ? 'Registering...' : 'Kayıt yapılıyor...') 
+                : (locale === 'en' ? 'Register Business Account' : 'Şirket Hesabı Oluştur')}
             </button>
           </form>
 
-          <p className="text-center mt-8 text-gray-600">
-            {t('auth.hasAccount')}{' '}
+          <p className="text-center mt-6 text-gray-600">
+            {locale === 'en' ? 'Already have an account?' : 'Zaten hesabınız var mı?'}{' '}
             <Link href="/login" className="text-primary-500 font-semibold hover:text-primary-600">
               {t('common.login')}
             </Link>
           </p>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-center text-sm text-gray-600 mb-4">
-              {locale === 'en' ? 'Are you a business?' : 'Şirket misiniz?'}
-            </p>
-            <Link
-              href="/register/business"
-              className="block w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors text-center"
-            >
-              {locale === 'en' ? 'Open Business Account' : 'Şirket Hesabı Aç'}
+          <p className="text-center mt-4 text-gray-600">
+            {locale === 'en' ? 'Not a business?' : 'Şirket değil misiniz?'}{' '}
+            <Link href="/register" className="text-primary-500 font-semibold hover:text-primary-600">
+              {locale === 'en' ? 'Register as Individual' : 'Bireysel Kayıt Ol'}
             </Link>
-          </div>
+          </p>
         </motion.div>
       </div>
     </div>

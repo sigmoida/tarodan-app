@@ -5,6 +5,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
+import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
 
 export const metadata: Metadata = {
   title: 'Tarodan - Model Araba Pazarı',
@@ -22,11 +23,13 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
-            <Navbar />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
+            <BusinessMembershipGuard>
+              <Navbar />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+            </BusinessMembershipGuard>
             <Toaster 
             position="top-right"
             toastOptions={{

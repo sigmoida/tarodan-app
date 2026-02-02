@@ -97,8 +97,8 @@ export class CollectionController {
   @HttpCode(HttpStatus.OK)
   async getLikedCollections(
     @Request() req: any,
-    @Query('page') page?: number,
-    @Query('pageSize') pageSize?: number,
+    @Query('page') page?: number | string,
+    @Query('pageSize') pageSize?: number | string,
   ): Promise<CollectionListResponseDto> {
     // Force no caching
     req.res?.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -106,14 +106,20 @@ export class CollectionController {
     req.res?.setHeader('Expires', '0');
     
     if (!req.user || !req.user.id) {
-      return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
+      return { collections: [], total: 0, page: 1, pageSize: 20 };
     }
 
+    // Parse and validate page and pageSize parameters
+    const parsedPage = page ? parseInt(String(page), 10) : 1;
+    const parsedPageSize = pageSize ? parseInt(String(pageSize), 10) : 20;
+    const validPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+    const validPageSize = isNaN(parsedPageSize) || parsedPageSize < 1 ? 20 : Math.min(parsedPageSize, 100); // Max 100 items per page
+
     try {
-      return await this.collectionService.getLikedCollections(req.user.id, page, pageSize);
+      return await this.collectionService.getLikedCollections(req.user.id, validPage, validPageSize);
     } catch (error) {
       this.logger.error('getLikedCollections failed');
-      return { collections: [], total: 0, page: page || 1, pageSize: pageSize || 20 };
+      return { collections: [], total: 0, page: validPage, pageSize: validPageSize };
     }
   }
 

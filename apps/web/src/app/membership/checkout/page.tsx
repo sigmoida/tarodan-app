@@ -12,33 +12,25 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi } from '@/lib/api';
+import { membershipApi, api } from '@/lib/api';
 
-const TIER_DETAILS: Record<string, { name: string; price: number; features: string[] }> = {
-  premium: {
-    name: 'Premium Üyelik',
-    price: 99,
-    features: [
-      'Sınırsız aktif ilan',
-      '15 resim/ilan',
-      'Takas yapma',
-      'Sınırsız koleksiyon (Digital Garage)',
-      'Reklamsız deneyim',
-      '3 öne çıkan ilan',
-    ],
-  },
-  business: {
-    name: 'İş Üyeliği',
-    price: 499,
-    features: [
-      '1000 aktif ilan hakkı',
-      'Takas yapma',
-      'Sınırsız koleksiyon',
-      'Reklamsız deneyim',
-      '7/24 öncelikli destek',
-      'Özel API erişimi',
-    ],
-  },
+const TIER_FEATURES: Record<string, string[]> = {
+  premium: [
+    'Sınırsız aktif ilan',
+    '15 resim/ilan',
+    'Takas yapma',
+    'Sınırsız koleksiyon (Digital Garage)',
+    'Reklamsız deneyim',
+    '3 öne çıkan ilan',
+  ],
+  business: [
+    '1000 aktif ilan hakkı',
+    'Takas yapma',
+    'Sınırsız koleksiyon',
+    'Reklamsız deneyim',
+    '7/24 öncelikli destek',
+    'Özel API erişimi',
+  ],
 };
 
 export default function MembershipCheckoutPage() {
@@ -48,6 +40,7 @@ export default function MembershipCheckoutPage() {
   
   const tier = searchParams.get('tier') || 'premium';
   const period = (searchParams.get('period') || 'monthly') as 'monthly' | 'yearly';
+  const required = searchParams.get('required') === 'true';
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
@@ -58,6 +51,62 @@ export default function MembershipCheckoutPage() {
     cvv: '',
   });
   const [agreed, setAgreed] = useState(false);
+  const [membershipPrices, setMembershipPrices] = useState<{
+    premium_monthly_price?: number;
+    premium_yearly_price?: number;
+    business_monthly_price?: number;
+    business_yearly_price?: number;
+    yearly_discount_percentage?: number;
+  }>({});
+
+  // Fetch membership prices from API
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const response = await api.get('/admin/settings/public');
+        const settings = response.data || {};
+        
+        // Validate and sanitize prices - if price seems too high, it might be in wrong unit
+        const sanitizePrice = (price: number | undefined, defaultPrice: number): number => {
+          if (!price || isNaN(price)) return defaultPrice;
+          // If price is suspiciously high (> 10000), it might be in wrong unit (kuruş instead of TL)
+          // Check if dividing by 100 makes it reasonable
+          if (price > 10000) {
+            const priceInTL = price / 100;
+            // If divided price is reasonable (between 1 and 10000), use it
+            if (priceInTL >= 1 && priceInTL <= 10000) {
+              return Math.round(priceInTL * 100) / 100;
+            }
+          }
+          // If price is reasonable, use it as is
+          if (price >= 1 && price <= 10000) {
+            return price;
+          }
+          // Otherwise, use default
+          return defaultPrice;
+        };
+        
+        setMembershipPrices({
+          premium_monthly_price: sanitizePrice(settings.premium_monthly_price, 99),
+          premium_yearly_price: sanitizePrice(settings.premium_yearly_price, 960),
+          business_monthly_price: sanitizePrice(settings.business_monthly_price, 499),
+          business_yearly_price: sanitizePrice(settings.business_yearly_price, 4790),
+          yearly_discount_percentage: settings.yearly_discount_percentage ?? 20,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch prices:', error);
+        // Use defaults if API fails
+        setMembershipPrices({
+          premium_monthly_price: 99,
+          premium_yearly_price: 960,
+          business_monthly_price: 499,
+          business_yearly_price: 4790,
+          yearly_discount_percentage: 20,
+        });
+      }
+    };
+    fetchPrices();
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -65,14 +114,42 @@ export default function MembershipCheckoutPage() {
     }
   }, [isAuthenticated, tier, period, router]);
 
-  const tierInfo = TIER_DETAILS[tier];
+  // Get tier info dynamically
+  const getTierInfo = () => {
+    const tierNames: Record<string, string> = {
+      premium: 'Premium Üyelik',
+      business: 'İş Üyeliği',
+    };
+    
+    let basePrice: number;
+    if (tier === 'premium') {
+      basePrice = period === 'monthly' 
+        ? (membershipPrices.premium_monthly_price ?? 99)
+        : (membershipPrices.premium_yearly_price ?? 960);
+    } else if (tier === 'business') {
+      basePrice = period === 'monthly'
+        ? (membershipPrices.business_monthly_price ?? 499)
+        : (membershipPrices.business_yearly_price ?? 4790);
+    } else {
+      return null;
+    }
+
+    return {
+      name: tierNames[tier],
+      price: basePrice,
+      features: TIER_FEATURES[tier] || [],
+      basePrice: period === 'monthly' ? basePrice : (tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
+    };
+  };
+
+  const tierInfo = getTierInfo();
   
-  if (!tierInfo) {
+  if (!tierInfo || !['premium', 'business'].includes(tier)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Geçersiz üyelik planı</p>
-          <Link href="/pricing" className="text-primary-500 hover:underline">
+          <Link href={required ? '/profile/membership?required=true' : '/profile/membership'} className="text-primary-500 hover:underline">
             Planlara Dön
           </Link>
         </div>
@@ -80,9 +157,19 @@ export default function MembershipCheckoutPage() {
     );
   }
 
-  const basePrice = tierInfo.price;
-  const finalPrice = period === 'yearly' ? Math.round(basePrice * 12 * 0.8) : basePrice;
-  const monthlyPrice = period === 'yearly' ? Math.round(finalPrice / 12) : basePrice;
+  const finalPrice = tierInfo.price;
+  const basePrice = tierInfo.basePrice;
+  const monthlyPrice = period === 'yearly' ? Math.round(finalPrice / 12) : finalPrice;
+
+  // Validate price - if it's too high, show warning
+  useEffect(() => {
+    if (finalPrice > 100000) {
+      toast.error(
+        `Fiyat çok yüksek görünüyor (${finalPrice.toLocaleString('tr-TR')} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
+        { duration: 10000 }
+      );
+    }
+  }, [finalPrice]);
 
   const formatCardNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
@@ -168,7 +255,10 @@ export default function MembershipCheckoutPage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/pricing" className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
+          <Link 
+            href={required ? '/profile/membership?required=true' : '/profile/membership'} 
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+          >
             <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
           </Link>
           <div>
@@ -373,7 +463,7 @@ export default function MembershipCheckoutPage() {
                       <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                     <div className="flex justify-between text-sm text-green-600">
-                      <span>İndirim (%20)</span>
+                      <span>İndirim (%{membershipPrices.yearly_discount_percentage ?? 20})</span>
                       <span>-{(basePrice * 12 - finalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                   </>
