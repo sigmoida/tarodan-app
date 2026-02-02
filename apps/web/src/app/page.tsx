@@ -171,8 +171,8 @@ const SCALES = ['1:8 Diecast', '1:12 Diecast', '1:18 Diecast', '1:24 Diecast', '
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
-  const [discountedProducts, setDiscountedProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
+  const [discountedProducts, setDiscountedProducts] = useState<Product[]>([]);
   const [isLoadingDiscounted, setIsLoadingDiscounted] = useState(false);
   const [currentCollectionIndex, setCurrentCollectionIndex] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -182,7 +182,7 @@ export default function Home() {
     icon: null as React.ReactNode | null,
     redirectPath: undefined as string | undefined,
   });
-  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-3');
+  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
 
   const { data: topCollections = [] } = useQuery({
     queryKey: ['home', 'topCollections', { limit: 20 }],
@@ -229,6 +229,8 @@ export default function Home() {
     },
     meta: { page: 'home', section: 'featuredBusiness' },
   });
+
+
 
   useEffect(() => {
     fetchDiscountedProducts();
@@ -498,6 +500,8 @@ export default function Home() {
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
 
+
+
       {/* İndirimdekiler Section - Popüler ilanların üstünde */}
       <section className="py-12 bg-gradient-to-br from-red-50/80 to-orange-50/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -604,11 +608,13 @@ export default function Home() {
           </div>
 
           <div className={
-            productLayout === 'grid-4'
-              ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'
-              : productLayout === 'grid-6'
-                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4'
-                : 'space-y-4'
+            productLayout === 'grid-3'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+              : productLayout === 'grid-4'
+                ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'
+                : productLayout === 'grid-6'
+                  ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4'
+                  : 'space-y-4'
           }>
             {bestSellers.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
@@ -754,89 +760,7 @@ export default function Home() {
       {/* Section Divider - Gradient Line */}
       <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent my-0"></div>
 
-      {/* İndirimli Ürünler Section */}
-      {discountedProducts.length > 0 && (
-        <section className="py-12 bg-gradient-to-br from-red-50 to-orange-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-8 bg-red-500 rounded"></div>
-                <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-                  <TagIcon className="w-8 h-8 text-red-500" />
-                  {locale === 'en' ? 'On Sale' : 'Fırsatlar'}
-                </h2>
-                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold animate-pulse">
-                  🔥 {locale === 'en' ? 'Hot Deals' : 'Fırsat'}
-                </span>
-              </div>
-              <Link
-                href="/listings?discountOnly=true"
-                className="text-red-500 font-semibold hover:text-red-600 flex items-center gap-1"
-              >
-                {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
-              </Link>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {isLoadingDiscounted ? (
-                [...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-xl overflow-hidden animate-pulse">
-                    <div className="aspect-square bg-gray-200" />
-                    <div className="p-3 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-3/4" />
-                      <div className="h-3 bg-gray-200 rounded w-1/2" />
-                      <div className="h-5 bg-gray-200 rounded w-1/3" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                discountedProducts.slice(0, 6).map((product) => (
-                  <Link key={product.id} href={`/listings/${product.id}`}>
-                    <div className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 border border-gray-100">
-                      <div className="relative aspect-square bg-gray-100">
-                        <Image
-                          src={getImageUrl(product.images?.[0])}
-                          alt={product.title}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-                          }}
-                        />
-                        {/* Discount Badge */}
-                        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-md">
-                          %{product.discountPercent ?? (isProductOnSaleDisplay(product) ? Math.round((1 - getProductEffectivePrice(product) / getProductOriginalPriceForDisplay(product)) * 100) : 0)} {locale === 'en' ? 'OFF' : 'İndirim'}
-                        </div>
-                      </div>
-                      <div className="p-3">
-                        <h3 className="font-medium text-gray-900 line-clamp-2 text-sm mb-2">
-                          {product.title}
-                        </h3>
-                        <div className="flex flex-col">
-                          {isProductOnSaleDisplay(product) && (
-                            <span className="text-xs text-gray-400 line-through">
-                              {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                            </span>
-                          )}
-                          <p className="text-lg font-bold text-red-500">
-                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Section Divider - Gradient Line */}
-      {discountedProducts.length > 0 && (
-        <div className="h-[2px] bg-gradient-to-r from-transparent via-red-400/60 to-transparent my-0"></div>
-      )}
 
       {/* En İyi Koleksiyonlar Section */}
       {topCollections.length > 0 && (

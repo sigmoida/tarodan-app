@@ -28,6 +28,9 @@ export interface SearchOptions {
   minPrice?: number;
   maxPrice?: number;
   condition?: string;
+  brand?: string;
+  scale?: string;
+  manufacturer?: string;
   page?: number;
   pageSize?: number;
   sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest';
@@ -50,7 +53,7 @@ export class SearchService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Initialize Elasticsearch client
@@ -233,6 +236,9 @@ export class SearchService implements OnModuleInit {
       minPrice,
       maxPrice,
       condition,
+      brand,
+      scale,
+      manufacturer,
       page = 1,
       pageSize = 20,
       sortBy = 'relevance',
@@ -353,6 +359,40 @@ export class SearchService implements OnModuleInit {
     // Condition filter
     if (condition) {
       filter.push({ term: { condition } });
+    }
+
+    // Brand filter
+    if (brand) {
+      must.push({
+        multi_match: {
+          query: brand,
+          fields: ['title', 'description', 'categoryName'],
+          type: 'phrase', // Use phrase match for exact brand names
+          boost: 2,
+        },
+      });
+    }
+
+    // Scale filter
+    if (scale) {
+      must.push({
+        multi_match: {
+          query: scale,
+          fields: ['title', 'description'],
+          type: 'phrase',
+        },
+      });
+    }
+
+    // Manufacturer filter (treat as brand or description)
+    if (manufacturer) {
+      must.push({
+        multi_match: {
+          query: manufacturer,
+          fields: ['title', 'description'],
+          type: 'phrase',
+        },
+      });
     }
 
     // Sorting
@@ -681,6 +721,9 @@ export class SearchService implements OnModuleInit {
       minPrice,
       maxPrice,
       condition,
+      brand,
+      scale,
+      manufacturer,
       page = 1,
       pageSize = 20,
       sortBy = 'relevance',
@@ -697,6 +740,26 @@ export class SearchService implements OnModuleInit {
 
     if (categoryId) where.categoryId = categoryId;
     if (condition) where.condition = condition;
+
+    if (brand) {
+      where.title = { contains: brand, mode: 'insensitive' };
+    }
+
+    if (scale) {
+      where.OR = where.OR || [];
+      where.OR.push(
+        { title: { contains: scale, mode: 'insensitive' } },
+        { description: { contains: scale, mode: 'insensitive' } }
+      );
+    }
+
+    if (manufacturer) {
+      where.OR = where.OR || [];
+      where.OR.push(
+        { title: { contains: manufacturer, mode: 'insensitive' } },
+        { description: { contains: manufacturer, mode: 'insensitive' } }
+      );
+    }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
       where.price = {};
@@ -770,8 +833,8 @@ export class SearchService implements OnModuleInit {
    */
   private async updateIndexStats(): Promise<void> {
     try {
-      const response = await this.client.count({ 
-        index: this.PRODUCTS_INDEX 
+      const response = await this.client.count({
+        index: this.PRODUCTS_INDEX
       });
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },

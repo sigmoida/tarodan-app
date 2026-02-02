@@ -12,6 +12,8 @@ import {
   Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { categoriesApi } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 // Kategori yapısı
 const CATEGORY_MENU = {
@@ -46,7 +48,7 @@ const CATEGORY_MENU = {
     scales: {
       label: 'Ölçek',
       items: [
-        '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', 
+        '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
         '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200',
       ],
     },
@@ -90,7 +92,7 @@ const CATEGORY_MENU = {
     scales: {
       label: 'Scale',
       items: [
-        '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', 
+        '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
         '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200',
       ],
     },
@@ -111,11 +113,54 @@ export default function CategoryMegaMenu() {
   const { locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<MenuSection>(null);
-  
+
   const menu = CATEGORY_MENU[locale as 'tr' | 'en'];
-  
+
+  // Fetch dynamic categories
+  const { data: dbCategories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      try {
+        const res = await categoriesApi.findAll();
+        // Handle both standard JSON reponse and direct array
+        return Array.isArray(res.data) ? res.data : (res.data.data || []);
+      } catch (err) {
+        console.error('Failed to load menu categories', err);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes cache
+  });
+
+  // Use DB categories if available, otherwise fallback to static list
+  const displayCategories = dbCategories && dbCategories.length > 0
+    ? dbCategories.map((c: any) => ({
+      label: c.name,
+      slug: c.slug,
+      icon: '📦' // Default icon since DB doesn't have icon field yet
+    }))
+    : menu.categories.items;
+
+  // Icons map for hardcoded matches (optional enhancement)
+  const ICON_MAP: Record<string, string> = {
+    'arabalar': '🚗',
+    'cars': '🚗',
+    'motosikletler': '🏍️',
+    'motorcycles': '🏍️',
+    'ucaklar': '✈️',
+    'aircrafts': '✈️',
+    'gemiler': '🚢',
+    'ships': '🚢'
+  };
+
+  // Enhance dynamic categories with icons if matching slug
+  const finalCategories = displayCategories.map((item: any) => ({
+    ...item,
+    icon: ICON_MAP[item.slug] || item.icon || '📦'
+  }));
+
   return (
-    <div 
+    <div
       className="relative"
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => {
@@ -136,7 +181,7 @@ export default function CategoryMegaMenu() {
               <span>{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</span>
               <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {/* Quick Links */}
             <div className="hidden md:flex items-center gap-1 ml-4">
               <Link
@@ -169,7 +214,7 @@ export default function CategoryMegaMenu() {
           </div>
         </div>
       </div>
-      
+
       {/* Mega Menu Dropdown */}
       <AnimatePresence>
         {isOpen && (
@@ -186,9 +231,8 @@ export default function CategoryMegaMenu() {
                 <div className="w-56 bg-gray-50 border-r border-gray-200 py-4">
                   <button
                     onMouseEnter={() => setActiveSection('categories')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      activeSection === 'categories' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'categories' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <Squares2X2Icon className="w-5 h-5" />
@@ -196,12 +240,11 @@ export default function CategoryMegaMenu() {
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
                   </button>
-                  
+
                   <button
                     onMouseEnter={() => setActiveSection('brands')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      activeSection === 'brands' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'brands' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-lg">🏎️</span>
@@ -209,12 +252,11 @@ export default function CategoryMegaMenu() {
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
                   </button>
-                  
+
                   <button
                     onMouseEnter={() => setActiveSection('scales')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      activeSection === 'scales' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'scales' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-lg">📏</span>
@@ -222,12 +264,11 @@ export default function CategoryMegaMenu() {
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
                   </button>
-                  
+
                   <button
                     onMouseEnter={() => setActiveSection('manufacturers')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      activeSection === 'manufacturers' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'manufacturers' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <TruckIcon className="w-5 h-5" />
@@ -235,7 +276,7 @@ export default function CategoryMegaMenu() {
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
                   </button>
-                  
+
                   {/* View All Link */}
                   <div className="mt-4 px-4">
                     <Link
@@ -246,14 +287,14 @@ export default function CategoryMegaMenu() {
                     </Link>
                   </div>
                 </div>
-                
+
                 {/* Right Content - Dynamic based on active section */}
                 <div className="flex-1 p-6 min-h-[320px]">
                   {activeSection === 'categories' && (
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.categories.label}</h3>
                       <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
-                        {menu.categories.items.map((item) => (
+                        {finalCategories.map((item: any) => (
                           <Link
                             key={item.slug}
                             href={`/listings?category=${item.slug}`}
@@ -266,7 +307,7 @@ export default function CategoryMegaMenu() {
                       </div>
                     </div>
                   )}
-                  
+
                   {activeSection === 'brands' && (
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.brands.label}</h3>
@@ -289,7 +330,7 @@ export default function CategoryMegaMenu() {
                       </Link>
                     </div>
                   )}
-                  
+
                   {activeSection === 'scales' && (
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.scales.label}</h3>
@@ -306,7 +347,7 @@ export default function CategoryMegaMenu() {
                       </div>
                     </div>
                   )}
-                  
+
                   {activeSection === 'manufacturers' && (
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.manufacturers.label}</h3>
@@ -323,7 +364,7 @@ export default function CategoryMegaMenu() {
                       </div>
                     </div>
                   )}
-                  
+
                   {!activeSection && (
                     <div className="flex items-center justify-center h-full text-gray-400">
                       <p>{locale === 'en' ? 'Hover over a category to explore' : 'Keşfetmek için bir kategori üzerine gelin'}</p>

@@ -16,7 +16,7 @@ export class SearchController {
   constructor(
     private readonly searchService: SearchService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Search products (public)
@@ -30,6 +30,9 @@ export class SearchController {
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('condition') condition?: string,
+    @Query('brand') brand?: string,
+    @Query('scale') scale?: string,
+    @Query('manufacturer') manufacturer?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('sortBy') sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest',
@@ -40,6 +43,9 @@ export class SearchController {
       minPrice: minPrice ? parseFloat(minPrice) : undefined,
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
       condition,
+      brand,
+      scale,
+      manufacturer,
       page: page ? parseInt(page) : 1,
       pageSize: pageSize ? parseInt(pageSize) : 20,
       sortBy,
@@ -98,15 +104,15 @@ export class SearchController {
   @Get('dev/reindex')
   async devReindex(): Promise<{ indexed: number; message: string }> {
     const isDev = this.configService.get('NODE_ENV') === 'development';
-    
+
     if (!isDev) {
       return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
     }
-    
+
     const indexed = await this.searchService.reindexAll();
-    return { 
-      indexed, 
-      message: `${indexed} ürün Elasticsearch'e index'lendi. Artık "hotw" veya "hxt wheels" gibi aramalar çalışacak.` 
+    return {
+      indexed,
+      message: `${indexed} ürün Elasticsearch'e index'lendi. Artık "hotw" veya "hxt wheels" gibi aramalar çalışacak.`
     };
   }
 
@@ -116,26 +122,26 @@ export class SearchController {
    */
   @Public()
   @Get('status')
-  async getStatus(): Promise<{ 
-    elasticsearch: boolean; 
+  async getStatus(): Promise<{
+    elasticsearch: boolean;
     indexExists: boolean;
     documentCount: number;
     message: string;
   }> {
     try {
       // This will test if ES is reachable and index exists
-      const result = await this.searchService.searchProducts({ 
-        query: '', 
-        page: 1, 
-        pageSize: 1 
+      const result = await this.searchService.searchProducts({
+        query: '',
+        page: 1,
+        pageSize: 1
       });
-      
+
       return {
         elasticsearch: true,
         indexExists: true,
         documentCount: result.total,
-        message: result.total > 0 
-          ? `Elasticsearch çalışıyor, ${result.total} ürün index'li` 
+        message: result.total > 0
+          ? `Elasticsearch çalışıyor, ${result.total} ürün index'li`
           : 'Elasticsearch çalışıyor ama index boş. /search/dev/reindex çağırın.',
       };
     } catch (error) {

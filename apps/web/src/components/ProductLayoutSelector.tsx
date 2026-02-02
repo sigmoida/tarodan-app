@@ -5,14 +5,16 @@ import {
   Squares2X2Icon,
   Bars3Icon,
   ViewColumnsIcon,
+  RectangleGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
   Squares2X2Icon as GridIconSolid,
   Bars3Icon as ListIconSolid,
   ViewColumnsIcon as ViewColumnsIconSolid,
+  RectangleGroupIcon as RectangleGroupIconSolid,
 } from '@heroicons/react/24/solid';
 
-export type ProductLayout = 'grid-4' | 'grid-6' | 'list';
+export type ProductLayout = 'grid-3' | 'grid-4' | 'grid-6' | 'list';
 
 interface ProductLayoutSelectorProps {
   layout: ProductLayout;
@@ -29,7 +31,7 @@ export default function ProductLayoutSelector({
   useEffect(() => {
     if (storageKey) {
       const saved = localStorage.getItem(storageKey) as ProductLayout | null;
-      if (saved && ['grid-4', 'grid-6', 'list'].includes(saved)) {
+      if (saved && ['grid-3', 'grid-4', 'grid-6', 'list'].includes(saved)) {
         onLayoutChange(saved);
       }
     }
@@ -43,6 +45,15 @@ export default function ProductLayoutSelector({
   }, [layout, storageKey]);
 
   const layouts: Array<{ value: ProductLayout; icon: React.ReactNode; label: string }> = [
+    {
+      value: 'grid-3',
+      icon: layout === 'grid-3' ? (
+        <RectangleGroupIconSolid className="w-5 h-5" />
+      ) : (
+        <RectangleGroupIcon className="w-5 h-5" />
+      ),
+      label: '3\'lü',
+    },
     {
       value: 'grid-4',
       icon: layout === 'grid-4' ? (
@@ -90,4 +101,3 @@ export default function ProductLayoutSelector({
     </div>
   );
 }
-
