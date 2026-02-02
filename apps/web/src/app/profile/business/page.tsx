@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, RectangleStackIcon } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ProductStats {
@@ -409,7 +410,7 @@ function ProductRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{product.title}</p>
-        <p className="text-sm text-orange-400">{product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
+        <p className="text-sm text-orange-400">{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
       </div>
       <div className="flex items-center gap-4 text-sm">
         <div className={`flex items-center gap-1 ${metric === 'views' ? 'text-blue-400' : 'text-gray-400'}`}>

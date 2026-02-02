@@ -273,6 +273,27 @@ Seed işleminden sonra aşağıdaki test hesaplarını kullanabilirsiniz:
 
 ## ⚠️ Sorun Giderme
 
+### API başlamıyor: "Can't reach database server" / "Failed to ensure bucket: ECONNREFUSED"
+
+Terminalde şunları görüyorsanız:
+- `PrismaClientInitializationError: Can't reach database server at localhost:5432`
+- `[MediaService] Failed to ensure bucket: connect ECONNREFUSED ::1:9000`
+- `[Bootstrap] Failed to start application`
+
+**Sebep:** PostgreSQL ve MinIO çalışmıyor; API bu servislere bağlanamıyor.
+
+**Çözüm:** Önce Docker servislerini başlatın, sonra `pnpm dev` çalıştırın:
+
+```bash
+pnpm docker:up
+# Birkaç saniye bekleyin (PostgreSQL ayağa kalksın)
+pnpm dev
+```
+
+Veya tek komutla: `pnpm start` (önce docker:up, sonra dev çalıştırır).
+
+---
+
 ### Port Zaten Kullanılıyor
 
 ```bash

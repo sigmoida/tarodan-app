@@ -13,11 +13,15 @@ import {
   Squares2X2Icon,
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   images: string[];
   condition: string;
   status: string;
@@ -136,7 +140,7 @@ export default function CategoryPage() {
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-white mb-4">Alt Kategoriler</h2>
             <div className="flex flex-wrap gap-3">
-              {category.children.map((child) => (
+              {category.children.map((child: Category) => (
                 <Link
                   key={child.id}
                   href={`/category/${child.slug}`}
@@ -299,7 +303,7 @@ export default function CategoryPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map((product) => (
+                {products.map((product: Product) => (
                   <Link
                     key={product.id}
                     href={`/listings/${product.id}`}
@@ -330,7 +334,7 @@ export default function CategoryPage() {
                       </h3>
                       <div className="flex items-center justify-between">
                         <span className="text-primary-500 font-bold text-lg">
-                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <span className="text-xs text-gray-600">
                           {getConditionLabel(product.condition)}
@@ -342,7 +346,7 @@ export default function CategoryPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {products.map((product) => (
+                {products.map((product: Product) => (
                   <Link
                     key={product.id}
                     href={`/listings/${product.id}`}
@@ -380,7 +384,7 @@ export default function CategoryPage() {
                       </div>
                       <div className="flex items-center justify-between mt-4">
                         <span className="text-primary-500 font-bold text-xl">
-                          {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
                         <button className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
                           <HeartIcon className="h-5 w-5 text-white" />

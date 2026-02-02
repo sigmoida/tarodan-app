@@ -67,6 +67,15 @@ export class DirectBuyDto {
   billingAddressId?: string;
 
   @ApiPropertyOptional({
+    example: 'INDIRIM10',
+    description: 'Coupon code to apply (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value?.toUpperCase()))
+  couponCode?: string;
+
+  @ApiPropertyOptional({
     description: 'Billing address object (use when different from shipping, no need to save in profile)',
   })
   @IsOptional()
@@ -87,6 +96,15 @@ export class DirectBuyResponseDto {
 
   @ApiProperty({ description: 'Total amount to pay' })
   totalAmount: number;
+
+  @ApiPropertyOptional({ description: 'Subtotal before discounts' })
+  subtotal?: number;
+
+  @ApiPropertyOptional({ description: 'Total discount applied' })
+  discountAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Applied coupon code' })
+  appliedCouponCode?: string;
 
   @ApiProperty({ description: 'Payment URL to redirect user' })
   paymentUrl: string;

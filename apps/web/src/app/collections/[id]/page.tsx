@@ -19,6 +19,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -641,7 +642,7 @@ export default function CollectionDetailPage() {
                           </div>
                           <div className="flex-1 text-left">
                             <p className="font-medium text-gray-900 line-clamp-1">{product.title}</p>
-                            <p className="text-primary-600 text-sm font-semibold">{Number(product.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
+                            <p className="text-primary-600 text-sm font-semibold">{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                           </div>
                           <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
                             isSelected

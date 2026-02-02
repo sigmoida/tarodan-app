@@ -14,6 +14,7 @@ import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { DiscountService, DiscountCalculator } from '../discount';
 
 /**
  * Commission calculation result interface
@@ -42,6 +43,8 @@ export class OrderService {
     private readonly cache: CacheService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    private readonly discountService: DiscountService,
+    private readonly discountCalculator: DiscountCalculator,
   ) {}
 
   // Shipping cost settings
@@ -511,21 +514,58 @@ export class OrderService {
         billingAddress = billing;
       }
 
-      // Get product price
+      // A + oldPrice: price (A) = güncel satış fiyatı; siparişte sadece price kullan
+      const now = new Date();
       const productPrice = Number(product.price);
+      const isSaleActive =
+        product.oldPrice != null &&
+        (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
+        (!product.saleEndDate || now <= new Date(product.saleEndDate));
+      const originalPrice = isSaleActive && product.oldPrice != null
+        ? Number(product.oldPrice)
+        : productPrice;
+      const productDiscount = isSaleActive ? originalPrice - productPrice : 0;
       
+      // Apply coupon discount if provided
+      let couponDiscount = 0;
+      let appliedCouponCode: string | null = null;
+      let appliedDiscountId: string | null = null;
+      
+      if (dto.couponCode) {
+        const validation = await this.discountService.validateCoupon(
+          { 
+            code: dto.couponCode, 
+            cartItems: [{ productId: dto.productId, quantity: 1 }] 
+          },
+          buyerId,
+        );
+        
+        if (validation.isValid && validation.discount) {
+          couponDiscount = validation.discount.estimatedDiscount;
+          appliedCouponCode = dto.couponCode.toUpperCase();
+          appliedDiscountId = validation.discount.id;
+        } else if (!validation.isValid) {
+          throw new BadRequestException(validation.error || 'Kupon kodu geçersiz');
+        }
+      }
+      
+      // Calculate total discount and subtotal
+      const totalDiscount = productDiscount + couponDiscount;
+      const subtotal = originalPrice;
+      const discountedPrice = productPrice - couponDiscount;
+
       // Calculate commission with category-based matching (3.3)
-      // Commission is calculated on product price, not including shipping
+      // Commission is calculated on discounted product price, not including shipping
       const commissionResult = await this.calculateCommission(
-        productPrice,
+        discountedPrice,
         product.sellerId,
         product.categoryId, // Pass categoryId for priority-based matching
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(productPrice);
+      const shippingCost = this.calculateShippingCost(discountedPrice);
       // Buyer fee is added to order total
-      const totalAmount = productPrice + shippingCost + commissionResult.buyerFeeAmount;
+      const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -568,7 +608,7 @@ export class OrderService {
         };
       }
 
-      // Create order
+      // Create order with discount info
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -576,6 +616,15 @@ export class OrderService {
           buyerId,
           sellerId: product.sellerId,
           totalAmount,
+          subtotal,
+          discountAmount: totalDiscount,
+          discountCode: appliedCouponCode,
+          discountBreakdown: totalDiscount > 0 ? {
+            productDiscount,
+            couponDiscount,
+            appliedDiscountId,
+            originalPrice,
+          } : undefined,
           shippingCost,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
@@ -608,6 +657,17 @@ export class OrderService {
         commissionResult,
       );
 
+      // Record discount usage if a coupon was applied
+      if (appliedDiscountId && couponDiscount > 0) {
+        await this.discountService.recordUsage(
+          appliedDiscountId,
+          buyerId,
+          order.id,
+          couponDiscount,
+        );
+        this.logger.log(`Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`);
+      }
+
       // Emit order.created event (outside transaction but still in the method)
       // This sends notification emails and push notifications
       try {
@@ -636,6 +696,9 @@ export class OrderService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount,
+        subtotal,
+        discountAmount: totalDiscount,
+        appliedCouponCode: appliedCouponCode ?? undefined,
         productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
         provider: 'iyzico', // Default provider
@@ -1238,6 +1301,7 @@ export class OrderService {
     const allowedTransitions: Record<OrderStatus, { nextStatuses: OrderStatus[]; allowedBy: 'buyer' | 'seller' | 'system' }[]> = {
       [OrderStatus.pending_payment]: [
         { nextStatuses: [OrderStatus.paid], allowedBy: 'system' },
+        { nextStatuses: [OrderStatus.preparing], allowedBy: 'system' }, // Payment success → preparing (first state after purchase)
         { nextStatuses: [OrderStatus.cancelled], allowedBy: 'buyer' },
       ],
       [OrderStatus.paid]: [

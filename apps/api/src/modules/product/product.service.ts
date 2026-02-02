@@ -17,6 +17,7 @@ import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType } from '@prisma/client';
+import { DiscountService } from '../discount/discount.service';
 
 @Injectable()
 export class ProductService {
@@ -31,6 +32,7 @@ export class ProductService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
+    private readonly discountService: DiscountService,
   ) {}
 
   /**
@@ -200,6 +202,7 @@ export class ProductService {
       brand,
       scale,
       tradeOnly,
+      discountOnly,
       minPrice,
       maxPrice,
       sortBy,
@@ -217,6 +220,7 @@ export class ProductService {
       brand,
       scale,
       tradeOnly,
+      discountOnly,
       minPrice,
       maxPrice,
       sortBy,
@@ -273,6 +277,19 @@ export class ProductService {
         // Trade only filter
         if (tradeOnly) {
           where.isTradeEnabled = true;
+        }
+
+        // Discount only filter – A + oldPrice: indirimde = oldPrice dolu ve tarih geçerli
+        if (discountOnly) {
+          const now = new Date();
+          const discountCondition = {
+            AND: [
+              { oldPrice: { not: null } },
+              { OR: [{ saleStartDate: null }, { saleStartDate: { lte: now } }] },
+              { OR: [{ saleEndDate: null }, { saleEndDate: { gte: now } }] },
+            ],
+          };
+          where.AND = where.AND ? [...(where.AND as any[]), discountCondition] : [discountCondition];
         }
 
         if (categoryId) {
@@ -566,21 +583,56 @@ export class ProductService {
       canEnableTrade = true;
     }
 
-    // Build update data
+    // A + oldPrice: price (A) = her zaman güncel satış fiyatı; indirim uygulanınca price = indirimli, oldPrice = önceki; indirim bitince price = oldPrice
+    const currentPrice = Number(product.price);
+    const currentOldPrice = product.oldPrice != null ? Number(product.oldPrice) : null;
+    const isSettingSale = dto.salePrice != null && Number(dto.salePrice) > 0;
+    const isClearingSale = dto.salePrice === null || dto.salePrice === undefined; // Açık null = indirimi kaldır
+
+    let priceUpdate: number | undefined;
+    let oldPriceUpdate: number | null | undefined;
+    let saleStartDateUpdate: Date | null | undefined;
+    let saleEndDateUpdate: Date | null | undefined;
+    let legacyOriginalPrice: number | null | undefined;
+    let legacySalePrice: number | null | undefined;
+
+    if (isSettingSale) {
+      const salePriceNum = Number(dto.salePrice);
+      const originalNum = dto.originalPrice != null ? Number(dto.originalPrice) : currentPrice;
+      priceUpdate = salePriceNum;
+      oldPriceUpdate = originalNum;
+      saleStartDateUpdate = dto.saleStartDate != null && dto.saleStartDate !== '' ? new Date(dto.saleStartDate as string) : undefined;
+      saleEndDateUpdate = dto.saleEndDate != null && dto.saleEndDate !== '' ? new Date(dto.saleEndDate as string) : undefined;
+      legacyOriginalPrice = originalNum;
+      legacySalePrice = salePriceNum;
+    } else if (isClearingSale && (dto.salePrice === null || dto.originalPrice === null)) {
+      priceUpdate = currentOldPrice ?? currentPrice;
+      oldPriceUpdate = null;
+      saleStartDateUpdate = null;
+      saleEndDateUpdate = null;
+      legacyOriginalPrice = null;
+      legacySalePrice = null;
+    } else {
+      if (dto.price !== undefined) priceUpdate = Number(dto.price);
+      if (dto.saleStartDate !== undefined) saleStartDateUpdate = dto.saleStartDate == null ? null : new Date(dto.saleStartDate);
+      if (dto.saleEndDate !== undefined) saleEndDateUpdate = dto.saleEndDate == null ? null : new Date(dto.saleEndDate);
+    }
+
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
-      price: dto.price,
+      ...(priceUpdate !== undefined ? { price: priceUpdate } : { price: dto.price }),
       condition: dto.condition,
       status: dto.status,
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
-      // CRITICAL: Handle quantity properly
-      // - If dto.quantity is explicitly null, set to null (unlimited stock)
-      // - If dto.quantity is a number, set to that number
-      // - If dto.quantity is undefined, don't update (preserve existing value)
       quantity: dto.quantity !== undefined ? (dto.quantity === null ? null : Number(dto.quantity)) : undefined,
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
-      version: { increment: 1 }, // Optimistic locking
+      version: { increment: 1 },
+      ...(oldPriceUpdate !== undefined ? { oldPrice: oldPriceUpdate } : {}),
+      ...(saleStartDateUpdate !== undefined ? { saleStartDate: saleStartDateUpdate } : (dto.saleStartDate !== undefined ? { saleStartDate: dto.saleStartDate == null ? null : new Date(dto.saleStartDate) } : {})),
+      ...(saleEndDateUpdate !== undefined ? { saleEndDate: saleEndDateUpdate } : (dto.saleEndDate !== undefined ? { saleEndDate: dto.saleEndDate == null ? null : new Date(dto.saleEndDate) } : {})),
+      ...(legacyOriginalPrice !== undefined ? { originalPrice: legacyOriginalPrice } : {}),
+      ...(legacySalePrice !== undefined ? { salePrice: legacySalePrice } : {}),
     };
 
     // Handle image updates if provided
@@ -601,10 +653,10 @@ export class ProductService {
       }
     }
 
-    // Check if price changed (for wishlist notifications)
-    const oldPrice = Number(product.price);
-    const newPrice = dto.price ? Number(dto.price) : oldPrice;
-    const priceChanged = dto.price !== undefined && oldPrice !== newPrice;
+    // Check if price changed (for wishlist notifications) – compare previous selling price with new one
+    const prevSellingPrice = Number(product.price);
+    const newSellingPrice = priceUpdate !== undefined ? priceUpdate : (dto.price !== undefined ? Number(dto.price) : prevSellingPrice);
+    const priceChanged = prevSellingPrice !== newSellingPrice;
 
     // Update with optimistic locking
     try {
@@ -641,7 +693,7 @@ export class ProductService {
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
         try {
-          await this.notifyWishlistUsersOfPriceChange(id, oldPrice, newPrice, updated.title);
+          await this.notifyWishlistUsersOfPriceChange(id, prevSellingPrice, newSellingPrice, updated.title);
         } catch (error) {
           // Don't fail the update if notification fails
           this.logger.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
@@ -1059,11 +1111,35 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       _count: true,
     });
 
+    // A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili)
+    const now = new Date();
+    const priceA = Number(product.price);
+    const oldPriceDb = product.oldPrice != null ? Number(product.oldPrice) : null;
+    const saleStartDate = product.saleStartDate ? new Date(product.saleStartDate) : null;
+    const saleEndDate = product.saleEndDate ? new Date(product.saleEndDate) : null;
+    const saleDatesValid =
+      (saleStartDate == null || now >= saleStartDate) &&
+      (saleEndDate == null || now <= saleEndDate);
+    const isOnSale = oldPriceDb != null && saleDatesValid;
+
+    // Kampanya fiyatı sadece sepette uygulanır; ürün API'de her zaman A döner
+    const discountPercent = isOnSale && oldPriceDb && oldPriceDb > priceA
+      ? Math.round(((oldPriceDb - priceA) / oldPriceDb) * 100)
+      : null;
+
     return {
       id: product.id,
       title: product.title,
       description: product.description,
-      price: Number(product.price),
+      price: priceA,
+      oldPrice: isOnSale ? oldPriceDb : null,
+      saleStartDate: saleStartDate?.toISOString() || null,
+      saleEndDate: saleEndDate?.toISOString() || null,
+      isOnSale,
+      discountPercent,
+      // API uyumluluğu: eski alanlar (originalPrice/salePrice) = oldPrice/price
+      originalPrice: isOnSale ? oldPriceDb : null,
+      salePrice: isOnSale ? priceA : null,
       condition: product.condition,
       status: product.status,
       isTradeEnabled: product.isTradeEnabled || false,

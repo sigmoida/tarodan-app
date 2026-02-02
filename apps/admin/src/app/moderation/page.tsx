@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import { toast } from 'react-hot-toast';
 import {
   CheckCircleIcon,
@@ -363,7 +364,7 @@ const ModerationPage = () => {
                         <span>Yorumcu: {item.reviewer.displayName || item.reviewer.email}</span>
                       )}
                       {item.price !== undefined && (
-                        <span>Fiyat: {item.price.toLocaleString('tr-TR')} ₺</span>
+                        <span>Fiyat: {getProductEffectivePrice(item).toLocaleString('tr-TR')} ₺</span>
                       )}
                       {item.score !== undefined && (
                         <span>Puan: {item.score}/5</span>

@@ -830,9 +830,34 @@ export class AdminService {
       data: products.map((p) => ({
         ...p,
         price: Number(p.price),
+        originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+        salePrice: p.salePrice != null ? Number(p.salePrice) : null,
         imageUrl: p.images[0]?.url,
       })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Get single product by ID (admin)
+   */
+  async getProduct(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        seller: { select: { id: true, displayName: true, email: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        images: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+    return {
+      ...product,
+      price: Number(product.price),
+      originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
+      salePrice: product.salePrice != null ? Number(product.salePrice) : null,
     };
   }
 

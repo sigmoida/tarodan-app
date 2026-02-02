@@ -10,6 +10,7 @@ import { SearchModule } from '../search/search.module';
 import { CacheModule } from '../cache';
 import { AdvertisementModule } from '../advertisement/advertisement.module';
 import { MediaModule } from '../media/media.module';
+import { DiscountModule } from '../discount/discount.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MediaModule } from '../media/media.module';
     CacheModule,
     AdvertisementModule,
     MediaModule,
+    DiscountModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

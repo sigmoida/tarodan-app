@@ -773,11 +773,11 @@ export class PaymentService {
         },
       });
 
-      // Update order status to PAID
+      // Update order status to PREPARING (first state after purchase; seller will then mark shipped when sent)
       await tx.order.update({
         where: { id: payment.orderId },
         data: {
-          status: OrderStatus.paid,
+          status: OrderStatus.preparing,
           version: { increment: 1 },
         },
       });

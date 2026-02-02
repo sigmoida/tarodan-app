@@ -67,6 +67,10 @@ import { EventModule } from './modules/events';
 // Advertisement banners (public + admin)
 import { AdvertisementModule } from './modules/advertisement/advertisement.module';
 
+// Discount & Promotion Engine
+import { DiscountModule } from './modules/discount';
+import { CartModule } from './modules/cart';
+
 @Module({
   imports: [
     // Configuration
@@ -148,6 +152,10 @@ import { AdvertisementModule } from './modules/advertisement/advertisement.modul
 
     // Advertisement banners (public /api/ads + admin /api/admin/ads)
     AdvertisementModule,
+
+    // Discount & Promotion Engine
+    DiscountModule,
+    CartModule,
   ],
   controllers: [],
   providers: [

@@ -12,6 +12,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -229,7 +230,7 @@ export default function OrderDetailPage() {
                       {order.product.title}
                     </Link>
                     <p className="text-gray-600 mt-1">
-                      ₺{order.product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      ₺{getProductEffectivePrice(order.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>

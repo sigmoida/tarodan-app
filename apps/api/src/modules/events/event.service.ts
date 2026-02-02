@@ -283,15 +283,7 @@ export class EventService {
       priority: 1,
     });
 
-    // Queue shipping creation job
-    await this.shippingQueue.add('create-shipment', {
-      orderId: payload.orderId,
-      orderNumber: payload.orderNumber,
-      sellerId: payload.sellerId,
-      shippingAddress: payload.shippingAddress,
-    }, {
-      priority: 2,
-    });
+    // Do NOT auto-create shipment here – order stays "Hazırlanıyor" until seller enters tracking / marks shipped
 
     // Queue analytics event
     await this.analyticsQueue.add('track-event', {

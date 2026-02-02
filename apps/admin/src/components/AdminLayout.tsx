@@ -22,6 +22,7 @@ import {
   ChatBubbleLeftRightIcon,
   TagIcon,
   SwatchIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
   { name: 'Kategoriler', href: '/categories', icon: TagIcon },
   { name: 'Markalar', href: '/brands', icon: SwatchIcon },
+  { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
   { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
   { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon },
   { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },

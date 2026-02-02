@@ -12,6 +12,7 @@ import {
   PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -20,6 +21,9 @@ interface ProductDetail {
   title: string;
   description: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   condition: string;
   status: string;
   category: {
@@ -225,8 +229,13 @@ export default function ProductDetailPage() {
                   <div className="grid grid-cols-2 gap-4 pt-3 border-t">
                     <div>
                       <span className="text-gray-600 text-sm">Fiyat:</span>
+                      {isProductOnSaleDisplay(product) && (
+                        <p className="text-gray-400 line-through text-base">
+                          ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
                       <p className="font-semibold text-lg">
-                        ₺{product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        ₺{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>

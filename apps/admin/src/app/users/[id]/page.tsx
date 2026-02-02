@@ -19,6 +19,7 @@ import {
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -26,6 +27,9 @@ interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   status: string;
   createdAt: string;
   imageUrl?: string;
@@ -591,7 +595,7 @@ export default function UserDetailPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-white font-medium">₺{product.price.toLocaleString('tr-TR')}</p>
+                              <p className="text-white font-medium">₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</p>
                             </div>
                           </div>
                         ))}

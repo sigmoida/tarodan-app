@@ -81,6 +81,15 @@ export class ProductQueryDto {
   tradeOnly?: boolean;
 
   @ApiPropertyOptional({
+    example: true,
+    description: 'Filter only products currently on sale/discount',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  discountOnly?: boolean;
+
+  @ApiPropertyOptional({
     example: 100,
     description: 'Minimum price filter',
   })

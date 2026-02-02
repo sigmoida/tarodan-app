@@ -156,11 +156,11 @@ export default function PricingPage() {
 
   const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
-      toast.info(t('membership.planAlreadyActive'));
+      toast(t('membership.planAlreadyActive'));
       return;
     }
     if (tierId === currentTier) {
-      toast.info(t('membership.planAlreadyActive'));
+      toast(t('membership.planAlreadyActive'));
       return;
     }
     setSelectedTier(tierId);

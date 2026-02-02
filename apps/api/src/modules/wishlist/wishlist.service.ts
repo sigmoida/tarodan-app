@@ -251,19 +251,20 @@ export class WishlistService {
   }
 
   // ==========================================================================
-  // HELPER METHODS
+  // HELPER – A + oldPrice: price (A) = her zaman güncel satış fiyatı
   // ==========================================================================
   private mapItemToDto(item: any): WishlistItemResponseDto {
+    const product = item.product;
     return {
       id: item.id,
-      productId: item.product.id,
-      productTitle: item.product.title,
-      productImage: item.product.images?.[0]?.url,
-      productPrice: parseFloat(item.product.price),
-      productCondition: item.product.condition,
-      productStatus: item.product.status,
-      sellerId: item.product.seller.id,
-      sellerName: item.product.seller.displayName,
+      productId: product.id,
+      productTitle: product.title,
+      productImage: product.images?.[0]?.url,
+      productPrice: Number(product.price),
+      productCondition: product.condition,
+      productStatus: product.status,
+      sellerId: product.seller.id,
+      sellerName: product.seller.displayName,
       addedAt: item.addedAt,
     };
   }

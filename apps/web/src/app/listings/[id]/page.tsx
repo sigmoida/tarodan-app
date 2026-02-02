@@ -28,6 +28,7 @@ import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
 import { formatCondition } from '@/lib/format';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
@@ -55,6 +56,11 @@ interface Listing {
   title: string;
   description: string;
   price: number;
+  oldPrice?: number | null;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
+  discountPercent?: number | null;
   images: Array<ProductImage | string>;
   brand?: string;
   scale?: string;
@@ -155,6 +161,7 @@ export default function ListingDetailPage() {
   });
   const listing = listingQuery.data ?? null;
   const isLoading = listingQuery.isLoading;
+  const effectivePrice = listing ? getProductEffectivePrice(listing) : 0;
 
   // Wishlist check: React Query (only when authenticated)
   const wishlistQuery = useQuery({
@@ -264,16 +271,7 @@ export default function ListingDetailPage() {
 
     setIsAddingToCart(true);
     try {
-      await addToCart({
-        productId: listing.id,
-        title: listing.title,
-        price: Number(listing.price),
-        imageUrl: listing.images?.length ? getImageUrl(listing.images[0]) : 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Product',
-        seller: {
-          id: listing.sellerId || listing.seller?.id || '',
-          displayName: listing.seller?.displayName || listing.seller?.username || t('product.seller'),
-        },
-      });
+      await addToCart(listing.id);
       toast.success(t('product.addedToCart'));
     } catch (error) {
       toast.error(t('common.operationFailed'));
@@ -287,7 +285,7 @@ export default function ListingDetailPage() {
 
     setIsAddingToCart(true);
     try {
-      await removeFromCart(cartItem.id);
+      await removeFromCart(cartItem.productId);
       toast.success(t('product.removedFromCart'));
     } catch (error) {
       toast.error(t('product.removeFromCartFailed'));
@@ -357,13 +355,13 @@ export default function ListingDetailPage() {
       return;
     }
 
-    const minOffer = Number(listing.price) * 0.5; // Minimum %50
+    const minOffer = effectivePrice * 0.5; // Minimum %50 of current price
     if (amount < minOffer) {
       toast.error(`Min: ${minOffer.toFixed(2)} TL (50%)`);
       return;
     }
 
-    if (amount >= Number(listing.price)) {
+    if (amount >= effectivePrice) {
       toast.error(t('product.offerMustBeLower'));
       return;
     }
@@ -460,6 +458,7 @@ export default function ListingDetailPage() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['wishlist-check', id] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
         queryClient.invalidateQueries({ queryKey: ['listing', id] }),
       ]);
     } catch (error: any) {
@@ -475,7 +474,7 @@ export default function ListingDetailPage() {
   const shareToSocial = async (platform: string) => {
     const url = encodeURIComponent(window.location.href);
     const title = encodeURIComponent(listing?.title || 'Check this out on Tarodan!');
-    const text = encodeURIComponent(`${listing?.title} - ${listing?.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
+    const text = encodeURIComponent(`${listing?.title} - ${effectivePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
 
     let shareUrl = '';
 
@@ -907,8 +906,8 @@ export default function ListingDetailPage() {
                           setPanPosition({ x: 0, y: 0 });
                         }}
                         className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === lightboxImageIndex
-                            ? 'border-orange-500'
-                            : 'border-white/20 hover:border-white/40'
+                          ? 'border-orange-500'
+                          : 'border-white/20 hover:border-white/40'
                           }`}
                       >
                         <OptimizedImage
@@ -1055,9 +1054,21 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-orange-500 mb-4">
-              {Number(listing.price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-            </p>
+            <div className="mb-4">
+              {isProductOnSaleDisplay(listing) && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl text-gray-400 line-through">
+                    {getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </span>
+                  <span className="bg-red-500 text-white text-sm font-bold px-2 py-0.5 rounded">
+                    %{listing.discountPercent ?? (listing.oldPrice != null && listing.price ? Math.round((1 - Number(listing.price) / Number(listing.oldPrice)) * 100) : 0)} indirim
+                  </span>
+                </div>
+              )}
+              <p className="text-4xl font-bold text-orange-500">
+                {effectivePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+              </p>
+            </div>
 
             {/* View & Like Stats */}
             <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
@@ -1176,9 +1187,9 @@ export default function ListingDetailPage() {
                         <div className="flex items-center">
                           <StarIcon className="w-4 h-4 text-yellow-400 mr-1" />
                           {listing.seller.rating.toFixed(1)}
-                          {listing.seller.totalRatings > 0 && (
+                          {(listing.seller as { totalRatings?: number }).totalRatings != null && (listing.seller as { totalRatings?: number }).totalRatings! > 0 && (
                             <span className="ml-1 text-gray-400">
-                              ({listing.seller.totalRatings})
+                              ({(listing.seller as { totalRatings?: number }).totalRatings})
                             </span>
                           )}
                         </div>
@@ -1227,24 +1238,24 @@ export default function ListingDetailPage() {
             {/* Product Status Banner */}
             {listing.status && listing.status !== 'active' && (
               <div className={`rounded-xl p-4 mb-4 ${listing.status === 'reserved'
-                  ? 'bg-yellow-50 border border-yellow-200'
-                  : listing.status === 'sold'
-                    ? 'bg-red-50 border border-red-200'
-                    : 'bg-gray-50 border border-gray-200'
+                ? 'bg-yellow-50 border border-yellow-200'
+                : listing.status === 'sold'
+                  ? 'bg-red-50 border border-red-200'
+                  : 'bg-gray-50 border border-gray-200'
                 }`}>
                 <div className="flex items-center gap-3">
                   <ExclamationTriangleIcon className={`w-6 h-6 ${listing.status === 'reserved'
-                      ? 'text-yellow-600'
-                      : listing.status === 'sold'
-                        ? 'text-red-600'
-                        : 'text-gray-600'
+                    ? 'text-yellow-600'
+                    : listing.status === 'sold'
+                      ? 'text-red-600'
+                      : 'text-gray-600'
                     }`} />
                   <div>
                     <p className={`font-semibold ${listing.status === 'reserved'
-                        ? 'text-yellow-800'
-                        : listing.status === 'sold'
-                          ? 'text-red-800'
-                          : 'text-gray-800'
+                      ? 'text-yellow-800'
+                      : listing.status === 'sold'
+                        ? 'text-red-800'
+                        : 'text-gray-800'
                       }`}>
                       {listing.status === 'reserved' && t('product.statusReserved')}
                       {listing.status === 'sold' && t('product.statusSold')}
@@ -1309,8 +1320,8 @@ export default function ListingDetailPage() {
                   onClick={handleBuyNow}
                   disabled={listing.status !== 'active'}
                   className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${listing.status === 'active'
-                      ? 'btn-primary'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                    ? 'btn-primary'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
                     }`}
                 >
                   <BoltIcon className="w-6 h-6" />
@@ -1355,8 +1366,8 @@ export default function ListingDetailPage() {
                     onClick={handleMakeOffer}
                     disabled={listing.status !== 'active'}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status !== 'active'
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
-                        : 'btn-secondary'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                      : 'btn-secondary'
                       }`}
                   >
                     <BoltIcon className="w-5 h-5" />
@@ -1366,10 +1377,10 @@ export default function ListingDetailPage() {
                     onClick={handleCartToggle}
                     disabled={isAddingToCart || listing.status !== 'active'}
                     className={`flex-1 flex items-center justify-center gap-2 ${listing.status !== 'active'
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
-                        : isInCart
-                          ? 'btn-secondary bg-red-50 border-red-200 text-red-600'
-                          : 'btn-secondary'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                      : isInCart
+                        ? 'btn-secondary bg-red-50 border-red-200 text-red-600'
+                        : 'btn-secondary'
                       }`}
                   >
                     <ShoppingCartIcon className="w-5 h-5" />
@@ -1415,8 +1426,8 @@ export default function ListingDetailPage() {
                     <StarIcon
                       key={star}
                       className={`w-5 h-5 ${star <= (reviewStats.averageRating || 0)
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-gray-300'
+                        ? 'text-yellow-400 fill-yellow-400'
+                        : 'text-gray-300'
                         }`}
                     />
                   ))}
@@ -1470,8 +1481,8 @@ export default function ListingDetailPage() {
                             <StarIcon
                               key={star}
                               className={`w-4 h-4 ${star <= (review.score || 0)
-                                  ? 'text-yellow-400 fill-yellow-400'
-                                  : 'text-gray-300'
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-gray-300'
                                 }`}
                             />
                           ))}
@@ -1598,10 +1609,10 @@ export default function ListingDetailPage() {
                   {t('product.productPrice')}
                 </label>
                 <div className="text-lg font-semibold text-gray-900">
-                  {Number(listing.price).toLocaleString('tr-TR')} TL
+                  {effectivePrice.toLocaleString('tr-TR')} TL
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(Number(listing.price) * 0.5).toLocaleString('tr-TR')} TL (%50)
+                  {locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'} {Math.round(effectivePrice * 0.5).toLocaleString('tr-TR')} TL (%50)
                 </p>
               </div>
 
@@ -1614,8 +1625,8 @@ export default function ListingDetailPage() {
                   value={offerAmount}
                   onChange={(e) => setOfferAmount(e.target.value)}
                   placeholder={locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'}
-                  min={Math.round(Number(listing.price) * 0.5)}
-                  max={Number(listing.price) - 1}
+                  min={Math.round(effectivePrice * 0.5)}
+                  max={Math.max(0, Math.round(effectivePrice) - 1)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>

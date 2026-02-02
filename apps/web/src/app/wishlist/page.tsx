@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { wishlistApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface WishlistItem {
   id: string;
@@ -34,15 +35,15 @@ interface WishlistItem {
 export default function WishlistPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToCart } = useCartStore();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/wishlist');
-      return;
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -51,7 +52,7 @@ export default function WishlistPage() {
       const data = response.data?.items || response.data?.data || response.data || [];
       return Array.isArray(data) ? data : [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'wishlist' },
   });
   const items = wishlistQuery.data ?? [];
@@ -91,6 +92,10 @@ export default function WishlistPage() {
   const getImageUrl = (imageUrl?: string): string => {
     return imageUrl || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
 
   if (!isAuthenticated) {
     return null;

@@ -16,11 +16,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { useTranslation } from '@/i18n';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   images: string[];
   condition: string;
   status: string;
@@ -336,7 +340,7 @@ function SearchContent() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product) => (
+                  {products.map((product: { id: string; title: string; images?: string[]; price?: number; isTradeEnabled?: boolean; condition?: string; category?: { name: string } }) => (
                     <Link
                       key={product.id}
                       href={`/listings/${product.id}`}
@@ -367,10 +371,10 @@ function SearchContent() {
                         </h3>
                         <div className="flex items-center justify-between">
                           <span className="text-primary-500 font-bold text-lg">
-                            {product.price?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </span>
                           <span className="text-xs text-gray-600">
-                            {getConditionLabel(product.condition)}
+                            {getConditionLabel(product.condition ?? '')}
                           </span>
                         </div>
                         {product.category && (

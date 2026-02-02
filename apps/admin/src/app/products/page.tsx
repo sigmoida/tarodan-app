@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import Image from 'next/image';
 import {
   MagnifyingGlassIcon,
@@ -22,6 +23,9 @@ interface Product {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  isOnSale?: boolean;
   status: 'pending' | 'active' | 'rejected' | 'sold' | 'inactive';
   condition: string;
   seller: {
@@ -129,6 +133,9 @@ export default function ProductsPage() {
         id: p.id,
         title: p.title,
         price: Number(p.price),
+        originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+        salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+        isOnSale: p.isOnSale,
         status: p.status,
         condition: p.condition,
         seller: p.seller || { id: p.sellerId, displayName: 'Satıcı' },
@@ -503,7 +510,12 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td className="font-medium text-primary-400">
-                        ₺{product.price.toLocaleString()}
+                        {isProductOnSaleDisplay(product) && (
+                          <span className="text-gray-400 line-through text-sm block">
+                            ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR')}
+                          </span>
+                        )}
+                        ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
                       </td>
                       <td>{getStatusBadge(product.status)}</td>
                       <td>
