@@ -90,6 +90,14 @@ export class ProductQueryDto {
   discountOnly?: boolean;
 
   @ApiPropertyOptional({
+    example: 'araba',
+    description: 'Filter by vehicle type (searches in title/description)',
+  })
+  @IsOptional()
+  @IsString()
+  vehicleType?: string;
+
+  @ApiPropertyOptional({
     example: 100,
     description: 'Minimum price filter',
   })

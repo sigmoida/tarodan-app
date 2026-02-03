@@ -77,6 +77,7 @@ export default function ListingsPage() {
     sortBy: 'created_desc',
     category: searchParams.get('category') || '',
     manufacturer: searchParams.get('manufacturer') || '',
+    vehicleType: searchParams.get('vehicleType') || '',
   });
 
   useEffect(() => {
@@ -128,6 +129,7 @@ export default function ListingsPage() {
         if (filters.tradeOnly) p.tradeOnly = true;
         if (filters.discountOnly) p.discountOnly = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
+        if (filters.vehicleType) p.vehicleType = filters.vehicleType;
         if (searchQuery?.trim()) p.search = searchQuery.trim();
         return p;
       };
@@ -216,7 +218,7 @@ export default function ListingsPage() {
   const clearFilters = () => {
     setFilters({
       brand: '', scale: '', condition: '', minPrice: '', maxPrice: '',
-      tradeOnly: false, discountOnly: false, sortBy: 'created_desc', category: '', manufacturer: '',
+      tradeOnly: false, discountOnly: false, sortBy: 'created_desc', category: '', manufacturer: '', vehicleType: '',
     });
   };
 

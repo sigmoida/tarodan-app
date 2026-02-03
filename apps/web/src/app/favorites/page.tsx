@@ -20,6 +20,7 @@ interface WishlistItem {
   productTitle: string;
   productImage?: string;
   productPrice: number;
+  productOriginalPrice?: number;
   productCondition?: string;
   productStatus?: string;
   sellerId: string;
@@ -188,9 +189,21 @@ export default function FavoritesPage() {
                       </h3>
                     </Link>
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xl font-bold text-primary-500">
-                        {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                      </p>
+                      <div className="flex flex-col">
+                        {item.productOriginalPrice && item.productOriginalPrice > item.productPrice && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-400 line-through">
+                              {Number(item.productOriginalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                            </span>
+                            <span className="text-xs font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded">
+                              %{Math.round(((item.productOriginalPrice - item.productPrice) / item.productOriginalPrice) * 100)}
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-xl font-bold text-primary-500">
+                          {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        </p>
+                      </div>
                       {item.productCondition && (
                         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                           {item.productCondition}

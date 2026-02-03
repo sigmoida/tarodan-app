@@ -11,6 +11,7 @@ import { CacheService } from '../cache/cache.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { ProductStatus } from '@prisma/client';
+import { DiscountService } from '../discount/discount.service';
 import {
   AddToWishlistDto,
   WishlistResponseDto,
@@ -26,7 +27,8 @@ export class WishlistService {
     private readonly cache: CacheService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
-  ) {}
+    private readonly discountService: DiscountService,
+  ) { }
 
   // ==========================================================================
   // GET OR CREATE WISHLIST
@@ -64,11 +66,18 @@ export class WishlistService {
       orderBy: { addedAt: 'desc' },
     });
 
+    // Map items with campaign discount prices
+    const mappedItems: WishlistItemResponseDto[] = [];
+    for (const item of items) {
+      const dto = await this.mapItemToDto(item);
+      mappedItems.push(dto);
+    }
+
     return {
       id: wishlist.id,
       userId: wishlist.userId,
-      items: items.map((item) => this.mapItemToDto(item)),
-      totalItems: items.length,
+      items: mappedItems,
+      totalItems: mappedItems.length,
       createdAt: wishlist.createdAt,
     };
   }
@@ -253,14 +262,28 @@ export class WishlistService {
   // ==========================================================================
   // HELPER – A + oldPrice: price (A) = her zaman güncel satış fiyatı
   // ==========================================================================
-  private mapItemToDto(item: any): WishlistItemResponseDto {
+  private async mapItemToDto(item: any): Promise<WishlistItemResponseDto> {
     const product = item.product;
+    const basePrice = Number(product.price);
+
+    // Get campaign discount price
+    const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+      product.id,
+      product.sellerId,
+      product.categoryId,
+      basePrice,
+    );
+
+    const effectivePrice = campaignPrice ?? basePrice;
+    const originalPrice = basePrice;
+
     return {
       id: item.id,
       productId: product.id,
       productTitle: product.title,
       productImage: product.images?.[0]?.url,
-      productPrice: Number(product.price),
+      productPrice: effectivePrice,
+      productOriginalPrice: effectivePrice < originalPrice ? originalPrice : undefined,
       productCondition: product.condition,
       productStatus: product.status,
       sellerId: product.seller.id,

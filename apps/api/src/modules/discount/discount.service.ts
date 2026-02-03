@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import {
   CreateDiscountDto,
   UpdateDiscountDto,
@@ -22,7 +23,27 @@ import { DiscountScope, Prisma } from '@prisma/client';
 export class DiscountService {
   private readonly logger = new Logger(DiscountService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) { }
+
+  /**
+   * İndirim değişince ürün listesi/detay cache'lerini temizle (fiyatlar kampanyaya göre hesaplanıyor)
+   */
+  private async invalidateProductCaches(): Promise<void> {
+    try {
+      const listCount = await this.cache.delPattern('products:list:*');
+      const detailCount = await this.cache.delPattern('products:detail:*');
+      if (listCount > 0 || detailCount > 0) {
+        this.logger.log(
+          `Product cache invalidated: ${listCount} list keys, ${detailCount} detail keys`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn('Product cache invalidation failed', e);
+    }
+  }
 
   /**
    * Create a new discount
@@ -54,15 +75,19 @@ export class DiscountService {
       }
     }
 
-    // Validate products exist and belong to seller if scope is product
-    if (dto.scope === DiscountScope.product && dto.targetProductIds?.length) {
+    // Scope=product: hedef ürün listesi zorunlu (seçili ürünler)
+    if (dto.scope === DiscountScope.product) {
+      if (!dto.targetProductIds?.length) {
+        throw new BadRequestException(
+          'Seçili ürünler kapsamı için en az bir ürün seçmelisiniz',
+        );
+      }
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: dto.targetProductIds },
           ...(actorId && !isAdmin ? { sellerId: actorId } : {}),
         },
       });
-
       if (products.length !== dto.targetProductIds.length) {
         throw new BadRequestException(
           isAdmin
@@ -70,6 +95,11 @@ export class DiscountService {
             : 'Sadece kendi ürünleriniz için indirim oluşturabilirsiniz',
         );
       }
+    }
+
+    // Scope=seller: tüm mağaza; targetProductIds kullanılmaz (boş kaydedilir)
+    if (dto.scope === DiscountScope.seller) {
+      dto.targetProductIds = [];
     }
 
     // Check for duplicate coupon code
@@ -117,6 +147,7 @@ export class DiscountService {
       `Discount created: ${discount.id} by ${isAdmin ? 'admin' : actorId}`,
     );
 
+    await this.invalidateProductCaches();
     return this.mapToResponse(discount);
   }
 
@@ -152,41 +183,61 @@ export class DiscountService {
       }
     }
 
+    // Scope=product kaldığı veya product yapıldığında hedef ürün listesi boş olamaz
+    const newScope = dto.scope ?? discount.scope;
+    if (newScope === DiscountScope.product && !isAdmin) {
+      const newIds =
+        dto.scope === DiscountScope.seller
+          ? []
+          : (dto.targetProductIds ?? discount.targetProductIds ?? []);
+      if (!newIds.length) {
+        throw new BadRequestException(
+          'Seçili ürünler kapsamı için en az bir ürün seçmelisiniz',
+        );
+      }
+    }
+
+    // Kapsam değişince: seller ise targetProductIds temizle; product ise dto.targetProductIds kullan
+    const updateData: Prisma.DiscountUpdateInput = {
+      ...(dto.code !== undefined && { code: dto.code?.toUpperCase() || null }),
+      ...(dto.name && { name: dto.name }),
+      ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.type && { type: dto.type }),
+      ...(dto.value !== undefined && {
+        value: new Prisma.Decimal(dto.value),
+      }),
+      ...(dto.scope && { scope: dto.scope }),
+      ...(dto.scope === DiscountScope.seller && { targetProductIds: [] }),
+      ...(dto.targetProductIds !== undefined && {
+        targetProductIds: dto.targetProductIds,
+      }),
+      ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
+      ...(dto.minCartValue !== undefined && {
+        minCartValue: dto.minCartValue
+          ? new Prisma.Decimal(dto.minCartValue)
+          : null,
+      }),
+      ...(dto.maxDiscountAmount !== undefined && {
+        maxDiscountAmount: dto.maxDiscountAmount
+          ? new Prisma.Decimal(dto.maxDiscountAmount)
+          : null,
+      }),
+      ...(dto.usageLimitTotal !== undefined && {
+        usageLimitTotal: dto.usageLimitTotal,
+      }),
+      ...(dto.usageLimitPerUser !== undefined && {
+        usageLimitPerUser: dto.usageLimitPerUser,
+      }),
+      ...(dto.isStackable !== undefined && { isStackable: dto.isStackable }),
+      ...(dto.priority !== undefined && { priority: dto.priority }),
+      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      ...(dto.startDate && { startDate: new Date(dto.startDate) }),
+      ...(dto.endDate && { endDate: new Date(dto.endDate) }),
+    };
+
     const updated = await this.prisma.discount.update({
       where: { id },
-      data: {
-        ...(dto.code !== undefined && { code: dto.code?.toUpperCase() || null }),
-        ...(dto.name && { name: dto.name }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.type && { type: dto.type }),
-        ...(dto.value !== undefined && {
-          value: new Prisma.Decimal(dto.value),
-        }),
-        ...(dto.scope && { scope: dto.scope }),
-        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
-        ...(dto.targetProductIds && { targetProductIds: dto.targetProductIds }),
-        ...(dto.minCartValue !== undefined && {
-          minCartValue: dto.minCartValue
-            ? new Prisma.Decimal(dto.minCartValue)
-            : null,
-        }),
-        ...(dto.maxDiscountAmount !== undefined && {
-          maxDiscountAmount: dto.maxDiscountAmount
-            ? new Prisma.Decimal(dto.maxDiscountAmount)
-            : null,
-        }),
-        ...(dto.usageLimitTotal !== undefined && {
-          usageLimitTotal: dto.usageLimitTotal,
-        }),
-        ...(dto.usageLimitPerUser !== undefined && {
-          usageLimitPerUser: dto.usageLimitPerUser,
-        }),
-        ...(dto.isStackable !== undefined && { isStackable: dto.isStackable }),
-        ...(dto.priority !== undefined && { priority: dto.priority }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-        ...(dto.startDate && { startDate: new Date(dto.startDate) }),
-        ...(dto.endDate && { endDate: new Date(dto.endDate) }),
-      },
+      data: updateData,
       include: {
         seller: { select: { id: true, displayName: true } },
         category: { select: { id: true, name: true } },
@@ -195,6 +246,7 @@ export class DiscountService {
 
     this.logger.log(`Discount updated: ${id}`);
 
+    await this.invalidateProductCaches();
     return this.mapToResponse(updated);
   }
 
@@ -221,6 +273,7 @@ export class DiscountService {
 
     await this.prisma.discount.delete({ where: { id } });
     this.logger.log(`Discount deleted: ${id}`);
+    await this.invalidateProductCaches();
   }
 
   /**
@@ -560,6 +613,49 @@ export class DiscountService {
   }
 
   /**
+   * Get criteria for all currently active auto-applied discounts.
+   * Used for filtering products in findAll.
+   */
+  async getActiveDiscountCriteria() {
+    const now = new Date();
+    const activeDiscounts = await this.prisma.discount.findMany({
+      where: {
+        isActive: true,
+        code: null, // Only auto-applied
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+      select: {
+        scope: true,
+        sellerId: true,
+        categoryId: true,
+        targetProductIds: true,
+      },
+    });
+
+    const criteria = {
+      hasGlobal: false,
+      sellerIds: [] as string[],
+      categoryIds: [] as string[],
+      productIds: [] as string[],
+    };
+
+    for (const d of activeDiscounts) {
+      if (d.scope === DiscountScope.global && !d.sellerId) {
+        criteria.hasGlobal = true;
+      } else if (d.scope === DiscountScope.seller && d.sellerId) {
+        criteria.sellerIds.push(d.sellerId);
+      } else if (d.scope === DiscountScope.category && d.categoryId) {
+        criteria.categoryIds.push(d.categoryId);
+      } else if (d.scope === DiscountScope.product && d.targetProductIds.length) {
+        criteria.productIds.push(...d.targetProductIds);
+      }
+    }
+
+    return criteria;
+  }
+
+  /**
    * Get active public campaigns (for homepage/listing display)
    */
   async getActiveCampaigns(): Promise<ActiveCampaignDto[]> {
@@ -651,18 +747,19 @@ export class DiscountService {
   ): boolean {
     switch (discount.scope) {
       case DiscountScope.global:
-        // If admin discount, applies to all
-        // If seller discount, only seller's products
         return discount.sellerId === null || discount.sellerId === product.sellerId;
 
       case DiscountScope.category:
         return product.categoryId === discount.categoryId;
 
       case DiscountScope.product:
+        // Sadece seçili ürünler: boş liste = hiçbir ürüne uygulanmaz
+        if (!discount.targetProductIds?.length) return false;
         return discount.targetProductIds.includes(product.id);
 
       case DiscountScope.seller:
-        return product.sellerId === discount.sellerId;
+        // Tüm mağaza: sadece bu satıcının ürünleri
+        return discount.sellerId != null && product.sellerId === discount.sellerId;
 
       default:
         return false;

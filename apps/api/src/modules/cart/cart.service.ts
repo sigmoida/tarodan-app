@@ -34,7 +34,7 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
-  ) {}
+  ) { }
 
   /**
    * Get or create a cart for user
@@ -149,7 +149,7 @@ export class CartService {
     if (existingItem) {
       // Update quantity
       const newQuantity = existingItem.quantity + (dto.quantity || 1);
-      
+
       // Check max quantity per order
       if (product.maxQuantityPerOrder && newQuantity > product.maxQuantityPerOrder) {
         throw new BadRequestException(
@@ -419,14 +419,26 @@ export class CartService {
     let subtotal = 0;
     let productDiscountTotal = 0;
 
-    // A + oldPrice: price (A) = her zaman güncel satış fiyatı; sepette sadece price kullan
+    // Calculate effective prices with campaign discounts
     for (const item of cart.items || []) {
       const product = item.product;
-      const priceA = Number(product.price);
-      const onSale = product.oldPrice != null && this.isSaleActive(product, now);
-      const originalPrice = onSale ? Number(product.oldPrice) : priceA;
-      const lineTotal = priceA * item.quantity;
-      const productDiscount = onSale ? (originalPrice - priceA) * item.quantity : 0;
+      const basePrice = Number(product.price);
+
+      // Get campaign discount price from DiscountService
+      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+        product.id,
+        product.sellerId,
+        product.categoryId,
+        basePrice,
+      );
+
+      // Use campaign price if available, otherwise base price
+      const effectivePrice = campaignPrice ?? basePrice;
+      const originalPrice = basePrice; // Original is always the base price
+      const hasDiscount = effectivePrice < originalPrice;
+
+      const lineTotal = effectivePrice * item.quantity;
+      const productDiscount = hasDiscount ? (originalPrice - effectivePrice) * item.quantity : 0;
 
       subtotal += lineTotal;
       productDiscountTotal += productDiscount;
@@ -458,8 +470,8 @@ export class CartService {
         sellerName: product.seller?.displayName || 'Satıcı',
         quantity: item.quantity,
         originalPrice,
-        salePrice: onSale ? priceA : undefined,
-        effectivePrice: priceA,
+        salePrice: hasDiscount ? effectivePrice : undefined,
+        effectivePrice,
         lineTotal,
         productDiscount: productDiscount > 0 ? productDiscount : undefined,
         isAvailable,
@@ -489,10 +501,14 @@ export class CartService {
     // Kodsuz (otomatik) indirim işlevi kaldırıldı – sadece kupon kodu ile indirim uygulanır
     const campaignDiscountTotal = 0;
 
-    // Calculate total discount
-    let totalDiscount = productDiscountTotal + couponDiscountTotal + campaignDiscountTotal;
+    // Calculate total discount for grandTotal
+    // NOTE: productDiscountTotal is DISPLAY ONLY - shows how much customer saved
+    // The subtotal already uses discounted prices (effectivePrice), so we only subtract:
+    // - couponDiscountTotal: additional coupon discount on top of current prices
+    // - campaignDiscountTotal: (currently 0, campaigns reflected in effectivePrice)
+    let totalDiscount = couponDiscountTotal + campaignDiscountTotal;
 
-    // Apply max discount cap (50% of subtotal before product discounts)
+    // Apply max discount cap (50% of original subtotal)
     const originalSubtotal = items.reduce(
       (sum, i) => sum + i.originalPrice * i.quantity,
       0,

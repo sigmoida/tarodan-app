@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     FunnelIcon,
     XMarkIcon,
@@ -8,6 +9,13 @@ import {
     ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { categoriesApi } from '@/lib/api';
+
+interface Category {
+    id: string;
+    name: string;
+    slug: string;
+}
 
 interface FilterSection {
     id: string;
@@ -27,26 +35,27 @@ interface SidebarFiltersProps {
         tradeOnly: boolean;
         category?: string;
         manufacturer?: string;
+        vehicleType?: string;
     };
     onFilterChange: (filters: any) => void;
     activeFilterCount: number;
     onClearFilters: () => void;
 }
 
-// Genişletilmiş kategoriler
-const VEHICLE_CATEGORIES = [
-    { value: 'arabalar', label: 'Arabalar', labelEn: 'Cars' },
-    { value: 'motosikletler', label: 'Motosikletler', labelEn: 'Motorcycles' },
-    { value: 'motorsports', label: 'Motorsports', labelEn: 'Motorsports' },
-    { value: 'acil-durum', label: 'Acil Durum Araçları', labelEn: 'Emergency Vehicles' },
-    { value: 'ticari', label: 'Ticari Araçlar', labelEn: 'Commercial' },
-    { value: 'insaat', label: 'İnşaat Araçları', labelEn: 'Construction' },
-    { value: 'tarim', label: 'Tarım Araçları', labelEn: 'Agriculture' },
-    { value: 'askeri', label: 'Askeri Araçlar', labelEn: 'Military' },
-    { value: 'gemiler', label: 'Gemiler', labelEn: 'Ships' },
-    { value: 'trenler', label: 'Trenler', labelEn: 'Trains' },
-    { value: 'ucaklar', label: 'Uçaklar', labelEn: 'Aircrafts' },
-    { value: 'setler', label: 'Setler', labelEn: 'Sets' },
+// Araç Türleri (Vehicle Types) - başlık/açıklamada arama yaparak filtrelenir
+const VEHICLE_TYPES = [
+    { value: 'araba', label: 'Arabalar', labelEn: 'Cars', searchTerms: ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'] },
+    { value: 'motosiklet', label: 'Motosikletler', labelEn: 'Motorcycles', searchTerms: ['motosiklet', 'motorcycle', 'motor', 'bike'] },
+    { value: 'motorsports', label: 'Motorsports', labelEn: 'Motorsports', searchTerms: ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'] },
+    { value: 'acil-durum', label: 'Acil Durum Araçları', labelEn: 'Emergency Vehicles', searchTerms: ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'] },
+    { value: 'ticari', label: 'Ticari Araçlar', labelEn: 'Commercial Vehicles', searchTerms: ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'] },
+    { value: 'insaat', label: 'İnşaat Araçları', labelEn: 'Construction', searchTerms: ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'] },
+    { value: 'tarim', label: 'Tarım Araçları', labelEn: 'Agriculture', searchTerms: ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'] },
+    { value: 'askeri', label: 'Askeri Araçlar', labelEn: 'Military', searchTerms: ['askeri', 'military', 'tank', 'zırhlı', 'armored'] },
+    { value: 'gemi', label: 'Gemiler', labelEn: 'Ships', searchTerms: ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'] },
+    { value: 'tren', label: 'Trenler', labelEn: 'Trains', searchTerms: ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'] },
+    { value: 'ucak', label: 'Uçaklar', labelEn: 'Aircrafts', searchTerms: ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'] },
+    { value: 'set', label: 'Setler', labelEn: 'Sets', searchTerms: ['set', 'koleksiyon', 'collection', 'paket', 'bundle'] },
 ];
 
 // Genişletilmiş markalar
@@ -76,6 +85,33 @@ export default function SidebarFilters({
     onClearFilters,
 }: SidebarFiltersProps) {
     const { t, locale } = useTranslation();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Fetch categories from API
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+        searchParams.get('categoryId')
+    );
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await categoriesApi.findAll();
+                // Handle both array and { data: [...] } responses
+                const cats = Array.isArray(response.data) ? response.data : response.data.data || [];
+                setCategories(cats);
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    // Sync selectedCategoryId with URL
+    useEffect(() => {
+        setSelectedCategoryId(searchParams.get('categoryId'));
+    }, [searchParams]);
 
     // Collapsed state for each section
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -135,11 +171,23 @@ export default function SidebarFilters({
         });
     };
 
-    const handleCategoryChange = (category: string) => {
-        onFilterChange({
-            ...filters,
-            category: filters.category === category ? '' : category,
-        });
+    // Category change - update URL with categoryId
+    const handleCategoryChange = (categoryId: string, categoryName: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        if (selectedCategoryId === categoryId) {
+            // Deselect - remove from URL
+            params.delete('categoryId');
+            setSelectedCategoryId(null);
+            onFilterChange({ ...filters, category: '' });
+        } else {
+            // Select - add to URL
+            params.set('categoryId', categoryId);
+            setSelectedCategoryId(categoryId);
+            onFilterChange({ ...filters, category: categoryName });
+        }
+
+        router.push(`/listings?${params.toString()}`);
     };
 
     const filteredBrands = BRANDS.filter(brand =>
@@ -177,14 +225,14 @@ export default function SidebarFilters({
             {/* Filter Sections */}
             <div className="divide-y divide-gray-100 overflow-y-auto flex-1">
 
-                {/* Kategori */}
+                {/* Araç Türü (Vehicle Type) */}
                 <div className="py-3 px-4">
                     <button
                         onClick={() => toggleSection('category')}
                         className="flex items-center justify-between w-full text-left"
                     >
                         <span className="font-medium text-gray-900">
-                            {locale === 'en' ? 'Category' : 'Kategori'}
+                            {locale === 'en' ? 'Vehicle Type' : 'Araç Türü'}
                         </span>
                         {collapsedSections.category ? (
                             <ChevronDownIcon className="w-5 h-5 text-gray-400" />
@@ -194,16 +242,19 @@ export default function SidebarFilters({
                     </button>
                     {!collapsedSections.category && (
                         <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                            {VEHICLE_CATEGORIES.map((cat) => (
+                            {VEHICLE_TYPES.map((type) => (
                                 <button
-                                    key={cat.value}
-                                    onClick={() => handleCategoryChange(cat.value)}
-                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors ${filters.category === cat.value
+                                    key={type.value}
+                                    onClick={() => {
+                                        const newValue = filters.vehicleType === type.value ? '' : type.value;
+                                        onFilterChange({ ...filters, vehicleType: newValue });
+                                    }}
+                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors ${filters.vehicleType === type.value
                                         ? 'bg-orange-100 text-orange-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                 >
-                                    <span>{locale === 'en' ? cat.labelEn : cat.label}</span>
+                                    <span>{locale === 'en' ? type.labelEn : type.label}</span>
                                 </button>
                             ))}
                         </div>

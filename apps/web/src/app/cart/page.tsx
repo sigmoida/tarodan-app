@@ -10,7 +10,18 @@ import { useCartStore } from '@/stores/cartStore';
 import { useTranslation } from '@/i18n';
 
 export default function CartPage() {
-  const { items, subtotal, grandTotal, isLoading, fetchCart, removeFromCart } = useCartStore();
+  const {
+    items,
+    subtotal,
+    grandTotal,
+    isLoading,
+    fetchCart,
+    removeFromCart,
+    shippingCost: apiShippingCost,
+    totalDiscount,
+    appliedDiscounts,
+    appliedCouponCode
+  } = useCartStore();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -126,7 +137,7 @@ export default function CartPage() {
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
               <h2 className="text-lg font-semibold mb-4">{t('checkout.orderSummary')}</h2>
-              
+
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('checkout.subtotal')}</span>
@@ -165,15 +176,15 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <Link 
-                href="/checkout" 
+              <Link
+                href="/checkout"
                 className="btn-primary w-full mt-6 flex items-center justify-center gap-2"
               >
                 {t('cart.proceedToCheckout')}
               </Link>
 
-              <Link 
-                href="/listings" 
+              <Link
+                href="/listings"
                 className="block text-center text-sm text-gray-500 hover:text-primary-500 mt-4"
               >
                 {t('cart.continueShopping')}

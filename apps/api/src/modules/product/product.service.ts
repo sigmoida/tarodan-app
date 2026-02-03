@@ -16,7 +16,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
-import { ProductStatus, Prisma, MembershipTierType } from '@prisma/client';
+import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
 import { DiscountService } from '../discount/discount.service';
 
 @Injectable()
@@ -221,6 +221,7 @@ export class ProductService {
       scale,
       tradeOnly,
       discountOnly,
+      vehicleType: query.vehicleType,
       minPrice,
       maxPrice,
       sortBy,
@@ -276,22 +277,83 @@ export class ProductService {
           where.AND = where.AND ? [...(where.AND as any[]), scaleCondition] : [scaleCondition];
         }
 
+        // Vehicle type filter - search in title or description with related terms
+        if (query.vehicleType) {
+          const vehicleTypeSearchTerms: Record<string, string[]> = {
+            'araba': ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'],
+            'motosiklet': ['motosiklet', 'motorcycle', 'motor', 'bike'],
+            'motorsports': ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'],
+            'acil-durum': ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'],
+            'ticari': ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'],
+            'insaat': ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'],
+            'tarim': ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'],
+            'askeri': ['askeri', 'military', 'tank', 'zırhlı', 'armored'],
+            'gemi': ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'],
+            'tren': ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'],
+            'ucak': ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'],
+            'set': ['set', 'koleksiyon', 'collection', 'paket', 'bundle'],
+          };
+
+          const searchTerms = vehicleTypeSearchTerms[query.vehicleType] || [query.vehicleType];
+          const vehicleTypeConditions = searchTerms.map(term => ({
+            OR: [
+              { title: { contains: term, mode: 'insensitive' } },
+              { description: { contains: term, mode: 'insensitive' } },
+            ],
+          }));
+
+          // Match any of the search terms
+          const vehicleTypeCondition = { OR: vehicleTypeConditions };
+          where.AND = where.AND ? [...(where.AND as any[]), vehicleTypeCondition] : [vehicleTypeCondition];
+        }
+
         // Trade only filter
         if (tradeOnly) {
           where.isTradeEnabled = true;
         }
 
         // Discount only filter – A + oldPrice: indirimde = oldPrice dolu ve tarih geçerli
+        // Discount only filter - Combined Manual (oldPrice) + Campaign (DiscountService)
         if (discountOnly) {
           const now = new Date();
-          const discountCondition = {
+
+          // 1. Manual discounts (oldPrice defined)
+          const manualDiscountCondition = {
             AND: [
               { oldPrice: { not: null } },
               { OR: [{ saleStartDate: null }, { saleStartDate: { lte: now } }] },
               { OR: [{ saleEndDate: null }, { saleEndDate: { gte: now } }] },
             ],
           };
-          where.AND = where.AND ? [...(where.AND as any[]), discountCondition] : [discountCondition];
+
+          // 2. Active campaign discounts
+          const criteria = await this.discountService.getActiveDiscountCriteria();
+
+          // If global discount exists, ALL products are discounted -> Apply NO filter
+          // If NOT global, apply filter: (Manual OR Seller-Scope OR Category-Scope OR Product-Scope)
+          if (!criteria.hasGlobal) {
+            const campaignConditions: any[] = [];
+
+            if (criteria.sellerIds.length > 0) {
+              campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
+            }
+
+            if (criteria.categoryIds.length > 0) {
+              campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
+            }
+
+            if (criteria.productIds.length > 0) {
+              campaignConditions.push({ id: { in: criteria.productIds } });
+            }
+
+            const combinedCondition = {
+              OR: [manualDiscountCondition, ...campaignConditions],
+            };
+
+            where.AND = where.AND
+              ? [...(where.AND as any[]), combinedCondition]
+              : [combinedCondition];
+          }
         }
 
         if (categoryId) {
@@ -1122,26 +1184,46 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     const saleDatesValid =
       (saleStartDate == null || now >= saleStartDate) &&
       (saleEndDate == null || now <= saleEndDate);
-    const isOnSale = oldPriceDb != null && saleDatesValid;
+    const isProductSale = oldPriceDb != null && saleDatesValid;
 
-    // Kampanya fiyatı sadece sepette uygulanır; ürün API'de her zaman A döner
-    const discountPercent = isOnSale && oldPriceDb && oldPriceDb > priceA
+    // Kampanya indirimi (satıcı/ürün/kategori/global): ürün kartında gösterilecek fiyata yansıt
+    const sellerId = product.sellerId ?? product.seller?.id;
+    const categoryId = product.categoryId ?? product.category?.id;
+    let displayPrice = priceA;
+    let displayOldPrice: number | null = isProductSale ? oldPriceDb : null;
+    let discountPercent: number | null = isProductSale && oldPriceDb && oldPriceDb > priceA
       ? Math.round(((oldPriceDb - priceA) / oldPriceDb) * 100)
       : null;
+
+    if (sellerId && categoryId) {
+      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+        product.id,
+        sellerId,
+        categoryId,
+        priceA,
+      );
+      if (campaignPrice != null && campaignPrice < priceA) {
+        displayPrice = campaignPrice;
+        displayOldPrice = priceA;
+        discountPercent = Math.round(((priceA - campaignPrice) / priceA) * 100);
+      }
+    }
+
+    const isOnSale = displayOldPrice != null && displayOldPrice > displayPrice;
 
     return {
       id: product.id,
       title: product.title,
       description: product.description,
-      price: priceA,
-      oldPrice: isOnSale ? oldPriceDb : null,
+      price: displayPrice,
+      oldPrice: displayOldPrice,
       saleStartDate: saleStartDate?.toISOString() || null,
       saleEndDate: saleEndDate?.toISOString() || null,
       isOnSale,
       discountPercent,
       // API uyumluluğu: eski alanlar (originalPrice/salePrice) = oldPrice/price
-      originalPrice: isOnSale ? oldPriceDb : null,
-      salePrice: isOnSale ? priceA : null,
+      originalPrice: displayOldPrice,
+      salePrice: displayPrice,
       condition: product.condition,
       status: product.status,
       isTradeEnabled: product.isTradeEnabled || false,
@@ -1528,7 +1610,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     return {
       categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
-      brands: brands.map(b => b.name),
+      brands: brands.map((b: Pick<Brand, 'name'>) => b.name),
       scales,
       manufacturers,
     };

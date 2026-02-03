@@ -24,12 +24,13 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand } from '@prisma/client';
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
+import { DiscountService } from '../discount/discount.service';
 
 @Injectable()
 export class AdminService {
@@ -42,6 +43,7 @@ export class AdminService {
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
+    private readonly discountService: DiscountService,
   ) { }
 
   // ==================== COMMISSION RULES ====================
@@ -826,14 +828,35 @@ export class AdminService {
       }),
     ]);
 
+    // Calculate campaign prices for each product
+    const productsWithCampaignPrices = await Promise.all(
+      products.map(async (p) => {
+        const basePrice = Number(p.price);
+
+        // Get campaign discount price from DiscountService
+        const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+          p.id,
+          p.sellerId,
+          p.categoryId ?? undefined,
+          basePrice,
+        );
+
+        const effectivePrice = campaignPrice ?? basePrice;
+        const hasDiscount = effectivePrice < basePrice;
+
+        return {
+          ...p,
+          price: effectivePrice,
+          originalPrice: hasDiscount ? basePrice : (p.originalPrice != null ? Number(p.originalPrice) : null),
+          salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+          isOnSale: hasDiscount || (p.salePrice != null && Number(p.salePrice) < basePrice),
+          imageUrl: p.images[0]?.url,
+        };
+      }),
+    );
+
     return {
-      data: products.map((p) => ({
-        ...p,
-        price: Number(p.price),
-        originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
-        salePrice: p.salePrice != null ? Number(p.salePrice) : null,
-        imageUrl: p.images[0]?.url,
-      })),
+      data: productsWithCampaignPrices,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -4229,7 +4252,7 @@ export class AdminService {
     });
 
     return {
-      data: brands.map((b) => ({
+      data: brands.map((b: Brand) => ({
         id: b.id,
         name: b.name,
         slug: b.slug,

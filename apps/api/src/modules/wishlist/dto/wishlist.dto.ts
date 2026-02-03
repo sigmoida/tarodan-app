@@ -18,6 +18,7 @@ export class WishlistItemResponseDto {
   productTitle: string;
   productImage?: string;
   productPrice: number;
+  productOriginalPrice?: number;
   productCondition: ProductCondition;
   productStatus: ProductStatus;
   sellerId: string;

@@ -20,6 +20,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { discountsApi, userApi } from '@/lib/api';
+import { getProductEffectivePrice } from '@/lib/productPrice';
 
 interface Discount {
   id: string;
@@ -91,7 +92,7 @@ const FILTER_TABS = [
 export default function ProfileDiscountsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
-  
+
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,14 +100,14 @@ export default function ProfileDiscountsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState<DiscountFormData>({
     code: '',
     name: '',
     description: '',
     type: 'percentage',
     value: 10,
-    scope: 'seller',
+    scope: 'product',
     targetProductIds: [],
     minCartValue: '',
     maxDiscountAmount: '',
@@ -141,7 +142,7 @@ export default function ProfileDiscountsPage() {
       const response = await discountsApi.getAll({ limit: 100 });
       const data = response.data;
       let items = data.items || data || [];
-      
+
       // Filter based on activeFilter
       if (activeFilter === 'active') {
         items = items.filter((d: Discount) => d.isActive && d.isCurrentlyValid);
@@ -150,7 +151,7 @@ export default function ProfileDiscountsPage() {
       } else if (activeFilter === 'expired') {
         items = items.filter((d: Discount) => new Date(d.endDate) < new Date());
       }
-      
+
       setDiscounts(items);
     } catch (error) {
       console.error('Failed to load discounts:', error);
@@ -223,12 +224,12 @@ export default function ProfileDiscountsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.scope === 'product' && formData.targetProductIds.length === 0) {
       toast.error('Lütfen en az bir ürün seçin');
       return;
     }
-    
+
     try {
       const data = {
         code: formData.code.trim() || undefined,
@@ -237,7 +238,9 @@ export default function ProfileDiscountsPage() {
         type: formData.type,
         value: formData.value,
         scope: formData.scope,
-        targetProductIds: formData.scope === 'product' ? formData.targetProductIds : undefined,
+        // Tüm mağaza = boş liste; seçili ürünler = seçilen id'ler (API kapsamı buna göre uygular)
+        targetProductIds:
+          formData.scope === 'product' ? formData.targetProductIds : [],
         minCartValue: formData.minCartValue ? parseFloat(formData.minCartValue) : undefined,
         maxDiscountAmount: formData.maxDiscountAmount ? parseFloat(formData.maxDiscountAmount) : undefined,
         usageLimitTotal: formData.usageLimitTotal ? parseInt(formData.usageLimitTotal) : undefined,
@@ -392,11 +395,10 @@ export default function ProfileDiscountsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveFilter(tab.value)}
-              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                activeFilter === tab.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${activeFilter === tab.value
+                ? 'bg-orange-500 text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
             >
               {tab.label}
             </button>
@@ -441,11 +443,11 @@ export default function ProfileDiscountsPage() {
                       <h3 className="font-semibold text-gray-900 truncate">{discount.name}</h3>
                       {getStatusBadge(discount)}
                     </div>
-                    
+
                     {discount.description && (
                       <p className="text-sm text-gray-500 mb-2 truncate">{discount.description}</p>
                     )}
-                    
+
                     <div className="flex flex-wrap gap-3 text-sm">
                       {/* Value */}
                       <span className="flex items-center gap-1 text-orange-600 font-semibold">
@@ -461,12 +463,12 @@ export default function ProfileDiscountsPage() {
                           </>
                         )}
                       </span>
-                      
+
                       {/* Scope */}
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs">
                         {SCOPE_LABELS[discount.scope] || discount.scope}
                       </span>
-                      
+
                       {/* Code */}
                       {discount.code ? (
                         <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">
@@ -475,13 +477,13 @@ export default function ProfileDiscountsPage() {
                       ) : (
                         <span className="text-xs text-gray-400 italic">Otomatik</span>
                       )}
-                      
+
                       {/* Date Range */}
                       <span className="flex items-center gap-1 text-gray-500">
                         <CalendarIcon className="w-4 h-4" />
                         {formatDate(discount.startDate)} - {formatDate(discount.endDate)}
                       </span>
-                      
+
                       {/* Usage */}
                       <span className="text-gray-500">
                         Kullanım: {discount.usedCount}
@@ -489,16 +491,15 @@ export default function ProfileDiscountsPage() {
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => toggleDiscountStatus(discount)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        discount.isActive 
-                          ? 'text-gray-500 hover:bg-gray-100' 
-                          : 'text-green-600 hover:bg-green-50'
-                      }`}
+                      className={`p-2 rounded-lg transition-colors ${discount.isActive
+                        ? 'text-gray-500 hover:bg-gray-100'
+                        : 'text-green-600 hover:bg-green-50'
+                        }`}
                       title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}
                     >
                       {discount.isActive ? <XMarkIcon className="w-5 h-5" /> : <CheckIcon className="w-5 h-5" />}
@@ -541,7 +542,7 @@ export default function ProfileDiscountsPage() {
                 Ürünleriniz için indirim veya kupon kodu oluşturun
               </p>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
@@ -618,75 +619,59 @@ export default function ProfileDiscountsPage() {
                 </div>
               </div>
 
-              {/* Scope */}
+              {/* Product Selection - scope is always 'product' */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kapsam *
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scope"
-                      value="seller"
-                      checked={formData.scope === 'seller'}
-                      onChange={() => setFormData(prev => ({ ...prev, scope: 'seller', targetProductIds: [] }))}
-                      className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-                    />
-                    <span className="text-sm text-gray-700">Tüm Mağazam</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scope"
-                      value="product"
-                      checked={formData.scope === 'product'}
-                      onChange={() => setFormData(prev => ({ ...prev, scope: 'product' }))}
-                      className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-                    />
-                    <span className="text-sm text-gray-700">Seçili Ürünler</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Product Selection */}
-              {formData.scope === 'product' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Ürün Seçin *
                   </label>
-                  {products.length === 0 ? (
-                    <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
-                      Aktif ürününüz bulunmuyor
-                    </p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y">
-                      {products.map(product => (
-                        <label
-                          key={product.id}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.targetProductIds.includes(product.id)}
-                            onChange={() => toggleProductSelection(product.id)}
-                            className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
-                            <p className="text-xs text-gray-500">{getProductEffectivePrice(product).toLocaleString('tr-TR')} TL</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {formData.targetProductIds.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formData.targetProductIds.length} ürün seçildi
-                    </p>
+                  {products.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.targetProductIds.length === products.length) {
+                          setFormData(prev => ({ ...prev, targetProductIds: [] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, targetProductIds: products.map(p => p.id) }));
+                        }
+                      }}
+                      className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                    >
+                      {formData.targetProductIds.length === products.length ? 'Seçimi Kaldır' : 'Hepsini Seç'}
+                    </button>
                   )}
                 </div>
-              )}
+                {products.length === 0 ? (
+                  <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                    Aktif ürününüz bulunmuyor
+                  </p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+                    {products.map(product => (
+                      <label
+                        key={product.id}
+                        className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.targetProductIds.includes(product.id)}
+                          onChange={() => toggleProductSelection(product.id)}
+                          className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
+                          <p className="text-xs text-gray-500">{getProductEffectivePrice(product).toLocaleString('tr-TR')} TL</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {formData.targetProductIds.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.targetProductIds.length} ürün seçildi
+                  </p>
+                )}
+              </div>
 
               {/* Limits */}
               <div className="grid grid-cols-2 gap-4">
