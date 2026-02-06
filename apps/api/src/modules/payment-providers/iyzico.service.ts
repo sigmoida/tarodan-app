@@ -317,4 +317,258 @@ export class IyzicoService {
       ip,
     });
   }
+  /**
+   * Initialize 3D Secure Payment (Direct API)
+   */
+  async initialize3DSecure(request: {
+    locale: string;
+    conversationId: string;
+    price: string;
+    paidPrice: string;
+    currency: string;
+    installment: number;
+    basketId: string;
+    paymentGroup: string;
+    callbackUrl: string;
+    paymentCard?: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+      registerCard?: number; // 0 or 1
+    };
+    cardUserKey?: string; // For stored cards
+    cardToken?: string; // For stored cards
+    buyer: {
+      id: string;
+      name: string;
+      surname: string;
+      gsmNumber?: string;
+      email: string;
+      identityNumber: string;
+      registrationAddress: string;
+      ip: string;
+      city: string;
+      country: string;
+    };
+    shippingAddress: {
+      contactName: string;
+      city: string;
+      country: string;
+      address: string;
+      zipCode?: string;
+    };
+    billingAddress: {
+      contactName: string;
+      city: string;
+      country: string;
+      address: string;
+      zipCode?: string;
+    };
+    basketItems: Array<{
+      id: string;
+      name: string;
+      category1: string;
+      itemType: 'PHYSICAL' | 'VIRTUAL';
+      price: string;
+    }>;
+  }): Promise<{
+    status: 'success' | 'failure';
+    errorCode?: string;
+    errorMessage?: string;
+    paymentId?: string;
+    conversationId?: string;
+    htmlContent?: string; // 3D Secure HTML content
+    threeDSHtmlContent?: string; // Alternative property name from Iyzico
+  }> {
+    if (!this.isConfigured) {
+      throw new BadRequestException('iyzico yapılandırılmamış');
+    }
+
+    this.logger.log('Initializing 3D Secure payment');
+
+    return new Promise((resolve, reject) => {
+      this.iyzipay.threedsInitialize.create(request, (err: any, result: any) => {
+        if (err) {
+          this.logger.error('Iyzico 3DS init error');
+          reject(new BadRequestException(err.message || 'iyzico bağlantı hatası'));
+          return;
+        }
+
+        if (result.status === 'failure') {
+          this.logger.warn(`Iyzico 3DS failed: ${result.errorMessage}`);
+          reject(new BadRequestException(result.errorMessage || 'Ödeme başlatılamadı'));
+          return;
+        }
+
+        resolve(result);
+      });
+    });
+  }
+
+  /**
+   * Complete 3D Secure Payment (Auth)
+   */
+  async complete3DSecure(request: {
+    paymentId: string;
+    conversationId?: string;
+    conversationData?: string;
+  }): Promise<{
+    status: 'success' | 'failure';
+    paymentId?: string;
+    paymentStatus?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    price?: number;
+    paidPrice?: number;
+  }> {
+    if (!this.isConfigured) {
+      throw new BadRequestException('iyzico yapılandırılmamış');
+    }
+
+    this.logger.log('Completing 3D Secure payment (Auth)');
+
+    return new Promise((resolve, reject) => {
+      this.iyzipay.threedsPayment.create({
+        locale: Iyzipay.LOCALE?.TR || 'tr',
+        conversationId: request.conversationId,
+        paymentId: request.paymentId,
+        conversationData: request.conversationData,
+      }, (err: any, result: any) => {
+        if (err) {
+          this.logger.error('Iyzico 3DS complete error');
+          reject(new BadRequestException(err.message || 'Ödeme tamamlama hatası'));
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
+
+  /**
+   * Add Card to Storage
+   */
+  async addCard(request: {
+    locale?: string;
+    conversationId?: string;
+    email: string; // Used as cardUserKey identifier (or verify with Iyzico pattern)
+    cardUserKey?: string;
+    card: {
+      cardAlias: string;
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+    };
+  }): Promise<{
+    status: 'success' | 'failure';
+    cardUserKey?: string;
+    cardToken?: string;
+    cardAlias?: string;
+    binNumber?: string;
+    errorCode?: string;
+    errorMessage?: string;
+  }> {
+    if (!this.isConfigured) {
+      throw new BadRequestException('iyzico yapılandırılmamış');
+    }
+
+    const payload = {
+      locale: request.locale || 'tr',
+      conversationId: request.conversationId || `ADD-CARD-${Date.now()}`,
+      email: request.email,
+      cardUserKey: request.cardUserKey,
+      card: request.card,
+    };
+
+    return new Promise((resolve, reject) => {
+      this.iyzipay.card.create(payload, (err: any, result: any) => {
+        if (err) {
+          reject(new BadRequestException(err.message || 'Kart saklama hatası'));
+          return;
+        }
+        if (result.status === 'failure') {
+          reject(new BadRequestException(result.errorMessage || 'Kart saklanamadı'));
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
+
+  /**
+   * Delete Card from Storage
+   */
+  async deleteCard(request: {
+    cardUserKey: string;
+    cardToken: string;
+  }): Promise<{ status: 'success' | 'failure' }> {
+    if (!this.isConfigured) {
+      throw new BadRequestException('iyzico yapılandırılmamış');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.iyzipay.card.delete({
+        locale: 'tr',
+        conversationId: `DEL-CARD-${Date.now()}`,
+        cardUserKey: request.cardUserKey,
+        cardToken: request.cardToken,
+      }, (err: any, result: any) => {
+        if (err) {
+          reject(new BadRequestException(err.message));
+          return;
+        }
+        if (result.status === 'failure') {
+          reject(new BadRequestException(result.errorMessage));
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
+
+  /**
+   * Get Stored Cards
+   */
+  async getCards(cardUserKey: string): Promise<{
+    status: 'success' | 'failure';
+    cardUserKey?: string;
+    cardDetails?: Array<{
+      cardToken: string;
+      cardAlias: string;
+      binNumber: string;
+      lastFourDigits: string;
+      cardType: string;
+      cardAssociation: string;
+      cardFamily: string;
+    }>;
+  }> {
+    if (!this.isConfigured) {
+      throw new BadRequestException('iyzico yapılandırılmamış');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.iyzipay.cardList.retrieve({
+        locale: 'tr',
+        conversationId: `LIST-CARDS-${Date.now()}`,
+        cardUserKey: cardUserKey,
+      }, (err: any, result: any) => {
+        if (err) {
+          reject(new BadRequestException(err.message));
+          return;
+        }
+        if (result.status === 'failure') {
+          // If user key not found, return empty list instead of specific error
+          if (result.errorCode === '5157') {
+            resolve({ status: 'success', cardDetails: [] });
+            return;
+          }
+          reject(new BadRequestException(result.errorMessage));
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
 }

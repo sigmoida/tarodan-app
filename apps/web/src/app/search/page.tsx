@@ -51,7 +51,7 @@ function SearchContent() {
   const router = useRouter();
   const { t } = useTranslation();
   const query = searchParams.get('q') || '';
-  
+
   const [searchTerm, setSearchTerm] = useState(query);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -64,6 +64,11 @@ function SearchContent() {
     sortOrder: searchParams.get('order') || 'desc',
   });
   const [page, setPage] = useState(1);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     setSearchTerm(query);
@@ -109,6 +114,28 @@ function SearchContent() {
   const totalItems = productsQuery.data?.totalItems ?? 0;
   const loading = productsQuery.isLoading;
 
+  // "Did you mean?" suggestions - fetch when we have a query but no results
+  const suggestionsQuery = useQuery({
+    queryKey: ['search-suggestions', query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      try {
+        const response = await listingsApi.getAll({ search: '', limit: 10 });
+        const allProducts = response.data?.data || response.data?.products || [];
+        // Get unique titles that partially match the query
+        const titles = allProducts
+          .map((p: Product) => p.title)
+          .filter((title: string) => title.toLowerCase().includes(query.slice(0, 3).toLowerCase()))
+          .slice(0, 3);
+        return titles;
+      } catch {
+        return [];
+      }
+    },
+    enabled: isMounted && !!query && products.length === 0 && !loading,
+    meta: { page: 'search-suggestions' },
+  });
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -120,7 +147,7 @@ function SearchContent() {
     if (filters.isTradeEnabled) params.set('trade', 'true');
     if (filters.sortBy !== 'createdAt') params.set('sort', filters.sortBy);
     if (filters.sortOrder !== 'desc') params.set('order', filters.sortOrder);
-    
+
     router.push(`/search?${params.toString()}`);
   };
 
@@ -210,11 +237,10 @@ function SearchContent() {
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                showFilters
-                  ? 'bg-primary-600 border-primary-600 text-white'
-                  : 'bg-dark-800 border-dark-700 text-gray-300 hover:border-primary-500'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'bg-dark-800 border-dark-700 text-gray-300 hover:border-primary-500'
+                }`}
             >
               <FunnelIcon className="h-5 w-5" />
               {t('common.filter')}
@@ -333,9 +359,32 @@ function SearchContent() {
               <div className="text-center py-16">
                 <MagnifyingGlassIcon className="h-16 w-16 text-gray-600 mx-auto mb-4" />
                 <h2 className="text-xl font-semibold text-white mb-2">{t('search.noResults')}</h2>
-                <p className="text-gray-400">
+                <p className="text-gray-400 mb-6">
                   {t('search.tryDifferent')}
                 </p>
+
+                {/* Did you mean? Suggestions */}
+                {isMounted && query && suggestionsQuery.data && suggestionsQuery.data.length > 0 && (
+                  <div className="mt-6 p-4 bg-dark-800 rounded-lg inline-block">
+                    <p className="text-gray-300 mb-3">
+                      <span className="text-primary-400 font-semibold">💡 {t('search.didYouMean') || 'Bunu mu demek istediniz?'}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {suggestionsQuery.data.map((suggestion: string, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            router.push(`/search?q=${encodeURIComponent(suggestion)}`);
+                          }}
+                          className="px-4 py-2 bg-primary-600/20 hover:bg-primary-600/40 text-primary-400 rounded-full border border-primary-500/30 transition-colors text-sm"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>

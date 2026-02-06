@@ -484,7 +484,7 @@ export default function Navbar() {
             <div className="hidden lg:flex items-center gap-6 mr-12">
               {NAV_LINKS.map((link) => {
                 // Takaslar link requires auth for guests
-                if (link.href === '/trades' && !isAuthenticated) {
+                if (link.href === '/trades' && !showAuthUI) {
                   return (
                     <button
                       key={link.href}

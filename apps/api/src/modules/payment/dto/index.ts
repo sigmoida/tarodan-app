@@ -4,3 +4,4 @@ export * from './payment-response.dto';
 export * from './refund-payment.dto';
 export * from './cancel-payment.dto';
 export * from './retry-payment.dto';
+export * from './direct-payment.dto';

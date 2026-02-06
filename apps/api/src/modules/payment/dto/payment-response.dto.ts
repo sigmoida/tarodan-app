@@ -33,11 +33,17 @@ export class PaymentInitResponseDto {
   @ApiProperty({ example: 'uuid' })
   paymentId: string;
 
-  @ApiProperty({ example: 'https://www.iyzipay.com/payment/...' })
-  paymentUrl: string;
+  @ApiPropertyOptional({ example: 'https://www.iyzipay.com/payment/...' })
+  paymentUrl?: string;
 
   @ApiPropertyOptional({ example: '<script>...</script>' })
   paymentHtml?: string;
+
+  @ApiPropertyOptional({ example: 'PGh0bWw...' })
+  htmlContent?: string;
+
+  @ApiPropertyOptional({ example: true })
+  isBase64?: boolean;
 
   @ApiProperty({ example: 'iyzico' })
   provider: string;
