@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 interface OrderDetail {
   id: string;
@@ -115,7 +116,10 @@ export default function OrderDetailScreen() {
     });
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | null | undefined) => {
+    if (price == null || isNaN(price)) {
+      return '₺0';
+    }
     return `₺${price.toLocaleString('tr-TR')}`;
   };
 
@@ -224,7 +228,7 @@ export default function OrderDetailScreen() {
           <TouchableOpacity onPress={() => router.push(`/product/${order.product.id}`)}>
             <Card.Content style={styles.productCard}>
               <Image
-                source={{ uri: order.product.images?.[0]?.url || 'https://via.placeholder.com/80' }}
+                source={{ uri: getImageUrlFromUtils(order.product.images) || 'https://via.placeholder.com/80' }}
                 style={styles.productImage}
               />
               <View style={styles.productInfo}>

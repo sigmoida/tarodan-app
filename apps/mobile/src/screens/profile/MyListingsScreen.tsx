@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import api from '../../services/api';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../utils/imageUrl';
 
 // Product status labels matching backend enum
 const STATUS_LABELS: Record<string, string> = {
@@ -100,7 +101,7 @@ const MyListingsScreen = ({ navigation }: any) => {
         onPress={() => navigation.navigate('ListingDetail', { id: item.id })}
       >
         <Image
-          source={{ uri: item.imageUrl || item.images?.[0]?.url || 'https://via.placeholder.com/100' }}
+          source={{ uri: transformImageUrl(item.imageUrl || item.images?.[0]?.url) || 'https://via.placeholder.com/100' }}
           style={styles.listingImage}
         />
         <View style={styles.listingInfo}>

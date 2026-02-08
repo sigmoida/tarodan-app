@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
 import { useCartStore } from '../src/stores/cartStore';
+import { transformImageUrl } from '../src/utils/imageUrl';
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
@@ -85,7 +86,7 @@ export default function CartScreen() {
           <View key={item.id} style={styles.cartItem}>
             <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
               <Image 
-                source={{ uri: item.imageUrl || 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Ürün' }} 
+                source={{ uri: transformImageUrl(item.imageUrl) || 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Ürün' }} 
                 style={styles.itemImage} 
               />
             </TouchableOpacity>

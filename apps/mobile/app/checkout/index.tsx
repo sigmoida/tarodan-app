@@ -6,6 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useCartStore } from '../../src/stores/cartStore';
 import { api } from '../../src/services/api';
+import { transformImageUrl } from '../../src/utils/imageUrl';
 
 interface ShippingAddress {
   fullName: string;
@@ -480,7 +481,7 @@ export default function CheckoutScreen() {
             {/* Order Items */}
             {items.map((item) => (
               <View key={item.id} style={styles.orderItem}>
-                <Image source={{ uri: item.imageUrl }} style={styles.orderItemImage} />
+                <Image source={{ uri: transformImageUrl(item.imageUrl) }} style={styles.orderItemImage} />
                 <View style={styles.orderItemInfo}>
                   <Text style={styles.orderItemTitle} numberOfLines={2}>{item.title}</Text>
                   <Text style={styles.orderItemMeta}>

@@ -206,8 +206,8 @@ export default function AnalyticsScreen() {
                 <Text variant="titleSmall">Son 7 Gün Görüntülenme</Text>
               </View>
               <View style={styles.simpleChart}>
-                {analytics.viewsLast7Days.map((value, index) => {
-                  const maxVal = getMaxValue(analytics.viewsLast7Days);
+                {(analytics.viewsLast7Days || []).map((value, index) => {
+                  const maxVal = getMaxValue(analytics.viewsLast7Days || []);
                   const height = (value / maxVal) * 100;
                   return (
                     <View key={index} style={styles.chartBar}>
@@ -219,7 +219,7 @@ export default function AnalyticsScreen() {
               </View>
               <View style={styles.chartFooter}>
                 <Text variant="bodySmall" style={styles.chartTotal}>
-                  Toplam: {analytics.viewsLast7Days.reduce((a, b) => a + b, 0)} görüntülenme
+                  Toplam: {(analytics.viewsLast7Days || []).reduce((a, b) => a + b, 0)} görüntülenme
                 </Text>
               </View>
             </Card.Content>
@@ -229,7 +229,7 @@ export default function AnalyticsScreen() {
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="titleSmall" style={styles.sectionTitle}>En Popüler İlanlarınız</Text>
-              {analytics.topListings.map((listing, index) => (
+              {(analytics.topListings || []).map((listing, index) => (
                 <TouchableOpacity
                   key={listing.id}
                   style={styles.listingItem}
