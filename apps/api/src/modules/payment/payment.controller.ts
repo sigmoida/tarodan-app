@@ -159,16 +159,39 @@ export class PaymentController {
   ) {
     // Iyzico Mock bazen GET ile query'de token/conversationData gönderir – body boşsa query'den al
     const query = (req as any).query || {};
+    const body = (req as any).body || dto || {};
+
+    // CRITICAL DEBUG: Log EVERYTHING for 3DS callback debugging
+    this.logger.log(`[CALLBACK DEBUG] Full body: ${JSON.stringify(body)}`);
+    this.logger.log(`[CALLBACK DEBUG] Full query: ${JSON.stringify(query)}`);
+    this.logger.log(`[CALLBACK DEBUG] dto object: ${JSON.stringify(dto)}`);
+
     const mergedDto = {
+      ...body,
       ...dto,
-      token: dto?.token || tokenFromQuery || query['token'],
-      conversationData: (dto as any)?.conversationData || (dto as any)?.conversation_data || conversationDataFromQuery || query['conversationData'] || query['conversation_data'],
+      token: dto?.token || body?.token || tokenFromQuery || query['token'],
+      conversationData: (dto as any)?.conversationData || (dto as any)?.conversation_data || body?.conversationData || body?.conversation_data || conversationDataFromQuery || query['conversationData'] || query['conversation_data'],
+      mdStatus: (dto as any)?.mdStatus || body?.mdStatus || query['mdStatus'],
+      paymentId: (dto as any)?.paymentId || body?.paymentId || query['paymentId'],
+      status: (dto as any)?.status || body?.status || query['status'],
     };
-    const logPayload = { bodyKeys: Object.keys(dto || {}), queryKeys: Object.keys(query), hasToken: !!mergedDto.token, hasConversationData: !!mergedDto.conversationData };
+    const logPayload = { bodyKeys: Object.keys(body), queryKeys: Object.keys(query), hasToken: !!mergedDto.token, hasConversationData: !!mergedDto.conversationData, mdStatus: mergedDto.mdStatus, paymentIdInBody: mergedDto.paymentId };
     this.logger.log(`[CALLBACK] Iyzico: ${JSON.stringify(logPayload)}`);
 
     // Get raw body for signature verification
     const rawBody = (req as any).rawBody || JSON.stringify(dto);
+
+    // DEBUG: Create a debug string to show what we received (will be visible in browser URL)
+    const debugInfo = encodeURIComponent(JSON.stringify({
+      bodyKeys: Object.keys(body),
+      bodyValues: body,
+      queryKeys: Object.keys(query),
+      dtoKeys: Object.keys(dto || {}),
+      hasToken: !!mergedDto.token,
+      hasConversationData: !!mergedDto.conversationData,
+      mdStatus: mergedDto.mdStatus,
+      contentType: req.headers['content-type'],
+    }));
 
     // Direct 3D Secure: bank POSTs here after user completes SMS; we complete auth and redirect to frontend
     if (direct === 'true' && paymentId) {
@@ -180,11 +203,11 @@ export class PaymentController {
 
       if (result.status === 'success') {
         const successUrl = orderId
-          ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}`
-          : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}`;
+          ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}&debug=${debugInfo}`
+          : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}&debug=${debugInfo}`;
         return res.redirect(302, successUrl);
       } else {
-        const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}`;
+        const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}&debug=${debugInfo}`;
         return res.redirect(302, failUrl);
       }
     }

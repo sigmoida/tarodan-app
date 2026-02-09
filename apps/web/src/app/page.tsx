@@ -184,6 +184,12 @@ export default function Home() {
   });
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
 
+  // Fix hydration mismatch: wait for mount before checking auth state
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { data: topCollections = [] } = useQuery({
     queryKey: ['home', 'topCollections', { limit: 20 }],
     queryFn: async () => {
@@ -356,7 +362,7 @@ export default function Home() {
                   : 'Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.'}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                {isAuthenticated ? (
+                {mounted && isAuthenticated ? (
                   <>
                     <Link
                       href="/listings/new"

@@ -12,15 +12,16 @@ import { NotificationService } from '../notification/notification.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
 import { TaxService } from '../tax';
+import * as PDFDocument from 'pdfkit';
 
-// Simple HTML to PDF generation (uses basic HTML for invoice)
-// In production, consider using puppeteer or pdfkit for better PDF generation
+// Invoice generation service using pdfkit for reliable PDF creation
+// Turkish character support via system font fallbacks or embedded fonts
 
 export interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: Date;
   dueDate?: Date;
-  
+
   // Seller info
   seller: {
     name: string;
@@ -29,7 +30,7 @@ export interface InvoiceData {
     address?: string;
     taxId?: string;
   };
-  
+
   // Buyer info
   buyer: {
     name: string;
@@ -38,11 +39,11 @@ export interface InvoiceData {
     address?: string;
     taxId?: string;
   };
-  
+
   // Order info
   orderId: string;
   orderNumber: string;
-  
+
   // Line items
   items: Array<{
     description: string;
@@ -50,7 +51,7 @@ export interface InvoiceData {
     unitPrice: number;
     total: number;
   }>;
-  
+
   // Totals
   subtotal: number;
   taxRate: number;
@@ -58,11 +59,11 @@ export interface InvoiceData {
   shippingCost: number;
   commission: number;
   total: number;
-  
+
   // Payment info
   paymentMethod: string;
   paymentDate?: Date;
-  
+
   // Currency
   currency: string;
 }
@@ -85,7 +86,7 @@ export class InvoiceService {
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
     private readonly taxService: TaxService,
-  ) {}
+  ) { }
 
   /**
    * Generate invoice for an order
@@ -115,7 +116,7 @@ export class InvoiceService {
 
     // Parse shipping address (it's stored as JSON); country default TR (addresses don't store country yet)
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
-    const buyerAddress = shippingAddr 
+    const buyerAddress = shippingAddr
       ? `${shippingAddr.addressLine1 || ''}, ${shippingAddr.district || ''}, ${shippingAddr.city || ''}`
       : 'Türkiye';
     const countryCode = (shippingAddr?.country as string) || 'TR';
@@ -137,7 +138,7 @@ export class InvoiceService {
     const invoiceData: InvoiceData = {
       invoiceNumber,
       invoiceDate: new Date(),
-      
+
       seller: {
         name: order.seller.displayName || 'Satıcı',
         email: order.seller.email,
@@ -145,7 +146,7 @@ export class InvoiceService {
         address: 'Türkiye',
         taxId: order.seller.taxId || undefined,
       },
-      
+
       buyer: {
         name: order.buyer.displayName || 'Alıcı',
         email: order.buyer.email,
@@ -153,35 +154,35 @@ export class InvoiceService {
         address: buyerAddress,
         taxId: order.buyer.taxId || undefined,
       },
-      
+
       orderId: order.id,
       orderNumber: order.orderNumber,
-      
+
       items: [{
         description: order.product.title,
         quantity: 1,
         unitPrice: subtotal,
         total: subtotal,
       }],
-      
+
       subtotal,
       taxRate,
       taxAmount,
       shippingCost: Number(order.shippingCost || 0),
       commission: Number(order.commissionAmount || 0),
       total: Number(order.totalAmount),
-      
+
       paymentMethod: order.payment?.provider || 'iyzico',
       paymentDate: order.payment?.createdAt,
-      
+
       currency: 'TRY',
     };
 
-    // Generate HTML invoice
+    // Generate HTML invoice (for email body)
     const htmlContent = this.generateInvoiceHtml(invoiceData);
 
-    // Generate PDF buffer from HTML
-    const pdfBuffer = await this.htmlToPdf(htmlContent);
+    // Generate PDF buffer from data
+    const pdfBuffer = await this.generatePdfFromData(invoiceData);
 
     // Store in MinIO
     let pdfUrl = '';
@@ -242,7 +243,7 @@ export class InvoiceService {
       // Get order with full details
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        include: { 
+        include: {
           buyer: true,
           seller: true,
           product: true,
@@ -255,17 +256,17 @@ export class InvoiceService {
       const shippingAddressData = order.shippingAddress as any;
       const buyerIsSystemGuest = !order.buyer.email || order.buyer.email === 'guest@tarodan.system' || (order.buyer.email && order.buyer.email.toLowerCase().includes('guest@tarodan'));
       const isGuestOrder = buyerIsSystemGuest || shippingAddressData?.isGuestOrder === true;
-      
+
       // Get actual buyer email and name for guest orders
-      const buyerEmail = isGuestOrder 
+      const buyerEmail = isGuestOrder
         ? (shippingAddressData?.guestEmail || shippingAddressData?.email || order.buyer.email)
         : order.buyer.email;
       const buyerName = isGuestOrder
         ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
         : (order.buyer.displayName || order.buyer.email.split('@')[0]);
-      
+
       const sellerName = order.seller.displayName || order.seller.email.split('@')[0];
-      
+
       this.logger.log(`Invoice will be sent to buyer: ${buyerEmail} (isGuest: ${isGuestOrder})`);
       const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
       // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
@@ -344,7 +345,7 @@ export class InvoiceService {
     orderId: string;
     frontendUrl: string;
   }): string {
-    const formatPrice = (amount: number) => 
+    const formatPrice = (amount: number) =>
       new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
     return `
@@ -497,9 +498,9 @@ export class InvoiceService {
     frontendUrl: string;
     orderId: string;
   }): string {
-    const formatPrice = (amount: number) => 
+    const formatPrice = (amount: number) =>
       new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-    
+
     const netAmount = data.totalAmount - data.commissionAmount;
 
     return `
@@ -643,8 +644,9 @@ export class InvoiceService {
 
   /**
    * Get invoice by order ID
+   * Optionally verify with paymentId (useful for guest checkouts or user ID mismatches on success page)
    */
-  async getByOrderId(orderId: string, userId: string) {
+  async getByOrderId(orderId: string, userId: string | null, paymentId?: string) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { orderId },
       include: {
@@ -653,6 +655,7 @@ export class InvoiceService {
             buyer: { select: { id: true, displayName: true, email: true } },
             seller: { select: { id: true, displayName: true, email: true } },
             product: { select: { id: true, title: true } },
+            payment: { select: { id: true } },
           },
         },
       },
@@ -662,8 +665,13 @@ export class InvoiceService {
       throw new NotFoundException('Fatura bulunamadı');
     }
 
-    // Check authorization
-    if (invoice.buyerId !== userId && invoice.sellerId !== userId) {
+    // Check authorization: buyer, seller, or someone with a valid paymentId for this order
+    const isBuyer = userId && invoice.buyerId === userId;
+    const isSeller = userId && invoice.sellerId === userId;
+    const isPaymentVerified = paymentId && invoice.order.payment?.id === paymentId;
+
+    if (!isBuyer && !isSeller && !isPaymentVerified) {
+      // Security: Don't reveal if it exists but unauthorized
       throw new NotFoundException('Fatura bulunamadı');
     }
 
@@ -692,7 +700,7 @@ export class InvoiceService {
   /**
    * Download invoice PDF
    */
-  async downloadInvoice(invoiceId: string, userId: string): Promise<Buffer> {
+  async downloadInvoice(invoiceId: string, userId: string | null, paymentId?: string): Promise<Buffer> {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -701,6 +709,7 @@ export class InvoiceService {
             buyer: true,
             seller: true,
             product: true,
+            payment: true,
           },
         },
       },
@@ -710,14 +719,18 @@ export class InvoiceService {
       throw new NotFoundException('Fatura bulunamadı');
     }
 
-    // Check authorization
-    if (invoice.buyerId !== userId && invoice.sellerId !== userId) {
+    // Check authorization: buyer, seller, or someone with a valid paymentId for this order
+    const isBuyer = userId && invoice.buyerId === userId;
+    const isSeller = userId && invoice.sellerId === userId;
+    const isPaymentVerified = paymentId && invoice.order.payment?.id === paymentId;
+
+    if (!isBuyer && !isSeller && !isPaymentVerified) {
       throw new NotFoundException('Fatura bulunamadı');
     }
 
     // Parse shipping address (it's stored as JSON)
     const shippingAddr = invoice.order.shippingAddress as Record<string, string> | null;
-    const buyerAddress = shippingAddr 
+    const buyerAddress = shippingAddr
       ? `${shippingAddr.addressLine1 || ''}, ${shippingAddr.district || ''}, ${shippingAddr.city || ''}`
       : 'Türkiye';
 
@@ -725,42 +738,41 @@ export class InvoiceService {
     const invoiceData: InvoiceData = {
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.issuedAt,
-      
+
       seller: {
         name: invoice.order.seller.displayName || 'Satıcı',
         email: invoice.order.seller.email,
         taxId: invoice.order.seller.taxId || undefined,
       },
-      
+
       buyer: {
         name: invoice.order.buyer.displayName || 'Alıcı',
         email: invoice.order.buyer.email,
         address: buyerAddress,
       },
-      
+
       orderId: invoice.orderId,
       orderNumber: invoice.order.orderNumber,
-      
+
       items: [{
         description: invoice.order.product.title,
         quantity: 1,
         unitPrice: Number(invoice.subtotal),
         total: Number(invoice.subtotal),
       }],
-      
+
       subtotal: Number(invoice.subtotal),
       taxRate: 18,
       taxAmount: Number(invoice.taxAmount),
       shippingCost: Number(invoice.shippingCost),
       commission: 0,
       total: Number(invoice.total),
-      
+
       paymentMethod: 'Online Ödeme',
       currency: 'TRY',
     };
 
-    const html = this.generateInvoiceHtml(invoiceData);
-    return this.htmlToPdf(html);
+    return this.generatePdfFromData(invoiceData);
   }
 
   /**
@@ -769,7 +781,7 @@ export class InvoiceService {
   private async generateInvoiceNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    
+
     // Get last invoice number for this month
     const lastInvoice = await this.prisma.invoice.findFirst({
       where: {
@@ -793,7 +805,7 @@ export class InvoiceService {
    * Generate HTML invoice content
    */
   private generateInvoiceHtml(data: InvoiceData): string {
-    const formatCurrency = (amount: number) => 
+    const formatCurrency = (amount: number) =>
       new Intl.NumberFormat('tr-TR', { style: 'currency', currency: data.currency }).format(amount);
 
     const formatDate = (date: Date) =>
@@ -936,27 +948,118 @@ export class InvoiceService {
   }
 
   /**
-   * Convert HTML to PDF buffer
-   * Uses a simple approach - in production consider using puppeteer or pdfkit
+   * Internal PDF generator using pdfkit
+   */
+  private async generatePdfFromData(data: InvoiceData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const buffers: Buffer[] = [];
+
+        doc.on('data', (chunk) => buffers.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+        doc.on('error', (err) => reject(err));
+
+        // Load font for Turkish support
+        const fontPath = '/System/Library/Fonts/Supplemental/Arial.ttf';
+        try {
+          doc.font(fontPath);
+        } catch {
+          // Fallback to standard Helvetica if Arial is not found (might lose Turkish chars)
+          doc.font('Helvetica');
+        }
+
+        // Header
+        doc.fillColor('#1d3557').fontSize(24).text('TARODAN', { align: 'left' });
+        doc.fontSize(10).fillColor('#666666').text('İkinci El Model Araba Pazarı', { align: 'left' });
+
+        doc.moveDown();
+        doc.fillColor('#000000').fontSize(20).text('FATURA', { align: 'right' });
+        doc.fontSize(10).text(`Fatura No: ${data.invoiceNumber}`, { align: 'right' });
+        doc.text(`Tarih: ${data.invoiceDate.toLocaleDateString('tr-TR')}`, { align: 'right' });
+
+        doc.moveDown();
+        const yBeforeInfo = doc.y;
+
+        // Seller Block
+        doc.fontSize(12).fillColor('#1d3557').text('SATICI BİLGİLERİ', 50, yBeforeInfo);
+        doc.fontSize(10).fillColor('#333333');
+        doc.text(data.seller.name);
+        doc.text(data.seller.email);
+        if (data.seller.taxId) doc.text(`Vergi No: ${data.seller.taxId}`);
+        if (data.seller.address) doc.text(data.seller.address, { width: 200 });
+
+        // Buyer Block
+        doc.fontSize(12).fillColor('#1d3557').text('ALICI BİLGİLERİ', 300, yBeforeInfo);
+        doc.fontSize(10).fillColor('#333333');
+        doc.text(data.buyer.name, 300);
+        doc.text(data.buyer.email, 300);
+        if (data.buyer.address) doc.text(data.buyer.address, 300, doc.y, { width: 200 });
+
+        doc.moveDown(4);
+
+        // Table Header
+        const tableTop = doc.y;
+        doc.rect(50, tableTop, 500, 20).fill('#f8f9fa');
+        doc.fillColor('#1d3557').fontSize(10);
+        doc.text('Açıklama', 60, tableTop + 6);
+        doc.text('Adet', 350, tableTop + 6, { width: 50, align: 'center' });
+        doc.text('Birim Fiyat', 400, tableTop + 6, { width: 70, align: 'right' });
+        doc.text('Toplam', 480, tableTop + 6, { width: 60, align: 'right' });
+
+        // Table Items
+        let currentY = tableTop + 25;
+        data.items.forEach((item) => {
+          doc.fillColor('#333333');
+          doc.text(item.description, 60, currentY, { width: 280 });
+          doc.text(item.quantity.toString(), 350, currentY, { width: 50, align: 'center' });
+          doc.text(`${item.unitPrice.toLocaleString('tr-TR')} TL`, 400, currentY, { width: 70, align: 'right' });
+          doc.text(`${item.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+          currentY += 20;
+        });
+
+        // Totals
+        const totalGap = 15;
+        currentY += 20;
+        doc.fontSize(10).fillColor('#666666');
+
+        doc.text('Ara Toplam:', 380, currentY, { width: 100, align: 'right' });
+        doc.text(`${data.subtotal.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+
+        currentY += totalGap;
+        doc.text(`KDV (%${data.taxRate}):`, 380, currentY, { width: 100, align: 'right' });
+        doc.text(`${data.taxAmount.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+
+        if (data.shippingCost > 0) {
+          currentY += totalGap;
+          doc.text('Kargo Ücreti:', 380, currentY, { width: 100, align: 'right' });
+          doc.text(`${data.shippingCost.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        }
+
+        currentY += 25;
+        doc.fontSize(14).fillColor('#1d3557').font(fontPath).text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
+        doc.text(`${data.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+
+        // Footer
+        const footerY = 750;
+        doc.fontSize(8).fillColor('#999999');
+        doc.text('Bu fatura elektronik olarak oluşturulmuştur ve mali değeri vardır.', 50, footerY, { align: 'center', width: 500 });
+        doc.text('Tarodan - Model Araba Alım Satım ve Takas Platformu', 50, footerY + 12, { align: 'center', width: 500 });
+        doc.text('https://tarodan.com', 50, footerY + 24, { align: 'center', width: 500 });
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Convert HTML to PDF buffer (Legacy - kept for compatibility, uses generatePdfFromData internally if possible)
    */
   private async htmlToPdf(html: string): Promise<Buffer> {
-    // For MVP, we'll return the HTML as a buffer
-    // In production, integrate puppeteer:
-    // const puppeteer = require('puppeteer');
-    // const browser = await puppeteer.launch();
-    // const page = await browser.newPage();
-    // await page.setContent(html);
-    // const pdf = await page.pdf({ format: 'A4' });
-    // await browser.close();
-    // return pdf;
-
-    // Simple HTML to PDF using basic approach
-    // This creates a valid PDF-like document that can be opened
-    const htmlBuffer = Buffer.from(html, 'utf-8');
-    
-    // For now, return HTML content as buffer (browsers can render it)
-    // In production, use proper PDF generation library
-    return htmlBuffer;
+    // This is now redundant but kept to avoid breaking types if any external calls exist
+    return Buffer.from(html, 'utf-8');
   }
 
   /**

@@ -573,6 +573,9 @@ export class PaymentService {
       throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçilmeli');
     }
 
+    // DEBUG: Log card saving parameters
+    this.logger.log(`[ÖDEME] Card Save Debug: saveCard=${dto.saveCard}, userId=${userId}, registerCard=${request.paymentCard?.registerCard}, cardUserKey=${request.cardUserKey}`);
+
     try {
       const result = await this.iyzicoService.initialize3DSecure(request);
 
@@ -819,8 +822,21 @@ export class PaymentService {
         }
       }
 
+      // NEW FIX: If mdStatus=1 and status=success, payment is successful even without conversationData
+      // Iyzico sometimes sends empty conversationData but with mdStatus=1 indicating 3DS was successful
+      const mdStatus = dtoAny.mdStatus || '';
+      const iyzicoStatus = dtoAny.status || '';
+      const iyzicoPaymentIdFromCallback = dtoAny.paymentId || '';
+
+      if (mdStatus === '1' && iyzicoStatus === 'success') {
+        this.logger.log(`[ÖDEME] mdStatus=1 ve status=success, ödeme başarılı kabul ediliyor. Iyzico paymentId: ${iyzicoPaymentIdFromCallback}`);
+        const isGuest = !(payment.order as any)?.buyerId;
+        await this.processSuccessfulPayment(payment, iyzicoPaymentIdFromCallback || iyzicoPaymentId);
+        return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
+      }
+
       if (!conversationData || String(conversationData).trim() === '') {
-        this.logger.warn('[ÖDEME] conversationData ve token yok. Keys: ' + Object.keys(dtoAny).join(','));
+        this.logger.warn('[ÖDEME] conversationData ve token yok, mdStatus da başarılı değil. Keys: ' + Object.keys(dtoAny).join(','));
         await this.processFailedPayment(payment, '3D Secure yanıtı alınamadı (conversationData/token eksik)');
         const isGuest = !(payment.order as any)?.buyerId;
         return { status: 'error', message: '3D Secure yanıtı alınamadı', orderId: payment.orderId, isGuest };
