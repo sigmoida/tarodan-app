@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { QUEUE_NAMES } from '../../workers/worker.module';
+import { QUEUE_NAMES } from '../../workers/constants';
+import { PrismaService } from '../../prisma';
 
 /**
  * Event Payload Types
@@ -128,6 +129,22 @@ export interface PaymentRefundedPayload {
   providerRefundId: string;
 }
 
+export interface AdminBroadcastPayload {
+  userIds: string[];
+  title: string;
+  body: string;
+  channels: string[];
+  data?: Record<string, any>;
+}
+
+export interface InAppNotificationPayload {
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+}
+
 @Injectable()
 export class EventService {
   private readonly logger = new Logger(EventService.name);
@@ -137,7 +154,8 @@ export class EventService {
     @InjectQueue(QUEUE_NAMES.PUSH) private readonly pushQueue: Queue,
     @InjectQueue(QUEUE_NAMES.SHIPPING) private readonly shippingQueue: Queue,
     @InjectQueue(QUEUE_NAMES.ANALYTICS) private readonly analyticsQueue: Queue,
-  ) {}
+    private readonly prisma: PrismaService,
+  ) { }
 
   /**
    * Emit order.created event
@@ -623,5 +641,55 @@ export class EventService {
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
     });
+  }
+
+  /**
+   * Emit admin broadcast notification
+   */
+  async emitAdminBroadcast(payload: AdminBroadcastPayload): Promise<void> {
+    this.logger.log(`Emitting admin broadcast to ${payload.userIds.length} users`);
+
+    // Fetch user details in chunks
+    const chunkSize = 100;
+    for (let i = 0; i < payload.userIds.length; i += chunkSize) {
+      const chunkIds = payload.userIds.slice(i, i + chunkSize);
+
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: chunkIds }, isBanned: false },
+        select: { id: true, email: true, fcmToken: true },
+      });
+
+      for (const user of users) {
+        // Send email if requested
+        if (payload.channels.includes('email')) {
+          await this.emailQueue.add('send', {
+            to: user.email,
+            subject: payload.title,
+            html: `
+              <div style="font-family: sans-serif; padding: 20px;">
+                <h2 style="color: #ea580c;">${payload.title}</h2>
+                <div style="line-height: 1.6; color: #374151;">${payload.body}</div>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;"/>
+                <p style="font-size: 12px; color: #6b7280;">Bu e-posta Tarodan tarafından otomatik olarak gönderilmiştir.</p>
+              </div>
+            `,
+          });
+        }
+
+        // Send push if requested and token exists
+        if (payload.channels.includes('push') && user.fcmToken) {
+          await this.pushQueue.add('send-notification', {
+            userId: user.id,
+            title: payload.title,
+            body: payload.body,
+            data: {
+              ...payload.data,
+              type: 'admin_broadcast',
+            },
+          });
+        }
+
+      }
+    }
   }
 }

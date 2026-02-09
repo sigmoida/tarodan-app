@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAuthStore } from './src/stores/authStore';
@@ -12,14 +12,22 @@ import { linking } from './src/navigation/linking';
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Conditionally configure notifications - only in development builds, not Expo Go
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+if (!isExpoGo) {
+  try {
+    const Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.log('⚠️ Notification handler setup failed (normal in Expo Go)');
+  }
+}
 
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -31,8 +39,14 @@ export default function App() {
         // Load stored authentication
         await loadStoredAuth();
         
-        // Register for push notifications
-        await registerForPushNotifications();
+        // Register for push notifications (only in development builds, not Expo Go)
+        if (!isExpoGo) {
+          try {
+            await registerForPushNotifications();
+          } catch (e) {
+            console.log('⚠️ Push notification registration skipped (normal in Expo Go)');
+          }
+        }
       } catch (e) {
         console.warn('App init error:', e);
       } finally {

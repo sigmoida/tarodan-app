@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
+import { PaymentService } from '../payment/payment.service';
 import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
@@ -31,6 +32,7 @@ export class ShippingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   /**
@@ -365,7 +367,7 @@ export class ShippingService {
 
     const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment status
       await tx.shipment.update({
         where: { id: shipment.id },
@@ -396,6 +398,20 @@ export class ShippingService {
 
       return { status: 'ok' };
     });
+
+    // Release payment hold when order is marked delivered (after transaction commits)
+    if (newStatus === ShipmentStatus.delivered) {
+      try {
+        const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
+        if (released) {
+          this.logger.log(`Payment hold released for order ${shipment.orderId} (delivered via webhook)`);
+        }
+      } catch (e: any) {
+        this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+      }
+    }
+
+    return result;
   }
 
   /**

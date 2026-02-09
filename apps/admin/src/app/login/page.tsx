@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
@@ -16,9 +17,16 @@ interface LoginForm {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setToken } = useAuthStore();
+  const { setUser, setToken, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isAuthLoading, router]);
+
 
   const {
     register,
@@ -43,18 +51,26 @@ export default function LoginPage() {
 
       // API returns { user, tokens: { accessToken, refreshToken } }
       if (response.data.tokens?.accessToken) {
-        setToken(response.data.tokens.accessToken);
+        const accessToken = response.data.tokens.accessToken;
+        setToken(accessToken);
         setUser(response.data.user);
         // Store token in localStorage for API interceptor
         if (typeof window !== 'undefined') {
-          localStorage.setItem('admin_token', response.data.tokens.accessToken);
+          localStorage.setItem('admin_token', accessToken);
           localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+          // Middleware checks cookie; set it so redirect to /dashboard succeeds
+          const maxAge = 24 * 60 * 60; // 24 hours
+          document.cookie = `admin_token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+          toast.success('Giriş başarılı!');
+
+          // Redirect to dashboard using href for full page reload to ensure middleware sees the cookie
+          window.location.href = '/dashboard';
         }
-        toast.success('Giriş başarılı!');
-        router.push('/dashboard');
       } else {
         toast.error('Geçersiz yanıt formatı');
       }
+
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Giriş başarısız');
     } finally {

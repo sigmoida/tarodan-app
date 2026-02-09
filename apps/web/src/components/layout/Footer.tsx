@@ -16,8 +16,9 @@ export default function Footer() {
       { href: '/pricing', label: t('membership.title') },
     ],
     support: [
+      { href: '/sayfa/about', label: t('footer.about') },
       { href: '/help', label: t('footer.help') },
-      { href: '/faq', label: t('footer.faq') },
+      { href: '/sayfa/faq', label: t('footer.faq') },
       { href: '/contact', label: t('footer.contact') },
       { href: '/guides', label: t('footer.guides') },
     ],

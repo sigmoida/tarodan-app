@@ -1506,6 +1506,25 @@ async function main() {
   console.log(`✅ Created ${tickets.length} support tickets`);
 
   // ==========================================================================
+  // 21b. Create Static Pages (About, FAQ)
+  // ==========================================================================
+  if (prisma.staticPage) {
+    console.log('Creating static pages...');
+    const pages = [
+      { slug: 'about', title: 'Hakkımızda', content: '<h1>Hakkımızda</h1><p>Tarodan, Türkiye\'nin diecast model araba koleksiyoncuları için en büyük pazaryeridir.</p>', metaTitle: 'Hakkımızda | Tarodan', metaDescription: 'Tarodan hakkında bilgi edinin.', sortOrder: 0 },
+      { slug: 'faq', title: 'Sıkça Sorulan Sorular', content: '<h1>SSS</h1><p>Genel sorular ve cevaplar. Bu içerik admin panelinden düzenlenebilir.</p>', metaTitle: 'SSS | Tarodan', metaDescription: 'Sıkça sorulan sorular.', sortOrder: 1 },
+    ];
+    for (const p of pages) {
+      await (prisma as any).staticPage.upsert({
+        where: { slug: p.slug },
+        create: p,
+        update: { title: p.title, content: p.content, metaTitle: p.metaTitle, metaDescription: p.metaDescription, sortOrder: p.sortOrder },
+      });
+    }
+    console.log(`✅ Created ${pages.length} static pages`);
+  }
+
+  // ==========================================================================
   // 22. Create Analytics Snapshots
   // ==========================================================================
   console.log('Creating analytics snapshots...');

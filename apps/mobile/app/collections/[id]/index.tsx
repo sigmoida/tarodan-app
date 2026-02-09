@@ -6,6 +6,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { TarodanColors } from '../../../src/theme';
+import { transformImageUrl } from '../../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 
@@ -126,7 +127,7 @@ export default function CollectionDetailScreen() {
     <View style={styles.container}>
       {/* Header Image */}
       <Image
-        source={{ uri: collection.coverImage }}
+        source={{ uri: transformImageUrl(collection.coverImage) }}
         style={styles.coverImage}
         resizeMode="cover"
       />
@@ -250,7 +251,7 @@ export default function CollectionDetailScreen() {
                 style={styles.itemCard}
               >
                 <Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: transformImageUrl(item.imageUrl) }}
                   style={styles.itemImage}
                   resizeMode="cover"
                 />

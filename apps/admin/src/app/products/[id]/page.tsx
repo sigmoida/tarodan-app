@@ -10,11 +10,18 @@ import {
   XCircleIcon,
   TrashIcon,
   PhotoIcon,
+  PencilIcon,
+  StarIcon,
+  ChatBubbleLeftRightIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 
 interface ProductDetail {
   id: string;
@@ -24,6 +31,7 @@ interface ProductDetail {
   originalPrice?: number | null;
   salePrice?: number | null;
   isOnSale?: boolean;
+  quantity?: number;
   condition: string;
   status: string;
   category: {
@@ -44,6 +52,24 @@ interface ProductDetail {
   createdAt: string;
   updatedAt: string;
   rejectionReason?: string;
+}
+
+interface Review {
+  id: string;
+  score: number;
+  title?: string;
+  review?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'spam';
+  adminReply?: string;
+  adminReplyAt?: string;
+  createdAt: string;
+  isVerifiedPurchase: boolean;
+  user: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+  };
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -68,6 +94,25 @@ export default function ProductDetailPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [approveNote, setApproveNote] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Tab and Reviews state
+  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [replyModalOpen, setReplyModalOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    price: '',
+    originalPrice: '',
+    quantity: '',
+    condition: '',
+    status: '',
+  });
 
   useEffect(() => {
     if (productId) {
@@ -80,12 +125,100 @@ export default function ProductDetailPage() {
     try {
       const response = await adminApi.getProduct(productId);
       setProduct(response.data);
+      setEditForm({
+        title: response.data.title,
+        description: response.data.description || '',
+        price: response.data.price?.toString() || '',
+        originalPrice: response.data.originalPrice?.toString() || '',
+        quantity: response.data.quantity?.toString() || '1',
+        condition: response.data.condition,
+        status: response.data.status,
+      });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Product load error:', error);
       toast.error(error.response?.data?.message || 'Ürün yüklenemedi');
       router.push('/products');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      const response = await adminApi.getReviews({ productId, limit: 50 });
+      setReviews(response.data.data || []);
+    } catch (error: any) {
+      console.error('Failed to load reviews:', error);
+      toast.error('Yorumlar yüklenemedi');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reviews' && productId) {
+      loadReviews();
+    }
+  }, [activeTab, productId]);
+
+  const handleReviewStatusUpdate = async (reviewId: string, status: string) => {
+    try {
+      await adminApi.updateReviewStatus(reviewId, status);
+      toast.success(`Yorum durumu güncellendi`);
+      loadReviews();
+    } catch (error: any) {
+      toast.error('Güncelleme başarısız');
+    }
+  };
+
+  const handleReviewReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReview) return;
+    try {
+      await adminApi.replyToReview(selectedReview.id, replyText);
+      toast.success('Yanıt gönderildi');
+      setReplyModalOpen(false);
+      setReplyText('');
+      setSelectedReview(null);
+      loadReviews();
+    } catch (error: any) {
+      toast.error('Yanıt gönderilemedi');
+    }
+  };
+
+  const handleReviewDelete = async (reviewId: string) => {
+    if (!confirm('Bu yorumu silmek istediğinizden emin misiniz?')) return;
+    try {
+      await adminApi.deleteReview(reviewId);
+      toast.success('Yorum silindi');
+      loadReviews();
+    } catch (error: any) {
+      toast.error('Silme başarısız');
+    }
+  };
+
+  const openReplyModal = (review: Review) => {
+    setSelectedReview(review);
+    setReplyText(review.adminReply || '');
+    setReplyModalOpen(true);
+  };
+
+  const renderStars = (score: number) => (
+    <div className="flex text-yellow-500">
+      {[...Array(5)].map((_, i) => (
+        i < score ? <StarIconSolid key={i} className="w-4 h-4" /> : <StarIcon key={i} className="w-4 h-4" />
+      ))}
+    </div>
+  );
+
+  const getReviewStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved': return <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">Onaylı</span>;
+      case 'pending': return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Bekliyor</span>;
+      case 'rejected': return <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">Reddedildi</span>;
+      case 'spam': return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">Spam</span>;
+      default: return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">{status}</span>;
     }
   };
 
@@ -132,6 +265,28 @@ export default function ProductDetailPage() {
       router.push('/products');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Silme işlemi başarısız');
+      setProcessing(false);
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcessing(true);
+    try {
+      const data = {
+        ...editForm,
+        price: parseFloat(editForm.price),
+        originalPrice: editForm.originalPrice ? parseFloat(editForm.originalPrice) : null,
+        quantity: editForm.quantity ? parseInt(editForm.quantity) : null,
+      };
+
+      await adminApi.updateProduct(productId, data);
+      toast.success('Ürün güncellendi');
+      setShowEditModal(false);
+      loadProduct();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Güncelleme başarısız');
+    } finally {
       setProcessing(false);
     }
   };
@@ -187,163 +342,344 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Images */}
-              {product.images && product.images.length > 0 && (
+          {/* Tabs */}
+          <div className="mb-6 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('info')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'info'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                <CubeIcon className="w-5 h-5 inline mr-2" />
+                Ürün Bilgileri
+              </button>
+              <button
+                onClick={() => setActiveTab('reviews')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'reviews'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                <StarIcon className="w-5 h-5 inline mr-2" />
+                Yorumlar ({reviews.length})
+              </button>
+            </nav>
+          </div>
+
+          {activeTab === 'info' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Content */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Images */}
+                {product.images && product.images.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <PhotoIcon className="w-5 h-5" />
+                      Görseller
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {product.images.map((image) => (
+                        <div key={image.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                          <img
+                            src={image.url}
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Product Info */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <PhotoIcon className="w-5 h-5" />
-                    Görseller
+                    <CubeIcon className="w-5 h-5" />
+                    Ürün Bilgileri
                   </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {product.images.map((image) => (
-                      <div key={image.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img
-                          src={image.url}
-                          alt={product.title}
-                          className="w-full h-full object-cover"
-                        />
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-gray-600 text-sm">Başlık:</span>
+                      <p className="font-medium">{product.title}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Açıklama:</span>
+                      <p className="mt-1 whitespace-pre-wrap">{product.description}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+                      <div>
+                        <span className="text-gray-600 text-sm">Fiyat:</span>
+                        {isProductOnSaleDisplay(product) && (
+                          <p className="text-gray-400 line-through text-base">
+                            ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
+                        <p className="font-semibold text-lg">
+                          ₺{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
-                    ))}
+                      <div>
+                        <span className="text-gray-600 text-sm">Durum:</span>
+                        <p className="font-medium capitalize">{product.condition}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+                      <div>
+                        <span className="text-gray-600 text-sm">Görüntülenme:</span>
+                        <p className="font-medium">{product.viewCount || 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 text-sm">Oluşturulma:</span>
+                        <p className="text-sm">
+                          {new Date(product.createdAt).toLocaleString('tr-TR')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t">
+                      <span className="text-gray-600 text-sm">Stok:</span>
+                      <p className="font-medium text-gray-900">{product.quantity !== undefined ? product.quantity : 'Belirtilmemiş'}</p>
+                    </div>
+                    {product.rejectionReason && (
+                      <div className="pt-3 border-t">
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-800">
+                            <strong>Red Nedeni:</strong> {product.rejectionReason}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Product Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <CubeIcon className="w-5 h-5" />
-                  Ürün Bilgileri
-                </h2>
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-gray-600 text-sm">Başlık:</span>
-                    <p className="font-medium">{product.title}</p>
+                {/* Seller Info */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Satıcı Bilgileri</h2>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="text-gray-600">İsim:</span>{' '}
+                      <Link
+                        href={`/users/${product.seller.id}`}
+                        className="text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        {product.seller.displayName}
+                      </Link>
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Email:</span> {product.seller.email}
+                    </p>
                   </div>
-                  <div>
-                    <span className="text-gray-600 text-sm">Açıklama:</span>
-                    <p className="mt-1 whitespace-pre-wrap">{product.description}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
-                    <div>
-                      <span className="text-gray-600 text-sm">Fiyat:</span>
-                      {isProductOnSaleDisplay(product) && (
-                        <p className="text-gray-400 line-through text-base">
-                          ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                        </p>
-                      )}
-                      <p className="font-semibold text-lg">
-                        ₺{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 text-sm">Durum:</span>
-                      <p className="font-medium capitalize">{product.condition}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
-                    <div>
-                      <span className="text-gray-600 text-sm">Görüntülenme:</span>
-                      <p className="font-medium">{product.viewCount || 0}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 text-sm">Oluşturulma:</span>
-                      <p className="text-sm">
-                        {new Date(product.createdAt).toLocaleString('tr-TR')}
-                      </p>
-                    </div>
-                  </div>
-                  {product.rejectionReason && (
-                    <div className="pt-3 border-t">
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-800">
-                          <strong>Red Nedeni:</strong> {product.rejectionReason}
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Seller Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Satıcı Bilgileri</h2>
-                <div className="space-y-2">
-                  <p>
-                    <span className="text-gray-600">İsim:</span>{' '}
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Actions */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <PencilIcon className="w-5 h-5" />
+                      Düzenle
+                    </button>
+                    {canApprove && (
+                      <button
+                        onClick={() => setShowApproveModal(true)}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckCircleIcon className="w-5 h-5" />
+                        Onayla
+                      </button>
+                    )}
+                    {canReject && (
+                      <button
+                        onClick={() => setShowRejectModal(true)}
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <XCircleIcon className="w-5 h-5" />
+                        Reddet
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                        Sil
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Links */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Linkler</h3>
+                  <div className="space-y-2">
                     <Link
                       href={`/users/${product.seller.id}`}
-                      className="text-primary-600 hover:text-primary-700 font-medium"
+                      className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                     >
-                      {product.seller.displayName}
+                      Satıcıyı Görüntüle
                     </Link>
-                  </p>
-                  <p>
-                    <span className="text-gray-600">Email:</span> {product.seller.email}
-                  </p>
+                    <Link
+                      href={`/orders?productId=${product.id}`}
+                      className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      Siparişleri Görüntüle
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Actions */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
-                <div className="space-y-2">
-                  {canApprove && (
-                    <button
-                      onClick={() => setShowApproveModal(true)}
-                      className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <CheckCircleIcon className="w-5 h-5" />
-                      Onayla
-                    </button>
-                  )}
-                  {canReject && (
-                    <button
-                      onClick={() => setShowRejectModal(true)}
-                      className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <XCircleIcon className="w-5 h-5" />
-                      Reddet
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <TrashIcon className="w-5 h-5" />
-                      Sil
-                    </button>
-                  )}
-                </div>
+          ) : (
+            /* Reviews Tab */
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <StarIcon className="w-5 h-5" />
+                  Ürün Yorumları
+                </h2>
               </div>
 
-              {/* Quick Links */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Linkler</h3>
-                <div className="space-y-2">
-                  <Link
-                    href={`/users/${product.seller.id}`}
-                    className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    Satıcıyı Görüntüle
-                  </Link>
-                  <Link
-                    href={`/orders?productId=${product.id}`}
-                    className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    Siparişleri Görüntüle
-                  </Link>
+              {reviewsLoading ? (
+                <div className="p-12 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                  <p className="mt-4 text-gray-500">Yorumlar yükleniyor...</p>
                 </div>
-              </div>
+              ) : reviews.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  Bu ürün için henüz yorum yok.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+                            {review.user.displayName.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-gray-900">{review.user.displayName}</span>
+                              {review.isVerifiedPurchase && (
+                                <span className="text-xs text-green-600 flex items-center gap-1">
+                                  <CheckCircleIcon className="w-3 h-3" /> Onaylı Alıcı
+                                </span>
+                              )}
+                              {getReviewStatusBadge(review.status)}
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              {renderStars(review.score)}
+                              <span className="text-sm text-gray-500">
+                                {format(new Date(review.createdAt), 'dd MMM yyyy', { locale: tr })}
+                              </span>
+                            </div>
+                            {review.title && <p className="font-medium text-gray-900 mb-1">{review.title}</p>}
+                            {review.review && <p className="text-gray-600">{review.review}</p>}
+
+                            {review.adminReply && (
+                              <div className="mt-3 pl-4 border-l-2 border-primary-500 bg-primary-50 p-3 rounded-r-lg">
+                                <p className="text-xs font-medium text-primary-700 mb-1">Satıcı Yanıtı:</p>
+                                <p className="text-sm text-gray-700">{review.adminReply}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {review.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleReviewStatusUpdate(review.id, 'approved')}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                                title="Onayla"
+                              >
+                                <CheckCircleIcon className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => handleReviewStatusUpdate(review.id, 'rejected')}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                title="Reddet"
+                              >
+                                <XCircleIcon className="w-5 h-5" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => openReplyModal(review)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Yanıtla"
+                          >
+                            <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleReviewStatusUpdate(review.id, 'spam')}
+                            className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg"
+                            title="Spam"
+                          >
+                            <ExclamationTriangleIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleReviewDelete(review.id)}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Sil"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* Reply Modal */}
+        {replyModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Yorumu Yanıtla</h3>
+              {selectedReview && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600 italic">"{selectedReview.review}"</p>
+                </div>
+              )}
+              <form onSubmit={handleReviewReply}>
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  rows={4}
+                  placeholder="Yanıtınızı yazın..."
+                  required
+                />
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setReplyModalOpen(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Yanıtla
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </main>
+        )}
 
         {/* Approve Modal */}
         {showApproveModal && (
@@ -421,6 +757,126 @@ export default function ProductDetailPage() {
                   {processing ? 'İşleniyor...' : 'Reddet'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
+            <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 my-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Ürünü Düzenle</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <XCircleIcon className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdate} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    rows={5}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fiyat (₺)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.price}
+                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">İndirimsiz Fiyat (Opsiyonel)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.originalPrice}
+                      onChange={(e) => setEditForm({ ...editForm, originalPrice: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      placeholder="Boş bırakılabilir"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stok</label>
+                    <input
+                      type="number"
+                      value={editForm.quantity}
+                      onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Durum (Kondisyon)</label>
+                    <select
+                      value={editForm.condition}
+                      onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    >
+                      <option value="new">Yeni</option>
+                      <option value="like_new">Yeni Gibi</option>
+                      <option value="good">İyi</option>
+                      <option value="fair">Orta</option>
+                      <option value="poor">Kötü</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Statü</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    >
+                      {Object.entries(statusConfig).map(([key, config]) => (
+                        <option key={key} value={key}>{config.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={processing}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {processing ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

@@ -50,12 +50,39 @@ export class CreateDiscountDto {
   @Type(() => Number)
   minCartValue?: number;
 
-  @ApiPropertyOptional({ description: 'Maksimum indirim tutarı (TL)', example: 500 })
+  @ApiPropertyOptional({ description: 'Adetli alım için minimum adet', example: 5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  minQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'BOGO: Kaç tane alınca? (Buy X)', example: 2 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  buyQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'BOGO: Kaç tane bedava/indirimli? (Get Y)', example: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  getQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Max indirim tutarı (TL)', example: 500 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   maxDiscountAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Flash Sale olarak işaretle', default: false })
+  @IsOptional()
+  @IsBoolean()
+  isFlashSale?: boolean;
+
 
   @ApiPropertyOptional({ description: 'Toplam kullanım limiti' })
   @IsOptional()

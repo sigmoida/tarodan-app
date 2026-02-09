@@ -6,6 +6,7 @@ import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bul
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma';
 import * as nodemailer from 'nodemailer';
 
 export interface EmailJobData {
@@ -30,7 +31,10 @@ export class EmailWorker {
   private transporter: nodemailer.Transporter | null;
   private readonly enabled: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     // Initialize SMTP transporter (Gmail or other SMTP provider)
     const host = this.configService.get<string>('SMTP_HOST', '');
     const port = this.configService.get<number>('SMTP_PORT', 587);
@@ -65,17 +69,46 @@ export class EmailWorker {
   async handleSend(job: Job<EmailJobData>) {
     this.logger.log(`Processing email job ${job.id} to ${job.data.to}`);
 
-    const { to, subject, html, text, from, replyTo, attachments } = job.data;
+    const { to, subject, html, text, from, replyTo, attachments, template, templateData } = job.data;
+    const fromEmail = from || this.configService.get<string>('MAIL_FROM') || 'noreply@tarodan.com';
+
+    // Create EmailLog entry with 'queued' status
+    let emailLog: any = null;
+    try {
+      emailLog = await this.prisma.emailLog.create({
+        data: {
+          to,
+          from: fromEmail,
+          subject,
+          template: template || null,
+          status: 'queued',
+          provider: this.enabled ? 'smtp' : 'mock',
+          userId: (templateData as Record<string, any>)?.userId || null,
+          metadata: templateData ? (templateData as any) : undefined,
+        },
+      });
+    } catch (logError) {
+      this.logger.warn(`Failed to create email log: ${logError.message}`);
+    }
 
     // If SMTP not configured, just log and return success
     if (!this.enabled || !this.transporter) {
       this.logger.log(`[EMAIL-MOCK] To: ${to}, Subject: ${subject}`);
+
+      // Update log status to sent (mock)
+      if (emailLog) {
+        await this.prisma.emailLog.update({
+          where: { id: emailLog.id },
+          data: { status: 'sent', sentAt: new Date(), messageId: `mock-${Date.now()}` },
+        }).catch(() => { });
+      }
+
       return { success: true, messageId: `mock-${Date.now()}` };
     }
 
     try {
       const mailOptions: nodemailer.SendMailOptions = {
-        from: from || this.configService.get('MAIL_FROM', 'noreply@tarodan.com'),
+        from: fromEmail,
         to,
         subject,
         html,
@@ -87,31 +120,72 @@ export class EmailWorker {
       const result = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email sent successfully to ${to}, messageId: ${result.messageId}`);
 
+      // Update log status to sent
+      if (emailLog) {
+        await this.prisma.emailLog.update({
+          where: { id: emailLog.id },
+          data: {
+            status: 'sent',
+            sentAt: new Date(),
+            messageId: result.messageId,
+          },
+        }).catch(() => { });
+      }
+
       return { success: true, messageId: result.messageId };
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}: ${error.message}`);
+
+      // Update log status to failed
+      if (emailLog) {
+        await this.prisma.emailLog.update({
+          where: { id: emailLog.id },
+          data: { status: 'failed', errorMessage: error.message },
+        }).catch(() => { });
+      }
+
       throw error;
     }
   }
+
 
   @Process('send-template')
   async handleSendTemplate(job: Job<EmailJobData>) {
     this.logger.log(`Processing template email job ${job.id}`);
 
     const { to, template, templateData } = job.data;
+    const data = templateData || {};
 
     if (!template) {
       throw new Error('Template name is required');
     }
 
-    // Get template HTML
-    const html = this.renderTemplate(template, templateData || {});
-    const subject = this.getTemplateSubject(template, templateData || {});
+    // Check DB for custom template first
+    const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: template } });
+    let html: string;
+    let subject: string;
+    if (dbTemplate?.subject && dbTemplate?.bodyHtml) {
+      subject = this.substituteVariables(dbTemplate.subject, data);
+      html = this.substituteVariables(dbTemplate.bodyHtml, data);
+    } else {
+      html = this.renderTemplate(template, data);
+      subject = this.getTemplateSubject(template, data);
+    }
 
     return this.handleSend({
       ...job,
       data: { ...job.data, html, subject },
     } as Job<EmailJobData>);
+  }
+
+  private substituteVariables(text: string, data: Record<string, any>): string {
+    if (!text) return text;
+    return text.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
+      const val = key.includes('.')
+        ? key.split('.').reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
+        : data[key];
+      return val != null ? String(val) : `{{${key}}}`;
+    });
   }
 
   @OnQueueCompleted()

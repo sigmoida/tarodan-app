@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './prisma';
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from './modules/auth';
 import { UserModule } from './modules/user';
@@ -70,6 +70,13 @@ import { AdvertisementModule } from './modules/advertisement/advertisement.modul
 // Discount & Promotion Engine
 import { DiscountModule } from './modules/discount';
 import { CartModule } from './modules/cart';
+
+// Tax resolution (admin rules applied to invoice + public /api/tax/calculate)
+import { TaxModule } from './modules/tax';
+// Static pages (public GET /api/pages/:slug)
+import { PagesModule } from './modules/pages';
+
+import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor';
 
 @Module({
   imports: [
@@ -156,6 +163,11 @@ import { CartModule } from './modules/cart';
     // Discount & Promotion Engine
     DiscountModule,
     CartModule,
+
+    // Tax (admin rules → invoice + public GET /api/tax/calculate)
+    TaxModule,
+    // Static pages (public GET /api/pages/:slug)
+    PagesModule,
   ],
   controllers: [],
   providers: [
@@ -169,6 +181,11 @@ import { CartModule } from './modules/cart';
       provide: APP_GUARD,
       useClass: BannedUserGuard,
     },
+    // Global Error Logging Interceptor
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ErrorLogInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -1823,6 +1823,44 @@ export class PaymentService {
   }
 
   /**
+   * Release all payment holds whose releaseAt date has passed (for cron).
+   * Returns the number of holds released.
+   */
+  async releaseHoldsDue(): Promise<{ count: number }> {
+    const now = new Date();
+    const result = await this.prisma.paymentHold.updateMany({
+      where: {
+        status: PaymentHoldStatus.held,
+        releaseAt: { lte: now },
+      },
+      data: {
+        status: PaymentHoldStatus.released,
+        releasedAt: now,
+      },
+    });
+    if (result.count > 0) {
+      this.logger.log(`Released ${result.count} payment hold(s) (releaseAt <= ${now.toISOString()})`);
+    }
+    return { count: result.count };
+  }
+
+  /**
+   * Try to release payment hold for an order (e.g. on delivery). Idempotent: no-op if already released or not found.
+   */
+  async releasePaymentIfHeld(orderId: string): Promise<boolean> {
+    const hold = await this.prisma.paymentHold.findFirst({
+      where: { orderId, status: PaymentHoldStatus.held },
+    });
+    if (!hold) return false;
+    await this.prisma.paymentHold.update({
+      where: { id: hold.id },
+      data: { status: PaymentHoldStatus.released, releasedAt: new Date() },
+    });
+    this.logger.log(`Payment hold ${hold.id} released for order ${orderId}`);
+    return true;
+  }
+
+  /**
    * Unified get payment status (works for both auth and guest)
    */
   async getPaymentStatusUnified(paymentId: string, userId: string | null) {

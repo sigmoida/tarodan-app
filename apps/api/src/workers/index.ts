@@ -11,4 +11,4 @@ export * from './payment.worker';
 export * from './shipping.worker';
 export * from './search.worker';
 
-export { QUEUE_NAMES } from './worker.module';
+export { QUEUE_NAMES } from './constants';

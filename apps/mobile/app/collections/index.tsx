@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
+import { transformImageUrl } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 
@@ -150,7 +151,7 @@ export default function CollectionsScreen() {
       onPress={() => router.push(`/collections/${item.id}`)}
     >
       <Image
-        source={{ uri: item.coverImage }}
+        source={{ uri: transformImageUrl(item.coverImage) }}
         style={styles.collectionImage}
         resizeMode="cover"
       />

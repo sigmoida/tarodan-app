@@ -80,11 +80,6 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
 
-  const INITIAL_THREADS = 6;
-  const visibleThreads = threadsExpanded ? threads : threads.slice(0, INITIAL_THREADS);
-  const hasMoreThreads = threads.length > INITIAL_THREADS && !threadsExpanded;
-  const remainingCount = threads.length - INITIAL_THREADS;
-
   const sellerId = searchParams.get('user');
   const productId = searchParams.get('listing');
 
@@ -138,6 +133,11 @@ export default function MessagesPage() {
   });
   const threads = threadsQuery.data ?? [];
   const loading = threadsQuery.isLoading;
+
+  const INITIAL_THREADS = 6;
+  const visibleThreads = threadsExpanded ? threads : threads.slice(0, INITIAL_THREADS);
+  const hasMoreThreads = threads.length > INITIAL_THREADS && !threadsExpanded;
+  const remainingCount = threads.length - INITIAL_THREADS;
 
   const messagesQuery = useQuery({
     queryKey: ['messages', selectedThread?.id],

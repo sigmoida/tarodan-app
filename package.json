@@ -4,7 +4,8 @@
   "private": true,
   "description": "Tarodan - İkinci El Eşya Alım Satım ve Takas Platformu",
   "scripts": {
-    "start": "pnpm docker:up && pnpm dev",
+    "start": "pnpm run docker:up; pnpm run dev",
+    "dev:only": "turbo run dev",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

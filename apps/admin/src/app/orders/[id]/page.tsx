@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,6 +10,8 @@ import {
   TruckIcon,
   MapPinIcon,
   ClockIcon,
+  PrinterIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
@@ -68,6 +70,17 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
+const carriers = [
+  'Yurtiçi Kargo',
+  'Aras Kargo',
+  'MNG Kargo',
+  'PTT Kargo',
+  'Sürat Kargo',
+  'UPS',
+  'DHL',
+  'Diğer',
+];
+
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -76,8 +89,20 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  // Tracking form
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [carrier, setCarrier] = useState('');
+
+  // Notify form
+  const [notifyType, setNotifyType] = useState<string>('status_update');
+  const [notifyMessage, setNotifyMessage] = useState('');
+
+  const invoiceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (orderId) {
@@ -111,6 +136,127 @@ export default function OrderDetailPage() {
       toast.error(error.response?.data?.message || 'Durum güncelleme başarısız');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleAddTracking = async () => {
+    if (!trackingNumber || !carrier) {
+      toast.error('Takip numarası ve kargo firması gerekli');
+      return;
+    }
+    setProcessing(true);
+    try {
+      await adminApi.addOrderTracking(orderId, trackingNumber, carrier);
+      toast.success('Kargo takibi eklendi');
+      setShowTrackingModal(false);
+      setTrackingNumber('');
+      setCarrier('');
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Kargo takibi eklenemedi');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSendNotification = async () => {
+    setProcessing(true);
+    try {
+      await adminApi.sendOrderNotification(orderId, notifyType, notifyMessage || undefined);
+      toast.success('Bildirim gönderildi');
+      setShowNotifyModal(false);
+      setNotifyMessage('');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Bildirim gönderilemedi');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    try {
+      const response = await adminApi.getOrderInvoice(orderId);
+      const invoiceData = response.data;
+
+      // Open print window with invoice content
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Fatura - ${invoiceData.invoiceNumber}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+              .header h1 { margin: 0; font-size: 24px; }
+              .header p { margin: 5px 0; color: #666; }
+              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+              .info-box { background: #f5f5f5; padding: 15px; border-radius: 8px; }
+              .info-box h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+              .info-box p { margin: 3px 0; font-size: 14px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+              th { background: #f5f5f5; }
+              .totals { text-align: right; }
+              .totals p { margin: 5px 0; }
+              .total-row { font-weight: bold; font-size: 18px; }
+              @media print { body { padding: 20px; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>FATURA</h1>
+              <p>Fatura No: ${invoiceData.invoiceNumber}</p>
+              <p>Tarih: ${new Date(invoiceData.orderDate).toLocaleDateString('tr-TR')}</p>
+            </div>
+            <div class="info-grid">
+              <div class="info-box">
+                <h3>ALICI</h3>
+                <p><strong>${invoiceData.buyer.name}</strong></p>
+                <p>${invoiceData.buyer.email}</p>
+                ${invoiceData.buyer.phone ? `<p>${invoiceData.buyer.phone}</p>` : ''}
+                ${invoiceData.buyer.address ? `<p>${invoiceData.buyer.address}</p>` : ''}
+              </div>
+              <div class="info-box">
+                <h3>SATICI</h3>
+                <p><strong>${invoiceData.seller.name}</strong></p>
+                <p>${invoiceData.seller.email}</p>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Ürün</th><th>Adet</th><th>Birim Fiyat</th><th>Toplam</th></tr>
+              </thead>
+              <tbody>
+                ${invoiceData.items.map((item: any) => `
+                  <tr>
+                    <td>${item.title}</td>
+                    <td>${item.quantity}</td>
+                    <td>₺${item.unitPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                    <td>₺${item.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="totals">
+              <p>Ara Toplam: ₺${invoiceData.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+              <p>Kargo: ₺${invoiceData.shippingCost.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+              <p class="total-row">TOPLAM: ₺${invoiceData.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+            </div>
+            ${invoiceData.shipment?.trackingNumber ? `
+              <div style="margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                <strong>Kargo Takip:</strong> ${invoiceData.shipment.carrier || ''} - ${invoiceData.shipment.trackingNumber}
+              </div>
+            ` : ''}
+            <script>window.onload = function() { window.print(); }</script>
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } catch (error: any) {
+      toast.error('Fatura oluşturulamadı');
     }
   };
 
@@ -161,13 +307,38 @@ export default function OrderDetailPage() {
               <span className={`px-4 py-2 rounded-full font-medium ${statusInfo.color} ${statusInfo.bg}`}>
                 {statusInfo.label}
               </span>
-              <button
-                onClick={() => setShowStatusModal(true)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                Durum Güncelle
-              </button>
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              onClick={() => setShowStatusModal(true)}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Durum Güncelle
+            </button>
+            <button
+              onClick={() => setShowTrackingModal(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <TruckIcon className="w-5 h-5" />
+              Kargo Takibi Ekle
+            </button>
+            <button
+              onClick={() => setShowNotifyModal(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            >
+              <BellIcon className="w-5 h-5" />
+              Bildirim Gönder
+            </button>
+            <button
+              onClick={handlePrintInvoice}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <PrinterIcon className="w-5 h-5" />
+              Fatura Yazdır
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -183,13 +354,13 @@ export default function OrderDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-gray-600 text-sm">Toplam Tutar:</span>
-                      <p className="font-semibold text-lg">
+                      <p className="font-semibold text-lg text-gray-900">
                         ₺{order.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>
                       <span className="text-gray-600 text-sm">Komisyon:</span>
-                      <p className="font-medium">
+                      <p className="font-medium text-gray-900">
                         ₺{order.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -197,13 +368,13 @@ export default function OrderDetailPage() {
                   <div className="grid grid-cols-2 gap-4 pt-3 border-t">
                     <div>
                       <span className="text-gray-600 text-sm">Kargo Ücreti:</span>
-                      <p className="font-medium">
+                      <p className="font-medium text-gray-900">
                         ₺{order.shippingCost.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div>
                       <span className="text-gray-600 text-sm">Durum:</span>
-                      <p className="font-medium capitalize">{statusInfo.label}</p>
+                      <p className="font-medium capitalize text-gray-900">{statusInfo.label}</p>
                     </div>
                   </div>
                 </div>
@@ -246,17 +417,17 @@ export default function OrderDetailPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Durum:</span>
-                      <span className="font-medium capitalize">{order.payment.status}</span>
+                      <span className="font-medium capitalize text-gray-900">{order.payment.status}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Tutar:</span>
-                      <span className="font-medium">
+                      <span className="font-medium text-gray-900">
                         ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Sağlayıcı:</span>
-                      <span className="uppercase">{order.payment.provider}</span>
+                      <span className="uppercase text-gray-900">{order.payment.provider}</span>
                     </div>
                     <Link
                       href={`/payments/${order.payment.id}`}
@@ -279,19 +450,19 @@ export default function OrderDetailPage() {
                     {order.shipment.trackingNumber && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Takip No:</span>
-                        <span className="font-mono text-sm">{order.shipment.trackingNumber}</span>
+                        <span className="font-mono text-sm text-gray-900">{order.shipment.trackingNumber}</span>
                       </div>
                     )}
                     {order.shipment.carrier && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Kargo Firması:</span>
-                        <span>{order.shipment.carrier}</span>
+                        <span className="text-gray-900">{order.shipment.carrier}</span>
                       </div>
                     )}
                     {order.shipment.status && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Durum:</span>
-                        <span className="font-medium capitalize">{order.shipment.status}</span>
+                        <span className="font-medium capitalize text-gray-900">{order.shipment.status}</span>
                       </div>
                     )}
                   </div>
@@ -309,7 +480,7 @@ export default function OrderDetailPage() {
                     {typeof order.shippingAddress === 'object' ? (
                       <>
                         {order.shippingAddress.fullName && (
-                          <p className="font-medium">{order.shippingAddress.fullName}</p>
+                          <p className="font-medium text-gray-900">{order.shippingAddress.fullName}</p>
                         )}
                         {order.shippingAddress.address && (
                           <p className="text-gray-600">{order.shippingAddress.address}</p>
@@ -375,13 +546,13 @@ export default function OrderDetailPage() {
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-medium">Oluşturulma</p>
+                    <p className="text-sm font-medium text-gray-900">Oluşturulma</p>
                     <p className="text-xs text-gray-500">
                       {new Date(order.createdAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Son Güncelleme</p>
+                    <p className="text-sm font-medium text-gray-900">Son Güncelleme</p>
                     <p className="text-xs text-gray-500">
                       {new Date(order.updatedAt).toLocaleString('tr-TR')}
                     </p>
@@ -404,7 +575,7 @@ export default function OrderDetailPage() {
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="pending_payment">Ödeme Bekliyor</option>
                   <option value="paid">Ödendi</option>
@@ -430,6 +601,106 @@ export default function OrderDetailPage() {
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Güncelle'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tracking Modal */}
+        {showTrackingModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kargo Takibi Ekle</h3>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Kargo Firması</label>
+                  <select
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                  >
+                    <option value="">Seçiniz</option>
+                    {carriers.map((c) => (<option key={c} value={c}>{c}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Takip Numarası</label>
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                    placeholder="Örn: 123456789"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowTrackingModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={processing}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleAddTracking}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  disabled={processing}
+                >
+                  {processing ? 'İşleniyor...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notify Modal */}
+        {showNotifyModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Bildirim Gönder</h3>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bildirim Türü</label>
+                  <select
+                    value={notifyType}
+                    onChange={(e) => setNotifyType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                  >
+                    <option value="status_update">Durum Güncelleme</option>
+                    <option value="shipped">Kargoya Verildi</option>
+                    <option value="delivered">Teslim Edildi</option>
+                    <option value="custom">Özel Mesaj</option>
+                  </select>
+                </div>
+                {notifyType === 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mesaj</label>
+                    <textarea
+                      value={notifyMessage}
+                      onChange={(e) => setNotifyMessage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      rows={3}
+                      placeholder="Alıcıya gönderilecek mesajı yazın..."
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowNotifyModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={processing}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSendNotification}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                  disabled={processing}
+                >
+                  {processing ? 'İşleniyor...' : 'Gönder'}
                 </button>
               </div>
             </div>

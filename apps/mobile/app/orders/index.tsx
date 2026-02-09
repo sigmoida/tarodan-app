@@ -8,6 +8,7 @@ import { ordersApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 interface Order {
   id: string;
@@ -212,7 +213,7 @@ export default function OrdersScreen() {
 
                 <View style={styles.orderContent}>
                   <Image
-                    source={{ uri: order.product.images?.[0]?.url || 'https://via.placeholder.com/80' }}
+                    source={{ uri: getImageUrlFromUtils(order.product.images) || 'https://via.placeholder.com/80' }}
                     style={styles.productImage}
                   />
                   <View style={styles.productInfo}>

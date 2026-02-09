@@ -27,7 +27,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   /**
    * Register a new user
@@ -60,11 +60,11 @@ export class AuthService {
       const today = new Date();
       let age = today.getFullYear() - birth.getFullYear();
       const monthDiff = today.getMonth() - birth.getMonth();
-      
+
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
         age--;
       }
-      
+
       if (age < 18) {
         throw new BadRequestException('Kayıt olmak için en az 18 yaşında olmanız gerekmektedir');
       }
@@ -274,7 +274,7 @@ export class AuthService {
 
     // Check if company name already exists (must be unique for business accounts)
     const existingCompanyName = await this.prisma.user.findFirst({
-      where: { 
+      where: {
         companyName: dto.companyName,
       },
     });
@@ -377,6 +377,11 @@ export class AuthService {
       });
 
       if (!user) {
+        // Log failed login attempt - user not found
+        await this.logSecurityEvent('failed_login', 'medium', {
+          email: dto.email,
+          reason: 'user_not_found',
+        });
         throw new UnauthorizedException('Email veya şifre hatalı');
       }
 
@@ -384,6 +389,12 @@ export class AuthService {
       const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
       if (!isPasswordValid) {
+        // Log failed login attempt - wrong password
+        await this.logSecurityEvent('failed_login', 'medium', {
+          email: dto.email,
+          userId: user.id,
+          reason: 'invalid_password',
+        });
         throw new UnauthorizedException('Email veya şifre hatalı');
       }
 
@@ -424,7 +435,7 @@ export class AuthService {
                 type: String(tier.type),
                 name: String(tier.name),
               },
-              expiresAt: user.membership.currentPeriodEnd 
+              expiresAt: user.membership.currentPeriodEnd
                 ? new Date(user.membership.currentPeriodEnd).toISOString()
                 : undefined,
             };
@@ -680,9 +691,10 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, {
-        secret: this.configService.get<string>('ADMIN_JWT_SECRET'),
+        secret: this.configService.get<string>('ADMIN_JWT_SECRET') || this.configService.get<string>('JWT_SECRET'),
         expiresIn: this.configService.get<string>('ADMIN_JWT_EXPIRES_IN') || '15m',
       }),
+
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: '1d', // Shorter refresh for admin
@@ -800,5 +812,31 @@ export class AuthService {
     });
 
     return { message: 'Şifre başarıyla sıfırlandı' };
+  }
+
+  /**
+   * Log security events for monitoring and compliance
+   */
+  private async logSecurityEvent(
+    eventType: string,
+    severity: 'low' | 'medium' | 'high' | 'critical',
+    details: Record<string, any>,
+  ): Promise<void> {
+    try {
+      await this.prisma.securityLog.create({
+        data: {
+          eventType,
+          severity,
+          userId: details.userId || null,
+          email: details.email || null,
+          ipAddress: details.ipAddress || null,
+          userAgent: details.userAgent || null,
+          details,
+        },
+      });
+    } catch (error) {
+      // Don't let logging failures affect the main flow
+      this.logger.warn(`Failed to log security event: ${error.message}`);
+    }
   }
 }

@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { transformImageUrl } from '../../utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 
@@ -57,7 +58,7 @@ export function ProductDetail({
       >
         {images.length > 0 ? (
           images.map((img, index) => (
-            <Image key={index} source={{ uri: img.url }} style={styles.image} />
+            <Image key={index} source={{ uri: transformImageUrl(img.url || img) }} style={styles.image} />
           ))
         ) : (
           <View style={[styles.image, styles.placeholder]}>

@@ -7,6 +7,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
+import { PaymentService } from '../modules/payment/payment.service';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
 export interface ShippingJobData {
@@ -25,6 +26,7 @@ export class ShippingWorker {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   @Process('create-shipment')
@@ -120,7 +122,7 @@ export class ShippingWorker {
         },
       });
 
-      // If delivered, update order
+      // If delivered, update order and release payment hold
       if (newStatus === ShipmentStatus.delivered) {
         await this.prisma.order.update({
           where: { id: shipment.orderId },
@@ -128,6 +130,12 @@ export class ShippingWorker {
             status: OrderStatus.delivered,
           },
         });
+        try {
+          const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
+          if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (track-update)`);
+        } catch (e: any) {
+          this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+        }
       }
 
       return {
@@ -175,7 +183,7 @@ export class ShippingWorker {
         },
       });
 
-      // Handle delivery
+      // Handle delivery: update order and release payment hold
       if (status === ShipmentStatus.delivered) {
         await this.prisma.order.update({
           where: { id: shipment.orderId },
@@ -183,6 +191,12 @@ export class ShippingWorker {
             status: OrderStatus.delivered,
           },
         });
+        try {
+          const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
+          if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (webhook)`);
+        } catch (e: any) {
+          this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+        }
       }
 
       return { success: true, shipmentId: shipment.id, status };

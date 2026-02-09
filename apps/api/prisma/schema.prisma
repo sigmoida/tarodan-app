@@ -195,9 +195,12 @@ enum TicketCategory {
 // =============================================================================
 
 enum DiscountType {
-  percentage // Yüzde indirim (ör. %10)
-  fixed_amount // Sabit tutar (ör. 50 TL)
+  percentage      // Yüzde indirim (ör. %10)
+  fixed_amount    // Sabit tutar (ör. 50 TL)
+  bogo            // Alana bedava (Buy X Get Y)
+  bulk_quantity   // Adetli alım indirimi (Buy X items get Y% off)
 }
+
 
 enum DiscountScope {
   global // Tüm site
@@ -554,6 +557,7 @@ model Category {
   name        String   @unique
   slug        String   @unique
   description String?
+  image       String?  @map("image") // Category cover image
   parentId    String?  @map("parent_id")
   sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
@@ -565,6 +569,7 @@ model Category {
   products        Product[]
   commissionRules CommissionRule[]
   discounts       Discount[] // Category-specific discounts
+  taxRules        TaxRule[]
 
   @@map("categories")
 }
@@ -644,6 +649,12 @@ model Product {
 
   // Cart relations (Discount System)
   cartItems CartItem[]
+
+  // Tag relations
+  tags ProductTag[]
+
+  // Attribute relations
+  productAttributes ProductAttribute[]
 
   @@index([sellerId])
   @@index([status])
@@ -953,6 +964,13 @@ model Rating {
   @@map("ratings")
 }
 
+enum RatingStatus {
+  pending
+  approved
+  rejected
+  spam
+}
+
 model ProductRating {
   id                 String   @id @default(uuid())
   productId          String   @map("product_id")
@@ -962,10 +980,13 @@ model ProductRating {
   title              String?
   review             String?
   images             String[] // Review images
-  isVerifiedPurchase Boolean  @default(true) @map("is_verified_purchase")
-  helpfulCount       Int      @default(0) @map("helpful_count")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  isVerifiedPurchase Boolean      @default(true) @map("is_verified_purchase")
+  helpfulCount       Int          @default(0) @map("helpful_count")
+  status             RatingStatus @default(pending)
+  adminReply         String?      @map("admin_reply")
+  adminReplyAt       DateTime?    @map("admin_reply_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   // Relations
   product Product @relation(fields: [productId], references: [id])
@@ -1020,6 +1041,7 @@ model Collection {
   description   String?
   coverImageUrl String?  @map("cover_image_url")
   isPublic      Boolean  @default(true) @map("is_public")
+  isFeatured    Boolean  @default(false) @map("is_featured")
   viewCount     Int      @default(0) @map("view_count")
   likeCount     Int      @default(0) @map("like_count")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -1076,6 +1098,101 @@ model CollectionLike {
   @@index([collectionId])
   @@index([userId])
   @@map("collection_likes")
+}
+
+// =============================================================================
+// TAG SYSTEM
+// =============================================================================
+
+model Tag {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  slug        String       @unique
+  description String?
+  color       String?      // Hex color for UI display
+  isActive    Boolean      @default(true) @map("is_active")
+  usageCount  Int          @default(0) @map("usage_count")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  products    ProductTag[]
+
+  @@index([isActive])
+  @@index([usageCount(sort: Desc)])
+  @@map("tags")
+}
+
+model ProductTag {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, tagId])
+  @@index([productId])
+  @@index([tagId])
+  @@map("product_tags")
+}
+
+// =============================================================================
+// ATTRIBUTE SYSTEM
+// =============================================================================
+
+model AttributeGroup {
+  id          String      @id @default(uuid())
+  name        String      @unique  // e.g., "Scale", "Condition", "Color"
+  slug        String      @unique
+  description String?
+  isRequired  Boolean     @default(false) @map("is_required")
+  isActive    Boolean     @default(true) @map("is_active")
+  sortOrder   Int         @default(0) @map("sort_order")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  attributes  Attribute[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("attribute_groups")
+}
+
+model Attribute {
+  id              String           @id @default(uuid())
+  groupId         String           @map("group_id")
+  value           String           // e.g., "1:18", "1:24", "Mint", "Red"
+  slug            String
+  displayValue    String?          @map("display_value")
+  color           String?          // For color attributes
+  sortOrder       Int              @default(0) @map("sort_order")
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  group           AttributeGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productAttributes ProductAttribute[]
+
+  @@unique([groupId, slug])
+  @@index([groupId])
+  @@index([isActive])
+  @@map("attributes")
+}
+
+model ProductAttribute {
+  id          String    @id @default(uuid())
+  productId   String    @map("product_id")
+  attributeId String    @map("attribute_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, attributeId])
+  @@index([productId])
+  @@index([attributeId])
+  @@map("product_attributes")
 }
 
 // =============================================================================
@@ -1358,6 +1475,118 @@ model CommissionRule {
 }
 
 // =============================================================================
+// TAX SETTINGS (Vergi Ayarları) - Regions, Rates, Rules, Reporting
+// =============================================================================
+
+model TaxRegion {
+  id          String    @id @default(uuid())
+  name        String    @map("name") // e.g. "Türkiye", "İstanbul"
+  countryCode String    @map("country_code") // ISO 3166-1 alpha-2, e.g. TR
+  regionCode  String?   @map("region_code") // optional: state/city code, e.g. 34
+  isDefault   Boolean   @default(false) @map("is_default")
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  taxRates TaxRate[]
+  taxRules TaxRule[]
+
+  @@unique([countryCode, regionCode])
+  @@index([countryCode])
+  @@index([isActive])
+  @@map("tax_regions")
+}
+
+model TaxRate {
+  id           String    @id @default(uuid())
+  taxRegionId  String    @map("tax_region_id")
+  name         String    @map("name") // e.g. "KDV Standart", "KDV İndirimli"
+  rate         Decimal   @db.Decimal(5, 2) // e.g. 18.00 for 18%
+  isDefault    Boolean   @default(false) @map("is_default") // default rate for this region
+  effectiveFrom DateTime? @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  sortOrder    Int       @default(0) @map("sort_order")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  taxRegion TaxRegion  @relation(fields: [taxRegionId], references: [id], onDelete: Cascade)
+  taxRules  TaxRule[]
+
+  @@index([taxRegionId])
+  @@index([isActive])
+  @@map("tax_rates")
+}
+
+enum TaxRuleScope {
+  default_rate   // applies as default for region
+  category       // override by category
+  product       // override by product (future)
+}
+
+model TaxRule {
+  id          String        @id @default(uuid())
+  taxRegionId String        @map("tax_region_id")
+  taxRateId   String        @map("tax_rate_id")
+  scope       TaxRuleScope  @default(default_rate) @map("scope")
+  categoryId  String?       @map("category_id") // when scope=category
+  priority    Int           @default(0) @map("priority") // higher = applied first
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  taxRegion TaxRegion @relation(fields: [taxRegionId], references: [id], onDelete: Cascade)
+  taxRate   TaxRate   @relation(fields: [taxRateId], references: [id], onDelete: Cascade)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([taxRegionId])
+  @@index([taxRateId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("tax_rules")
+}
+
+// =============================================================================
+// STATIC PAGES (About, FAQ, etc.) - Admin editable, SEO
+// =============================================================================
+
+model StaticPage {
+  id            String   @id @default(uuid())
+  slug          String   @unique // e.g. "about", "faq"
+  title         String
+  content       String   @db.Text // HTML content (WYSIWYG)
+  metaTitle     String?  @map("meta_title")
+  metaDescription String? @map("meta_description") @db.Text
+  metaKeywords  String?  @map("meta_keywords") @db.Text
+  isPublished   Boolean  @default(true) @map("is_published")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([isPublished])
+  @@map("static_pages")
+}
+
+// =============================================================================
+// EMAIL TEMPLATES - Admin editable (overrides code defaults)
+// =============================================================================
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g. "welcome", "order-paid"
+  name        String   @map("name") // Display name
+  subject     String   @db.Text
+  bodyHtml    String   @map("body_html") @db.Text
+  variablesJson String? @map("variables_json") @db.Text // JSON array of variable names for docs
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
+}
+
+// =============================================================================
 // PLATFORM SETTINGS (Ayarlar) - Unchanged
 // =============================================================================
 
@@ -1495,6 +1724,78 @@ model NotificationLog {
   @@index([channel])
   @@index([status])
   @@map("notification_logs")
+}
+
+// =============================================================================
+// ADMIN LOGS SYSTEM
+// =============================================================================
+
+model ErrorLog {
+  id         String   @id @default(uuid())
+  severity   String   // "error", "warning", "critical"
+  message    String
+  stackTrace String?  @map("stack_trace") @db.Text
+  source     String   // "api", "worker", "scheduler"
+  endpoint   String?  // API endpoint if applicable
+  userId     String?  @map("user_id")
+  requestId  String?  @map("request_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([severity])
+  @@index([source])
+  @@index([createdAt])
+  @@map("error_logs")
+}
+
+model SecurityLog {
+  id         String    @id @default(uuid())
+  eventType  String    @map("event_type") // "failed_login", "ip_block", "suspicious_activity", "password_reset", "2fa_enabled"
+  severity   String    // "low", "medium", "high", "critical"
+  userId     String?   @map("user_id")
+  email      String?
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  location   String?   // GeoIP lookup result
+  details    Json?
+  resolved   Boolean   @default(false)
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([eventType])
+  @@index([severity])
+  @@index([ipAddress])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("security_logs")
+}
+
+model EmailLog {
+  id           String    @id @default(uuid())
+  messageId    String?   @map("message_id") // Provider message ID
+  to           String
+  from         String
+  subject      String
+  template     String?   // Template name if used
+  status       String    // "queued", "sent", "delivered", "bounced", "failed"
+  provider     String    // "sendgrid", "smtp"
+  userId       String?   @map("user_id")
+  errorMessage String?   @map("error_message")
+  sentAt       DateTime? @map("sent_at")
+  deliveredAt  DateTime? @map("delivered_at")
+  bouncedAt    DateTime? @map("bounced_at")
+  openedAt     DateTime? @map("opened_at")
+  clickedAt    DateTime? @map("clicked_at")
+  metadata     Json?     // Additional tracking data
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([to])
+  @@index([userId])
+  @@index([status])
+  @@index([template])
+  @@index([createdAt])
+  @@map("email_logs")
 }
 
 // =============================================================================
@@ -1647,10 +1948,18 @@ model Discount {
 
   // Rules
   minCartValue      Decimal? @map("min_cart_value") @db.Decimal(10, 2) // Min sepet tutarı
+  minQuantity       Int?     @default(1) @map("min_quantity") // Adetli alım için minimum adet
+  buyQuantity       Int?     @map("buy_quantity") // BOGO: Kaç tane alınca? (Buy X)
+  getQuantity       Int?     @map("get_quantity") // BOGO: Kaç tane bedava/indirimli? (Get Y)
+  
   maxDiscountAmount Decimal? @map("max_discount_amount") @db.Decimal(10, 2) // Max indirim tutarı
   usageLimitTotal   Int?     @map("usage_limit_total") // Toplam kullanım limiti
   usageLimitPerUser Int?     @default(1) @map("usage_limit_per_user") // Kullanıcı başı limit
   usedCount         Int      @default(0) @map("used_count") // Kullanılma sayısı
+  
+  // Flash Sale Identifier
+  isFlashSale       Boolean  @default(false) @map("is_flash_sale")
+
 
   // Stacking
   isStackable Boolean @default(false) @map("is_stackable") // Diğer indirimlerle kombine?
@@ -1720,6 +2029,117 @@ model CartItem {
   @@index([cartId])
   @@index([productId])
   @@map("cart_items")
+}
+
+// =============================================================================
+// SHIPPING MANAGEMENT (Admin Panel Features)
+// =============================================================================
+
+// Shipping Method - e.g., "Standard", "Express", "Economy"
+model ShippingMethod {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rates ShippingRate[]
+
+  @@index([isActive])
+  @@map("shipping_methods")
+}
+
+// Shipping Carrier - e.g., "Aras Kargo", "Yurtiçi", "MNG"
+model ShippingCarrier {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  code           String   @unique // "aras", "yurtici", "mng"
+  logo           String?
+  trackingUrl    String?  @map("tracking_url") // URL template with {{tracking}}
+  apiEndpoint    String?  @map("api_endpoint")
+  apiKey         String?  @map("api_key")
+  apiSecret      String?  @map("api_secret")
+  isActive       Boolean  @default(true) @map("is_active")
+  supportsLabels Boolean  @default(true) @map("supports_labels")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  rates ShippingRate[]
+
+  @@index([isActive])
+  @@map("shipping_carriers")
+}
+
+// Shipping Zone - geographic regions
+model ShippingZone {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  countries   String[] // ISO country codes
+  regions     String[] // Region/state codes
+  cities      String[] // City names
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rates ShippingRate[]
+
+  @@index([isActive])
+  @@map("shipping_zones")
+}
+
+// Shipping Rate - links zone + method + carrier with pricing
+model ShippingRate {
+  id              String   @id @default(uuid())
+  zoneId          String   @map("zone_id")
+  methodId        String   @map("method_id")
+  carrierId       String   @map("carrier_id")
+  basePrice       Decimal  @map("base_price") @db.Decimal(10, 2)
+  pricePerKg      Decimal  @default(0) @map("price_per_kg") @db.Decimal(10, 2)
+  freeShippingMin Decimal? @map("free_shipping_min") @db.Decimal(10, 2)
+  minDeliveryDays Int      @map("min_delivery_days")
+  maxDeliveryDays Int      @map("max_delivery_days")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  zone    ShippingZone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  method  ShippingMethod  @relation(fields: [methodId], references: [id], onDelete: Cascade)
+  carrier ShippingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, methodId, carrierId])
+  @@index([isActive])
+  @@map("shipping_rates")
+}
+
+// =============================================================================
+// SCHEDULED NOTIFICATIONS (Admin Panel Features)
+// =============================================================================
+
+// Scheduled Notification for bulk/scheduled sends
+model ScheduledNotification {
+  id           String    @id @default(uuid())
+  title        String
+  body         String
+  channels     String[] // ["push", "email", "sms"]
+  targetType   String    @map("target_type") // "all", "segment", "user_ids"
+  targetData   Json?     @map("target_data") // user IDs or segment criteria
+  scheduledFor DateTime  @map("scheduled_for")
+  status       String    @default("pending") // "pending", "sent", "cancelled"
+  sentAt       DateTime? @map("sent_at")
+  sentCount    Int       @default(0) @map("sent_count")
+  errorCount   Int       @default(0) @map("error_count")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([scheduledFor, status])
+  @@index([status])
+  @@map("scheduled_notifications")
 }
 
 // =============================================================================

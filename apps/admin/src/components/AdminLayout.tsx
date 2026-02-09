@@ -23,6 +23,16 @@ import {
   TagIcon,
   SwatchIcon,
   TicketIcon,
+  CalculatorIcon,
+  BanknotesIcon,
+  DocumentTextIcon,
+  TruckIcon,
+  MapIcon,
+  BellAlertIcon,
+  CubeIcon,
+  ClipboardDocumentCheckIcon,
+  StarIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -31,14 +41,31 @@ const navigation = [
   { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon },
   { name: 'Kullanıcılar', href: '/users', icon: UsersIcon },
   { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
-  { name: 'Kategoriler', href: '/categories', icon: TagIcon },
+  { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
+  { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
   { name: 'Markalar', href: '/brands', icon: SwatchIcon },
+  { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon },
+  { name: 'Etiketler', href: '/tags', icon: TagIcon },
+  { name: 'Özellikler', href: '/attributes', icon: ClipboardDocumentListIcon },
   { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
   { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
-  { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon },
+  { name: 'Kargo', href: '/shipping', icon: TruckIcon },
+  { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon },
   { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
+  { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon },
+  { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon },
+  { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon },
+  { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon },
+  { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon },
+
+  { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon },
+  { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon },
+  { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon },
+  { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon },
+  { name: 'Ödeme Ayarları', href: '/settings/payments', icon: CreditCardIcon },
   { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon },
 ];
+
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -68,7 +95,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 transform transition-transform duration-300 lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 transform transition-transform duration-300 lg:translate-x-0 flex flex-col',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

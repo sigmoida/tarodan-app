@@ -19,6 +19,12 @@ interface Settings {
   premiumMonthlyPrice: number;
   businessMonthlyPrice: number;
   yearlyDiscountPercentage: number;
+  siteName: string;
+  logoUrl: string;
+  supportEmail: string;
+  timezone: string;
+  currency: string;
+  language: string;
 }
 
 export default function SettingsPage() {
@@ -36,10 +42,16 @@ export default function SettingsPage() {
     premiumMonthlyPrice: 99,
     businessMonthlyPrice: 499,
     yearlyDiscountPercentage: 20,
+    siteName: 'Tarotaro',
+    logoUrl: '',
+    supportEmail: 'support@tarotaro.com',
+    timezone: 'Europe/Istanbul',
+    currency: 'TRY',
+    language: 'tr',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'listing' | 'trade' | 'message' | 'membership'>('listing');
+  const [activeTab, setActiveTab] = useState<'general' | 'listing' | 'trade' | 'message' | 'membership'>('general');
 
   useEffect(() => {
     loadSettings();
@@ -51,7 +63,7 @@ export default function SettingsPage() {
       // API response format: { data: { data: [...] } } or { data: [...] }
       const settingsData = settingsResponse.data?.data || settingsResponse.data || [];
       const settingsObj: Record<string, any> = {};
-      
+
       // Handle both array and object formats
       // Backend returns Prisma model with settingKey and settingValue fields
       if (Array.isArray(settingsData)) {
@@ -67,9 +79,9 @@ export default function SettingsPage() {
           settingsObj[key] = settingsData[key];
         });
       }
-      
+
       if (process.env.NODE_ENV === 'development') console.log('Loaded settings:', settingsObj);
-      
+
       // Load membership tier prices if not in platform settings
       let premiumMonthlyPrice = settingsObj.premium_monthly_price ? Number(settingsObj.premium_monthly_price) : null;
       let businessMonthlyPrice = settingsObj.business_monthly_price ? Number(settingsObj.business_monthly_price) : null;
@@ -79,10 +91,10 @@ export default function SettingsPage() {
         try {
           const tiersResponse = await adminApi.getMembershipTiers();
           const tiers = tiersResponse.data?.tiers || tiersResponse.data || [];
-          
+
           const premiumTier = tiers.find((t: any) => t.type === 'premium');
           const businessTier = tiers.find((t: any) => t.type === 'business');
-          
+
           if (premiumMonthlyPrice === null && premiumTier) {
             premiumMonthlyPrice = Number(premiumTier.monthlyPrice) || 99;
           }
@@ -105,7 +117,7 @@ export default function SettingsPage() {
           if (process.env.NODE_ENV === 'development') console.error('Failed to load membership tiers:', error);
         }
       }
-      
+
       // Map platform setting keys to local settings
       setSettings({
         freeListingLimit: settingsObj.free_listing_limit ? Number(settingsObj.free_listing_limit) : 10,
@@ -121,6 +133,12 @@ export default function SettingsPage() {
         premiumMonthlyPrice: premiumMonthlyPrice ?? 99,
         businessMonthlyPrice: businessMonthlyPrice ?? 499,
         yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
+        siteName: settingsObj.site_name || 'Tarotaro',
+        logoUrl: settingsObj.logo_url || '',
+        supportEmail: settingsObj.support_email || 'support@tarotaro.com',
+        timezone: settingsObj.timezone || 'Europe/Istanbul',
+        currency: settingsObj.currency || 'TRY',
+        language: settingsObj.language || 'tr',
       });
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Settings load error:', error);
@@ -135,7 +153,7 @@ export default function SettingsPage() {
     try {
       // Save each setting individually with correct keys
       const settingsToSave = [];
-      
+
       if (activeTab === 'listing') {
         settingsToSave.push(
           adminApi.updateSetting('free_listing_limit', settings.freeListingLimit.toString()),
@@ -143,6 +161,15 @@ export default function SettingsPage() {
           adminApi.updateSetting('business_listing_limit', settings.businessListingLimit.toString()),
           adminApi.updateSetting('min_product_price', settings.minProductPrice.toString()),
           adminApi.updateSetting('max_product_price', settings.maxProductPrice.toString())
+        );
+      } else if (activeTab === 'general') {
+        settingsToSave.push(
+          adminApi.updateSetting('site_name', settings.siteName),
+          adminApi.updateSetting('logo_url', settings.logoUrl),
+          adminApi.updateSetting('support_email', settings.supportEmail),
+          adminApi.updateSetting('timezone', settings.timezone),
+          adminApi.updateSetting('currency', settings.currency),
+          adminApi.updateSetting('language', settings.language)
         );
       } else if (activeTab === 'trade') {
         settingsToSave.push(
@@ -162,7 +189,7 @@ export default function SettingsPage() {
           adminApi.updateSetting('yearly_discount_percentage', settings.yearlyDiscountPercentage.toString())
         );
       }
-      
+
       await Promise.all(settingsToSave);
       toast.success('Ayarlar kaydedildi');
       // Reload settings after save to reflect changes
@@ -197,24 +224,99 @@ export default function SettingsPage() {
         {/* Tabs */}
         <div className="flex gap-2 border-b border-dark-700 pb-2">
           {[
+            { id: 'general', label: 'Genel' },
             { id: 'listing', label: 'İlan' },
             { id: 'trade', label: 'Takas' },
+
             { id: 'message', label: 'Mesaj' },
             { id: 'membership', label: 'Üyelik' },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 rounded-t-lg transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-dark-700 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-t-lg transition-colors ${activeTab === tab.id
+                ? 'bg-dark-700 text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
+
+        {/* General Settings */}
+        {activeTab === 'general' && (
+          <div className="admin-card">
+            <h2 className="text-lg font-semibold text-white mb-4">Genel Ayarlar</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Site Adı</label>
+                <input
+                  type="text"
+                  value={settings.siteName}
+                  onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
+                  className="admin-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Destek E-posta</label>
+                <input
+                  type="email"
+                  value={settings.supportEmail}
+                  onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                  className="admin-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Logo URL</label>
+                <input
+                  type="text"
+                  value={settings.logoUrl}
+                  onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
+                  className="admin-input"
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-gray-500 mt-1">Logo görseli için doğrudan URL</p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Saat Dilimi</label>
+                <select
+                  value={settings.timezone}
+                  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                  className="admin-input"
+                >
+                  <option value="Europe/Istanbul">Europe/Istanbul (GMT+3)</option>
+                  <option value="UTC">UTC (GMT+0)</option>
+                  <option value="Europe/London">Europe/London (GMT+0/+1)</option>
+                  <option value="America/New_York">America/New_York (GMT-5/-4)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Para Birimi</label>
+                <select
+                  value={settings.currency}
+                  onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+                  className="admin-input"
+                >
+                  <option value="TRY">Türk Lirası (₺)</option>
+                  <option value="USD">Amerikan Doları ($)</option>
+                  <option value="EUR">Euro (€)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Dil</label>
+                <select
+                  value={settings.language}
+                  onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+                  className="admin-input"
+                >
+                  <option value="tr">Türkçe</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Listing Settings */}
         {activeTab === 'listing' && (

@@ -10,6 +10,7 @@ import { TarodanColors, SCALES, BRANDS } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
+import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -205,14 +206,9 @@ export default function HomeScreen() {
   // Loading durumu
   const isLoading = loadingProducts;
 
-  // Web ile aynı getImageUrl helper
+  // Use utility function that transforms localhost URLs to network IP
   const getImageUrl = (images: any): string => {
-    if (!images || (Array.isArray(images) && images.length === 0)) {
-      return 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Ürün';
-    }
-    const firstImage = Array.isArray(images) ? images[0] : images;
-    if (typeof firstImage === 'string') return firstImage;
-    return firstImage?.url || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Ürün';
+    return getImageUrlFromUtils(images);
   };
 
   const renderProductCard = (item: any, index: number) => {

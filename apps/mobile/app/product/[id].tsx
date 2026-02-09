@@ -12,6 +12,7 @@ import { useGuestStore } from '../../src/stores/guestStore';
 import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { TarodanColors, CONDITIONS } from '../../src/theme';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 
@@ -123,8 +124,12 @@ export default function ProductDetailScreen() {
 
   // Use API data or fallback to mock
   const product = apiProduct || MOCK_PRODUCT;
+  // Transform image URLs to use network IP instead of localhost
   const images = product.images?.length > 0 
-    ? product.images 
+    ? product.images.map((img: any) => {
+        const url = typeof img === 'string' ? img : img.url;
+        return typeof img === 'string' ? transformImageUrl(url) : { ...img, url: transformImageUrl(url) };
+      })
     : ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'];
 
   const getConditionInfo = (condition: string) => {
@@ -136,7 +141,7 @@ export default function ProductDetailScreen() {
       productId: product.id,
       title: product.title,
       price: product.price,
-      imageUrl: images[0],
+      imageUrl: typeof images[0] === 'string' ? images[0] : images[0]?.url || getImageUrlFromUtils(product.images),
       brand: product.brand,
       scale: product.scale,
       seller: {
@@ -308,14 +313,17 @@ export default function ProductDetailScreen() {
           }}
           scrollEventThrottle={16}
         >
-          {images.map((uri: string, index: number) => (
-            <Image
-              key={index}
-              source={{ uri }}
-              style={styles.productImage}
-              resizeMode="contain"
-            />
-          ))}
+          {images.map((img: any, index: number) => {
+            const uri = typeof img === 'string' ? img : img.url;
+            return (
+              <Image
+                key={index}
+                source={{ uri }}
+                style={styles.productImage}
+                resizeMode="contain"
+              />
+            );
+          })}
         </ScrollView>
 
         {/* Image Indicators */}

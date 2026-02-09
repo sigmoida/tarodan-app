@@ -20,7 +20,7 @@ interface Discount {
   code: string | null;
   name: string;
   description: string | null;
-  type: 'percentage' | 'fixed_amount';
+  type: 'percentage' | 'fixed_amount' | 'bogo' | 'bulk_quantity';
   value: number;
   scope: 'global' | 'category' | 'product' | 'seller';
   sellerId: string | null;
@@ -29,6 +29,9 @@ interface Discount {
   categoryName: string | null;
   targetProductIds: string[];
   minCartValue: number | null;
+  minQuantity: number | null;
+  buyQuantity: number | null;
+  getQuantity: number | null;
   maxDiscountAmount: number | null;
   usageLimitTotal: number | null;
   usageLimitPerUser: number;
@@ -36,6 +39,7 @@ interface Discount {
   isStackable: boolean;
   priority: number;
   isActive: boolean;
+  isFlashSale: boolean;
   startDate: string;
   endDate: string;
   createdAt: string;
@@ -52,17 +56,21 @@ interface DiscountFormData {
   code: string;
   name: string;
   description: string;
-  type: 'percentage' | 'fixed_amount';
+  type: 'percentage' | 'fixed_amount' | 'bogo' | 'bulk_quantity';
   value: number;
   scope: 'global' | 'category' | 'product' | 'seller';
   categoryId: string;
   minCartValue: string;
+  minQuantity: string;
+  buyQuantity: string;
+  getQuantity: string;
   maxDiscountAmount: string;
   usageLimitTotal: string;
   usageLimitPerUser: string;
   isStackable: boolean;
   priority: number;
   isActive: boolean;
+  isFlashSale: boolean;
   startDate: string;
   endDate: string;
 }
@@ -77,7 +85,10 @@ const SCOPE_LABELS: Record<string, string> = {
 const TYPE_LABELS: Record<string, string> = {
   percentage: 'Yüzde (%)',
   fixed_amount: 'Sabit Tutar (TL)',
+  bogo: 'Alana Bedava (BOGO)',
+  bulk_quantity: 'Çoklu Alım',
 };
+
 
 export default function DiscountsPage() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
@@ -89,7 +100,7 @@ export default function DiscountsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterScope, setFilterScope] = useState<string>('');
   const [filterActive, setFilterActive] = useState<string>('');
-  
+
   const [formData, setFormData] = useState<DiscountFormData>({
     code: '',
     name: '',
@@ -99,13 +110,18 @@ export default function DiscountsPage() {
     scope: 'global',
     categoryId: '',
     minCartValue: '',
+    minQuantity: '',
+    buyQuantity: '',
+    getQuantity: '',
     maxDiscountAmount: '',
     usageLimitTotal: '',
     usageLimitPerUser: '1',
     isStackable: false,
     priority: 0,
     isActive: true,
+    isFlashSale: false,
     startDate: new Date().toISOString().split('T')[0],
+
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   });
 
@@ -133,7 +149,7 @@ export default function DiscountsPage() {
           isActive: filterActive === '' ? undefined : filterActive === 'true',
         },
       });
-      
+
       const data = response.data;
       setDiscounts(data.items || []);
       setPagination(prev => ({
@@ -169,13 +185,18 @@ export default function DiscountsPage() {
       scope: 'global',
       categoryId: '',
       minCartValue: '',
+      minQuantity: '',
+      buyQuantity: '',
+      getQuantity: '',
       maxDiscountAmount: '',
       usageLimitTotal: '',
       usageLimitPerUser: '1',
       isStackable: false,
       priority: 0,
       isActive: true,
+      isFlashSale: false,
       startDate: new Date().toISOString().split('T')[0],
+
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     });
     setShowModal(true);
@@ -192,21 +213,26 @@ export default function DiscountsPage() {
       scope: discount.scope,
       categoryId: discount.categoryId || '',
       minCartValue: discount.minCartValue?.toString() || '',
+      minQuantity: discount.minQuantity?.toString() || '',
+      buyQuantity: discount.buyQuantity?.toString() || '',
+      getQuantity: discount.getQuantity?.toString() || '',
       maxDiscountAmount: discount.maxDiscountAmount?.toString() || '',
       usageLimitTotal: discount.usageLimitTotal?.toString() || '',
       usageLimitPerUser: discount.usageLimitPerUser.toString(),
       isStackable: discount.isStackable,
       priority: discount.priority,
       isActive: discount.isActive,
+      isFlashSale: discount.isFlashSale,
       startDate: discount.startDate.split('T')[0],
       endDate: discount.endDate.split('T')[0],
+
     });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const data = {
         // Otomatik kodsuz indirim için code null gönderilmeli (boş string değil)
@@ -218,14 +244,19 @@ export default function DiscountsPage() {
         scope: formData.scope,
         categoryId: formData.scope === 'category' ? formData.categoryId : undefined,
         minCartValue: formData.minCartValue ? parseFloat(formData.minCartValue) : undefined,
+        minQuantity: formData.minQuantity ? parseInt(formData.minQuantity) : undefined,
+        buyQuantity: formData.buyQuantity ? parseInt(formData.buyQuantity) : undefined,
+        getQuantity: formData.getQuantity ? parseInt(formData.getQuantity) : undefined,
         maxDiscountAmount: formData.maxDiscountAmount ? parseFloat(formData.maxDiscountAmount) : undefined,
         usageLimitTotal: formData.usageLimitTotal ? parseInt(formData.usageLimitTotal) : undefined,
         usageLimitPerUser: parseInt(formData.usageLimitPerUser) || 1,
         isStackable: formData.isStackable,
         priority: formData.priority,
         isActive: formData.isActive,
+        isFlashSale: formData.isFlashSale,
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate + 'T23:59:59').toISOString(),
+
       };
 
       if (editingDiscount) {
@@ -431,11 +462,21 @@ export default function DiscountsPage() {
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Otomatik</span>
                         )}
+                        {discount.isFlashSale && (
+                          <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-medium border border-purple-200">
+                            ⚡ Flash
+                          </span>
+                        )}
+
                       </td>
                       <td>
                         <span className="font-semibold text-primary">
-                          {discount.type === 'percentage' ? `%${discount.value}` : `${discount.value} TL`}
+                          {discount.type === 'percentage' && `%${discount.value}`}
+                          {discount.type === 'fixed_amount' && `${discount.value} TL`}
+                          {discount.type === 'bogo' && `BOGO (${discount.buyQuantity} Ver ${discount.getQuantity} Al ${discount.value === 100 ? 'Bedava' : `%${discount.value} İndirim`})`}
+                          {discount.type === 'bulk_quantity' && `${discount.minQuantity} adet alımda %${discount.value}`}
                         </span>
+
                       </td>
                       <td>
                         <span className="badge badge-info">
@@ -461,11 +502,10 @@ export default function DiscountsPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => toggleDiscountStatus(discount)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              discount.isActive 
-                                ? 'text-muted-foreground hover:bg-muted' 
-                                : 'text-green-400 hover:bg-green-900/30'
-                            }`}
+                            className={`p-1.5 rounded-lg transition-colors ${discount.isActive
+                              ? 'text-muted-foreground hover:bg-muted'
+                              : 'text-green-400 hover:bg-green-900/30'
+                              }`}
                             title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}
                           >
                             {discount.isActive ? <XMarkIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
@@ -531,7 +571,7 @@ export default function DiscountsPage() {
                   {editingDiscount ? 'İndirimi Düzenle' : 'Yeni İndirim Oluştur'}
                 </h2>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {/* Basic Info */}
                 <div className="grid grid-cols-2 gap-4">
@@ -589,24 +629,85 @@ export default function DiscountsPage() {
                     >
                       <option value="percentage">Yüzde (%)</option>
                       <option value="fixed_amount">Sabit Tutar (TL)</option>
+                      <option value="bogo">Alana Bedava (BOGO)</option>
+                      <option value="bulk_quantity">Çoklu Alım (Adet İndirimi)</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">
-                      Değer *
+                      {formData.type === 'bogo' ? 'İndirim Oranı (2. Üründe)' : 'Değer *'}
                     </label>
                     <input
                       type="number"
                       required
                       min="0"
-                      max={formData.type === 'percentage' ? 100 : 10000}
-                      step={formData.type === 'percentage' ? 1 : 0.01}
+                      max={formData.type === 'percentage' || formData.type === 'bogo' ? 100 : 10000}
+                      step={formData.type === 'percentage' || formData.type === 'bogo' ? 1 : 0.01}
                       value={formData.value}
                       onChange={(e) => setFormData(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
+                      placeholder={formData.type === 'bogo' ? '100 = Bedava' : ''}
                       className="admin-input"
                     />
+                    {formData.type === 'bogo' && (
+                      <p className="text-xs text-muted-foreground mt-1">100 = Tamamen bedava, 50 = %50 indirimli</p>
+                    )}
                   </div>
                 </div>
+
+                {/* Type Specific Fields */}
+                {formData.type === 'bogo' && (
+                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border border-border">
+                    <div className="col-span-2">
+                      <p className="text-sm font-medium text-primary mb-2">BOGO Ayarları (Buy X Get Y)</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Kaç Adet Alınca? (Buy)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.buyQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, buyQuantity: e.target.value }))}
+                        className="admin-input"
+                        placeholder="Örn: 1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Kaç Adet İndirimli? (Get)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.getQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, getQuantity: e.target.value }))}
+                        className="admin-input"
+                        placeholder="Örn: 1"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {formData.type === 'bulk_quantity' && (
+                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                    <p className="text-sm font-medium text-primary mb-2">Çoklu Alım Ayarları</p>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Min. Adet Sayısı
+                      </label>
+                      <input
+                        type="number"
+                        min="2"
+                        value={formData.minQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, minQuantity: e.target.value }))}
+                        className="admin-input"
+                        placeholder="Örn: 3 adet alımda"
+                      />
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Scope */}
                 <div className="grid grid-cols-2 gap-4">
@@ -734,6 +835,18 @@ export default function DiscountsPage() {
 
                 {/* Options */}
                 <div className="flex items-center gap-6 flex-wrap">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isFlashSale}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isFlashSale: e.target.checked }))}
+                      className="w-4 h-4 text-purple-600 border-border rounded focus:ring-purple-600 bg-input"
+                    />
+                    <span className="text-sm text-foreground flex items-center gap-1">
+                      ⚡ Flash Sale (Flaş İndirim)
+                    </span>
+                  </label>
+
                   <label className="flex items-center gap-2 cursor-pointer" title="Diğer kuponlarla birlikte uygulanabilir. Ürün indirimi (satıcı indirimi) her zaman uygulanır.">
                     <input
                       type="checkbox"
@@ -743,6 +856,7 @@ export default function DiscountsPage() {
                     />
                     <span className="text-sm text-foreground">Diğer indirimlerle kombine edilebilir</span>
                   </label>
+
                   <span className="text-xs text-muted-foreground hidden sm:inline">(diğer kupon/kampanyalarla; ürün indirimi her zaman geçerli)</span>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input

@@ -5,6 +5,7 @@ import { InvoiceController } from './invoice.controller';
 import { PrismaModule } from '../../prisma';
 import { StorageModule } from '../storage/storage.module';
 import { NotificationModule } from '../notification/notification.module';
+import { TaxModule } from '../tax';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { NotificationModule } from '../notification/notification.module';
     ConfigModule,
     StorageModule,
     NotificationModule,
+    TaxModule,
   ],
   controllers: [InvoiceController],
   providers: [InvoiceService],

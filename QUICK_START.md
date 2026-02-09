@@ -93,6 +93,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3002
 EOF
 ```
 
+## 📄 Sayfalar ve E-posta Şablonları – Koşullar
+
+Admin panelinde **Sayfalar** ve **E-posta Şablonları** kısımlarının düzgün çalışması için:
+
+| Koşul | Nasıl sağlanır |
+|-------|-----------------|
+| **1. API ayakta** | `pnpm dev` ile API (port 3001) çalışıyor olmalı. Kontrol: `curl http://localhost:3001/api/health` |
+| **2. Admin girişi** | Admin panele giriş yapın (http://localhost:3002). Token `localStorage`'a yazılır; Sayfalar / E-posta Şablonları bu token ile istek atar. |
+| **3. Test e-postası** | E-posta Şablonları > Test gönder için API `.env` içinde `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` dolu olmalı. MailHog kullanıyorsanız: `SMTP_HOST=localhost`, `SMTP_PORT=1025`, `SMTP_USER=` ve `SMTP_PASS=` boş bırakılabilir. |
+| **4. Web’de statik sayfalar** | `/sayfa/about`, `/sayfa/faq` için web `.env.local` içinde `NEXT_PUBLIC_API_URL=http://localhost:3001` (veya API adresiniz) olmalı. |
+
+Detaylı env örnekleri: `apps/api/env.example.txt`, `apps/admin/env.example.txt`, `apps/web/env.example.txt`.
+
 ## 🔄 Günlük Kullanım
 
 Projeyi her gün başlatmak için:

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { ScheduledNotificationScheduler } from './scheduled-notification.scheduler';
 import { PrismaModule } from '../../prisma';
 import { AuthModule } from '../auth';
 import { PaymentModule } from '../payment';
@@ -11,9 +13,11 @@ import { CacheModule } from '../cache';
 import { AdvertisementModule } from '../advertisement/advertisement.module';
 import { MediaModule } from '../media/media.module';
 import { DiscountModule } from '../discount/discount.module';
+import { EventModule } from '../events/event.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     PaymentModule,
@@ -24,9 +28,10 @@ import { DiscountModule } from '../discount/discount.module';
     AdvertisementModule,
     MediaModule,
     DiscountModule,
+    EventModule,
   ],
   controllers: [AdminController],
-  providers: [AdminService],
+  providers: [AdminService, ScheduledNotificationScheduler],
   exports: [AdminService],
 })
-export class AdminModule {}
+export class AdminModule { }

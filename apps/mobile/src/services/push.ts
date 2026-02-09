@@ -1,9 +1,27 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { api } from './api';
 
+// Conditionally import notifications - only in development builds, not Expo Go
+let Notifications: any = null;
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (e) {
+    console.log('⚠️ expo-notifications not available');
+  }
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
+  // Skip in Expo Go - push notifications not supported
+  if (isExpoGo || !Notifications) {
+    console.log('⚠️ Push notifications not available in Expo Go');
+    return null;
+  }
+
   let token: string | null = null;
 
   if (!Device.isDevice) {
@@ -11,18 +29,23 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
-  // Check existing permissions
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
+  try {
+    // Check existing permissions
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
 
-  // Request permissions if not granted
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
+    // Request permissions if not granted
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
 
-  if (finalStatus !== 'granted') {
-    console.log('Push notification permission not granted');
+    if (finalStatus !== 'granted') {
+      console.log('Push notification permission not granted');
+      return null;
+    }
+  } catch (e) {
+    console.log('⚠️ Push notification permissions unavailable');
     return null;
   }
 
@@ -58,40 +81,47 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   // Configure notification channel for Android
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Varsayılan',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#E53935',
-    });
+  if (Platform.OS === 'android' && Notifications) {
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Varsayılan',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#E53935',
+      });
 
-    await Notifications.setNotificationChannelAsync('trades', {
-      name: 'Takaslar',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#4CAF50',
-    });
+      await Notifications.setNotificationChannelAsync('trades', {
+        name: 'Takaslar',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4CAF50',
+      });
 
-    await Notifications.setNotificationChannelAsync('messages', {
-      name: 'Mesajlar',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#2196F3',
-    });
+      await Notifications.setNotificationChannelAsync('messages', {
+        name: 'Mesajlar',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#2196F3',
+      });
 
-    await Notifications.setNotificationChannelAsync('orders', {
-      name: 'Siparişler',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF9800',
-    });
+      await Notifications.setNotificationChannelAsync('orders', {
+        name: 'Siparişler',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF9800',
+      });
+    } catch (e) {
+      console.log('⚠️ Notification channel setup failed');
+    }
   }
 
   return token;
 }
 
 export async function unregisterPushNotifications(): Promise<void> {
+  if (isExpoGo || !Notifications) {
+    return;
+  }
   try {
     const tokenResponse = await Notifications.getExpoPushTokenAsync();
     await api.delete('/notifications/register-device', {
@@ -103,13 +133,19 @@ export async function unregisterPushNotifications(): Promise<void> {
 }
 
 export function addNotificationReceivedListener(
-  callback: (notification: Notifications.Notification) => void
-): Notifications.Subscription {
+  callback: (notification: any) => void
+): any {
+  if (isExpoGo || !Notifications) {
+    return { remove: () => {} };
+  }
   return Notifications.addNotificationReceivedListener(callback);
 }
 
 export function addNotificationResponseReceivedListener(
-  callback: (response: Notifications.NotificationResponse) => void
-): Notifications.Subscription {
+  callback: (response: any) => void
+): any {
+  if (isExpoGo || !Notifications) {
+    return { remove: () => {} };
+  }
   return Notifications.addNotificationResponseReceivedListener(callback);
 }

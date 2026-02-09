@@ -131,7 +131,12 @@ export class DiscountService {
           : null,
         usageLimitTotal: dto.usageLimitTotal || null,
         usageLimitPerUser: dto.usageLimitPerUser || 1,
+        minQuantity: dto.minQuantity || null,
+        buyQuantity: dto.buyQuantity || null,
+        getQuantity: dto.getQuantity || null,
+        isFlashSale: dto.isFlashSale ?? false,
         isStackable: dto.isStackable ?? false,
+
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
         startDate: new Date(dto.startDate),
@@ -228,7 +233,18 @@ export class DiscountService {
       ...(dto.usageLimitPerUser !== undefined && {
         usageLimitPerUser: dto.usageLimitPerUser,
       }),
+      ...(dto.minQuantity !== undefined && {
+        minQuantity: dto.minQuantity,
+      }),
+      ...(dto.buyQuantity !== undefined && {
+        buyQuantity: dto.buyQuantity,
+      }),
+      ...(dto.getQuantity !== undefined && {
+        getQuantity: dto.getQuantity,
+      }),
+      ...(dto.isFlashSale !== undefined && { isFlashSale: dto.isFlashSale }),
       ...(dto.isStackable !== undefined && { isStackable: dto.isStackable }),
+
       ...(dto.priority !== undefined && { priority: dto.priority }),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       ...(dto.startDate && { startDate: new Date(dto.startDate) }),
@@ -815,7 +831,14 @@ export class DiscountService {
       usageLimitTotal: discount.usageLimitTotal,
       usageLimitPerUser: discount.usageLimitPerUser,
       usedCount: discount.usedCount,
+
+      isFlashSale: discount.isFlashSale,
+      minQuantity: discount.minQuantity,
+      buyQuantity: discount.buyQuantity,
+      getQuantity: discount.getQuantity,
+
       isStackable: discount.isStackable,
+
       priority: discount.priority,
       isActive: discount.isActive,
       startDate: discount.startDate,
