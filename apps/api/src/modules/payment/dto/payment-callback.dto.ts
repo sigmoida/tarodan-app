@@ -3,8 +3,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class IyzicoCallbackDto {
   @ApiProperty({ description: 'Iyzico token' })
+  @IsOptional()
   @IsString()
-  token: string;
+  token?: string;
 
   @ApiPropertyOptional({ description: 'Conversation ID' })
   @IsOptional()
@@ -25,6 +26,12 @@ export class IyzicoCallbackDto {
   @IsOptional()
   @IsString()
   conversationData?: string;
+
+  /** Form field name from bank redirect (snake_case) */
+  @ApiPropertyOptional({ description: 'Conversation data (3D auth) - form field name' })
+  @IsOptional()
+  @IsString()
+  conversation_data?: string;
 
   @ApiPropertyOptional({ description: 'MD Status' })
   @IsOptional()

@@ -138,7 +138,7 @@ export default function CreditCardForm({ orderId, amount, onSuccess, onCancel }:
                     Kredi / Banka Kartı ile Ödeme
                 </h3>
                 <div className="flex gap-2">
-                    <img src="https://iyzi.media/branding/iyzico-logo-blue.svg" alt="iyzico" className="h-6 opacity-70" />
+                    <span className="text-sm font-semibold text-gray-500 tracking-wide">iyzico</span>
                 </div>
             </div>
 

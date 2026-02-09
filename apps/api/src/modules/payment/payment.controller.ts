@@ -15,6 +15,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Res,
+  Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
@@ -47,6 +48,8 @@ import {
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(private readonly paymentService: PaymentService) { }
 
   /**
@@ -104,6 +107,39 @@ export class PaymentController {
   }
 
   /**
+   * GET /payments/callback/iyzico - Iyzico Mock / banka GET redirect (token/conversationData query'de)
+   */
+  @Get('callback/iyzico')
+  @Public()
+  @ApiOperation({ summary: 'Iyzico callback (GET redirect)' })
+  async iyzicoCallbackGet(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('paymentId') paymentId?: string,
+    @Query('direct') direct?: string,
+    @Query('token') token?: string,
+    @Query('conversationData') conversationData?: string,
+  ) {
+    const query = (req as any).query || {};
+    this.logger.log(`[CALLBACK GET] Iyzico: queryKeys=${Object.keys(query).join(',')}`);
+    if (direct === 'true' && paymentId) {
+      const mergedDto = { token: token || query['token'], conversationData: conversationData || query['conversationData'] || query['conversation_data'] };
+      const result = await this.paymentService.completeDirect3DSecure(paymentId, mergedDto as any);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const orderId = (result as any).orderId;
+      const isGuest = (result as any).isGuest;
+      const guestParam = isGuest ? '&guest=true' : '';
+      if (result.status === 'success') {
+        const successUrl = orderId ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}` : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}`;
+        return res.redirect(302, successUrl);
+      }
+      const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}`;
+      return res.redirect(302, failUrl);
+    }
+    return res.redirect(302, `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/fail?error=Geçersiz%20callback`);
+  }
+
+  /**
    * POST /payments/callback/iyzico - Iyzico webhook
    */
   @Post('callback/iyzico')
@@ -118,19 +154,38 @@ export class PaymentController {
     @Headers('x-iyzico-signature') signature?: string,
     @Query('paymentId') paymentId?: string,
     @Query('direct') direct?: string,
+    @Query('token') tokenFromQuery?: string,
+    @Query('conversationData') conversationDataFromQuery?: string,
   ) {
+    // Iyzico Mock bazen GET ile query'de token/conversationData gönderir – body boşsa query'den al
+    const query = (req as any).query || {};
+    const mergedDto = {
+      ...dto,
+      token: dto?.token || tokenFromQuery || query['token'],
+      conversationData: (dto as any)?.conversationData || (dto as any)?.conversation_data || conversationDataFromQuery || query['conversationData'] || query['conversation_data'],
+    };
+    const logPayload = { bodyKeys: Object.keys(dto || {}), queryKeys: Object.keys(query), hasToken: !!mergedDto.token, hasConversationData: !!mergedDto.conversationData };
+    this.logger.log(`[CALLBACK] Iyzico: ${JSON.stringify(logPayload)}`);
+
     // Get raw body for signature verification
     const rawBody = (req as any).rawBody || JSON.stringify(dto);
 
-    // Direct 3D Secure Redirection
+    // Direct 3D Secure: bank POSTs here after user completes SMS; we complete auth and redirect to frontend
     if (direct === 'true' && paymentId) {
-      const result = await this.paymentService.completeDirect3DSecure(paymentId, dto);
+      const result = await this.paymentService.completeDirect3DSecure(paymentId, mergedDto as any);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const orderId = (result as any).orderId;
+      const isGuest = (result as any).isGuest;
+      const guestParam = isGuest ? '&guest=true' : '';
 
       if (result.status === 'success') {
-        return res.redirect(`${frontendUrl}/payment/success`);
+        const successUrl = orderId
+          ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}`
+          : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}`;
+        return res.redirect(302, successUrl);
       } else {
-        return res.redirect(`${frontendUrl}/payment/failed?reason=${encodeURIComponent(result.message || 'Ödeme başarısız')}`);
+        const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}`;
+        return res.redirect(302, failUrl);
       }
     }
 

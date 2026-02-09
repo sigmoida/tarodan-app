@@ -68,6 +68,7 @@ interface OrderDetail {
     status: string;
     amount: number;
     provider: string;
+    failureReason?: string | null;
   };
 }
 
@@ -313,6 +314,31 @@ export default function OrderDetailPage() {
                 >
                   {locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}
                 </button>
+              </div>
+            )}
+
+            {/* Pending Payment – Buyer can complete payment */}
+            {order.isBuyer && order.status === 'pending_payment' && order.payment && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl sm:p-6 p-4">
+                <h2 className="text-lg font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                  <CreditCardIcon className="w-5 h-5 text-amber-600" />
+                  {locale === 'en' ? 'Payment Pending' : 'Ödeme Bekleniyor'}
+                </h2>
+                <p className="text-sm text-amber-800 mb-3">
+                  {locale === 'en' ? 'This order has not been paid yet. Complete the payment to continue.' : 'Bu siparişin ödemesi henüz yapılmadı. Devam etmek için ödemeyi tamamlayın.'}
+                </p>
+                {order.payment.failureReason && (
+                  <p className="text-sm text-red-700 mb-3 bg-red-50 px-3 py-2 rounded-lg">
+                    <strong>{locale === 'en' ? 'Last error:' : 'Son hata:'}</strong> {order.payment.failureReason}
+                  </p>
+                )}
+                <Link
+                  href={`/payment/${order.payment.id}`}
+                  className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                >
+                  <CreditCardIcon className="w-5 h-5" />
+                  {locale === 'en' ? 'Complete Payment' : 'Ödemeyi Tamamla'}
+                </Link>
               </div>
             )}
 

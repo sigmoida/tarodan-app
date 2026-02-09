@@ -307,13 +307,13 @@ export class TradeService {
       this.prisma.trade.count({
         where: {
           receiverId: userId,
-          status: 'pending',
+          status: TradeStatus.pending,
         },
       }),
       this.prisma.trade.count({
         where: {
           initiatorId: userId,
-          status: 'pending',
+          status: TradeStatus.pending,
         },
       }),
     ]);

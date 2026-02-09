@@ -8,6 +8,8 @@ import {
   Query,
   Request,
   ParseUUIDPipe,
+  UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { TradeService } from './trade.service';
 import {
@@ -29,7 +31,18 @@ import { AdminRole } from '@prisma/client';
 
 @Controller('trades')
 export class TradeController {
+  private readonly logger = new Logger(TradeController.name);
+
   constructor(private readonly tradeService: TradeService) {}
+
+  private getUserId(req: any): string {
+    const userId = req?.user?.id;
+    if (!userId) {
+      this.logger.warn('trades: req.user.id missing');
+      throw new UnauthorizedException('Oturum gerekli');
+    }
+    return userId;
+  }
 
   /**
    * Create a new trade offer
@@ -40,7 +53,7 @@ export class TradeController {
     @Request() req: any,
     @Body() dto: CreateTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.createTrade(req.user.id, dto);
+    return this.tradeService.createTrade(this.getUserId(req), dto);
   }
 
   /**
@@ -49,7 +62,12 @@ export class TradeController {
    */
   @Get('pending-count')
   async getPendingCount(@Request() req: any) {
-    return this.tradeService.getPendingCount(req.user.id);
+    try {
+      return await this.tradeService.getPendingCount(this.getUserId(req));
+    } catch (e: any) {
+      this.logger.error(`trades/pending-count failed: ${e?.message}`, e?.stack);
+      throw e;
+    }
   }
 
   /**
@@ -61,7 +79,7 @@ export class TradeController {
     @Request() req: any,
     @Query() query: TradeQueryDto,
   ): Promise<TradeListResponseDto> {
-    return this.tradeService.listUserTrades(req.user.id, query);
+    return this.tradeService.listUserTrades(this.getUserId(req), query);
   }
 
   /**
@@ -73,7 +91,7 @@ export class TradeController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.getTradeById(id, req.user.id);
+    return this.tradeService.getTradeById(id, this.getUserId(req));
   }
 
   /**
@@ -86,7 +104,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AcceptTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.acceptTrade(id, req.user.id, dto);
+    return this.tradeService.acceptTrade(id, this.getUserId(req), dto);
   }
 
   /**
@@ -99,7 +117,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.rejectTrade(id, req.user.id, dto);
+    return this.tradeService.rejectTrade(id, this.getUserId(req), dto);
   }
 
   /**
@@ -112,7 +130,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CounterTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.counterTrade(id, req.user.id, dto);
+    return this.tradeService.counterTrade(id, this.getUserId(req), dto);
   }
 
   /**
@@ -125,7 +143,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.cancelTrade(id, req.user.id, dto);
+    return this.tradeService.cancelTrade(id, this.getUserId(req), dto);
   }
 
   /**
@@ -138,7 +156,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.shipTrade(id, req.user.id, dto);
+    return this.tradeService.shipTrade(id, this.getUserId(req), dto);
   }
 
   /**
@@ -151,7 +169,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ConfirmTradeReceiptDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.confirmReceipt(id, req.user.id, dto);
+    return this.tradeService.confirmReceipt(id, this.getUserId(req), dto);
   }
 
   /**
@@ -164,7 +182,7 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RaiseTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.raiseDispute(id, req.user.id, dto);
+    return this.tradeService.raiseDispute(id, this.getUserId(req), dto);
   }
 
   /**
@@ -178,6 +196,6 @@ export class TradeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ResolveTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    return this.tradeService.resolveDispute(id, req.user.adminId || req.user.id, dto);
+    return this.tradeService.resolveDispute(id, req.user?.adminId || this.getUserId(req), dto);
   }
 }

@@ -8,6 +8,8 @@ import {
   Request,
   ParseUUIDPipe,
   UseGuards,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { MessagingService } from './messaging.service';
 import { ContentFilterService, ContentFilterRule } from './content-filter.service';
@@ -32,10 +34,21 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('messages')
 export class MessagingController {
+  private readonly logger = new Logger(MessagingController.name);
+
   constructor(
     private readonly messagingService: MessagingService,
     private readonly contentFilterService: ContentFilterService,
   ) {}
+
+  private getUserId(req: any): string {
+    const userId = req?.user?.id;
+    if (!userId) {
+      this.logger.warn('messages: req.user.id missing');
+      throw new UnauthorizedException('Oturum gerekli');
+    }
+    return userId;
+  }
 
   /**
    * Create a new thread or get existing one
@@ -46,7 +59,7 @@ export class MessagingController {
     @Request() req: any,
     @Body() dto: CreateThreadDto,
   ): Promise<MessageThreadResponseDto> {
-    return this.messagingService.createThread(req.user.id, dto);
+    return this.messagingService.createThread(this.getUserId(req), dto);
   }
 
   /**
@@ -58,7 +71,12 @@ export class MessagingController {
     @Request() req: any,
     @Query() query: ThreadQueryDto,
   ): Promise<ThreadListResponseDto> {
-    return this.messagingService.getUserThreads(req.user.id, query);
+    try {
+      return await this.messagingService.getUserThreads(this.getUserId(req), query);
+    } catch (e: any) {
+      this.logger.error(`messages/threads failed: ${e?.message}`, e?.stack);
+      throw e;
+    }
   }
 
   /**
@@ -70,7 +88,7 @@ export class MessagingController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MessageThreadResponseDto> {
-    return this.messagingService.getThreadById(id, req.user.id);
+    return this.messagingService.getThreadById(id, this.getUserId(req));
   }
 
   /**
@@ -83,7 +101,7 @@ export class MessagingController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: MessageQueryDto,
   ): Promise<MessageListResponseDto> {
-    return this.messagingService.getThreadMessages(id, req.user.id, query);
+    return this.messagingService.getThreadMessages(id, this.getUserId(req), query);
   }
 
   /**
@@ -96,7 +114,7 @@ export class MessagingController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,
   ): Promise<MessageResponseDto> {
-    return this.messagingService.sendMessage(id, req.user.id, dto);
+    return this.messagingService.sendMessage(id, this.getUserId(req), dto);
   }
 
   /**
@@ -105,7 +123,7 @@ export class MessagingController {
    */
   @Get('daily-limit')
   async getDailyLimit(@Request() req: any) {
-    return this.messagingService.getRemainingDailyMessages(req.user.id);
+    return this.messagingService.getRemainingDailyMessages(this.getUserId(req));
   }
 
   // ==========================================================================
@@ -141,7 +159,7 @@ export class MessagingController {
   ): Promise<MessageResponseDto> {
     return this.messagingService.moderateMessage(
       id,
-      req.user.id,
+      this.getUserId(req),
       dto.action,
     );
   }

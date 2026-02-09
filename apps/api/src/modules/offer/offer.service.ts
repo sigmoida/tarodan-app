@@ -576,13 +576,13 @@ export class OfferService {
       this.prisma.offer.count({
         where: {
           sellerId: userId,
-          status: 'pending',
+          status: OfferStatus.pending,
         },
       }),
       this.prisma.offer.count({
         where: {
           buyerId: userId,
-          status: 'pending',
+          status: OfferStatus.pending,
         },
       }),
     ]);

@@ -1634,6 +1634,15 @@ export class OrderService {
         : null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
+      payment: order.payment
+        ? {
+            id: order.payment.id,
+            status: order.payment.status,
+            amount: Number(order.payment.amount),
+            provider: order.payment.provider,
+            failureReason: order.payment.failureReason ?? undefined,
+          }
+        : undefined,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };

@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,8 @@ import {
 @ApiTags('offers')
 @Controller('offers')
 export class OfferController {
+  private readonly logger = new Logger(OfferController.name);
+
   constructor(private readonly offerService: OfferService) {}
 
   /**
@@ -80,7 +83,12 @@ export class OfferController {
     },
   })
   async getPendingCount(@CurrentUser('id') userId: string) {
-    return this.offerService.getPendingCount(userId);
+    try {
+      return await this.offerService.getPendingCount(userId);
+    } catch (e: any) {
+      this.logger.error(`offers/pending-count failed: ${e?.message}`, e?.stack);
+      throw e;
+    }
   }
 
   /**

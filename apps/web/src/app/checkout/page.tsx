@@ -688,13 +688,28 @@ export default function CheckoutPage() {
           throw orderError;
         }
 
-        const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
+        // Backend directBuy returns orderId; guest checkout returns id; support both
+        const orderId =
+          orderResponse?.data?.orderId ??
+          orderResponse?.data?.id ??
+          orderResponse?.data?.order?.id ??
+          null;
+
+        if (!orderId) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Checkout: order created but no orderId in response', orderResponse?.data);
+          }
+          toast.error(locale === 'en' ? 'Order was created but could not start payment. Please go to My Orders to complete payment.' : 'Sipariş oluşturuldu ancak ödeme başlatılamadı. Lütfen Siparişlerim sayfasından ödemeyi tamamlayın.');
+          setIsLoading(false);
+          router.push('/orders');
+          return;
+        }
 
         if (orderId) {
           // For Iyzico, use Direct API with card info from the form
           if (paymentProvider === 'iyzico') {
             try {
-              // Validate card info if using new card
+              // Validate card info only when using NEW card
               if (useNewCard || savedCards.length === 0) {
                 if (!cardName || !cardNumber || !cardExpiry || !cardCvc) {
                   toast.error(locale === 'en' ? 'Please fill in all card information' : 'Lütfen tüm kart bilgilerini doldurun');
@@ -703,8 +718,25 @@ export default function CheckoutPage() {
                 }
               }
 
-              // Parse expiry date
-              const [month, year] = cardExpiry.split('/');
+              let month: string | undefined;
+              let year: string | undefined;
+              // Parse expiry only when using new card (saved card does not need expiry in payload)
+              if (useNewCard || savedCards.length === 0) {
+                const expiryNormalized = cardExpiry.replace(/\s/g, '').replace(/-/g, '/');
+                const expiryParts = expiryNormalized.includes('/')
+                  ? expiryNormalized.split('/')
+                  : expiryNormalized.length >= 4
+                    ? [expiryNormalized.slice(0, 2), expiryNormalized.slice(2)]
+                    : [];
+                month = expiryParts[0]?.trim();
+                const rawYear = expiryParts[1]?.trim() || '';
+                year = rawYear.length === 2 ? '20' + rawYear : rawYear;
+                if (!month || !year || month.length !== 2 || Number(month) < 1 || Number(month) > 12) {
+                  toast.error(locale === 'en' ? 'Please enter a valid expiry date (MM/YY)' : 'Geçerli bir son kullanma tarihi girin (AA/YY)');
+                  setIsLoading(false);
+                  return;
+                }
+              }
 
               const directPayload: any = {
                 orderId,
@@ -715,67 +747,85 @@ export default function CheckoutPage() {
               if (!useNewCard && selectedSavedCard && savedCards.length > 0) {
                 directPayload.cardToken = selectedSavedCard;
               } else {
+                if (!month || !year) {
+                  toast.error(locale === 'en' ? 'Please enter a valid expiry date (MM/YY)' : 'Geçerli bir son kullanma tarihi girin (AA/YY)');
+                  setIsLoading(false);
+                  return;
+                }
                 directPayload.card = {
-                  cardHolderName: cardName,
+                  cardHolderName: cardName.trim(),
                   cardNumber: cardNumber.replace(/\s/g, ''),
                   expireMonth: month,
-                  expireYear: year.length === 2 ? '20' + year : year,
+                  expireYear: year,
                   cvc: cardCvc,
                 };
               }
 
               const directResponse = await paymentsApi.processDirect(directPayload);
               const directData = directResponse.data;
-              console.log('Processing Direct Payment Response (v3)', directData);
+              // LOG: Tam yanıtı görüp neden 3DS açılmadığını anlamak için
+              console.log('[ÖDEME] API yanıtı (tam):', { ...directData, htmlContentLength: directData?.htmlContent?.length, htmlContentPreview: directData?.htmlContent?.substring?.(0, 80) });
 
-              // Base64 decode logic with robust detection
-              let htmlContent = directData.htmlContent;
+              // API her zaman Base64 gönderiyor – içerik < ile başlamıyorsa decode et
+              let htmlContent = directData?.htmlContent;
+              if (typeof htmlContent !== 'string') {
+                toast.error('Ödeme yanıtı geçersiz.');
+                setIsLoading(false);
+                return;
+              }
+              htmlContent = htmlContent.trim();
 
-              // Check explicit flag OR auto-detect Base64 (starts with alphanumeric, not <)
-              const needsDecode = directData.isBase64 || (htmlContent && !htmlContent.trim().startsWith('<') && /^[a-zA-Z0-9+/=]+$/.test(htmlContent.substring(0, 50)));
-
-              if (needsDecode && htmlContent) {
+              // Base64 ise decode et (isBase64 flag'e güvenme; içerik < ile başlamıyorsa decode dene)
+              if (!htmlContent.startsWith('<')) {
                 try {
-                  console.log('Decoding Base64 HTML content...');
                   htmlContent = atob(htmlContent);
+                  // Çift encode olmuşsa bir kez daha
+                  if (htmlContent && !htmlContent.trim().startsWith('<') && /^[A-Za-z0-9+/=]+$/.test(htmlContent.substring(0, 100).replace(/\s/g, ''))) {
+                    htmlContent = atob(htmlContent);
+                  }
                 } catch (e) {
-                  console.error('Failed to decode HTML content', e);
+                  console.error('Base64 decode hatası', e);
                   toast.error('Ödeme sayfası yüklenemedi (Decode hatası)');
+                  setIsLoading(false);
                   return;
                 }
               }
+              if (htmlContent) htmlContent = htmlContent.trim();
 
-              // Check if 3D Secure HTML content is returned
-              if (htmlContent) {
+              // HTML mi? (<!DOCTYPE veya <html veya <?xml)
+              const hasHtml = htmlContent.length > 0 && (htmlContent.toLowerCase().startsWith('<!') || htmlContent.toLowerCase().startsWith('<html') || htmlContent.toLowerCase().startsWith('<?'));
+              if (hasHtml) {
                 // Clear cart before showing 3D Secure
                 if (!directProductId) {
                   await clearCart();
                 }
-                // Open 3D Secure page in current window
+                setIsLoading(false);
+                // Open 3D Secure page in current window (bank SMS form)
                 document.open();
                 document.write(htmlContent);
                 document.close();
                 return;
-              } else if (directData.status === 'success') {
-                // Direct success (no 3D Secure needed)
-                if (!directProductId) {
-                  await clearCart();
-                }
-                toast.success(locale === 'en' ? 'Payment successful!' : 'Ödeme başarılı!');
-                router.push(`/checkout/success?orderId=${orderId}`);
+              }
+              if (!htmlContent || htmlContent.trim().length === 0) {
+                console.error('[ÖDEME] HTML yok. API keys:', Object.keys(directData || {}));
+                toast.error(directData?.message || (locale === 'en' ? 'Payment page could not be loaded.' : 'Ödeme sayfası yüklenemedi. API HTML dönmedi.'));
+                setIsLoading(false);
                 return;
-              } else {
-                throw new Error(directData.message || (locale === 'en' ? 'Payment failed' : 'Ödeme başarısız'));
               }
+              // İçerik var ama HTML değil – gerçek sebebi logla ve göster
+              console.error('[ÖDEME] 3DS HTML sayılmadı. Decode sonrası ilk 400 karakter:', htmlContent.substring(0, 400));
+              console.error('[ÖDEME] API status:', directData?.status, 'Keys:', Object.keys(directData || {}));
+              const errMsg = directData?.message || (locale === 'en' ? '3D Secure response was not valid HTML. See console (F12) for details.' : '3D Secure yanıtı HTML değil. Detay için F12 ile konsolu açın.');
+              toast.error(errMsg);
+              setIsLoading(false);
+              return;
             } catch (paymentError: any) {
-              if (process.env.NODE_ENV === 'development') {
-                console.error('Direct payment failed:', paymentError);
-              }
-              toast.error(
-                paymentError.response?.data?.message ||
-                (locale === 'en' ? 'Payment failed. Please try again.' : 'Ödeme başarısız. Lütfen tekrar deneyin.')
-              );
-              throw paymentError;
+              const apiMessage = paymentError?.response?.data?.message;
+              const apiError = paymentError?.response?.data;
+              console.error('[ÖDEME] Hata (tam):', { message: apiMessage, status: paymentError?.response?.status, data: apiError });
+              toast.error(apiMessage || paymentError?.message || (locale === 'en' ? 'Payment failed.' : 'Ödeme başarısız.'));
+              setIsLoading(false);
+              return;
             }
           } else {
             // PayTR - use existing hosted checkout flow
@@ -833,17 +883,14 @@ export default function CheckoutPage() {
         }
       }
 
-      toast.success(t('checkout.orderSuccess'));
-      if (!directProductId) {
-        await clearCart();
+      // Bu satıra sadece sipariş oluşturuldu ama orderId alınamadığında veya ödeme adımı atlanırsa düşmemeli.
+      // Ödeme her zaman yukarıdaki döngüde (iyzico 3DS veya PayTR redirect) ile tamamlanır veya return edilir.
+      // Eğer buraya düşüldüyse beklenmeyen durum: kullanıcıyı siparişlere yönlendir, ödeme yapılmamış olabilir.
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Checkout: reached end of loop without payment redirect – possible missing orderId or payment step');
       }
-
-      // Redirect based on auth status
-      if (isAuthenticated) {
-        router.push('/orders');
-      } else {
-        router.push(`/checkout/success?email=${encodeURIComponent(contactEmail)}`);
-      }
+      toast.error(locale === 'en' ? 'Please complete payment from My Orders.' : 'Lütfen ödemeyi Siparişlerim sayfasından tamamlayın.');
+      router.push('/orders');
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
         console.error('Checkout failed:', error);

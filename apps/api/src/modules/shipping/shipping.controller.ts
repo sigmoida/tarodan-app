@@ -50,7 +50,24 @@ export class ShippingController {
   }
 
   /**
-   * POST /shipping/rates - Calculate shipping rates
+   * GET /shipping/rates - Get shipping rate by city (for checkout)
+   * Query: city, carrier (aras | yurtici | mng), weight (kg, default 0.5)
+   */
+  @Get('rates')
+  @Public()
+  @ApiOperation({ summary: 'Get shipping rate by city and carrier' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Single rate for the given city/carrier' })
+  async getRatesByCity(
+    @Query('city') city: string,
+    @Query('carrier') carrier: string,
+    @Query('weight') weight?: string,
+  ): Promise<{ rate: number }> {
+    const weightKg = weight ? parseFloat(weight) || 0.5 : 0.5;
+    return this.shippingService.getRateByCity(city || '', carrier || 'aras', weightKg);
+  }
+
+  /**
+   * POST /shipping/rates - Calculate shipping rates (by address IDs)
    * Requirement: Real-time cost calculation (project.md)
    */
   @Post('rates')

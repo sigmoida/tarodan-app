@@ -4,8 +4,9 @@ import Image, { ImageProps } from 'next/image';
 import { useState, useCallback } from 'react';
 import * as Sentry from '@sentry/nextjs';
 
-// Default placeholder for broken images
-const DEFAULT_PLACEHOLDER = 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Image';
+// Default placeholder for broken images (data URL avoids external SSL / ERR_CERT_AUTHORITY_INVALID)
+const DEFAULT_PLACEHOLDER =
+  'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f3f4f6" width="400" height="400"/><text fill="#9ca3af" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18">Image</text></svg>');
 
 /** Default sizes for fill images: responsive grid (e.g. 3 cols desktop, 2 tablet, 1 mobile) */
 const DEFAULT_FILL_SIZES = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';

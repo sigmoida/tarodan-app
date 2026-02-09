@@ -145,6 +145,21 @@ export class ShippingService {
    * Calculate rate for a specific provider
    * Mock implementation - replace with actual API calls
    */
+  /**
+   * Get single shipping rate by city (for checkout)
+   * Used when we only have destination city, not address IDs.
+   */
+  async getRateByCity(city: string, carrier: string, weightKg: number): Promise<{ rate: number }> {
+    const provider = Object.values(ShippingProvider).includes(carrier as ShippingProvider)
+      ? (carrier as ShippingProvider)
+      : ShippingProvider.aras;
+    const weight = weightKg > 0 ? weightKg : 0.5;
+    const fromCity = 'İstanbul'; // Default origin for rate calculation
+    const toCity = city?.trim() || 'İstanbul';
+    const result = await this.calculateProviderRate(provider, fromCity, toCity, weight);
+    return { rate: result.cost };
+  }
+
   private async calculateProviderRate(
     provider: ShippingProvider,
     fromCity: string,

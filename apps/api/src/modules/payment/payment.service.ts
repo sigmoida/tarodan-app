@@ -512,11 +512,9 @@ export class PaymentService {
       zipCode: shippingAddress?.zipCode || '34000',
     };
 
-    // Callback URL needs to be special for 3D Secure
-    // It should handle the POST from bank and then redirect to frontend
-    // We can use the existing callback endpoint logic but we might need a frontend redirect page
-    const baseUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
-    const callbackUrl = `${baseUrl}/api/payment/callback/iyzico?paymentId=${payment.id}&direct=true`;
+    // Callback URL: bank/iyzico POSTs here after 3DS. Must be backend so we can call complete3DSecure and redirect.
+    const apiBaseUrl = this.configService.get('API_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://api.tarodan.com' : 'http://localhost:3001');
+    const callbackUrl = `${apiBaseUrl}/api/payments/callback/iyzico?paymentId=${payment.id}&direct=true`;
 
     const request: any = {
       locale: 'tr',
@@ -578,26 +576,39 @@ export class PaymentService {
     try {
       const result = await this.iyzicoService.initialize3DSecure(request);
 
-      this.logger.log(`Full Iyzico Result: ${JSON.stringify(result)}`);
+      const resultKeys = Object.keys(result || {}).join(',');
+      this.logger.log(`[ÖDEME] Iyzico 3DS yanıt keys: ${resultKeys}, status: ${(result as any)?.status}`);
+      Object.keys(result || {}).forEach((k) => {
+        const v = (result as any)[k];
+        if (typeof v === 'string' && v.length > 0 && v.length < 500) this.logger.log(`[ÖDEME] Iyzico.${k} (${v.length} char): ${v.substring(0, 100)}...`);
+        else if (typeof v === 'string') this.logger.log(`[ÖDEME] Iyzico.${k} length=${v.length}, startsWith: ${v.substring(0, 50)}`);
+      });
 
-      // Extracts HTML content
-      const rawHtmlContent = result.htmlContent || result.threeDSHtmlContent;
+      // Iyzico SDK can return HTML under different keys (htmlContent, threeDSHtmlContent, etc.)
+      const htmlKey = Object.keys(result || {}).find((k) => k.toLowerCase().includes('html'));
+      const rawHtmlContent =
+        (result as any).htmlContent ||
+        (result as any).threeDSHtmlContent ||
+        (result as any).HTMLContent ||
+        (result as any).three_ds_html_content ||
+        (htmlKey ? (result as any)[htmlKey] : undefined);
 
-      // Update payment with provider metadata
+      // Store iyzico paymentId for 3DS callback (complete3DSecure needs it)
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
-          providerPaymentId: payment.id,
+          providerPaymentId: (result as any).paymentId || payment.id,
           providerConversationId: order.id,
           metadata: {
             isDirectApi: true,
             iyzicoStatus: result.status,
+            iyzicoPaymentId: (result as any).paymentId,
           }
         }
       });
 
       if (rawHtmlContent) {
-        this.logger.log(`HTML Content found (length: ${rawHtmlContent.length}). Returning Base64.`);
+        this.logger.log(`[ÖDEME] 3DS HTML bulundu, length=${rawHtmlContent.length}, ilk 60 char: ${rawHtmlContent.substring(0, 60)}`);
         return {
           status: 'success',
           htmlContent: Buffer.from(rawHtmlContent).toString('base64'),
@@ -609,16 +620,12 @@ export class PaymentService {
         // Bu durumda ödeme alınmamıştır, sadece init olmuştur.
         // Kullanıcıya başarılı demek yanlıştır.
 
-        this.logger.error('Iyzico returned success but NO HTML content found under known keys');
-        this.logger.error(`Full result: ${JSON.stringify(result)}`);
-
-        // Debug için keyleri hata mesajına ekle
-        const keys = Object.keys(result).join(',');
-        throw new BadRequestException(`3D Secure HTML içeriği alınamadı. (Keys: ${keys})`);
+        this.logger.error(`[ÖDEME] Iyzico HTML yok. Keys: ${resultKeys}. Frontend bu mesajı gösterecek.`);
+        throw new BadRequestException(`3D Secure HTML gelmedi. Iyzico dönen alanlar: ${resultKeys}. (Sandbox/API key kontrol et.)`);
       }
 
     } catch (e: any) {
-      this.logger.error(`Direct payment init failed: ${e.message}`);
+      this.logger.error(`[ÖDEME] processDirect hata: ${e.message}`, e?.stack);
       throw new BadRequestException(e.message || 'Ödeme başlatılamadı');
     }
   }
@@ -709,6 +716,10 @@ export class PaymentService {
 
     this.logger.log(`Payment found: internalId=${payment.id}, orderId=${payment.orderId}, status=${payment.status}`);
 
+    if (!dto.token) {
+      throw new BadRequestException('Payment token is required');
+    }
+
     // Retrieve checkout form result from Iyzico
     try {
       const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(dto.token);
@@ -761,30 +772,80 @@ export class PaymentService {
     if (!payment) throw new NotFoundException('Payment not found');
 
     if (payment.status === PaymentStatus.completed) {
-      return { status: 'success', paymentId: payment.id };
+      const isGuest = !(payment.order as any)?.buyerId;
+      return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
     }
 
     try {
-      // Call Auth
-      // conversationData is required for 3DS auth
+      // Use iyzico paymentId from init (stored in metadata); callback form may send conversationData only
+      const iyzicoPaymentId = (payment.metadata as any)?.iyzicoPaymentId || dto.paymentId || '';
+      const conversationId = payment.providerConversationId || payment.orderId || (payment.order as any)?.id;
+
+      if (!iyzicoPaymentId) {
+        this.logger.error('Missing iyzico paymentId for 3DS complete');
+        await this.processFailedPayment(payment, '3D Secure doğrulama bilgisi eksik');
+        return { status: 'error', message: '3D Secure doğrulama bilgisi eksik' };
+      }
+
+      // Iyzico/bank may send conversationData or token (Mock bazen token döner)
+      const dtoAny = dto as any;
+      const conversationData =
+        dto.conversationData ||
+        dto.conversation_data ||
+        dtoAny.conversationData ||
+        dtoAny.conversation_data ||
+        dtoAny.threeDSHtmlContent ||
+        '';
+      const token = dto.token || dtoAny.token || '';
+
+      // conversationData yok ama token varsa (Iyzico Mock): retrieveCheckoutForm ile sonucu al
+      if ((!conversationData || String(conversationData).trim() === '') && token) {
+        this.logger.log('[ÖDEME] conversationData yok, token ile retrieveCheckoutForm deneniyor (Mock)');
+        try {
+          const retrieveResult = await this.iyzicoService.retrieveCheckoutForm(token);
+          const isGuest = !(payment.order as any)?.buyerId;
+          if (retrieveResult.status === 'success' && retrieveResult.paymentId) {
+            await this.processSuccessfulPayment(payment, retrieveResult.paymentId);
+            return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
+          }
+          const err = retrieveResult.errorMessage || 'Ödeme doğrulanamadı';
+          await this.processFailedPayment(payment, err);
+          return { status: 'failed', message: err, orderId: payment.orderId, isGuest };
+        } catch (e: any) {
+          this.logger.error(`[ÖDEME] retrieveCheckoutForm failed: ${e?.message}`);
+          await this.processFailedPayment(payment, e?.message || 'Token ile doğrulama başarısız');
+          const isGuest = !(payment.order as any)?.buyerId;
+          return { status: 'error', message: e?.message || '3D Secure yanıtı alınamadı', orderId: payment.orderId, isGuest };
+        }
+      }
+
+      if (!conversationData || String(conversationData).trim() === '') {
+        this.logger.warn('[ÖDEME] conversationData ve token yok. Keys: ' + Object.keys(dtoAny).join(','));
+        await this.processFailedPayment(payment, '3D Secure yanıtı alınamadı (conversationData/token eksik)');
+        const isGuest = !(payment.order as any)?.buyerId;
+        return { status: 'error', message: '3D Secure yanıtı alınamadı', orderId: payment.orderId, isGuest };
+      }
+
       const result = await this.iyzicoService.complete3DSecure({
-        paymentId: dto.paymentId || '', // This comes from Iyzico body (Iyzipay paymentId)
-        conversationId: dto.conversationId,
-        conversationData: dto.conversationData,
+        paymentId: iyzicoPaymentId,
+        conversationId: String(conversationId),
+        conversationData: String(conversationData).trim(),
       });
 
+      const isGuest = !(payment.order as any)?.buyerId;
       if (result.status === 'success' && (result.paymentStatus === 'SUCCESS' || result.status === 'success')) {
         await this.processSuccessfulPayment(payment, result.paymentId);
-        return { status: 'success', paymentId: payment.id };
+        return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
       } else {
         const err = result.errorMessage || '3D Secure Auth failed';
         await this.processFailedPayment(payment, err);
-        return { status: 'failed', message: err };
+        return { status: 'failed', message: err, orderId: payment.orderId, isGuest };
       }
     } catch (e: any) {
       this.logger.error(`3DS Complete error: ${e.message}`);
+      const isGuest = !(payment.order as any)?.buyerId;
       await this.processFailedPayment(payment, e.message);
-      return { status: 'error', message: e.message };
+      return { status: 'error', message: e.message, orderId: payment.orderId, isGuest };
     }
   }
 
