@@ -17,22 +17,14 @@ import { AnalyticsWorker } from './analytics.worker';
 
 // Prisma for database access
 import { PrismaModule } from '../prisma/prisma.module';
-
-// Queue names
-export const QUEUE_NAMES = {
-  EMAIL: 'email',
-  PUSH: 'push',
-  IMAGE: 'image',
-  PAYMENT: 'payment',
-  SHIPPING: 'shipping',
-  SEARCH: 'search',
-  ANALYTICS: 'analytics',
-} as const;
+import { PaymentModule } from '../modules/payment/payment.module';
+import { QUEUE_NAMES } from './constants';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
+    PaymentModule,
     // Configure BullMQ with Redis connection
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -76,4 +68,4 @@ export const QUEUE_NAMES = {
   ],
   exports: [BullModule],
 })
-export class WorkerModule {}
+export class WorkerModule { }

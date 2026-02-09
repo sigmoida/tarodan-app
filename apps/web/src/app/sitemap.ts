@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 
 // Site base URL
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://tarodan.com';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Static pages
@@ -186,12 +187,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.5,
         },
         {
-            url: `${BASE_URL}/about`,
-            lastModified: new Date(),
-            changeFrequency: 'monthly',
-            priority: 0.4,
-        },
-        {
             url: `${BASE_URL}/contact`,
             lastModified: new Date(),
             changeFrequency: 'monthly',
@@ -205,14 +200,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
     ];
 
-    // TODO: In production, fetch dynamic product listings from API
-    // const products = await fetch(`${API_URL}/api/products/sitemap`).then(res => res.json());
-    // const productPages = products.map((product: any) => ({
-    //   url: `${BASE_URL}/listings/${product.id}`,
-    //   lastModified: new Date(product.updatedAt),
-    //   changeFrequency: 'weekly' as const,
-    //   priority: 0.6,
-    // }));
+    // Dynamic static pages from API (about, faq, etc.)
+    let cmsPages: MetadataRoute.Sitemap = [];
+    try {
+      const res = await fetch(`${API_BASE}/api/pages`, { next: { revalidate: 3600 } });
+      if (res.ok) {
+        const pages: Array<{ slug: string; updatedAt: string }> = await res.json();
+        cmsPages = pages.map((p) => ({
+          url: `${BASE_URL}/sayfa/${p.slug}`,
+          lastModified: new Date(p.updatedAt),
+          changeFrequency: 'monthly' as const,
+          priority: 0.4,
+        }));
+      }
+    } catch {
+      // API unreachable; sitemap still returns static entries
+    }
 
-    return [...staticPages];
+    return [...staticPages, ...cmsPages];
 }

@@ -29,4 +29,21 @@ export class PaymentSchedulerService {
       this.logger.error(`Error cancelling expired payments: ${error.message}`, error.stack);
     }
   }
+
+  /**
+   * Run every hour: release payment holds whose releaseAt date has passed
+   */
+  @Cron('0 * * * *') // Every hour at minute 0
+  async handleReleaseHoldsDue() {
+    this.logger.log('Checking for payment holds due for release...');
+
+    try {
+      const result = await this.paymentService.releaseHoldsDue();
+      if (result.count > 0) {
+        this.logger.log(`Released ${result.count} payment hold(s)`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
+    }
+  }
 }

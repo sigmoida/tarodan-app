@@ -165,7 +165,7 @@ export default function ProductsPage() {
 
       // Better error handling
       let errorMessage = 'İşlem başarısız';
-      
+
       if (error.response) {
         // Server responded with error
         errorMessage = error.response.data?.message || error.response.data?.error || `Sunucu hatası: ${error.response.status}`;
@@ -176,7 +176,7 @@ export default function ProductsPage() {
         // Error in request setup
         errorMessage = error.message || 'Bir hata oluştu';
       }
-      
+
       toast.error(errorMessage);
     }
   };
@@ -360,7 +360,25 @@ export default function ProductsPage() {
               </button>
             </div>
           )}
+          <button
+            onClick={async () => {
+              try {
+                const res = await adminApi.exportProducts({ status: filter === 'all' ? undefined : filter, sellerId: selectedSellerId || undefined });
+                const blob = new Blob([res.data], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+              } catch (e) { console.error(e); }
+            }}
+            className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg text-sm"
+          >
+            CSV İndir
+          </button>
         </div>
+
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
@@ -378,7 +396,7 @@ export default function ProductsPage() {
               Ara
             </button>
           </div>
-          
+
           {/* Seller Filter */}
           <div className="relative w-full sm:w-64">
             <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -401,7 +419,7 @@ export default function ProductsPage() {
                 <XCircleIcon className="h-5 w-5" />
               </button>
             )}
-            
+
             {showSellerDropdown && sellerSearch.length >= 2 && (
               <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {loadingUsers ? (
@@ -423,7 +441,7 @@ export default function ProductsPage() {
               </div>
             )}
           </div>
-          
+
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}

@@ -11,6 +11,7 @@ import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
+import { TaxService } from '../tax';
 
 // Simple HTML to PDF generation (uses basic HTML for invoice)
 // In production, consider using puppeteer or pdfkit for better PDF generation
@@ -83,6 +84,7 @@ export class InvoiceService {
     private readonly storageService: StorageService,
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
+    private readonly taxService: TaxService,
   ) {}
 
   /**
@@ -93,13 +95,13 @@ export class InvoiceService {
     pdfUrl: string;
     htmlContent: string;
   }> {
-    // Get order with all related data
+    // Get order with all related data (product includes categoryId for tax rules)
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
         buyer: true,
         seller: true,
-        product: true,
+        product: { select: { title: true, categoryId: true } },
         payment: true,
       },
     });
@@ -111,11 +113,25 @@ export class InvoiceService {
     // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber();
 
-    // Parse shipping address (it's stored as JSON)
+    // Parse shipping address (it's stored as JSON); country default TR (addresses don't store country yet)
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     const buyerAddress = shippingAddr 
       ? `${shippingAddr.addressLine1 || ''}, ${shippingAddr.district || ''}, ${shippingAddr.city || ''}`
       : 'Türkiye';
+    const countryCode = (shippingAddr?.country as string) || 'TR';
+    const regionCode = (shippingAddr?.regionCode as string) || (shippingAddr?.district as string) || null;
+
+    // Resolve tax from admin-configured rules (region + category)
+    const subtotal = Number(order.totalAmount) - Number(order.shippingCost || 0);
+    const resolvedTax = await this.taxService.resolveTaxRate(
+      countryCode,
+      regionCode,
+      order.product?.categoryId ?? null,
+    );
+    const taxRate = resolvedTax ? resolvedTax.rate : 18;
+    const taxAmount = resolvedTax
+      ? this.taxService.calculateTaxAmount(subtotal, resolvedTax)
+      : 0;
 
     // Build invoice data
     const invoiceData: InvoiceData = {
@@ -144,13 +160,13 @@ export class InvoiceService {
       items: [{
         description: order.product.title,
         quantity: 1,
-        unitPrice: Number(order.totalAmount) - Number(order.shippingCost || 0),
-        total: Number(order.totalAmount) - Number(order.shippingCost || 0),
+        unitPrice: subtotal,
+        total: subtotal,
       }],
       
-      subtotal: Number(order.totalAmount) - Number(order.shippingCost || 0),
-      taxRate: 18, // KDV %18
-      taxAmount: 0, // Included in price for marketplace
+      subtotal,
+      taxRate,
+      taxAmount,
       shippingCost: Number(order.shippingCost || 0),
       commission: Number(order.commissionAmount || 0),
       total: Number(order.totalAmount),

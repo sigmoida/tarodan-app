@@ -13,7 +13,9 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -55,6 +57,23 @@ import {
   ReportQueryDto,
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
+  PayoutTransactionsQueryDto,
+  PayoutExportQueryDto,
+  CreateTaxRegionDto,
+  UpdateTaxRegionDto,
+  CreateTaxRateDto,
+  UpdateTaxRateDto,
+  CreateTaxRuleDto,
+  UpdateTaxRuleDto,
+  TaxReportQueryDto,
+  CreateStaticPageDto,
+  UpdateStaticPageDto,
+  UpdateEmailTemplateDto,
+  UpdateProductDto,
+  SendTestEmailDto,
+  RatingQueryDto,
+  UpdateRatingStatusDto,
+  ReplyToRatingDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -204,7 +223,54 @@ export class AdminController {
     return this.adminService.getProduct(id);
   }
 
+  @Patch('products/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Update product details' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  async updateProduct(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateProductDto,
+  ) {
+    return this.adminService.updateProduct(adminId, id, dto);
+  }
+
+  @Get('products-export')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Export products to CSV' })
+  async exportProducts(
+    @Query('status') status?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('sellerId') sellerId?: string,
+    @Res() res?: any,
+  ) {
+    const result = await this.adminService.exportProducts({ status, categoryId, sellerId });
+    res.setHeader('Content-Type', result.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.content);
+  }
+
+  @Get('payments/refunds')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get refund history' })
+  async getRefundHistory(
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getRefundHistory({
+      search,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+    });
+  }
+
   // ==================== DISCOUNT MANAGEMENT (admin token) ====================
+
 
   @Get('discounts')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
@@ -361,7 +427,42 @@ export class AdminController {
     return this.adminService.resolveDispute(adminId, id, dto);
   }
 
+  @Post('orders/:id/tracking')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Add tracking information to order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async addOrderTracking(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+  ) {
+    return this.adminService.addOrderTracking(adminId, id, dto);
+  }
+
+  @Post('orders/:id/notify')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send notification about order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async sendOrderNotification(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: { type: string; message?: string },
+  ) {
+    return this.adminService.sendOrderNotification(adminId, id, dto as any);
+  }
+
+  @Get('orders/:id/invoice')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get invoice data for order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async getOrderInvoice(@Param('id') id: string) {
+    return this.adminService.generateOrderInvoice(id);
+  }
+
   // ==================== ANALYTICS & REPORTS ====================
+
 
   @Get('dashboard')
   @Roles(AdminRole.super_admin, AdminRole.admin)
@@ -620,6 +721,171 @@ export class AdminController {
     return this.adminService.forceCancelPayment(adminId, id, body.reason);
   }
 
+  // ==================== SELLER PAYOUTS ====================
+
+  @Get('payouts/summary')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get payout summary (pending, released, next releases)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout summary' })
+  async getPayoutsSummary() {
+    return this.adminService.getPayoutsSummary();
+  }
+
+  @Get('payouts/transactions')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get payout transaction history' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of payout transactions' })
+  async getPayoutsTransactions(@Query() query: PayoutTransactionsQueryDto) {
+    return this.adminService.getPayoutsTransactions(query);
+  }
+
+  @Get('payouts/schedule')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get payout schedule (upcoming releases)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout schedule' })
+  async getPayoutsSchedule(
+    @Query('sellerId') sellerId?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getPayoutsSchedule({ sellerId, limit });
+  }
+
+  @Get('payouts/export')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Export payout transactions as CSV' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'CSV content and filename' })
+  async getPayoutsExport(@Query() query: PayoutExportQueryDto) {
+    return this.adminService.getPayoutsExport(query);
+  }
+
+  @Post('payouts/release/:orderId')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release payment hold to seller (manual)' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Hold released' })
+  async releasePayout(
+    @Param('orderId') orderId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.releasePayout(adminId, orderId);
+  }
+
+  // ==================== STATIC PAGES ====================
+
+  @Get('pages')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all static pages' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of static pages' })
+  async getPages() {
+    return this.adminService.getPages();
+  }
+
+  @Get('pages/slug/:slug')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get static page by slug' })
+  @ApiParam({ name: 'slug', description: 'Page slug' })
+  async getPageBySlug(@Param('slug') slug: string) {
+    return this.adminService.getPageBySlug(slug);
+  }
+
+  @Get('pages/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get static page by ID' })
+  @ApiParam({ name: 'id', description: 'Page ID' })
+  async getPageById(@Param('id') id: string) {
+    return this.adminService.getPageById(id);
+  }
+
+  @Post('pages')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create static page' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Page created' })
+  async createPage(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateStaticPageDto,
+  ) {
+    return this.adminService.createPage(adminId, dto);
+  }
+
+  @Patch('pages/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update static page' })
+  @ApiParam({ name: 'id', description: 'Page ID' })
+  async updatePage(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateStaticPageDto,
+  ) {
+    return this.adminService.updatePage(adminId, id, dto);
+  }
+
+  @Delete('pages/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete static page' })
+  @ApiParam({ name: 'id', description: 'Page ID' })
+  async deletePage(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deletePage(adminId, id);
+  }
+
+  // ==================== EMAIL TEMPLATES ====================
+
+  @Get('email-templates')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all email templates' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of email templates' })
+  async getEmailTemplates() {
+    return this.adminService.getEmailTemplates();
+  }
+
+  @Get('email-templates/:key')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get email template by key' })
+  @ApiParam({ name: 'key', description: 'Template key' })
+  async getEmailTemplate(@Param('key') key: string) {
+    return this.adminService.getEmailTemplate(key);
+  }
+
+  @Patch('email-templates/:key')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update email template' })
+  @ApiParam({ name: 'key', description: 'Template key' })
+  async updateEmailTemplate(
+    @Param('key') key: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateEmailTemplateDto,
+  ) {
+    return this.adminService.updateEmailTemplate(adminId, key, dto);
+  }
+
+  @Post('email-templates/:key/preview')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Preview email template with sample data' })
+  @ApiParam({ name: 'key', description: 'Template key' })
+  async previewEmailTemplate(
+    @Param('key') key: string,
+    @Body() body: { templateData?: Record<string, any> },
+  ) {
+    return this.adminService.previewEmailTemplate(key, body.templateData);
+  }
+
+  @Post('email-templates/:key/send-test')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send test email' })
+  @ApiParam({ name: 'key', description: 'Template key' })
+  async sendTestEmail(
+    @Param('key') key: string,
+    @Body() dto: SendTestEmailDto,
+  ) {
+    return this.adminService.sendTestEmail(key, dto);
+  }
+
   // ==================== TRADE MANAGEMENT ====================
 
   @Get('trades')
@@ -848,6 +1114,150 @@ export class AdminController {
     return this.adminService.deleteCategory(adminId, id);
   }
 
+  // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
+
+  @Get('tax/regions')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all tax regions' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of tax regions' })
+  async getTaxRegions() {
+    return this.adminService.getTaxRegions();
+  }
+
+  @Post('tax/regions')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Create tax region' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tax region created' })
+  async createTaxRegion(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateTaxRegionDto,
+  ) {
+    return this.adminService.createTaxRegion(adminId, dto);
+  }
+
+  @Patch('tax/regions/:id')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Update tax region' })
+  @ApiParam({ name: 'id', description: 'Tax region ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tax region updated' })
+  async updateTaxRegion(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateTaxRegionDto,
+  ) {
+    return this.adminService.updateTaxRegion(adminId, id, dto);
+  }
+
+  @Delete('tax/regions/:id')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete tax region' })
+  @ApiParam({ name: 'id', description: 'Tax region ID' })
+  async deleteTaxRegion(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteTaxRegion(adminId, id);
+  }
+
+  @Get('tax/rates')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get tax rates (optional filter by region)' })
+  @ApiQuery({ name: 'regionId', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of tax rates' })
+  async getTaxRates(@Query('regionId') regionId?: string) {
+    return this.adminService.getTaxRates(regionId);
+  }
+
+  @Post('tax/rates')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Create tax rate' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tax rate created' })
+  async createTaxRate(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateTaxRateDto,
+  ) {
+    return this.adminService.createTaxRate(adminId, dto);
+  }
+
+  @Patch('tax/rates/:id')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Update tax rate' })
+  @ApiParam({ name: 'id', description: 'Tax rate ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tax rate updated' })
+  async updateTaxRate(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateTaxRateDto,
+  ) {
+    return this.adminService.updateTaxRate(adminId, id, dto);
+  }
+
+  @Delete('tax/rates/:id')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete tax rate' })
+  @ApiParam({ name: 'id', description: 'Tax rate ID' })
+  async deleteTaxRate(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteTaxRate(adminId, id);
+  }
+
+  @Get('tax/rules')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get tax rules (optional filter by region)' })
+  @ApiQuery({ name: 'regionId', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of tax rules' })
+  async getTaxRules(@Query('regionId') regionId?: string) {
+    return this.adminService.getTaxRules(regionId);
+  }
+
+  @Post('tax/rules')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Create tax rule' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tax rule created' })
+  async createTaxRule(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateTaxRuleDto,
+  ) {
+    return this.adminService.createTaxRule(adminId, dto);
+  }
+
+  @Patch('tax/rules/:id')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Update tax rule' })
+  @ApiParam({ name: 'id', description: 'Tax rule ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tax rule updated' })
+  async updateTaxRule(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateTaxRuleDto,
+  ) {
+    return this.adminService.updateTaxRule(adminId, id, dto);
+  }
+
+  @Delete('tax/rules/:id')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete tax rule' })
+  @ApiParam({ name: 'id', description: 'Tax rule ID' })
+  async deleteTaxRule(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteTaxRule(adminId, id);
+  }
+
+  @Get('tax/report')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Tax report by period (from invoices)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tax report summary and breakdown' })
+  async getTaxReport(@Query() query: TaxReportQueryDto) {
+    return this.adminService.getTaxReport(query);
+  }
+
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
 
   @Get('membership-tiers')
@@ -1041,5 +1451,1042 @@ export class AdminController {
     @Query('hardDelete') hardDelete?: string,
   ) {
     return this.adminService.deleteProduct(adminId, id, hardDelete === 'true');
+  }
+
+  // ==================== SHIPPING METHODS ====================
+
+  @Get('shipping/methods')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all shipping methods' })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping methods' })
+  async getShippingMethods(
+    @Query('isActive') isActive?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getShippingMethods({
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      search,
+    });
+  }
+
+  @Post('shipping/methods')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create shipping method' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping method created' })
+  async createShippingMethod(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name: string; code: string; description?: string; isActive?: boolean; sortOrder?: number },
+  ) {
+    return this.adminService.createShippingMethod(adminId, body);
+  }
+
+  @Patch('shipping/methods/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update shipping method' })
+  @ApiParam({ name: 'id', description: 'Shipping method ID' })
+  async updateShippingMethod(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name?: string; code?: string; description?: string; isActive?: boolean; sortOrder?: number },
+  ) {
+    return this.adminService.updateShippingMethod(adminId, id, body);
+  }
+
+  @Delete('shipping/methods/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete shipping method' })
+  @ApiParam({ name: 'id', description: 'Shipping method ID' })
+  async deleteShippingMethod(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteShippingMethod(adminId, id);
+  }
+
+  // ==================== SHIPPING CARRIERS ====================
+
+  @Get('shipping/carriers')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all shipping carriers' })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'supportsLabels', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping carriers' })
+  async getShippingCarriers(
+    @Query('isActive') isActive?: string,
+    @Query('supportsLabels') supportsLabels?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getShippingCarriers({
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      supportsLabels: supportsLabels === 'true' ? true : supportsLabels === 'false' ? false : undefined,
+      search,
+    });
+  }
+
+  @Post('shipping/carriers')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create shipping carrier' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping carrier created' })
+  async createShippingCarrier(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name: string;
+      code: string;
+      logo?: string;
+      trackingUrl?: string;
+      apiEndpoint?: string;
+      apiKey?: string;
+      apiSecret?: string;
+      isActive?: boolean;
+      supportsLabels?: boolean;
+    },
+  ) {
+    return this.adminService.createShippingCarrier(adminId, body);
+  }
+
+  @Patch('shipping/carriers/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update shipping carrier' })
+  @ApiParam({ name: 'id', description: 'Shipping carrier ID' })
+  async updateShippingCarrier(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name?: string;
+      code?: string;
+      logo?: string;
+      trackingUrl?: string;
+      apiEndpoint?: string;
+      apiKey?: string;
+      apiSecret?: string;
+      isActive?: boolean;
+      supportsLabels?: boolean;
+    },
+  ) {
+    return this.adminService.updateShippingCarrier(adminId, id, body);
+  }
+
+  @Delete('shipping/carriers/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete shipping carrier' })
+  @ApiParam({ name: 'id', description: 'Shipping carrier ID' })
+  async deleteShippingCarrier(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteShippingCarrier(adminId, id);
+  }
+
+  // ==================== SHIPPING ZONES ====================
+
+  @Get('shipping/zones')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all shipping zones' })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'country', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping zones' })
+  async getShippingZones(
+    @Query('isActive') isActive?: string,
+    @Query('country') country?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getShippingZones({
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      country,
+      search,
+    });
+  }
+
+  @Post('shipping/zones')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create shipping zone' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping zone created' })
+  async createShippingZone(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name: string;
+      description?: string;
+      countries?: string[];
+      regions?: string[];
+      cities?: string[];
+      isDefault?: boolean;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.createShippingZone(adminId, body);
+  }
+
+  @Patch('shipping/zones/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update shipping zone' })
+  @ApiParam({ name: 'id', description: 'Shipping zone ID' })
+  async updateShippingZone(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name?: string;
+      description?: string;
+      countries?: string[];
+      regions?: string[];
+      cities?: string[];
+      isDefault?: boolean;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.updateShippingZone(adminId, id, body);
+  }
+
+  @Delete('shipping/zones/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete shipping zone' })
+  @ApiParam({ name: 'id', description: 'Shipping zone ID' })
+  async deleteShippingZone(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteShippingZone(adminId, id);
+  }
+
+  // ==================== SHIPPING RATES ====================
+
+  @Get('shipping/rates')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get shipping rates' })
+  @ApiQuery({ name: 'zoneId', required: false })
+  @ApiQuery({ name: 'methodId', required: false })
+  @ApiQuery({ name: 'carrierId', required: false })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping rates' })
+  async getShippingRates(
+    @Query('zoneId') zoneId?: string,
+    @Query('methodId') methodId?: string,
+    @Query('carrierId') carrierId?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.adminService.getShippingRates({
+      zoneId,
+      methodId,
+      carrierId,
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+    });
+  }
+
+  @Post('shipping/rates')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create shipping rate' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping rate created' })
+  async createShippingRate(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      zoneId: string;
+      methodId: string;
+      carrierId: string;
+      basePrice: number;
+      pricePerKg?: number;
+      freeShippingMin?: number;
+      minDeliveryDays: number;
+      maxDeliveryDays: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.createShippingRate(adminId, body);
+  }
+
+  @Patch('shipping/rates/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update shipping rate' })
+  @ApiParam({ name: 'id', description: 'Shipping rate ID' })
+  async updateShippingRate(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      zoneId?: string;
+      methodId?: string;
+      carrierId?: string;
+      basePrice?: number;
+      pricePerKg?: number;
+      freeShippingMin?: number;
+      minDeliveryDays?: number;
+      maxDeliveryDays?: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.updateShippingRate(adminId, id, body);
+  }
+
+  @Delete('shipping/rates/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete shipping rate' })
+  @ApiParam({ name: 'id', description: 'Shipping rate ID' })
+  async deleteShippingRate(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteShippingRate(adminId, id);
+  }
+
+  // ==================== SHIPPING LABELS ====================
+
+  @Get('shipping/shipments')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get shipments' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'carrierId', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipments' })
+  async getShipments(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('carrierId') carrierId?: string,
+  ) {
+    return this.adminService.getShipments({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status,
+      carrierId,
+    });
+  }
+
+  @Post('shipping/labels/generate')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate shipping label for a shipment' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Label generated' })
+  async generateShippingLabel(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { shipmentId: string },
+  ) {
+    return this.adminService.generateShippingLabel(adminId, body.shipmentId);
+  }
+
+  @Post('shipping/labels/bulk-generate')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk generate shipping labels' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Labels generated' })
+  async bulkGenerateShippingLabels(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { shipmentIds: string[] },
+  ) {
+    return this.adminService.bulkGenerateShippingLabels(adminId, body.shipmentIds);
+  }
+
+  // ==================== NOTIFICATION MANAGEMENT ====================
+
+  @Get('notifications/history')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get notification history' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'channel', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Notification history' })
+  async getNotificationHistory(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('channel') channel?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: string,
+    @Query('type') type?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.adminService.getNotificationHistory({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      channel,
+      status,
+      userId,
+      type,
+      startDate,
+      endDate,
+    });
+  }
+
+  @Post('notifications/send')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send notification to users' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Notification sent' })
+  async sendNotification(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: 'all' | 'segment' | 'user_ids';
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      data?: Record<string, any>;
+    },
+  ) {
+    return this.adminService.sendNotification(adminId, body);
+  }
+
+  @Post('notifications/schedule')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Schedule a notification' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Notification scheduled' })
+  async scheduleNotification(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: 'all' | 'segment' | 'user_ids';
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      scheduledFor: string;
+    },
+  ) {
+    return this.adminService.scheduleNotification(adminId, body);
+  }
+
+  @Get('notifications/scheduled')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get scheduled notifications' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Scheduled notifications' })
+  async getScheduledNotifications(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getScheduledNotifications({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status,
+    });
+  }
+
+  @Delete('notifications/scheduled/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel scheduled notification' })
+  @ApiParam({ name: 'id', description: 'Scheduled notification ID' })
+  async cancelScheduledNotification(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.cancelScheduledNotification(adminId, id);
+  }
+
+  // ==================== LOGS MANAGEMENT ====================
+
+  @Get('logs/errors')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get error logs' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'severity', required: false, enum: ['warning', 'error', 'critical'] })
+  @ApiQuery({ name: 'source', required: false })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Error logs with pagination' })
+  async getErrorLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('severity') severity?: string,
+    @Query('source') source?: string,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getErrorLogs({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      severity,
+      source,
+      userId,
+      startDate,
+      endDate,
+      search,
+    });
+  }
+
+  @Get('logs/security')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get security logs' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'eventType', required: false })
+  @ApiQuery({ name: 'severity', required: false })
+  @ApiQuery({ name: 'ipAddress', required: false })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'resolved', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Security logs with pagination' })
+  async getSecurityLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('eventType') eventType?: string,
+    @Query('severity') severity?: string,
+    @Query('ipAddress') ipAddress?: string,
+    @Query('userId') userId?: string,
+    @Query('resolved') resolved?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getSecurityLogs({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      eventType,
+      severity,
+      ipAddress,
+      userId,
+      resolved: resolved === 'true' ? true : resolved === 'false' ? false : undefined,
+      startDate,
+      endDate,
+      search,
+    });
+  }
+
+  @Patch('logs/security/:id/resolve')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resolve a security issue' })
+  @ApiParam({ name: 'id', description: 'Security log ID' })
+  async resolveSecurityIssue(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { notes?: string },
+  ) {
+    return this.adminService.resolveSecurityIssue(adminId, id, body.notes);
+  }
+
+  @Post('logs/security/block-ip')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Block an IP address' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'IP blocked' })
+  async blockIP(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { ipAddress: string; reason?: string },
+  ) {
+    return this.adminService.blockIP(adminId, body.ipAddress, body.reason);
+  }
+
+  @Get('logs/emails')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get email logs' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['queued', 'sent', 'delivered', 'bounced', 'failed'] })
+  @ApiQuery({ name: 'template', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Email logs with pagination' })
+  async getEmailLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('template') template?: string,
+    @Query('to') to?: string,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getEmailLogs({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status,
+      template,
+      to,
+      userId,
+      startDate,
+      endDate,
+      search,
+    });
+  }
+
+  // ==================== COLLECTION MANAGEMENT ====================
+
+  @Get('collections')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all collections with filters' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'isPublic', required: false })
+  @ApiQuery({ name: 'isFeatured', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['createdAt', 'name', 'likeCount', 'viewCount'] })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of collections' })
+  async getCollections(
+    @Query('search') search?: string,
+    @Query('userId') userId?: string,
+    @Query('isPublic') isPublic?: string,
+    @Query('isFeatured') isFeatured?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: 'createdAt' | 'name' | 'likeCount' | 'viewCount',
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    return this.adminService.getCollections({
+      search,
+      userId,
+      isPublic: isPublic === 'true' ? true : isPublic === 'false' ? false : undefined,
+      isFeatured: isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortOrder,
+    });
+  }
+
+  @Get('collections/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get collection details' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Collection details with items' })
+  async getCollectionById(@Param('id') id: string) {
+    return this.adminService.getCollectionById(id);
+  }
+
+  @Post('collections')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new collection' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Collection created' })
+  async createCollection(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name: string;
+      description?: string;
+      isPublic?: boolean;
+      isFeatured?: boolean;
+      coverImageUrl?: string;
+      userId?: string;
+    },
+  ) {
+    return this.adminService.createAdminCollection(adminId, body);
+  }
+
+  @Patch('collections/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update a collection' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Collection updated' })
+  async updateCollection(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      isFeatured?: boolean;
+      coverImageUrl?: string;
+    },
+  ) {
+    return this.adminService.updateAdminCollection(adminId, id, body);
+  }
+
+  @Delete('collections/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a collection' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  async deleteCollection(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteAdminCollection(adminId, id);
+  }
+
+  @Post('collections/:id/items')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Add products to a collection' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Products added' })
+  async addItemsToCollection(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { productIds: string[] },
+  ) {
+    return this.adminService.addItemsToCollection(adminId, id, body.productIds);
+  }
+
+  @Delete('collections/:collectionId/items/:itemId')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove an item from a collection' })
+  @ApiParam({ name: 'collectionId', description: 'Collection ID' })
+  @ApiParam({ name: 'itemId', description: 'Collection Item ID' })
+  async removeItemFromCollection(
+    @Param('collectionId') collectionId: string,
+    @Param('itemId') itemId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.removeItemFromAdminCollection(adminId, collectionId, itemId);
+  }
+
+  @Patch('collections/:id/visibility')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set collection visibility' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  async setCollectionVisibility(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { isPublic: boolean },
+  ) {
+    return this.adminService.setCollectionVisibility(adminId, id, body.isPublic);
+  }
+
+  @Patch('collections/:id/featured')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set collection featured status' })
+  @ApiParam({ name: 'id', description: 'Collection ID' })
+  async setCollectionFeatured(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { isFeatured: boolean },
+  ) {
+    return this.adminService.setCollectionFeatured(adminId, id, body.isFeatured);
+  }
+
+  // ==================== TAG MANAGEMENT ====================
+
+  @Get('tags')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all tags with filters' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['name', 'usageCount', 'createdAt'] })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of tags' })
+  async getTags(
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: 'name' | 'usageCount' | 'createdAt',
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    return this.adminService.getTags({
+      search,
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortOrder,
+    });
+  }
+
+  @Post('tags')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new tag' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tag created' })
+  async createTag(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name: string;
+      description?: string;
+      color?: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.createTag(adminId, body);
+  }
+
+  @Patch('tags/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update a tag' })
+  @ApiParam({ name: 'id', description: 'Tag ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tag updated' })
+  async updateTag(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name?: string;
+      description?: string;
+      color?: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.updateTag(adminId, id, body);
+  }
+
+  @Delete('tags/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a tag' })
+  @ApiParam({ name: 'id', description: 'Tag ID' })
+  async deleteTag(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteTag(adminId, id);
+  }
+
+  @Post('tags/merge')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Merge multiple tags into one' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tags merged' })
+  async mergeTags(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { sourceTagIds: string[]; targetTagId: string },
+  ) {
+    return this.adminService.mergeTags(adminId, body.sourceTagIds, body.targetTagId);
+  }
+
+  @Post('tags/bulk-assign')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk assign tags to products' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tags assigned' })
+  async bulkAssignTags(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { productIds: string[]; tagIds: string[] },
+  ) {
+    return this.adminService.bulkAssignTags(adminId, body.productIds, body.tagIds);
+  }
+
+  @Post('tags/bulk-remove')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk remove tags from products' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Tags removed' })
+  async bulkRemoveTags(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { productIds: string[]; tagIds: string[] },
+  ) {
+    return this.adminService.bulkRemoveTags(adminId, body.productIds, body.tagIds);
+  }
+
+  // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
+
+  @Get('attribute-groups')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all attribute groups' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of attribute groups' })
+  async getAttributeGroups(
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getAttributeGroups({
+      search,
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('attribute-groups/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get attribute group with its values' })
+  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute group details' })
+  async getAttributeGroupById(@Param('id') id: string) {
+    return this.adminService.getAttributeGroupById(id);
+  }
+
+  @Post('attribute-groups')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new attribute group' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute group created' })
+  async createAttributeGroup(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
+    return this.adminService.createAttributeGroup(adminId, body);
+  }
+
+  @Patch('attribute-groups/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update an attribute group' })
+  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute group updated' })
+  async updateAttributeGroup(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      name?: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
+    return this.adminService.updateAttributeGroup(adminId, id, body);
+  }
+
+  @Delete('attribute-groups/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an attribute group' })
+  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
+  async deleteAttributeGroup(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteAttributeGroup(adminId, id);
+  }
+
+  // ==================== ATTRIBUTE VALUE MANAGEMENT ====================
+
+  @Get('attributes')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all attributes with filters' })
+  @ApiQuery({ name: 'groupId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'isActive', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of attributes' })
+  async getAttributes(
+    @Query('groupId') groupId?: string,
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getAttributes({
+      groupId,
+      search,
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Post('attributes')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new attribute value' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute created' })
+  async createAttribute(
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      groupId: string;
+      value: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.createAttribute(adminId, body);
+  }
+
+  @Patch('attributes/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update an attribute value' })
+  @ApiParam({ name: 'id', description: 'Attribute ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute updated' })
+  async updateAttribute(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: {
+      value?: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.adminService.updateAttribute(adminId, id, body);
+  }
+
+  @Delete('attributes/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an attribute value' })
+  @ApiParam({ name: 'id', description: 'Attribute ID' })
+  async deleteAttribute(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteAttribute(adminId, id);
+  }
+
+  // ==================== REVIEWS & RATINGS ====================
+
+  @Get('reviews')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all reviews' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of reviews' })
+  async getReviews(@Query() query: RatingQueryDto) {
+    return this.adminService.getReviews(query);
+  }
+
+  @Patch('reviews/:id/status')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Update review status' })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Review status updated' })
+  async updateReviewStatus(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateRatingStatusDto,
+  ) {
+    return this.adminService.updateReviewStatus(adminId, id, dto.status);
+  }
+
+  @Post('reviews/:id/reply')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Reply to review' })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Reply added' })
+  async replyToReview(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ReplyToRatingDto,
+  ) {
+    return this.adminService.replyToReview(adminId, id, dto.reply);
+  }
+
+  @Delete('reviews/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete review' })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  async deleteReview(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteReview(adminId, id);
   }
 }

@@ -47,6 +47,19 @@ export class DiscountResponseDto {
   @ApiPropertyOptional()
   usageLimitTotal?: number;
 
+  @ApiPropertyOptional()
+  minQuantity?: number;
+
+  @ApiPropertyOptional()
+  buyQuantity?: number;
+
+  @ApiPropertyOptional()
+  getQuantity?: number;
+
+  @ApiPropertyOptional()
+  isFlashSale?: boolean;
+
+
   @ApiProperty()
   usageLimitPerUser: number;
 

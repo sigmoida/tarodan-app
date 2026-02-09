@@ -1,6 +1,8 @@
 import { IsString, IsEnum, IsOptional, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductStatus } from '@prisma/client';
+import { ProductStatus, ProductCondition } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsNumber, Min } from 'class-validator';
 
 export class ApproveProductDto {
   @ApiPropertyOptional({
@@ -68,4 +70,47 @@ export class ResolveDisputeDto {
   @IsString()
   @MaxLength(1000)
   note: string;
+}
+
+export class UpdateProductDto {
+  @ApiPropertyOptional({ example: 'iPhone 15 Pro' })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Yeni nesil iPhone...' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 49999.99 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({ example: 54999.99, nullable: true })
+  @IsOptional()
+  @IsNumber()
+  oldPrice?: number | null;
+
+  @ApiPropertyOptional({ example: 10, nullable: true })
+  @IsOptional()
+  @IsNumber()
+  quantity?: number | null;
+
+  @ApiPropertyOptional({ enum: ProductCondition, example: 'new' })
+  @IsOptional()
+  @IsEnum(ProductCondition)
+  condition?: ProductCondition;
+
+  @ApiPropertyOptional({ enum: ProductStatus, example: 'active' })
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
+  @ApiPropertyOptional({ example: 'uuid-category-id' })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }

@@ -14,10 +14,13 @@ export function middleware(request: NextRequest) {
 
   // Check for auth token in cookies
   const token = request.cookies.get('admin_token')?.value;
+  console.log(`Middleware Path: ${pathname}, Token present: ${!!token}`);
 
   // If no token, redirect to login
   if (!token) {
+    console.log('No token found, redirecting to /login');
     const loginUrl = new URL('/login', request.url);
+
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }

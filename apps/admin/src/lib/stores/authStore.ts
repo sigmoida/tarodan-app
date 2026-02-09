@@ -42,6 +42,7 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('admin_token');
           localStorage.removeItem('admin_user');
+          document.cookie = 'admin_token=; path=/; max-age=0';
         }
         set({ user: null, token: null, isAuthenticated: false });
       },
