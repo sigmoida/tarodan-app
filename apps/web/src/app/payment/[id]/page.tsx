@@ -13,6 +13,7 @@ import {
 import toast from 'react-hot-toast';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import CreditCardForm from '@/components/payment/CreditCardForm';
 
 export default function PaymentPage() {
   const params = useParams();
@@ -53,8 +54,9 @@ export default function PaymentPage() {
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
       } else if (paymentData.paymentUrl) {
-        // For Iyzico, redirect to payment URL
-        if (paymentData.provider === 'iyzico') {
+        // For Iyzico, we stay on page to show custom form (Direct API)
+        // Only redirect if provider is NOT iyzico (fallback) or if legacy checkout
+        if (paymentData.provider !== 'iyzico') {
           window.location.href = paymentData.paymentUrl;
         }
       }
@@ -169,13 +171,12 @@ export default function PaymentPage() {
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Durum</p>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                payment.status === 'pending'
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${payment.status === 'pending'
                   ? 'bg-yellow-100 text-yellow-800'
                   : payment.status === 'completed'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
                 {payment.status === 'pending' && 'Beklemede'}
                 {payment.status === 'completed' && 'Tamamlandı'}
                 {payment.status === 'failed' && 'Başarısız'}
@@ -211,8 +212,26 @@ export default function PaymentPage() {
               Ödeme tamamlandıktan sonra otomatik olarak yönlendirileceksiniz.
             </p>
           </motion.div>
+        ) : payment.provider === 'iyzico' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <CreditCardForm
+              orderId={payment.orderId}
+              amount={payment.amount}
+              onSuccess={(html) => {
+                if (html) {
+                  setPaymentHtml(html);
+                } else {
+                  handlePaymentComplete(); // If no HTML (direct success without 3D?), poll.
+                }
+              }}
+              onCancel={() => router.back()}
+            />
+          </motion.div>
         ) : payment.paymentUrl ? (
-          // Iyzico redirect
+          // Generic redirect (fallback)
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -249,7 +268,7 @@ export default function PaymentPage() {
         {/* Help Text */}
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
           <p className="text-sm text-blue-800">
-            <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun yaşarsanız, 
+            <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun yaşarsanız,
             lütfen{' '}
             <a href="/support" className="underline font-medium">
               destek ekibimiz

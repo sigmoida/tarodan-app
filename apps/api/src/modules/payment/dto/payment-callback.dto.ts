@@ -20,6 +20,16 @@ export class IyzicoCallbackDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({ description: 'Conversation Data (for 3D auth)' })
+  @IsOptional()
+  @IsString()
+  conversationData?: string;
+
+  @ApiPropertyOptional({ description: 'MD Status' })
+  @IsOptional()
+  @IsString()
+  mdStatus?: string;
 }
 
 export class PayTRCallbackDto {

@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi } from '../../src/services/api';
 import { TarodanColors, SCALES } from '../../src/theme';
+import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -70,10 +71,7 @@ export default function CategoryScreen() {
   }, [refetch]);
 
   const getImageUrl = (item: any) => {
-    if (item.images && item.images.length > 0) {
-      return typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url;
-    }
-    return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    return getImageUrlFromUtils(item.images);
   };
 
   const getSortLabel = () => {

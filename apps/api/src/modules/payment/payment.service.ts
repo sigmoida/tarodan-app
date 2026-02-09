@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
-import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto } from './dto';
+import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto, DirectPaymentDto, CreditCardDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -194,23 +194,31 @@ export class PaymentService {
     let paymentHtml: string | undefined;
     const clientIp = this.getClientIp(req);
 
+    // For Iyzico, use Direct API flow (no Hosted Checkout)
+    // Frontend will show CreditCardForm and call processDirect
     if (dto.provider === PaymentProvider.iyzico) {
-      const result = await this.initializeIyzicoPayment(payment, order, clientIp);
-      paymentUrl = result.paymentUrl;
-      paymentHtml = result.paymentHtml;
+      // Don't initialize Hosted Checkout - just return paymentId
+      // Frontend will handle the card input and call /payments/process-direct
+      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      return {
+        paymentId: payment.id,
+        orderId: order.id,
+        amount: Number(order.totalAmount),
+        provider: dto.provider,
+        // No paymentUrl - frontend will show CreditCardForm
+        expiresIn: 600, // 10 minutes
+      };
     } else {
+      // PayTR - use existing flow
       const result = await this.initializePayTRPayment(payment, order, clientIp);
-      paymentUrl = result.paymentUrl;
-      paymentHtml = result.paymentHtml;
+      return {
+        paymentId: payment.id,
+        paymentUrl: result.paymentUrl,
+        paymentHtml: result.paymentHtml,
+        provider: dto.provider,
+        expiresIn: 300, // 5 minutes
+      };
     }
-
-    return {
-      paymentId: payment.id,
-      paymentUrl,
-      paymentHtml,
-      provider: dto.provider,
-      expiresIn: 300, // 5 minutes
-    };
   }
 
   /**
@@ -370,7 +378,7 @@ export class PaymentService {
     try {
       // Get shipping address from order
       const shippingAddress = order.shippingAddress as any;
-      
+
       // Prepare buyer info with actual shipping address
       const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
       const buyerFirstName = buyerName[0] || 'Müşteri';
@@ -423,12 +431,237 @@ export class PaymentService {
       };
     } catch (error: any) {
       this.logger.error(`PayTR initialization error: ${error.message}`, error.stack);
-      
+
       // Don't fallback - throw error so user knows payment failed
       throw new BadRequestException(
         error.message || 'PayTR ödeme başlatılamadı',
       );
     }
+  }
+
+  /**
+   * Process Direct Payment (3D Secure via API)
+   * Supports saved cards (cardToken) or new card entry
+   */
+  async processDirectPayment(dto: DirectPaymentDto, userId: string, req?: Request) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+      include: {
+        buyer: true,
+        product: true,
+      },
+    });
+
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.status !== OrderStatus.pending_payment) throw new BadRequestException('Sipariş ödeme bekliyor durumunda değil');
+
+    // Guest check
+    if (userId && order.buyerId !== userId) throw new ForbiddenException('Bu sipariş size ait değil');
+
+    // Guest orders can't use saved cards unless we implement guest temporary storage (risky), so block cardToken for guests if strict
+    // but for now assumme cardToken implies auth user.
+
+    const clientIp = this.getClientIp(req);
+    const shippingAddress = order.shippingAddress as any;
+    const isGuestOrder = !userId; // or check shippingAddress.isGuestOrder
+
+    // Create payment record if not exists
+    let payment = await this.prisma.payment.findFirst({
+      where: { orderId: dto.orderId, status: PaymentStatus.pending },
+    });
+
+    if (!payment) {
+      payment = await this.prisma.payment.create({
+        data: {
+          orderId: dto.orderId,
+          amount: order.totalAmount,
+          currency: 'TRY',
+          provider: PaymentProvider.iyzico,
+          status: PaymentStatus.pending,
+        },
+      });
+    }
+
+    // Prepare buyer info
+    let buyerFirstName, buyerLastName, buyerEmail, buyerPhone;
+    if (isGuestOrder) {
+      const guestName = shippingAddress?.guestName || shippingAddress?.fullName || 'Misafir Müşteri';
+      const parts = guestName.split(' ');
+      buyerFirstName = parts[0];
+      buyerLastName = parts.slice(1).join(' ') || 'Müşteri';
+      buyerEmail = shippingAddress?.guestEmail || 'guest@tarodan.com';
+      buyerPhone = shippingAddress?.guestPhone || shippingAddress?.phone || '+905555555555';
+    } else {
+      const parts = order.buyer.displayName?.split(' ') || ['Müşteri'];
+      buyerFirstName = parts[0];
+      buyerLastName = parts.slice(1).join(' ') || 'Müşteri';
+      buyerEmail = order.buyer.email;
+      buyerPhone = order.buyer.phone || '+905555555555';
+    }
+
+    // Address mapping
+    const address = shippingAddress?.address || 'Türkiye';
+    const city = shippingAddress?.city || 'İstanbul';
+    const contactName = shippingAddress?.fullName || `${buyerFirstName} ${buyerLastName}`;
+
+    const iyzicoAddress = {
+      contactName,
+      city,
+      country: 'Turkey',
+      address,
+      zipCode: shippingAddress?.zipCode || '34000',
+    };
+
+    // Callback URL needs to be special for 3D Secure
+    // It should handle the POST from bank and then redirect to frontend
+    // We can use the existing callback endpoint logic but we might need a frontend redirect page
+    const baseUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+    const callbackUrl = `${baseUrl}/api/payment/callback/iyzico?paymentId=${payment.id}&direct=true`;
+
+    const request: any = {
+      locale: 'tr',
+      conversationId: order.id,
+      price: Number(order.totalAmount).toFixed(2),
+      paidPrice: Number(order.totalAmount).toFixed(2),
+      currency: 'TRY',
+      basketId: order.id,
+      paymentGroup: 'PRODUCT',
+      callbackUrl,
+      buyer: {
+        id: order.buyerId || 'guest',
+        name: buyerFirstName,
+        surname: buyerLastName,
+        gsmNumber: buyerPhone,
+        email: buyerEmail,
+        identityNumber: '11111111111',
+        registrationAddress: address,
+        ip: clientIp,
+        city,
+        country: 'Turkey',
+      },
+      shippingAddress: iyzicoAddress,
+      billingAddress: iyzicoAddress, // Using same for simplicity
+      basketItems: [{
+        id: order.product.id,
+        name: order.product.title.substring(0, 50),
+        category1: 'Koleksiyon',
+        itemType: 'PHYSICAL',
+        price: Number(order.totalAmount).toFixed(2),
+      }],
+      installment: 1, // Default single installment
+    };
+
+    // Card Token Logic
+    if (dto.cardToken && userId) {
+      // Use stored card
+      request.cardUserKey = userId; // Using userId as cardUserKey
+      request.cardToken = dto.cardToken;
+    } else if (dto.card) {
+      // Use new card
+      request.paymentCard = {
+        cardHolderName: dto.card.cardHolderName,
+        cardNumber: dto.card.cardNumber.replace(/\s/g, ''),
+        expireMonth: dto.card.expireMonth,
+        expireYear: dto.card.expireYear,
+        cvc: dto.card.cvc,
+        registerCard: dto.saveCard && userId ? 1 : 0, // Register if requested and user logged in
+      };
+
+      // If saving card, we need cardUserKey (userId)
+      if (dto.saveCard && userId) {
+        request.cardUserKey = userId;
+      }
+    } else {
+      throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçilmeli');
+    }
+
+    try {
+      const result = await this.iyzicoService.initialize3DSecure(request);
+
+      this.logger.log(`Full Iyzico Result: ${JSON.stringify(result)}`);
+
+      // Extracts HTML content
+      const rawHtmlContent = result.htmlContent || result.threeDSHtmlContent;
+
+      // Update payment with provider metadata
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          providerPaymentId: payment.id,
+          providerConversationId: order.id,
+          metadata: {
+            isDirectApi: true,
+            iyzicoStatus: result.status,
+          }
+        }
+      });
+
+      if (rawHtmlContent) {
+        this.logger.log(`HTML Content found (length: ${rawHtmlContent.length}). Returning Base64.`);
+        return {
+          status: 'success',
+          htmlContent: Buffer.from(rawHtmlContent).toString('base64'),
+          isBase64: true,
+          paymentId: payment.id,
+        };
+      } else {
+        // Init başarılı (status: success) olsa bile HTML yoksa 3DS başlayamaz.
+        // Bu durumda ödeme alınmamıştır, sadece init olmuştur.
+        // Kullanıcıya başarılı demek yanlıştır.
+
+        this.logger.error('Iyzico returned success but NO HTML content found under known keys');
+        this.logger.error(`Full result: ${JSON.stringify(result)}`);
+
+        // Debug için keyleri hata mesajına ekle
+        const keys = Object.keys(result).join(',');
+        throw new BadRequestException(`3D Secure HTML içeriği alınamadı. (Keys: ${keys})`);
+      }
+
+    } catch (e: any) {
+      this.logger.error(`Direct payment init failed: ${e.message}`);
+      throw new BadRequestException(e.message || 'Ödeme başlatılamadı');
+    }
+  }
+
+  /**
+   * Get Stored Cards
+   */
+  async getStoredCards(userId: string) {
+    if (!userId) return [];
+    try {
+      const res = await this.iyzicoService.getCards(userId);
+      return res.cardDetails || [];
+    } catch (e) {
+      // If user has no cards yet, iyzico might throw or return empty. handled in service.
+      return [];
+    }
+  }
+
+  /**
+   * Add Card standalone
+   */
+  async addStoredCard(userId: string, email: string, card: CreditCardDto) {
+    return this.iyzicoService.addCard({
+      email,
+      cardUserKey: userId,
+      card: {
+        cardAlias: card.cardAlias || 'Kartım',
+        cardHolderName: card.cardHolderName,
+        cardNumber: card.cardNumber,
+        expireMonth: card.expireMonth,
+        expireYear: card.expireYear,
+      }
+    });
+  }
+
+  /**
+   * Remove Card
+   */
+  async removeStoredCard(userId: string, cardToken: string) {
+    return this.iyzicoService.deleteCard({
+      cardUserKey: userId,
+      cardToken,
+    });
   }
 
   /**
@@ -458,7 +691,7 @@ export class PaymentService {
           { metadata: { path: ['token'], equals: dto.token } },
         ],
       },
-      include: { 
+      include: {
         order: {
           include: {
             buyer: true,
@@ -508,6 +741,54 @@ export class PaymentService {
   }
 
   /**
+   * Complete Direct 3D Secure Payment
+   */
+  async completeDirect3DSecure(paymentId: string, dto: IyzicoCallbackDto) {
+    this.logger.log(`Completing Direct 3D Secure for payment ${paymentId}`);
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    if (payment.status === PaymentStatus.completed) {
+      return { status: 'success', paymentId: payment.id };
+    }
+
+    try {
+      // Call Auth
+      // conversationData is required for 3DS auth
+      const result = await this.iyzicoService.complete3DSecure({
+        paymentId: dto.paymentId || '', // This comes from Iyzico body (Iyzipay paymentId)
+        conversationId: dto.conversationId,
+        conversationData: dto.conversationData,
+      });
+
+      if (result.status === 'success' && (result.paymentStatus === 'SUCCESS' || result.status === 'success')) {
+        await this.processSuccessfulPayment(payment, result.paymentId);
+        return { status: 'success', paymentId: payment.id };
+      } else {
+        const err = result.errorMessage || '3D Secure Auth failed';
+        await this.processFailedPayment(payment, err);
+        return { status: 'failed', message: err };
+      }
+    } catch (e: any) {
+      this.logger.error(`3DS Complete error: ${e.message}`);
+      await this.processFailedPayment(payment, e.message);
+      return { status: 'error', message: e.message };
+    }
+  }
+
+  /**
    * Verify Iyzico checkout form result using token
    * Called by frontend after iyzico redirects back
    */
@@ -523,7 +804,7 @@ export class PaymentService {
           { metadata: { path: ['token'], equals: token } },
         ],
       },
-      include: { 
+      include: {
         order: {
           include: {
             buyer: true,
@@ -558,10 +839,10 @@ export class PaymentService {
           payment,
           checkoutResult.paymentId,
         );
-        return { 
-          success: true, 
-          status: 'success', 
-          paymentId: payment.id, 
+        return {
+          success: true,
+          status: 'success',
+          paymentId: payment.id,
           orderId: payment.orderId,
           iyzicoPaymentId: checkoutResult.paymentId,
         };
@@ -606,7 +887,7 @@ export class PaymentService {
           { orderId: dto.merchant_oid },
         ],
       },
-      include: { 
+      include: {
         order: {
           include: {
             buyer: true,
@@ -621,7 +902,7 @@ export class PaymentService {
       // Also try to find by provider payment ID
       const paymentByToken = await this.prisma.payment.findFirst({
         where: { providerPaymentId: { contains: dto.merchant_oid } },
-        include: { 
+        include: {
           order: {
             include: {
               buyer: true,
@@ -685,24 +966,24 @@ export class PaymentService {
               entityId: paymentId,
               oldValue: oldStatus
                 ? {
-                    status: oldStatus,
-                    paymentId,
-                    orderId,
-                    ...metadata,
-                  }
+                  status: oldStatus,
+                  paymentId,
+                  orderId,
+                  ...metadata,
+                }
                 : null,
               newValue: newStatus
                 ? {
-                    status: newStatus,
-                    paymentId,
-                    orderId,
-                    ...metadata,
-                  }
+                  status: newStatus,
+                  paymentId,
+                  orderId,
+                  ...metadata,
+                }
                 : {
-                    paymentId,
-                    orderId,
-                    ...metadata,
-                  },
+                  paymentId,
+                  orderId,
+                  ...metadata,
+                },
             },
           });
         }
@@ -751,7 +1032,7 @@ export class PaymentService {
       // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
-        data: { 
+        data: {
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
         },
@@ -788,7 +1069,7 @@ export class PaymentService {
 
       // Check if this is a membership order (productId starts with "membership-")
       const isMembershipOrder = payment.order.productId.startsWith('membership-');
-      
+
       if (isMembershipOrder) {
         // Activate membership for the buyer
         const membership = await tx.userMembership.findUnique({
@@ -822,7 +1103,7 @@ export class PaymentService {
           if (paymentMetadata?.cardData) {
             const cardData = paymentMetadata.cardData;
             const cardNumber = cardData.number?.replace(/\s/g, '') || '';
-            
+
             if (cardNumber.length >= 13) {
               // Extract card brand
               let cardBrand = 'Kart';
@@ -837,7 +1118,7 @@ export class PaymentService {
               }
 
               const lastFour = cardNumber.slice(-4);
-              
+
               // Parse expiry (format: MM/YY)
               const expiryParts = cardData.expiry?.split('/') || [];
               const expiryMonth = parseInt(expiryParts[0] || '0', 10);
@@ -891,10 +1172,10 @@ export class PaymentService {
 
         // Update product status to SOLD
         // If stock is 0, set product to inactive instead
-        const updateData: any = { 
-          status: product.quantity !== null && product.quantity === 0 
-            ? ProductStatus.inactive 
-            : ProductStatus.sold 
+        const updateData: any = {
+          status: product.quantity !== null && product.quantity === 0
+            ? ProductStatus.inactive
+            : ProductStatus.sold
         };
 
         await tx.product.update({
@@ -1015,11 +1296,11 @@ export class PaymentService {
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
     // This publishes jobs to email, push, and shipping queues
     const isMembershipOrder = result.productId.startsWith('membership-');
-    
+
     if (!isMembershipOrder) {
       try {
         const shippingAddressData = result.shippingAddress as any;
-        
+
         // Check if this is a guest order and get actual buyer info
         const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
@@ -1028,9 +1309,9 @@ export class PaymentService {
         const actualBuyerName = isGuestOrder
           ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
           : (result.buyer.displayName || result.buyer.email);
-        
+
         this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
-        
+
         await this.eventService.emitOrderPaid({
           orderId: result.id,
           orderNumber: result.orderNumber,
@@ -1558,6 +1839,7 @@ export class PaymentService {
 
     return {
       id: payment.id,
+      orderId: payment.orderId,
       status: payment.status,
       amount: Number(payment.amount),
       currency: payment.currency,
@@ -1689,7 +1971,7 @@ export class PaymentService {
     // Extract card brand from card number (simple detection)
     const cardNumber = dto.cardNumber.replace(/\s/g, '');
     let cardBrand = 'Kart';
-    
+
     if (cardNumber.startsWith('4')) {
       cardBrand = 'Visa';
     } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {

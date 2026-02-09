@@ -7,6 +7,7 @@ import { useFavoritesStore, WishlistItem } from '../src/stores/favoritesStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useCartStore } from '../src/stores/cartStore';
 import { TarodanColors } from '../src/theme';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
 
 export default function FavoritesScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -45,17 +46,14 @@ export default function FavoritesScreen() {
       productId: product.id,
       title: product.title,
       price: product.price,
-      imageUrl: product.images?.[0]?.url || '',
+      imageUrl: getImageUrlFromUtils(product.images),
       seller: product.seller,
     });
     setSnackbar({ visible: true, message: 'Sepete eklendi' });
   };
 
   const getImageUrl = (product: WishlistItem['product']) => {
-    if (product.images && product.images.length > 0) {
-      return product.images[0].url;
-    }
-    return 'https://via.placeholder.com/150x150?text=No+Image';
+    return getImageUrlFromUtils(product.images);
   };
 
   const formatPrice = (price: number) => {

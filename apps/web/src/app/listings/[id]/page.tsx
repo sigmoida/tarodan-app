@@ -23,6 +23,9 @@ import {
   FlagIcon,
   ExclamationTriangleIcon,
   PencilIcon,
+  ArrowPathIcon,
+  PlayIcon,
+  PauseIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
@@ -134,6 +137,12 @@ export default function ListingDetailPage() {
   const animationFrameRef = useRef<number | null>(null);
   const zoomPreviewRef = useRef<HTMLDivElement | null>(null);
   const viewCountedRef = useRef<boolean>(false);
+
+  // 360° View state
+  const [show360Modal, setShow360Modal] = useState(false);
+  const [is360Playing, setIs360Playing] = useState(false);
+  const [view360Index, setView360Index] = useState(0);
+  const rotation360IntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     viewCountedRef.current = false;
@@ -472,7 +481,7 @@ export default function ListingDetailPage() {
       if (process.env.NODE_ENV === 'development') {
         console.error('Toggle favorite error:', error);
       }
-      
+
       // 409 (Conflict) - zaten favorilerde ise başarılı say
       if (error?.response?.status === 409) {
         toast.success(t('product.addToFavorites'));
@@ -482,7 +491,7 @@ export default function ListingDetailPage() {
         ]);
         return;
       }
-      
+
       const message = error?.response?.data?.message || error?.message || t('common.operationFailed');
       toast.error(message);
     }
@@ -674,6 +683,49 @@ export default function ListingDetailPage() {
     setShowMagnifier(false);
   };
 
+  // 360° View handlers
+  const open360View = () => {
+    if (images.length < 2) {
+      toast.error(locale === 'en' ? 'Multiple images required for 360° view' : '360° görüntüleme için birden fazla resim gerekli');
+      return;
+    }
+    setView360Index(0);
+    setShow360Modal(true);
+    setIs360Playing(true);
+  };
+
+  const close360View = () => {
+    setShow360Modal(false);
+    setIs360Playing(false);
+    if (rotation360IntervalRef.current) {
+      clearInterval(rotation360IntervalRef.current);
+      rotation360IntervalRef.current = null;
+    }
+  };
+
+  const toggle360Play = () => {
+    setIs360Playing(!is360Playing);
+  };
+
+  // 360° auto-rotation effect
+  useEffect(() => {
+    if (show360Modal && is360Playing && images.length > 1) {
+      rotation360IntervalRef.current = setInterval(() => {
+        setView360Index((prev) => (prev + 1) % images.length);
+      }, 800); // Change image every 800ms
+    } else if (rotation360IntervalRef.current) {
+      clearInterval(rotation360IntervalRef.current);
+      rotation360IntervalRef.current = null;
+    }
+
+    return () => {
+      if (rotation360IntervalRef.current) {
+        clearInterval(rotation360IntervalRef.current);
+        rotation360IntervalRef.current = null;
+      }
+    };
+  }, [show360Modal, is360Playing, images.length]);
+
   // Check if trade is available
   const isTradeAvailable = listing?.trade_available || listing?.isTradeEnabled || false;
 
@@ -804,24 +856,39 @@ export default function ListingDetailPage() {
               </motion.div>
             )}
 
-            {/* Thumbnails */}
-            {images.length > 1 && (
-              <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                {images.map((img, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setActiveImageIndex(index);
-                      openLightbox(index);
-                    }}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
-                      }`}
-                  >
-                    <OptimizedImage src={img} alt="" fill className="object-cover" logContext={{ page: 'listing-detail-thumb' }} />
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* 360° Button and Thumbnails */}
+            <div className="flex gap-2 mt-4 overflow-x-auto pb-2 items-center">
+              {/* 360° View Button - Always visible */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  open360View();
+                }}
+                className={`flex-shrink-0 w-20 h-20 rounded-lg flex flex-col items-center justify-center transition-all shadow-md ${images.length > 1
+                    ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                title={locale === 'en' ? '360° View' : '360° Görüntüle'}
+                disabled={images.length <= 1}
+              >
+                <ArrowPathIcon className="w-6 h-6 mb-1" />
+                <span className="text-xs font-semibold">360°</span>
+              </button>
+
+              {images.map((img, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setActiveImageIndex(index);
+                    openLightbox(index);
+                  }}
+                  className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
+                    }`}
+                >
+                  <OptimizedImage src={img} alt="" fill className="object-cover" logContext={{ page: 'listing-detail-thumb' }} />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Lightbox Modal */}
@@ -949,6 +1016,105 @@ export default function ListingDetailPage() {
                     {lightboxImageIndex + 1} / {images.length}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* 360° View Modal */}
+          {show360Modal && (
+            <div
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              onClick={close360View}
+            >
+              <div
+                className="relative max-w-4xl w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
+                      <ArrowPathIcon className={`w-6 h-6 text-white ${is360Playing ? 'animate-spin' : ''}`} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold text-lg">
+                        {locale === 'en' ? '360° View' : '360° Görüntüleme'}
+                      </h3>
+                      <p className="text-white/60 text-sm">
+                        {locale === 'en' ? 'Rotate to see from all angles' : 'Tüm açılardan görüntüleyin'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={close360View}
+                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Main Image */}
+                <div className="relative aspect-square bg-gray-900 rounded-2xl overflow-hidden mb-4">
+                  <OptimizedImage
+                    src={images[view360Index]}
+                    alt={`${listing.title} - ${view360Index + 1}`}
+                    fill
+                    className="object-contain"
+                    fallbackSrc="https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün"
+                    logContext={{ listingId: listing.id, page: 'listing-detail-360' }}
+                  />
+
+                  {/* Navigation Arrows */}
+                  <button
+                    onClick={() => setView360Index((i) => (i > 0 ? i - 1 : images.length - 1))}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                  >
+                    <ChevronLeftIcon className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => setView360Index((i) => (i < images.length - 1 ? i + 1 : 0))}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                  >
+                    <ChevronRightIcon className="w-6 h-6" />
+                  </button>
+
+                  {/* Progress Bar */}
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="flex gap-1">
+                      {images.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setView360Index(index)}
+                          className={`h-1.5 flex-1 rounded-full transition-all ${index === view360Index ? 'bg-orange-500' : 'bg-white/30 hover:bg-white/50'
+                            }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={toggle360Play}
+                    className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-semibold transition-colors"
+                  >
+                    {is360Playing ? (
+                      <>
+                        <PauseIcon className="w-5 h-5" />
+                        {locale === 'en' ? 'Pause' : 'Durdur'}
+                      </>
+                    ) : (
+                      <>
+                        <PlayIcon className="w-5 h-5" />
+                        {locale === 'en' ? 'Auto Rotate' : 'Otomatik Döndür'}
+                      </>
+                    )}
+                  </button>
+                  <div className="text-white/60 text-sm">
+                    {view360Index + 1} / {images.length}
+                  </div>
+                </div>
               </div>
             </div>
           )}

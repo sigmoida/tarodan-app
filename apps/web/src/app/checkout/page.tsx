@@ -56,10 +56,16 @@ export default function CheckoutPage() {
   const { items: cartItems, subtotal: cartSubtotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
-  
+
+  // Hydration fix - wait for client mount
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Direct buy mode (from URL param)
   const directProductId = searchParams.get('productId');
-  
+
   const [step, setStep] = useState(1); // 1: Address, 2: Payment, 3: Confirm
   const [isLoading, setIsLoading] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -67,12 +73,12 @@ export default function CheckoutPage() {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [paymentProvider, setPaymentProvider] = useState<'iyzico' | 'paytr'>('iyzico');
   const [directProduct, setDirectProduct] = useState<CheckoutItem | null>(null);
-  
+
   // Guest checkout fields
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestName, setGuestName] = useState('');
-  
+
   // New address form
   const [newAddress, setNewAddress] = useState<Omit<Address, 'id'>>({
     title: '',
@@ -101,14 +107,14 @@ export default function CheckoutPage() {
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState<string>('aras');
-  
+
   // Card info state (for UI display - actual payment handled by iyzico/paytr)
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [saveCard, setSaveCard] = useState(false);
-  
+
   // Coupon code state
   const [couponCode, setCouponCode] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -138,7 +144,7 @@ export default function CheckoutPage() {
     const formatted = formatPhoneNumber(value);
     return formatted;
   };
-  
+
   // Saved cards state
   const [savedCards, setSavedCards] = useState<Array<{
     id: string;
@@ -155,14 +161,14 @@ export default function CheckoutPage() {
   const checkoutItems: CheckoutItem[] = directProduct
     ? [directProduct]
     : cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
-        id: item.id,
-        productId: item.productId,
-        title: item.productTitle,
-        price: item.effectivePrice,
-        originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
-        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
-        seller: { id: item.sellerId, displayName: item.sellerName },
-      }));
+      id: item.id,
+      productId: item.productId,
+      title: item.productTitle,
+      price: item.effectivePrice,
+      originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
+      imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+      seller: { id: item.sellerId, displayName: item.sellerName },
+    }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
   const discountAmount = appliedCoupon?.discountAmount || 0;
   const grandTotal = Math.max(0, subtotal - discountAmount + shippingCost);
@@ -173,10 +179,10 @@ export default function CheckoutPage() {
       setCouponError(locale === 'en' ? 'Please enter a coupon code' : 'Lütfen kupon kodu girin');
       return;
     }
-    
+
     setCouponLoading(true);
     setCouponError(null);
-    
+
     try {
       const response = await api.post('/discounts/validate', {
         code: couponCode.trim(),
@@ -184,7 +190,7 @@ export default function CheckoutPage() {
           ? [{ productId: directProduct.productId, quantity: 1 }]
           : cartItems.map((item: { productId: string; quantity: number }) => ({ productId: item.productId, quantity: item.quantity })),
       });
-      
+
       if (response.data.isValid && response.data.discount) {
         setAppliedCoupon({
           code: response.data.discount.code,
@@ -204,7 +210,7 @@ export default function CheckoutPage() {
       setCouponLoading(false);
     }
   };
-  
+
   // Remove applied coupon
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
@@ -253,7 +259,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const calculateShipping = async () => {
       let city = '';
-      
+
       if (isAuthenticated && selectedAddressId) {
         const selectedAddr = addresses.find(a => a.id === selectedAddressId);
         city = selectedAddr?.city || '';
@@ -374,13 +380,13 @@ export default function CheckoutPage() {
         setSelectedAddressId(createdAddress.id);
         setShowAddressForm(false);
         // Reset but keep user's name and phone for next time
-        setNewAddress({ 
-          fullName: user?.displayName || '', 
-          phone: user?.phone || '', 
-          city: '', 
-          district: '', 
-          address: '', 
-          zipCode: '' 
+        setNewAddress({
+          fullName: user?.displayName || '',
+          phone: user?.phone || '',
+          city: '',
+          district: '',
+          address: '',
+          zipCode: ''
         });
         toast.success(locale === 'en' ? 'Address added' : 'Adres eklendi');
       } else {
@@ -405,7 +411,7 @@ export default function CheckoutPage() {
       const hasSavedAddress = isAuthenticated && selectedAddressId && addresses.length > 0;
       // Check if form has all required fields including phone
       const hasFormAddress = newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address;
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('=== CHECKOUT DEBUG ===');
         console.log('isAuthenticated:', isAuthenticated);
@@ -431,7 +437,7 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
-        
+
         // Validate phone is available
         const addressPhone = selectedAddress.phone || user?.phone;
         if (!addressPhone) {
@@ -439,7 +445,7 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
-        
+
         shippingAddress = {
           fullName: selectedAddress.fullName,
           phone: addressPhone,
@@ -456,7 +462,7 @@ export default function CheckoutPage() {
         const email = isAuthenticated ? user?.email : guestEmail;
         const phone = isAuthenticated ? (user?.phone || newAddress.phone) : (guestPhone || newAddress.phone);
         const name = isAuthenticated ? (user?.displayName || newAddress.fullName) : (guestName || newAddress.fullName);
-        
+
         // Validate required contact info for guest users
         if (!isAuthenticated) {
           if (!guestName?.trim()) {
@@ -475,7 +481,7 @@ export default function CheckoutPage() {
             return;
           }
         }
-        
+
         if (!email) {
           toast.error(t('checkout.enterEmail'));
           setIsLoading(false);
@@ -486,7 +492,7 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
-        
+
         // Ensure address has a valid phone number
         const addressPhone = newAddress.phone?.trim() || phone;
         if (!addressPhone) {
@@ -494,7 +500,7 @@ export default function CheckoutPage() {
           setIsLoading(false);
           return;
         }
-        
+
         shippingAddress = {
           fullName: newAddress.fullName,
           phone: addressPhone,
@@ -524,7 +530,7 @@ export default function CheckoutPage() {
           if (!newAddress.city) missingFields.push(locale === 'en' ? 'City' : 'Şehir');
           if (!newAddress.district) missingFields.push(locale === 'en' ? 'District' : 'İlçe');
           if (!newAddress.address) missingFields.push(locale === 'en' ? 'Address' : 'Açık Adres');
-          
+
           if (missingFields.length > 0) {
             toast.error(locale === 'en' ? `Please fill in: ${missingFields.join(', ')}` : `Lütfen şu alanları doldurun: ${missingFields.join(', ')}`);
           } else {
@@ -538,15 +544,15 @@ export default function CheckoutPage() {
       // Create orders - use different endpoint based on auth status
       for (const item of checkoutItems) {
         let orderResponse;
-        
+
         try {
           if (isAuthenticated) {
             // Authenticated user: use directBuy endpoint
             // Only send shippingAddressId if it's a valid UUID, otherwise send shippingAddress object
-            const validAddressId = hasSavedAddress && selectedAddressId && selectedAddressId.trim() !== '' 
-              ? selectedAddressId 
+            const validAddressId = hasSavedAddress && selectedAddressId && selectedAddressId.trim() !== ''
+              ? selectedAddressId
               : undefined;
-            
+
             // Build request payload
             const payload: {
               productId: string;
@@ -559,7 +565,7 @@ export default function CheckoutPage() {
               productId: item.productId,
               ...(appliedCoupon && { couponCode: appliedCoupon.code }),
             };
-            
+
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;
             }
@@ -581,13 +587,13 @@ export default function CheckoutPage() {
               // Use shippingAddress from above, or fallback to newAddress if form was filled (edge case)
               const addr = shippingAddress || (hasFormAddress && newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address
                 ? {
-                    fullName: newAddress.fullName,
-                    phone: newAddress.phone || user?.phone || '',
-                    city: newAddress.city,
-                    district: newAddress.district,
-                    address: newAddress.address,
-                    zipCode: newAddress.zipCode,
-                  }
+                  fullName: newAddress.fullName,
+                  phone: newAddress.phone || user?.phone || '',
+                  city: newAddress.city,
+                  district: newAddress.district,
+                  address: newAddress.address,
+                  zipCode: newAddress.zipCode,
+                }
                 : null);
               if (addr) {
                 if (!addr.fullName?.trim()) throw new Error('Teslimat adresi için ad soyad gereklidir');
@@ -611,7 +617,7 @@ export default function CheckoutPage() {
                 return;
               }
             }
-            
+
             if (process.env.NODE_ENV === 'development') {
               console.log('DirectBuy payload:', JSON.stringify(payload, null, 2));
             }
@@ -620,13 +626,13 @@ export default function CheckoutPage() {
             // Guest user: use guest checkout endpoint
             // Format phone numbers properly
             const cleanContactPhone = contactPhone?.replace(/\s/g, '') || '';
-            const formattedContactPhone = cleanContactPhone.startsWith('+90') ? cleanContactPhone : 
-                                          cleanContactPhone.startsWith('0') ? '+9' + cleanContactPhone : '+90' + cleanContactPhone;
-            
+            const formattedContactPhone = cleanContactPhone.startsWith('+90') ? cleanContactPhone :
+              cleanContactPhone.startsWith('0') ? '+9' + cleanContactPhone : '+90' + cleanContactPhone;
+
             const cleanAddrPhone = shippingAddress?.phone?.replace(/\s/g, '') || '';
-            const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone : 
-                                       cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
-            
+            const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone :
+              cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
+
             const guestPayload: {
               productId: string;
               email: string;
@@ -656,7 +662,7 @@ export default function CheckoutPage() {
                 zipCode: newBillingAddress.zipCode?.trim() || undefined,
               };
             }
-            
+
             orderResponse = await ordersApi.createGuest(guestPayload);
           }
         } catch (orderError: any) {
@@ -683,49 +689,127 @@ export default function CheckoutPage() {
         }
 
         const orderId = orderResponse.data.id || orderResponse.data.orderId || orderResponse.data.order?.id;
-        
+
         if (orderId) {
-          // Initiate payment for the order (same endpoint works for both auth and guest)
-          try {
-            const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
-            const paymentData = paymentResponse.data;
+          // For Iyzico, use Direct API with card info from the form
+          if (paymentProvider === 'iyzico') {
+            try {
+              // Validate card info if using new card
+              if (useNewCard || savedCards.length === 0) {
+                if (!cardName || !cardNumber || !cardExpiry || !cardCvc) {
+                  toast.error(locale === 'en' ? 'Please fill in all card information' : 'Lütfen tüm kart bilgilerini doldurun');
+                  setIsLoading(false);
+                  return;
+                }
+              }
 
-            // Clear cart before redirecting to payment
-            if (!directProductId) {
-              await clearCart();
+              // Parse expiry date
+              const [month, year] = cardExpiry.split('/');
+
+              const directPayload: any = {
+                orderId,
+                saveCard: isAuthenticated && saveCard,
+              };
+
+              // Use saved card token or new card details
+              if (!useNewCard && selectedSavedCard && savedCards.length > 0) {
+                directPayload.cardToken = selectedSavedCard;
+              } else {
+                directPayload.card = {
+                  cardHolderName: cardName,
+                  cardNumber: cardNumber.replace(/\s/g, ''),
+                  expireMonth: month,
+                  expireYear: year.length === 2 ? '20' + year : year,
+                  cvc: cardCvc,
+                };
+              }
+
+              const directResponse = await paymentsApi.processDirect(directPayload);
+              const directData = directResponse.data;
+              console.log('Processing Direct Payment Response (v3)', directData);
+
+              // Base64 decode logic with robust detection
+              let htmlContent = directData.htmlContent;
+
+              // Check explicit flag OR auto-detect Base64 (starts with alphanumeric, not <)
+              const needsDecode = directData.isBase64 || (htmlContent && !htmlContent.trim().startsWith('<') && /^[a-zA-Z0-9+/=]+$/.test(htmlContent.substring(0, 50)));
+
+              if (needsDecode && htmlContent) {
+                try {
+                  console.log('Decoding Base64 HTML content...');
+                  htmlContent = atob(htmlContent);
+                } catch (e) {
+                  console.error('Failed to decode HTML content', e);
+                  toast.error('Ödeme sayfası yüklenemedi (Decode hatası)');
+                  return;
+                }
+              }
+
+              // Check if 3D Secure HTML content is returned
+              if (htmlContent) {
+                // Clear cart before showing 3D Secure
+                if (!directProductId) {
+                  await clearCart();
+                }
+                // Open 3D Secure page in current window
+                document.open();
+                document.write(htmlContent);
+                document.close();
+                return;
+              } else if (directData.status === 'success') {
+                // Direct success (no 3D Secure needed)
+                if (!directProductId) {
+                  await clearCart();
+                }
+                toast.success(locale === 'en' ? 'Payment successful!' : 'Ödeme başarılı!');
+                router.push(`/checkout/success?orderId=${orderId}`);
+                return;
+              } else {
+                throw new Error(directData.message || (locale === 'en' ? 'Payment failed' : 'Ödeme başarısız'));
+              }
+            } catch (paymentError: any) {
+              if (process.env.NODE_ENV === 'development') {
+                console.error('Direct payment failed:', paymentError);
+              }
+              toast.error(
+                paymentError.response?.data?.message ||
+                (locale === 'en' ? 'Payment failed. Please try again.' : 'Ödeme başarısız. Lütfen tekrar deneyin.')
+              );
+              throw paymentError;
             }
+          } else {
+            // PayTR - use existing hosted checkout flow
+            try {
+              const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
+              const paymentData = paymentResponse.data;
 
-            // Redirect to payment page
-            if (paymentData.paymentUrl) {
-              // For Iyzico, redirect directly to payment URL
-              if (paymentProvider === 'iyzico' && paymentData.paymentUrl.startsWith('http')) {
+              // Clear cart before redirecting to payment
+              if (!directProductId) {
+                await clearCart();
+              }
+
+              if (paymentData.paymentUrl) {
                 window.location.href = paymentData.paymentUrl;
                 return;
+              } else if (paymentData.paymentId) {
+                const paymentPageUrl = isAuthenticated
+                  ? `/payment/${paymentData.paymentId}`
+                  : `/payment/${paymentData.paymentId}?guest=true`;
+                router.push(paymentPageUrl);
+                return;
+              } else {
+                throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');
               }
-              // For PayTR or other cases, go to payment page
-              const paymentPageUrl = isAuthenticated 
-                ? `/payment/${paymentData.paymentId}`
-                : `/payment/${paymentData.paymentId}?guest=true`;
-              router.push(paymentPageUrl);
-              return;
-            } else if (paymentData.paymentId) {
-              const paymentPageUrl = isAuthenticated 
-                ? `/payment/${paymentData.paymentId}`
-                : `/payment/${paymentData.paymentId}?guest=true`;
-              router.push(paymentPageUrl);
-              return;
-            } else {
-              throw new Error(locale === 'en' ? 'Failed to initiate payment' : 'Ödeme başlatılamadı');
+            } catch (paymentError: any) {
+              if (process.env.NODE_ENV === 'development') {
+                console.error('Payment initiation failed:', paymentError);
+              }
+              toast.error(
+                paymentError.response?.data?.message ||
+                (locale === 'en' ? 'Failed to initiate payment. Please try again.' : 'Ödeme başlatılamadı. Lütfen tekrar deneyin.')
+              );
+              throw paymentError;
             }
-          } catch (paymentError: any) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('Payment initiation failed:', paymentError);
-            }
-            toast.error(
-              paymentError.response?.data?.message || 
-              (locale === 'en' ? 'Failed to initiate payment. Please try again.' : 'Ödeme başlatılamadı. Lütfen tekrar deneyin.')
-            );
-            throw paymentError;
           }
         }
       }
@@ -753,7 +837,7 @@ export default function CheckoutPage() {
       if (!directProductId) {
         await clearCart();
       }
-      
+
       // Redirect based on auth status
       if (isAuthenticated) {
         router.push('/orders');
@@ -769,6 +853,18 @@ export default function CheckoutPage() {
       setIsLoading(false);
     }
   };
+
+  // Wait for client mount before rendering dynamic content
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (checkoutItems.length === 0 && !directProductId) {
     return (
@@ -810,11 +906,10 @@ export default function CheckoutPage() {
           ].map((s, index) => (
             <div key={s.step} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${
-                  step >= s.step
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${step >= s.step
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-gray-200 text-gray-500'
+                  }`}
               >
                 {step > s.step ? <CheckCircleIcon className="w-6 h-6" /> : s.step}
               </div>
@@ -851,11 +946,10 @@ export default function CheckoutPage() {
                         {addresses.map((addr) => (
                           <label
                             key={addr.id}
-                            className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                              selectedAddressId === addr.id
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                            className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedAddressId === addr.id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                              }`}
                           >
                             <div className="flex items-start gap-3">
                               <input
@@ -956,7 +1050,7 @@ export default function CheckoutPage() {
                         {locale === 'en' ? 'You are shopping without logging in. Enter your email to track your order.' : 'Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.'}
                       </p>
                     </div>
-                    
+
                     <div className="grid sm:grid-cols-2 gap-4">
                       <input
                         type="text"
@@ -989,10 +1083,10 @@ export default function CheckoutPage() {
                         required
                       />
                     </div>
-                    
+
                     <hr className="my-4" />
                     <h3 className="font-semibold">{t('checkout.shippingAddress')}</h3>
-                    
+
                     <input
                       type="text"
                       placeholder={locale === 'en' ? 'Address Title (e.g. Home, Work)' : 'Adres Başlığı (örn: Ev, İş)'}
@@ -1122,9 +1216,9 @@ export default function CheckoutPage() {
                     disabled={
                       isAuthenticated
                         ? (!selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)) ||
-                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
+                        (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
                         : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address) ||
-                          (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
+                        (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
                     }
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1154,11 +1248,10 @@ export default function CheckoutPage() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <label
-                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                        selectedCarrier === 'aras'
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedCarrier === 'aras'
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -1172,11 +1265,10 @@ export default function CheckoutPage() {
                       </div>
                     </label>
                     <label
-                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                        selectedCarrier === 'yurtici'
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedCarrier === 'yurtici'
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -1201,11 +1293,10 @@ export default function CheckoutPage() {
                 </h3>
                 <div className="space-y-3">
                   <label
-                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      paymentProvider === 'iyzico'
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentProvider === 'iyzico'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <input
@@ -1226,11 +1317,10 @@ export default function CheckoutPage() {
                   </label>
 
                   <label
-                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      paymentProvider === 'paytr'
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentProvider === 'paytr'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <input
@@ -1257,7 +1347,7 @@ export default function CheckoutPage() {
                     <CreditCardIcon className="w-5 h-5 text-primary-500" />
                     {locale === 'en' ? 'Card Information' : 'Kart Bilgileri'}
                   </h3>
-                  
+
                   {/* Saved Cards Section */}
                   {isAuthenticated && savedCards.length > 0 && (
                     <div className="mb-6">
@@ -1266,11 +1356,10 @@ export default function CheckoutPage() {
                         {savedCards.map((card) => (
                           <label
                             key={card.id}
-                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                              !useNewCard && selectedSavedCard === card.id
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${!useNewCard && selectedSavedCard === card.id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                              }`}
                           >
                             <input
                               type="radio"
@@ -1297,14 +1386,13 @@ export default function CheckoutPage() {
                             )}
                           </label>
                         ))}
-                        
+
                         {/* New Card Option */}
                         <label
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            useNewCard
-                              ? 'border-primary-500 bg-primary-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${useNewCard
+                            ? 'border-primary-500 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                            }`}
                         >
                           <input
                             type="radio"
@@ -1321,7 +1409,7 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* New Card Form - Show when no saved cards or new card selected */}
                   {(savedCards.length === 0 || useNewCard) && (
                     <div className="space-y-4">
@@ -1337,7 +1425,7 @@ export default function CheckoutPage() {
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           {locale === 'en' ? 'Card Number' : 'Kart Numarası'}
@@ -1354,7 +1442,7 @@ export default function CheckoutPage() {
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1390,7 +1478,7 @@ export default function CheckoutPage() {
                           />
                         </div>
                       </div>
-                      
+
                       {isAuthenticated && (
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                           <input
@@ -1404,7 +1492,7 @@ export default function CheckoutPage() {
                       )}
                     </div>
                   )}
-                  
+
                   {/* CVV for saved card */}
                   {!useNewCard && selectedSavedCard && (
                     <div className="mt-4">
@@ -1421,7 +1509,7 @@ export default function CheckoutPage() {
                       />
                     </div>
                   )}
-                  
+
                   <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
                     <ShieldCheckIcon className="w-4 h-4 text-green-500" />
                     256-bit SSL ile şifrelenmiş güvenli ödeme
@@ -1510,8 +1598,8 @@ export default function CheckoutPage() {
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}</p>
                   <p className="font-medium">
-                    {paymentProvider === 'iyzico' 
-                      ? (locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde') 
+                    {paymentProvider === 'iyzico'
+                      ? (locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde')
                       : (locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde')}
                   </p>
                 </div>
@@ -1599,7 +1687,7 @@ export default function CheckoutPage() {
                   <TagIcon className="w-4 h-4 inline-block mr-1" />
                   {locale === 'en' ? 'Coupon Code' : 'Kupon Kodu'}
                 </label>
-                
+
                 {appliedCoupon ? (
                   <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div>
@@ -1638,7 +1726,7 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 )}
-                
+
                 {couponError && (
                   <p className="mt-2 text-xs text-red-600">{couponError}</p>
                 )}
@@ -1649,7 +1737,7 @@ export default function CheckoutPage() {
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
                   <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
-                
+
                 {/* Discount Breakdown */}
                 {appliedCoupon && (
                   <div className="flex justify-between text-green-600">
@@ -1657,7 +1745,7 @@ export default function CheckoutPage() {
                     <span className="font-medium">-{appliedCoupon.discountAmount.toFixed(2)} TL</span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
                   <span className="font-medium">
@@ -1670,7 +1758,7 @@ export default function CheckoutPage() {
                     )}
                   </span>
                 </div>
-                
+
                 {/* Total Savings */}
                 {discountAmount > 0 && (
                   <div className="p-2 bg-green-50 rounded-lg">
@@ -1679,7 +1767,7 @@ export default function CheckoutPage() {
                     </p>
                   </div>
                 )}
-                
+
                 <hr />
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{locale === 'en' ? 'Total' : 'Toplam'}</span>

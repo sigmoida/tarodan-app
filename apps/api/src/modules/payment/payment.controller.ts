@@ -14,9 +14,10 @@ import {
   Headers,
   NotFoundException,
   ForbiddenException,
+  Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -39,12 +40,14 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
+  DirectPaymentDto,
+  AddCardDto,
 } from './dto';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(private readonly paymentService: PaymentService) { }
 
   /**
    * POST /payments/initiate - Initiate payment (works for both authenticated and guest users)
@@ -65,7 +68,7 @@ export class PaymentController {
     // Extract user ID from JWT if present (optional auth)
     const authHeader = req.headers.authorization;
     let userId: string | null = null;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
@@ -77,7 +80,7 @@ export class PaymentController {
         userId = null;
       }
     }
-    
+
     return this.paymentService.initiatePaymentUnified(userId, dto, req);
   }
 
@@ -111,10 +114,26 @@ export class PaymentController {
   async iyzicoCallback(
     @Body() dto: IyzicoCallbackDto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Headers('x-iyzico-signature') signature?: string,
+    @Query('paymentId') paymentId?: string,
+    @Query('direct') direct?: string,
   ) {
     // Get raw body for signature verification
     const rawBody = (req as any).rawBody || JSON.stringify(dto);
+
+    // Direct 3D Secure Redirection
+    if (direct === 'true' && paymentId) {
+      const result = await this.paymentService.completeDirect3DSecure(paymentId, dto);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+      if (result.status === 'success') {
+        return res.redirect(`${frontendUrl}/payment/success`);
+      } else {
+        return res.redirect(`${frontendUrl}/payment/failed?reason=${encodeURIComponent(result.message || 'Ödeme başarısız')}`);
+      }
+    }
+
     return this.paymentService.handleIyzicoCallback(dto, rawBody, signature);
   }
 
@@ -146,15 +165,40 @@ export class PaymentController {
   // PAYMENT METHODS - Must be BEFORE :id routes
   // ============================================================
 
+  // ============================================================
+  // DIRECT PAYMENT & SAVED CARDS
+  // ============================================================
+
+  @Post('process-direct')
+  @ApiOperation({ summary: 'Process direct payment (3D Secure)' })
+  @Public()
+  async processDirectPayment(
+    @Body() dto: DirectPaymentDto,
+    @Req() req: Request,
+  ) {
+    // Optional Auth Logic
+    const authHeader = req.headers.authorization;
+    let userId: string | null = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        userId = decoded.sub || decoded.id;
+      } catch (e) { userId = null; }
+    }
+    return this.paymentService.processDirectPayment(dto, userId || '', req);
+  }
+
   /**
-   * GET /payments/methods - Get user's saved payment methods
+   * GET /payments/methods - Get user's saved payment methods (Iyzico Stored Cards)
    */
   @Get('methods')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get saved payment methods' })
   async getPaymentMethods(@CurrentUser('id') userId: string) {
-    return this.paymentService.getPaymentMethods(userId);
+    return this.paymentService.getStoredCards(userId);
   }
 
   /**
@@ -166,9 +210,10 @@ export class PaymentController {
   @ApiOperation({ summary: 'Add new payment method' })
   async addPaymentMethod(
     @CurrentUser('id') userId: string,
-    @Body() dto: { cardNumber: string; cardHolder: string; expiryMonth: number; expiryYear: number; cvv: string },
+    @CurrentUser('email') email: string,
+    @Body() dto: AddCardDto,
   ) {
-    return this.paymentService.addPaymentMethod(userId, dto);
+    return this.paymentService.addStoredCard(userId, email, dto.card);
   }
 
   /**
@@ -179,12 +224,12 @@ export class PaymentController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete payment method' })
-  @ApiParam({ name: 'id', description: 'Payment method ID' })
+  @ApiParam({ name: 'id', description: 'Card Token' })
   async deletePaymentMethod(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id') cardToken: string,
   ) {
-    return this.paymentService.deletePaymentMethod(userId, id);
+    return this.paymentService.removeStoredCard(userId, cardToken);
   }
 
   /**
@@ -239,7 +284,7 @@ export class PaymentController {
     // Extract user ID from JWT if present
     const authHeader = req.headers.authorization;
     let userId: string | null = null;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
@@ -250,7 +295,7 @@ export class PaymentController {
         userId = null;
       }
     }
-    
+
     return this.paymentService.getPaymentStatusUnified(id, userId);
   }
 

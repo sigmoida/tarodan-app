@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { productsApi, searchApi } from '../../src/services/api';
 import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
 import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
+import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -197,8 +198,8 @@ export default function SearchScreen() {
   }, [selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly, category]);
 
   const renderProduct = ({ item }: { item: any }) => {
-    // Image URL extraction - handle both string and object formats
-    const imageUrl = item.images?.[0]?.url || item.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    // Image URL extraction - handle both string and object formats with URL transformation
+    const imageUrl = getImageUrlFromUtils(item.images);
     
     return (
     <Card
