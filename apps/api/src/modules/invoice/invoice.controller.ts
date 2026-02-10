@@ -15,7 +15,6 @@ import { Response } from 'express';
 import { InvoiceService } from './invoice.service';
 import { JwtAuthGuard } from '../auth/guards';
 import { CurrentUser, Public } from '../auth/decorators';
-import { JwtPayload } from '../auth/interfaces';
 
 @ApiTags('invoices')
 @Controller('invoices')
@@ -30,10 +29,10 @@ export class InvoiceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user invoices' })
   async getUserInvoices(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser('id') userId: string,
     @Query('type') type: 'buyer' | 'seller' = 'buyer',
   ) {
-    return this.invoiceService.getUserInvoices(user.sub, type);
+    return this.invoiceService.getUserInvoices(userId, type);
   }
 
   /**
@@ -45,10 +44,10 @@ export class InvoiceController {
   @ApiOperation({ summary: 'Get invoice by order ID' })
   async getByOrderId(
     @Param('orderId', ParseUUIDPipe) orderId: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser('id') userId: string,
     @Query('paymentId') paymentId?: string,
   ) {
-    return this.invoiceService.getByOrderId(orderId, user.sub, paymentId);
+    return this.invoiceService.getByOrderId(orderId, userId, paymentId);
   }
 
   /**
@@ -91,11 +90,11 @@ export class InvoiceController {
   @ApiResponse({ status: HttpStatus.OK, description: 'PDF file stream' })
   async downloadInvoice(
     @Param('id', ParseUUIDPipe) invoiceId: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser('id') userId: string,
     @Res() res: Response,
     @Query('paymentId') paymentId?: string,
   ) {
-    const pdfBuffer = await this.invoiceService.downloadInvoice(invoiceId, user.sub, paymentId);
+    const pdfBuffer = await this.invoiceService.downloadInvoice(invoiceId, userId, paymentId);
 
     res.set({
       'Content-Type': 'application/pdf',

@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
-import { HeartIcon, TrashIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { HeartIcon, TrashIcon, ShoppingCartIcon, ShareIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { wishlistApi } from '@/lib/api';
+import { wishlistApi, listingsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useTranslation } from '@/i18n';
@@ -30,18 +30,27 @@ interface WishlistItem {
 
 export default function FavoritesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToCart } = useCartStore();
   const { t } = useTranslation();
 
+  const sharedIds = useMemo(() => {
+    const ids = searchParams.get('ids');
+    if (!ids) return null;
+    return ids.split(',').filter(Boolean);
+  }, [searchParams]);
+
+  const isSharedView = sharedIds !== null && sharedIds.length > 0;
+
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isSharedView) return;
     if (!isAuthenticated) {
       toast.error(t('favorites.loginRequired'));
       router.push('/login?redirect=/favorites');
     }
-  }, [isAuthenticated, authLoading, router, t]);
+  }, [isAuthenticated, authLoading, isSharedView, router, t]);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -53,11 +62,42 @@ export default function FavoritesPage() {
       );
       return validItems;
     },
-    enabled: !authLoading && isAuthenticated,
+    enabled: !authLoading && isAuthenticated && !isSharedView,
     meta: { page: 'favorites' },
   });
-  const items = wishlistQuery.data ?? [];
-  const isLoading = wishlistQuery.isLoading;
+
+  const sharedProductsQuery = useQuery({
+    queryKey: ['favorites-shared', sharedIds?.join(',')],
+    queryFn: async (): Promise<WishlistItem[]> => {
+      if (!sharedIds?.length) return [];
+      const results = await Promise.allSettled(
+        sharedIds.map((id) => listingsApi.getById(id).then((r) => r.data))
+      );
+      return results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value)
+        .map((r) => {
+          const p = r.value;
+          return {
+            id: p.id,
+            productId: p.id,
+            productTitle: p.title,
+            productImage: p.images?.[0]?.url ?? p.imageUrl,
+            productPrice: p.price ?? p.sellingPrice,
+            productOriginalPrice: p.originalPrice,
+            productCondition: p.condition,
+            productStatus: p.status,
+            sellerId: p.sellerId ?? p.userId,
+            sellerName: p.seller?.displayName ?? p.sellerName ?? '',
+            addedAt: p.createdAt,
+          };
+        });
+    },
+    enabled: isSharedView && (sharedIds?.length ?? 0) > 0,
+    meta: { page: 'favorites-shared' },
+  });
+
+  const items = isSharedView ? (sharedProductsQuery.data ?? []) : (wishlistQuery.data ?? []);
+  const isLoading = isSharedView ? sharedProductsQuery.isLoading : wishlistQuery.isLoading;
 
   const handleRemove = async (productId: string) => {
     try {
@@ -101,11 +141,11 @@ export default function FavoritesPage() {
     return productImage;
   };
 
-  if (authLoading) {
+  if (!isSharedView && authLoading) {
     return <AuthLoadingScreen />;
   }
 
-  if (!isAuthenticated) {
+  if (!isSharedView && !isAuthenticated) {
     return null;
   }
 
@@ -129,13 +169,31 @@ export default function FavoritesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{t('favorites.myFavorites')}</h1>
+            <h1 className="text-3xl font-bold mb-2">
+              {isSharedView ? t('favorites.sharedList') : t('favorites.myFavorites')}
+            </h1>
             <p className="text-gray-600">
               {items.length} {t('favorites.itemsInFavorites')}
             </p>
           </div>
+          {!isSharedView && items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/favorites?ids=${items.map((i) => i.productId).join(',')}`;
+                navigator.clipboard.writeText(url).then(
+                  () => toast.success(t('favorites.linkCopied')),
+                  () => toast.error(t('common.operationFailed'))
+                );
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+            >
+              <ShareIcon className="w-5 h-5" />
+              {t('favorites.shareList')}
+            </button>
+          )}
         </div>
 
         {items.length === 0 ? (
@@ -170,16 +228,18 @@ export default function FavoritesPage() {
                         fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Product"
                         logContext={{ itemId: item.id, page: 'favorites' }}
                       />
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleRemove(item.productId);
-                        }}
-                        className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
-                        title={t('favorites.removeFromFavorites')}
-                      >
-                        <TrashIcon className="w-5 h-5 text-red-500" />
-                      </button>
+                      {!isSharedView && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleRemove(item.productId);
+                          }}
+                          className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
+                          title={t('favorites.removeFromFavorites')}
+                        >
+                          <TrashIcon className="w-5 h-5 text-red-500" />
+                        </button>
+                      )}
                     </div>
                   </Link>
                   <div className="p-4">

@@ -44,8 +44,8 @@ export class ErrorLogInterceptor implements NestInterceptor {
                     stackTrace: error.stack,
                     source: 'api',
                     endpoint: `${method} ${url}`,
-                    userId: user?.id,
-                    details: {
+                    userId: user?.id ?? user?.sub,
+                    metadata: {
                         status,
                         name: error.name,
                         body: method !== 'GET' ? body : undefined,

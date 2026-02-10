@@ -645,9 +645,10 @@ export class InvoiceService {
   /**
    * Get invoice by order ID
    * Optionally verify with paymentId (useful for guest checkouts or user ID mismatches on success page)
+   * If no invoice exists but order is paid and user is buyer/seller, generates the invoice (lazy creation).
    */
   async getByOrderId(orderId: string, userId: string | null, paymentId?: string) {
-    const invoice = await this.prisma.invoice.findFirst({
+    let invoice = await this.prisma.invoice.findFirst({
       where: { orderId },
       include: {
         order: {
@@ -662,17 +663,60 @@ export class InvoiceService {
     });
 
     if (!invoice) {
-      throw new NotFoundException('Fatura bulunamadı');
-    }
+      // Lazy create: if order exists, user is buyer/seller, and order is not cancelled/pending → try to generate
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, buyerId: true, sellerId: true, status: true, payment: { select: { id: true } } },
+      });
+      const statusStr = order?.status ? String(order.status) : '';
+      const skipStatuses = ['cancelled', 'pending_payment'];
+      const canGenerateByStatus = order && !skipStatuses.includes(statusStr);
+      const isBuyer = userId && order?.buyerId === userId;
+      const isSeller = userId && order?.sellerId === userId;
+      const isPaymentVerified = paymentId && order?.payment?.id === paymentId;
+      const mayCreate = canGenerateByStatus && (isBuyer || isSeller || isPaymentVerified);
+      if (!order) {
+        this.logger.debug(`Invoice getByOrderId: order ${orderId} not found`);
+      } else if (!mayCreate) {
+        this.logger.debug(
+          `Invoice getByOrderId: order ${orderId} status=${statusStr} isBuyer=${isBuyer} isSeller=${isSeller} buyerId=${order.buyerId} sellerId=${order.sellerId} userId=${userId}`,
+        );
+      }
+      if (mayCreate) {
+        try {
+          await this.generateForOrder(orderId);
+          invoice = await this.prisma.invoice.findFirst({
+            where: { orderId },
+            include: {
+              order: {
+                include: {
+                  buyer: { select: { id: true, displayName: true, email: true } },
+                  seller: { select: { id: true, displayName: true, email: true } },
+                  product: { select: { id: true, title: true } },
+                  payment: { select: { id: true } },
+                },
+              },
+            },
+          });
+        } catch (err) {
+          this.logger.warn(`Lazy invoice generation failed for order ${orderId}:`, err);
+          throw new NotFoundException(
+            'Fatura oluşturulamadı. Sipariş ödenmiş olsa bile fatura kaydı eksik olabilir.',
+          );
+        }
+      }
+      if (!invoice) {
+        throw new NotFoundException('Fatura bulunamadı');
+      }
+    } else {
+      // Check authorization: buyer, seller, or someone with a valid paymentId for this order
+      const isBuyer = userId && invoice.buyerId === userId;
+      const isSeller = userId && invoice.sellerId === userId;
+      const isPaymentVerified = paymentId && invoice.order.payment?.id === paymentId;
 
-    // Check authorization: buyer, seller, or someone with a valid paymentId for this order
-    const isBuyer = userId && invoice.buyerId === userId;
-    const isSeller = userId && invoice.sellerId === userId;
-    const isPaymentVerified = paymentId && invoice.order.payment?.id === paymentId;
-
-    if (!isBuyer && !isSeller && !isPaymentVerified) {
-      // Security: Don't reveal if it exists but unauthorized
-      throw new NotFoundException('Fatura bulunamadı');
+      if (!isBuyer && !isSeller && !isPaymentVerified) {
+        throw new NotFoundException('Fatura bulunamadı');
+      }
     }
 
     return invoice;

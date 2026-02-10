@@ -8,6 +8,7 @@
     "dev:only": "turbo run dev",
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:restart": "lsof -ti:3000 -ti:3001 -ti:3002 2>/dev/null | xargs kill -9 2>/dev/null; sleep 2; pnpm dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

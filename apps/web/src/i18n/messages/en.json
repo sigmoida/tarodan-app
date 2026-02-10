@@ -363,7 +363,10 @@
     "itemsInFavorites": "items in favorites",
     "removeFromFavorites": "Remove from Favorites",
     "loginRequired": "Please login to view favorites",
-    "loadFailed": "Failed to load favorites"
+    "loadFailed": "Failed to load favorites",
+    "shareList": "Share list",
+    "linkCopied": "Link copied",
+    "sharedList": "Shared list"
   },
   "checkout": {
     "title": "Checkout",
@@ -442,6 +445,8 @@
     "orderStatus": "Status",
     "orderDetails": "Order Details",
     "trackOrder": "Track Order",
+    "downloadInvoice": "Download Invoice",
+    "reorder": "Reorder",
     "cancelOrder": "Cancel Order",
     "cancelConfirm": "Are you sure you want to cancel this order?",
     "statusPending": "Pending",

@@ -362,7 +362,10 @@
     "itemsInFavorites": "ürün favorilerinizde",
     "removeFromFavorites": "Favorilerden Çıkar",
     "loginRequired": "Favorileri görüntülemek için giriş yapın",
-    "loadFailed": "Favoriler yüklenemedi"
+    "loadFailed": "Favoriler yüklenemedi",
+    "shareList": "Listeyi paylaş",
+    "linkCopied": "Link kopyalandı",
+    "sharedList": "Paylaşılan liste"
   },
   "checkout": {
     "title": "Ödeme",
@@ -441,6 +444,8 @@
     "orderStatus": "Durum",
     "orderDetails": "Sipariş Detayları",
     "trackOrder": "Siparişi Takip Et",
+    "downloadInvoice": "Fatura İndir",
+    "reorder": "Tekrar Sipariş Ver",
     "cancelOrder": "Siparişi İptal Et",
     "cancelConfirm": "Bu siparişi iptal etmek istediğinizden emin misiniz?",
     "statusPending": "Beklemede",

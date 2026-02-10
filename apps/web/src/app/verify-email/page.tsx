@@ -22,6 +22,9 @@ function VerifyEmailContent() {
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'no-token'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -46,6 +49,26 @@ function VerifyEmailContent() {
 
     verifyEmail();
   }, [token, locale]);
+
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = resendEmail.trim();
+    if (!email) {
+      toast.error(locale === 'tr' ? 'E-posta adresi girin' : 'Enter email address');
+      return;
+    }
+    setResendLoading(true);
+    setResendSuccess(false);
+    try {
+      await api.post('/auth/resend-verification', { email });
+      setResendSuccess(true);
+      toast.success(locale === 'tr' ? 'Doğrulama e-postası gönderildi' : 'Verification email sent');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'tr' ? 'Gönderilemedi' : 'Failed to send'));
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
@@ -149,6 +172,33 @@ function VerifyEmailContent() {
                 </p>
               </div>
 
+              <form onSubmit={handleResendVerification} className="mb-6 space-y-3">
+                <input
+                  type="email"
+                  value={resendEmail}
+                  onChange={(e) => setResendEmail(e.target.value)}
+                  placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={resendLoading}
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {resendLoading ? (
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                  ) : (
+                    locale === 'tr' ? 'Yeniden doğrulama e-postası gönder' : 'Resend verification email'
+                  )}
+                </button>
+                {resendSuccess && (
+                  <p className="text-sm text-green-600 text-center">
+                    {locale === 'tr' ? 'E-posta gönderildi. Gelen kutunuzu kontrol edin.' : 'Email sent. Check your inbox.'}
+                  </p>
+                )}
+              </form>
+
               <div className="space-y-3">
                 <Link
                   href="/login"
@@ -192,10 +242,37 @@ function VerifyEmailContent() {
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
                 <p className="text-sm text-blue-800">
                   📬 {locale === 'tr' 
-                    ? 'E-postanızı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin.' 
-                    : "Can't find the email? Check your spam/junk folder."}
+                    ? 'E-postanızı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin veya yeni doğrulama e-postası isteyin.' 
+                    : "Can't find the email? Check your spam/junk folder or request a new verification email."}
                 </p>
               </div>
+
+              <form onSubmit={handleResendVerification} className="mb-6 space-y-3">
+                <input
+                  type="email"
+                  value={resendEmail}
+                  onChange={(e) => setResendEmail(e.target.value)}
+                  placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={resendLoading}
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {resendLoading ? (
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                  ) : (
+                    locale === 'tr' ? 'Yeniden doğrulama e-postası gönder' : 'Resend verification email'
+                  )}
+                </button>
+                {resendSuccess && (
+                  <p className="text-sm text-green-600 text-center">
+                    {locale === 'tr' ? 'E-posta gönderildi. Gelen kutunuzu kontrol edin.' : 'Email sent. Check your inbox.'}
+                  </p>
+                )}
+              </form>
 
               <div className="space-y-3">
                 <Link

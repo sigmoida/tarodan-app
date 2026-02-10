@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
 import { api, ratingsApi } from '@/lib/api';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
@@ -65,7 +66,9 @@ export default function OrdersPage() {
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+  const addToCart = useCartStore((s) => s.addToCart);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
+  const [downloadingInvoiceOrderId, setDownloadingInvoiceOrderId] = useState<string | null>(null);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
@@ -179,6 +182,51 @@ export default function OrdersPage() {
     const isReviewableStatus = REVIEWABLE_STATUSES.includes(order.status);
     const notAlreadyReviewed = !reviewedOrders.has(order.id);
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    setDownloadingInvoiceOrderId(orderId);
+    try {
+      const invoiceRes = await api.get(`/invoices/order/${orderId}`);
+      const invoice = invoiceRes.data;
+      if (!invoice?.id) {
+        toast.error(locale === 'en' ? 'Invoice not found' : 'Fatura bulunamadı');
+        return;
+      }
+      const response = await api.get(`/invoices/download/${invoice.id}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `fatura-${invoice.invoiceNumber || invoice.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(locale === 'en' ? 'Invoice downloaded' : 'Fatura indirildi');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');
+      } else {
+        toast.error(err.response?.data?.message || (locale === 'en' ? 'Download failed' : 'İndirme başarısız'));
+      }
+    } finally {
+      setDownloadingInvoiceOrderId(null);
+    }
+  };
+
+  const handleReorder = async (order: Order) => {
+    const productId = order.product?.id || order.items?.[0]?.product?.id;
+    if (!productId) {
+      toast.error(t('order.orderNotFound'));
+      return;
+    }
+    try {
+      await addToCart(productId, order.items?.[0]?.quantity ?? 1);
+      toast.success(locale === 'en' ? 'Added to cart' : 'Sepete eklendi');
+      router.push('/cart');
+    } catch (err: any) {
+      toast.error(err?.message || (locale === 'en' ? 'Could not add to cart' : 'Sepete eklenemedi'));
+    }
   };
 
   if (authLoading) return <AuthLoadingScreen />;
@@ -311,13 +359,38 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 mt-4">
+                  <div className="flex flex-wrap gap-2 mt-4">
                     <Link
                       href={`/orders/${order.id}`}
                       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
                     >
                       {t('common.details')}
                     </Link>
+                    {order.isBuyer !== false && (order.shipment || ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(order.status)) && (
+                      <Link
+                        href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || '')}`}
+                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                      >
+                        {t('order.trackOrder')}
+                      </Link>
+                    )}
+                    {order.isBuyer !== false && ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(order.status) && (
+                      <button
+                        onClick={() => handleDownloadInvoice(order.id)}
+                        disabled={downloadingInvoiceOrderId === order.id}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm disabled:opacity-50"
+                      >
+                        {downloadingInvoiceOrderId === order.id ? (locale === 'en' ? 'Downloading...' : 'İndiriliyor...') : t('order.downloadInvoice')}
+                      </button>
+                    )}
+                    {order.isBuyer !== false && (order.product?.id || order.items?.[0]?.product?.id) && (
+                      <button
+                        onClick={() => handleReorder(order)}
+                        className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm"
+                      >
+                        {t('order.reorder')}
+                      </button>
+                    )}
                     {canReview(order) && (
                       <button
                         onClick={() => openReviewModal(order)}
@@ -328,9 +401,9 @@ export default function OrdersPage() {
                       </button>
                     )}
                     {order.status === 'delivered' && (
-                      <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm">
+                      <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
                         {t('order.statusDelivered')}
-                      </button>
+                      </span>
                     )}
                   </div>
                 </div>

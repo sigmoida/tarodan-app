@@ -88,12 +88,13 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
   const statusLabels = getStatusLabels(locale);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number | undefined>(undefined);
   const [processingRefund, setProcessingRefund] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   const orderId = params?.id as string;
 
@@ -145,6 +146,37 @@ export default function OrderDetailPage() {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to start refund' : 'İade işlemi başlatılamadı'));
     } finally {
       setProcessingRefund(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!orderId) return;
+    setDownloadingInvoice(true);
+    try {
+      const invoiceRes = await api.get(`/invoices/order/${orderId}`);
+      const invoice = invoiceRes.data;
+      if (!invoice?.id) {
+        toast.error(locale === 'en' ? 'Invoice not found' : 'Fatura bulunamadı');
+        return;
+      }
+      const response = await api.get(`/invoices/download/${invoice.id}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `fatura-${invoice.invoiceNumber || invoice.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(locale === 'en' ? 'Invoice downloaded' : 'Fatura indirildi');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');
+      } else {
+        toast.error(err.response?.data?.message || (locale === 'en' ? 'Download failed' : 'İndirme başarısız'));
+      }
+    } finally {
+      setDownloadingInvoice(false);
     }
   };
 
@@ -266,6 +298,15 @@ export default function OrderDetailPage() {
                     <span className="text-gray-600">{locale === 'en' ? 'Shipping Status:' : 'Kargo Durumu:'}</span>
                     <span className="font-medium">{order.shipment.status}</span>
                   </div>
+                  {order.isBuyer && (
+                    <Link
+                      href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || '')}`}
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <TruckIcon className="w-4 h-4" />
+                      {t('order.trackOrder')}
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
@@ -438,11 +479,22 @@ export default function OrderDetailPage() {
                   <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
-                  <p className="text-sm text-green-800">
-                    {locale === 'en' 
-                      ? 'Your invoice has been sent to your email address after the payment was completed.'
-                      : 'Faturanız ödeme tamamlandıktan sonra e-posta adresinize gönderildi.'}
-                  </p>
+                  <div className="flex-1">
+                    <p className="text-sm text-green-800 mb-2">
+                      {locale === 'en' 
+                        ? 'Your invoice has been sent to your email address after the payment was completed.'
+                        : 'Faturanız ödeme tamamlandıktan sonra e-posta adresinize gönderildi.'}
+                    </p>
+                    {order.isBuyer && (
+                      <button
+                        onClick={handleDownloadInvoice}
+                        disabled={downloadingInvoice}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {downloadingInvoice ? (locale === 'en' ? 'Downloading...' : 'İndiriliyor...') : t('order.downloadInvoice')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
