@@ -1302,5 +1302,34 @@
       "countdownLabel": "Açılışa kalan süre",
       "socialTitle": "Bizi takip edin"
     }
+  },
+  "marketing": {
+    "newsletter": {
+      "title": "Bültene Abone Ol",
+      "subtitle": "Yeni ilanlar, fırsatlar ve koleksiyoner haberleri e-posta kutunuza gelsin.",
+      "benefitsTitle": "Neler kazanırsınız?",
+      "benefit1": "Haftalık öne çıkan ilanlar ve trend ürünler",
+      "benefit2": "Özel indirim ve kampanya duyuruları",
+      "benefit3": "Yeni marka ve model bilgileri",
+      "emailLabel": "E-posta adresiniz",
+      "emailPlaceholder": "ornek@email.com",
+      "preferencesTitle": "Tercihleriniz",
+      "prefNewsletter": "Haftalık bülten",
+      "prefPromotions": "Kampanya ve fırsat e-postaları",
+      "subscribeButton": "Abone Ol",
+      "successTitle": "Teşekkürler!",
+      "successMessage": "Bültene başarıyla abone oldunuz. İlk bültenimiz en kısa sürede size ulaşacak.",
+      "manageInSettings": "Hesabınızla bülten tercihlerinizi yönetmek için",
+      "manageInSettingsLink": "Ayarlar sayfasına gidin",
+      "unsubscribeTitle": "Bülten Aboneliğini İptal Et",
+      "unsubscribeSubtitle": "Artık bülten e-postaları almak istemiyorsanız aşağıdaki formu kullanabilirsiniz.",
+      "unsubscribeByEmail": "E-posta ile iptal",
+      "unsubscribeEmailPlaceholder": "Abone olduğunuz e-posta",
+      "unsubscribeButton": "Abonelikten Çık",
+      "unsubscribeSuccess": "Aboneliğiniz iptal edildi. Artık bülten e-postası almayacaksınız.",
+      "unsubscribeTokenSuccess": "Bülten aboneliğiniz iptal edildi.",
+      "feedbackTitle": "Neden ayrılıyorsunuz? (İsteğe bağlı)",
+      "feedbackPlaceholder": "Geri bildiriminiz..."
+    }
   }
 }

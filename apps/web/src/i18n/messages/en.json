@@ -1304,5 +1304,34 @@
       "countdownLabel": "Time until launch",
       "socialTitle": "Follow us"
     }
+  },
+  "marketing": {
+    "newsletter": {
+      "title": "Subscribe to Newsletter",
+      "subtitle": "Get new listings, deals and collector news in your inbox.",
+      "benefitsTitle": "What you get",
+      "benefit1": "Weekly featured listings and trending products",
+      "benefit2": "Exclusive discounts and campaign announcements",
+      "benefit3": "New brand and model updates",
+      "emailLabel": "Your email",
+      "emailPlaceholder": "you@example.com",
+      "preferencesTitle": "Preferences",
+      "prefNewsletter": "Weekly newsletter",
+      "prefPromotions": "Promotions and offers",
+      "subscribeButton": "Subscribe",
+      "successTitle": "Thank you!",
+      "successMessage": "You are now subscribed. Our first newsletter will reach you soon.",
+      "manageInSettings": "To manage newsletter preferences with your account,",
+      "manageInSettingsLink": "go to Settings",
+      "unsubscribeTitle": "Unsubscribe from Newsletter",
+      "unsubscribeSubtitle": "Use the form below if you no longer wish to receive newsletter emails.",
+      "unsubscribeByEmail": "Unsubscribe by email",
+      "unsubscribeEmailPlaceholder": "Email you subscribed with",
+      "unsubscribeButton": "Unsubscribe",
+      "unsubscribeSuccess": "You have been unsubscribed. You will not receive further newsletter emails.",
+      "unsubscribeTokenSuccess": "Your newsletter subscription has been cancelled.",
+      "feedbackTitle": "Why are you leaving? (Optional)",
+      "feedbackPlaceholder": "Your feedback..."
+    }
   }
 }

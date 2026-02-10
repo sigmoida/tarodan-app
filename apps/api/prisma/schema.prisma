@@ -133,6 +133,22 @@ model EmailVerificationToken {
   @@map("email_verification_tokens")
 }
 
+model NewsletterSubscriber {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  newsletter     Boolean   @default(true) @map("newsletter")
+  promotions     Boolean   @default(true) @map("promotions")
+  unsubscribeToken String  @unique @map("unsubscribe_token")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([unsubscribeToken])
+  @@index([unsubscribedAt])
+  @@map("newsletter_subscribers")
+}
+
 model RefreshToken {
   id         String    @id @default(uuid())
   userId     String    @map("user_id")

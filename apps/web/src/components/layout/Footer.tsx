@@ -18,6 +18,7 @@ export default function Footer() {
     support: [
       { href: '/about', label: t('footer.about') },
       { href: '/sitemap', label: t('footer.sitemap') },
+      { href: '/newsletter', label: t('footer.newsletter') },
       { href: '/help', label: t('footer.help') },
       { href: '/faq', label: t('footer.faq') },
       { href: '/contact', label: t('footer.contact') },
