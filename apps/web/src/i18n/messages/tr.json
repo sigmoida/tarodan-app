@@ -779,6 +779,13 @@
     "help": "Yardım Merkezi",
     "faq": "Sıkça Sorulan Sorular",
     "guides": "Kullanım Kılavuzları",
+    "shipping": "Kargo ve Teslimat",
+    "paymentOptions": "Ödeme Seçenekleri",
+    "returns": "İade ve Değişim",
+    "security": "Güvenlik",
+    "sizeGuide": "Ölçek Rehberi",
+    "authenticity": "Orijinallik",
+    "collectorsGuide": "Koleksiyoner Rehberi",
     "copyright": "Tüm hakları saklıdır.",
     "categories": "Kategoriler",
     "legal": "Yasal",
@@ -1143,5 +1150,108 @@
     "duration": "Süre",
     "important": "Önemli",
     "dataProtectionOfficer": "Veri Koruma Görevlisi"
+  },
+  "information": {
+    "about": {
+      "title": "Hakkımızda",
+      "subtitle": "Türkiye'nin diecast model araba pazarı",
+      "storyTitle": "Hikayemiz",
+      "missionTitle": "Misyon",
+      "valuesTitle": "Değerlerimiz",
+      "story": "Tarodan, koleksiyoncular ve satıcılar için güvenli bir pazar yeri sunmak amacıyla kuruldu. Alıcı ve satıcıyı bir araya getiriyoruz.",
+      "mission": "Misyonumuz, model araba tutkunlarına en iyi alışveriş ve takas deneyimini sunmaktır.",
+      "values": "Değerlerimiz: güvenilirlik, şeffaflık ve koleksiyonculuk kültürüne saygı."
+    },
+    "shipping": {
+      "title": "Kargo ve Teslimat",
+      "subtitle": "Teslimat süreleri ve kargo bilgileri",
+      "methods": "Kargo Yöntemleri",
+      "methodsDesc": "Siparişleriniz anlaşmalı kargo firmaları ile gönderilir. Satıcı ödeme sonrası ürünü kargoya verir.",
+      "costs": "Kargo Ücretleri",
+      "costsDesc": "500 TL ve üzeri siparişlerde kargo ücretsizdir. Altındaki siparişlerde standart kargo ücreti uygulanır.",
+      "times": "Teslimat Süreleri",
+      "timesDesc": "Yurt içi teslimatlar genellikle 2–5 iş günü içinde tamamlanır. Süre kargo firmasına ve bölgeye göre değişebilir.",
+      "tracking": "Sipariş Takibi",
+      "trackingDesc": "Siparişinizi \"Siparişlerim\" sayfasından veya e-postanızdaki takip linki ile takip edebilirsiniz.",
+      "trackLink": "Sipariş takip sayfası"
+    },
+    "paymentOptions": {
+      "title": "Ödeme Seçenekleri",
+      "subtitle": "Kabul ettiğimiz ödeme yöntemleri ve güvenlik",
+      "accepted": "Kabul Edilen Yöntemler",
+      "acceptedDesc": "Kredi kartı, banka kartı ve sanal kart ile güvenli ödeme yapabilirsiniz. Ödemeler iyzico altyapısı ile işlenir.",
+      "security": "Güvenlik",
+      "securityDesc": "Kart bilgileriniz 256-bit SSL ile şifrelenir. Ödeme sayfamızda kart numaranız bizde saklanmaz.",
+      "installments": "Taksit",
+      "installmentsDesc": "Banka kampanyalarına göre taksit seçenekleri ödeme ekranında sunulmaktadır."
+    },
+    "returns": {
+      "title": "İade ve Değişim",
+      "subtitle": "İade koşulları ve süreci",
+      "policy": "İade Politikası",
+      "policyDesc": "Ürün teslim alındıktan sonra 14 gün içinde cayma hakkınız bulunmaktadır. Ürün orijinal ambalajında ve kullanılmamış olmalıdır.",
+      "process": "İade Süreci",
+      "processDesc": "İade talebini destek üzerinden veya sipariş detay sayfasından başlatabilirsiniz. Onay sonrası kargo bilgisi paylaşılır.",
+      "timeline": "Süre",
+      "timelineDesc": "İade kargosu tarafımıza ulaştıktan sonra inceleme 5 iş günü içinde tamamlanır. Onaylanan iadelerde ödeme 14 gün içinde iade edilir."
+    },
+    "security": {
+      "title": "Güvenlik ve Gizlilik",
+      "subtitle": "Alıcı koruma, ödeme güvenliği ve veri gizliliği",
+      "measures": "Güvenlik Önlemleri",
+      "measuresDesc": "Site TLS/SSL ile şifrelenir. Ödeme işlemleri PCI-DSS uyumlu altyapı ile gerçekleştirilir.",
+      "buyerProtection": "Alıcı Koruması",
+      "buyerProtectionDesc": "Ödeme alıcı teslim alana kadar güvende tutulur. Sorun durumunda iade ve anlaşmazlık çözüm süreçleri uygulanır.",
+      "dataPrivacy": "Veri Gizliliği",
+      "dataPrivacyDesc": "Kişisel verileriniz Gizlilik Politikamız ve KVKK kapsamında işlenir. Ödeme bilgileri ödeme sağlayıcı tarafında saklanır."
+    },
+    "sizeGuide": {
+      "title": "Ölçek Rehberi",
+      "subtitle": "Model araba ölçekleri ve boyut karşılaştırması",
+      "intro": "Diecast modeller ölçek (scale) ile ifade edilir. Ölçek, modelin gerçek araca oranını gösterir.",
+      "tableTitle": "Yaygın Ölçekler (yaklaşık boyutlar)",
+      "scale": "Ölçek",
+      "approxLength": "Yaklaşık uzunluk (ör. sedan)",
+      "notes": "Not",
+      "scale18": "1:18",
+      "scale24": "1:24",
+      "scale43": "1:43",
+      "scale64": "1:64",
+      "note18": "Detaylı, vitrin klasik",
+      "note24": "Yaygın, orta boy",
+      "note43": "Koleksiyonda sık",
+      "note64": "Mini, Hot Wheels / Matchbox"
+    },
+    "authenticity": {
+      "title": "Orijinallik Garantisi",
+      "subtitle": "Doğrulama süreci ve sahtecilik önlemi",
+      "process": "Doğrulama Süreci",
+      "processDesc": "Satıcılar ve ilanlar platform kurallarına uygunluk açısından değerlendirilir. Şikayet edilen içerikler incelenir.",
+      "protection": "Sahtecilik Önlemi",
+      "protectionDesc": "Orijinal olmayan veya yanıltıcı ürün ilanları yasaktır. İhlal tespitinde ilan kaldırılır ve hesap tedbirleri uygulanabilir.",
+      "badges": "Rozetler",
+      "badgesDesc": "Doğrulanmış satıcı ve onaylı ilan rozetleri, güvenilir tarafları işaret etmek için kullanılır."
+    },
+    "collectorsGuide": {
+      "title": "Koleksiyoner Rehberi",
+      "subtitle": "Koleksiyon ipuçları, saklama ve değerleme",
+      "tips": "Koleksiyon İpuçları",
+      "tipsDesc": "Orijinal kutusunda saklamak değeri korur. Nem ve güneşten uzak, tozsuz ortam tercih edin.",
+      "grading": "Derecelendirme",
+      "gradingDesc": "Piyasada kullanılan durum tanımları (sıfır, çok iyi, iyi vb.) ilan açıklamalarında belirtilir. Alıcı ve satıcı iletişimi önemlidir.",
+      "storage": "Saklama",
+      "storageDesc": "Vitrin veya kapalı raf kullanın; uzun süre doğrudan ışığa maruz bırakmayın. Nem oranı düşük ortamlar tercih edilir.",
+      "valuation": "Değerleme",
+      "valuationDesc": "Fiyatlar satıcı tarafından belirlenir. Benzer ilanları arayarak piyasa fiyatı hakkında fikir edinebilirsiniz."
+    },
+    "contactInfo": {
+      "title": "İletişim Bilgileri",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "address": "Adres",
+      "emailValue": "destek@tarodan.com",
+      "phoneValue": "+90 212 XXX XX XX",
+      "addressValue": "İstanbul, Türkiye"
+    }
   }
 }

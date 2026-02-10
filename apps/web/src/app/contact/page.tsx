@@ -49,8 +49,28 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold mb-8">{t('contact.title')}</h1>
-        <div className="bg-white rounded-xl shadow-sm p-8">
+        <h1 className="text-3xl font-bold mb-2">{t('contact.title')}</h1>
+        <p className="text-gray-600 mb-8">{t('contact.subtitle')}</p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="font-semibold text-gray-900 mb-3">{t('information.contactInfo.title')}</h2>
+            <dl className="space-y-2 text-sm text-gray-700">
+              <div>
+                <dt className="text-gray-500">{t('information.contactInfo.email')}</dt>
+                <dd><a href={`mailto:${t('information.contactInfo.emailValue')}`} className="text-orange-600 hover:underline">{t('information.contactInfo.emailValue')}</a></dd>
+              </div>
+              <div>
+                <dt className="text-gray-500">{t('information.contactInfo.phone')}</dt>
+                <dd>{t('information.contactInfo.phoneValue')}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500">{t('information.contactInfo.address')}</dt>
+                <dd>{t('information.contactInfo.addressValue')}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -108,6 +128,7 @@ export default function ContactPage() {
               {isSubmitting ? t('contact.sending') : t('contact.send')}
             </button>
           </form>
+          </div>
         </div>
       </main>
     </div>

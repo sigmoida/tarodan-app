@@ -781,6 +781,13 @@
     "help": "Help Center",
     "faq": "FAQ",
     "guides": "User Guides",
+    "shipping": "Shipping & Delivery",
+    "paymentOptions": "Payment Options",
+    "returns": "Returns & Exchanges",
+    "security": "Security",
+    "sizeGuide": "Size Guide",
+    "authenticity": "Authenticity",
+    "collectorsGuide": "Collector's Guide",
     "copyright": "All rights reserved.",
     "categories": "Categories",
     "legal": "Legal",
@@ -1145,5 +1152,108 @@
     "duration": "Duration",
     "important": "Important",
     "dataProtectionOfficer": "Data Protection Officer"
+  },
+  "information": {
+    "about": {
+      "title": "About Us",
+      "subtitle": "Turkey's diecast model car marketplace",
+      "storyTitle": "Our Story",
+      "missionTitle": "Mission",
+      "valuesTitle": "Our Values",
+      "story": "Tarodan was founded to provide a secure marketplace for collectors and sellers. We bring buyers and sellers together.",
+      "mission": "Our mission is to offer the best shopping and trading experience for model car enthusiasts.",
+      "values": "Our values: reliability, transparency, and respect for collector culture."
+    },
+    "shipping": {
+      "title": "Shipping & Delivery",
+      "subtitle": "Delivery times and shipping information",
+      "methods": "Shipping Methods",
+      "methodsDesc": "Your orders are shipped with our partner carriers. The seller ships the item after payment.",
+      "costs": "Shipping Costs",
+      "costsDesc": "Free shipping on orders of 500 TL and above. Standard shipping fee applies below that.",
+      "times": "Delivery Times",
+      "timesDesc": "Domestic deliveries are usually completed within 2–5 business days. Times may vary by carrier and region.",
+      "tracking": "Order Tracking",
+      "trackingDesc": "You can track your order from the \"My Orders\" page or via the tracking link in your email.",
+      "trackLink": "Track order page"
+    },
+    "paymentOptions": {
+      "title": "Payment Options",
+      "subtitle": "Accepted payment methods and security",
+      "accepted": "Accepted Methods",
+      "acceptedDesc": "You can pay securely with credit card, debit card, or virtual card. Payments are processed via iyzico.",
+      "security": "Security",
+      "securityDesc": "Your card details are encrypted with 256-bit SSL. We do not store your full card number on our payment page.",
+      "installments": "Installments",
+      "installmentsDesc": "Installment options are shown at checkout according to bank promotions."
+    },
+    "returns": {
+      "title": "Returns & Exchanges",
+      "subtitle": "Return policy and process",
+      "policy": "Return Policy",
+      "policyDesc": "You have the right to withdraw within 14 days of receiving the product. The product must be in original packaging and unused.",
+      "process": "Return Process",
+      "processDesc": "You can start a return request via support or the order detail page. After approval, shipping details are shared.",
+      "timeline": "Timeline",
+      "timelineDesc": "After we receive the return shipment, the review is completed within 5 business days. Refunds for approved returns are processed within 14 days."
+    },
+    "security": {
+      "title": "Security & Privacy",
+      "subtitle": "Buyer protection, payment security, and data privacy",
+      "measures": "Security Measures",
+      "measuresDesc": "The site is encrypted with TLS/SSL. Payments are processed via PCI-DSS compliant infrastructure.",
+      "buyerProtection": "Buyer Protection",
+      "buyerProtectionDesc": "Payment is held securely until the buyer receives the item. Refund and dispute resolution processes apply when issues arise.",
+      "dataPrivacy": "Data Privacy",
+      "dataPrivacyDesc": "Your personal data is processed in line with our Privacy Policy and applicable law. Payment details are stored by the payment provider."
+    },
+    "sizeGuide": {
+      "title": "Size Guide",
+      "subtitle": "Model car scales and size comparison",
+      "intro": "Diecast models are described by scale—the ratio of the model to the real vehicle.",
+      "tableTitle": "Common scales (approximate length for sedan)",
+      "scale": "Scale",
+      "approxLength": "Approx. length",
+      "notes": "Notes",
+      "scale18": "1:18",
+      "scale24": "1:24",
+      "scale43": "1:43",
+      "scale64": "1:64",
+      "note18": "Detailed, display classic",
+      "note24": "Common, mid-size",
+      "note43": "Popular in collections",
+      "note64": "Mini, Hot Wheels / Matchbox"
+    },
+    "authenticity": {
+      "title": "Authenticity Guarantee",
+      "subtitle": "Verification process and counterfeit protection",
+      "process": "Verification Process",
+      "processDesc": "Sellers and listings are reviewed for compliance with platform rules. Reported content is investigated.",
+      "protection": "Counterfeit Protection",
+      "protectionDesc": "Listings for non-authentic or misleading products are prohibited. Violations may result in listing removal and account measures.",
+      "badges": "Badges",
+      "badgesDesc": "Verified seller and approved listing badges are used to indicate trusted parties."
+    },
+    "collectorsGuide": {
+      "title": "Collector's Guide",
+      "subtitle": "Collecting tips, storage, and valuation",
+      "tips": "Collecting Tips",
+      "tipsDesc": "Keeping items in original packaging helps preserve value. Store away from moisture and direct sunlight in a dust-free environment.",
+      "grading": "Grading",
+      "gradingDesc": "Condition terms used in the market (mint, excellent, good, etc.) are stated in listing descriptions. Communication between buyer and seller is important.",
+      "storage": "Storage",
+      "storageDesc": "Use display cases or closed shelves; avoid prolonged direct light. Prefer low-humidity environments.",
+      "valuation": "Valuation",
+      "valuationDesc": "Prices are set by sellers. You can get an idea of market value by searching for similar listings."
+    },
+    "contactInfo": {
+      "title": "Contact Information",
+      "email": "Email",
+      "phone": "Phone",
+      "address": "Address",
+      "emailValue": "support@tarodan.com",
+      "phoneValue": "+90 212 XXX XX XX",
+      "addressValue": "Istanbul, Turkey"
+    }
   }
 }
