@@ -10,6 +10,7 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   XMarkIcon,
+  ClockIcon,
   AdjustmentsHorizontalIcon,
   HeartIcon,
   ArrowsRightLeftIcon,
@@ -17,6 +18,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { useTranslation } from '@/i18n';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 
 interface Product {
   id: string;
@@ -51,6 +53,7 @@ function SearchContent() {
   const router = useRouter();
   const { t } = useTranslation();
   const query = searchParams.get('q') || '';
+  const { searches: recentSearches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
 
   const [searchTerm, setSearchTerm] = useState(query);
   const [showFilters, setShowFilters] = useState(false);
@@ -138,8 +141,10 @@ function SearchContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = searchTerm.trim();
+    if (trimmed) addSearch(trimmed);
     const params = new URLSearchParams();
-    if (searchTerm) params.set('q', searchTerm);
+    if (trimmed) params.set('q', trimmed);
     if (filters.categoryId) params.set('category', filters.categoryId);
     if (filters.minPrice) params.set('minPrice', filters.minPrice);
     if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
@@ -148,6 +153,13 @@ function SearchContent() {
     if (filters.sortBy !== 'createdAt') params.set('sort', filters.sortBy);
     if (filters.sortOrder !== 'desc') params.set('order', filters.sortOrder);
 
+    router.push(`/search?${params.toString()}`);
+  };
+
+  const handleRecentSearchClick = (q: string) => {
+    setSearchTerm(q);
+    const params = new URLSearchParams();
+    params.set('q', q);
     router.push(`/search?${params.toString()}`);
   };
 
@@ -202,6 +214,46 @@ function SearchContent() {
               </button>
             </div>
           </form>
+
+          {/* Son aranılanlar */}
+          {isMounted && recentSearches.length > 0 && (
+            <div className="max-w-2xl mx-auto mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-400 flex items-center gap-1.5">
+                  <ClockIcon className="h-4 w-4" />
+                  {t('search.recentSearches')}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSearches}
+                  className="text-xs text-gray-500 hover:text-primary-400 transition-colors"
+                >
+                  {t('search.clearAll')}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recentSearches.map((q) => (
+                  <div key={q} className="group flex items-center gap-1 bg-dark-800 border border-dark-700 rounded-full pl-4 pr-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRecentSearchClick(q)}
+                      className="text-sm text-gray-300 hover:text-white transition-colors"
+                    >
+                      {q}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeSearch(q); }}
+                      className="p-1 rounded-full text-gray-500 hover:text-gray-300 hover:bg-dark-700 transition-colors"
+                      aria-label={t('common.close')}
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Results Info */}

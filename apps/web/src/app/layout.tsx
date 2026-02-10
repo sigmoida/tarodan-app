@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import Navbar from '@/components/layout/Navbar';
+import GlobalSearchBar from '@/components/layout/GlobalSearchBar';
 import CategoryNavBar from '@/components/layout/CategoryNavBar';
 import Footer from '@/components/layout/Footer';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
@@ -50,6 +51,7 @@ export default function RootLayout({
         <LanguageProvider>
           <QueryProvider>
             <Navbar />
+            <GlobalSearchBar />
             <CategoryNavBar />
             <main className="flex-1">
               {children}
