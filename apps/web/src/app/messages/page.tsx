@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { messagesApi, listingsApi, api } from '@/lib/api';
+import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 interface MessageThread {
@@ -47,6 +47,29 @@ const PROHIBITED_PATTERNS = [
   /\b(whatsapp|wp|telegram)\b/gi,
 ];
 
+const IMG_PATTERN = /\[IMG:(https?:\/\/[^\]]+)\]/g;
+
+function parseMessageContent(content: string): Array<{ type: 'text' | 'image'; value: string }> {
+  if (!content) return [];
+  const parts: Array<{ type: 'text' | 'image'; value: string }> = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  IMG_PATTERN.lastIndex = 0;
+  while ((m = IMG_PATTERN.exec(content)) !== null) {
+    if (m.index > lastIndex) {
+      const text = content.slice(lastIndex, m.index).trim();
+      if (text) parts.push({ type: 'text', value: text });
+    }
+    parts.push({ type: 'image', value: m[1] });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < content.length) {
+    const text = content.slice(lastIndex).trim();
+    if (text) parts.push({ type: 'text', value: text });
+  }
+  return parts.length ? parts : [{ type: 'text', value: content }];
+}
+
 const checkContentFilter = (text: string, locale: string): { passed: boolean; warning?: string } => {
   const lowerText = text.toLowerCase();
   
@@ -77,6 +100,9 @@ export default function MessagesPage() {
   const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const [threadsExpanded, setThreadsExpanded] = useState(false);
+  const [attachedUrls, setAttachedUrls] = useState<string[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
 
@@ -321,11 +347,36 @@ export default function MessagesPage() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!selectedThread || !newMessage.trim() || sending) return;
+  const handleAttachImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || attaching) return;
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error(locale === 'en' ? 'Please select an image file' : 'Lütfen bir resim dosyası seçin');
+      return;
+    }
+    setAttaching(true);
+    try {
+      const res = await mediaApi.uploadMessageImage(file);
+      const url = res.data?.url;
+      if (url) setAttachedUrls((prev) => [...prev, url]);
+    } catch (err) {
+      toast.error(locale === 'en' ? 'Failed to upload image' : 'Resim yüklenemedi');
+    } finally {
+      setAttaching(false);
+      e.target.value = '';
+    }
+  };
 
-    // Check message length
-    if (newMessage.length > maxMessageLength) {
+  const sendMessage = async () => {
+    const text = newMessage.trim();
+    const hasAttachments = attachedUrls.length > 0;
+    if (!selectedThread || (!text && !hasAttachments) || sending) return;
+
+    const contentToSend = text + (hasAttachments ? '\n\n' + attachedUrls.map((u) => `[IMG:${u}]`).join('\n') : '');
+
+    // Check message length (content includes attachment markers)
+    if (contentToSend.length > maxMessageLength) {
       toast.error(
         locale === 'en'
           ? `Message cannot exceed ${maxMessageLength} characters. Current: ${newMessage.length}`
@@ -334,8 +385,8 @@ export default function MessagesPage() {
       return;
     }
 
-    // Final content filter check
-    const filterResult = checkContentFilter(newMessage, locale);
+    // Final content filter check (text only)
+    const filterResult = text ? checkContentFilter(text, locale) : { passed: true };
     if (!filterResult.passed) {
       const confirm = window.confirm(
         locale === 'en'
@@ -347,7 +398,7 @@ export default function MessagesPage() {
 
     setSending(true);
     try {
-      const response = await messagesApi.sendMessage(selectedThread.id, newMessage.trim());
+      const response = await messagesApi.sendMessage(selectedThread.id, contentToSend);
       const sentMessage = response.data.message || response.data;
       
       // Check if message was filtered by backend
@@ -357,6 +408,7 @@ export default function MessagesPage() {
 
       setNewMessage('');
       setContentWarning(null);
+      setAttachedUrls([]);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messages', selectedThread.id] }),
         queryClient.invalidateQueries({ queryKey: ['message-threads'] }),
@@ -517,7 +569,17 @@ export default function MessagesPage() {
                               : ''
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                          <div className="text-sm break-words space-y-2">
+                            {parseMessageContent(message.content).map((part, i) =>
+                              part.type === 'text' ? (
+                                <p key={i} className="whitespace-pre-wrap">{part.value}</p>
+                              ) : (
+                                <a key={i} href={part.value} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden max-w-[240px]">
+                                  <img src={part.value} alt="" className="max-w-full max-h-48 object-cover rounded-lg" />
+                                </a>
+                              )
+                            )}
+                          </div>
                           <div className="flex items-center justify-end gap-1.5 mt-1">
                             <span
                               className={`text-xs ${isFromMe ? 'text-white/80' : 'text-gray-400'}`}
@@ -542,7 +604,39 @@ export default function MessagesPage() {
                       ⚠️ {contentWarning}
                     </div>
                   )}
+                  {attachedUrls.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {attachedUrls.map((url, i) => (
+                        <div key={i} className="relative">
+                          <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                          <button
+                            type="button"
+                            onClick={() => setAttachedUrls((prev) => prev.filter((_, j) => j !== i))}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex gap-2">
+                    <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleAttachImage} />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={attaching}
+                      title={locale === 'en' ? 'Attach image' : 'Resim ekle'}
+                      className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 disabled:opacity-50"
+                    >
+                      {attaching ? (
+                        <span className="text-xs">...</span>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                        </svg>
+                      )}
+                    </button>
                     <input
                       type="text"
                       value={newMessage}
@@ -557,7 +651,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={sendMessage}
-                      disabled={!newMessage.trim() || sending}
+                      disabled={(!newMessage.trim() && !attachedUrls.length) || sending}
                       className="flex-shrink-0 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
                     >
                       {sending ? '...' : t('common.send')}

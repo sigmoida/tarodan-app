@@ -299,6 +299,7 @@ export default function ProfilePage() {
       title: t('common.shopping'),
       items: [
         { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', desc: 'İlanlarınızı yönetin' },
+        { icon: ChartBarIcon, label: t('sellerDashboard.title'), href: '/seller/dashboard', desc: t('sellerDashboard.subtitle') },
         { icon: TagIcon, label: t('order.myOrders'), href: '/orders', desc: 'Sipariş geçmişiniz' },
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
         { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', desc: 'Favori ürünleriniz' },

@@ -109,7 +109,7 @@ export default function NotificationsPage() {
 
   const markAllAsRead = async () => {
     try {
-      await api.patch('/notifications/read-all');
+      await api.post('/notifications/mark-all-read');
       toast.success(locale === 'en' ? 'All marked as read' : 'Tümü okundu olarak işaretlendi');
       await invalidateNotifications();
     } catch (error) {
