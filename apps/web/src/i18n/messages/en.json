@@ -778,6 +778,10 @@
     "privacy": "Privacy Policy",
     "cookies": "Cookie Policy",
     "distanceSales": "Distance Sales Agreement",
+    "refundPolicy": "Refund Policy",
+    "sellerAgreement": "Seller Agreement",
+    "buyerProtection": "Buyer Protection",
+    "intellectualProperty": "Intellectual Property",
     "help": "Help Center",
     "faq": "FAQ",
     "guides": "User Guides",
@@ -789,6 +793,7 @@
     "authenticity": "Authenticity",
     "collectorsGuide": "Collector's Guide",
     "copyright": "All rights reserved.",
+    "sitemap": "Sitemap",
     "categories": "Categories",
     "legal": "Legal",
     "support": "Support",
@@ -1141,6 +1146,10 @@
     "termsTitle": "Terms of Service",
     "cookiesTitle": "Cookie Policy",
     "distanceSalesTitle": "Distance Sales Agreement",
+    "refundPolicyTitle": "Refund Policy",
+    "sellerAgreementTitle": "Seller Agreement",
+    "buyerProtectionTitle": "Buyer Protection",
+    "intellectualPropertyTitle": "Intellectual Property",
     "savePreferences": "Save Preferences",
     "acceptAll": "Accept All",
     "necessaryCookies": "Necessary Cookies",
@@ -1254,6 +1263,46 @@
       "emailValue": "support@tarodan.com",
       "phoneValue": "+90 212 XXX XX XX",
       "addressValue": "Istanbul, Turkey"
+    }
+  },
+  "utility": {
+    "sitemap": {
+      "title": "Sitemap",
+      "subtitle": "All pages listed by category.",
+      "marketplace": "Marketplace",
+      "sell": "Sell",
+      "sellOnSite": "Sell on This Site",
+      "sellerRegister": "Seller Registration",
+      "businessRegister": "Business Registration",
+      "account": "Account"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or has been moved.",
+      "searchPlaceholder": "Search brand, model or product...",
+      "searchButton": "Search",
+      "popularCategories": "Popular Categories",
+      "goHome": "Back to Home"
+    },
+    "error500": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred. Please refresh the page or contact support.",
+      "retry": "Refresh Page",
+      "contactSupport": "Contact Support"
+    },
+    "maintenance": {
+      "title": "Under Maintenance",
+      "description": "We are currently updating our site. We will be back shortly.",
+      "estimatedTime": "Estimated time",
+      "socialTitle": "Follow us"
+    },
+    "comingSoon": {
+      "title": "Coming Soon",
+      "subtitle": "Our marketplace for model car enthusiasts is launching soon.",
+      "emailPlaceholder": "Your email",
+      "notifyMe": "Notify Me",
+      "countdownLabel": "Time until launch",
+      "socialTitle": "Follow us"
     }
   }
 }

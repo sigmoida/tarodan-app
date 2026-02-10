@@ -17,6 +17,7 @@ export default function Footer() {
     ],
     support: [
       { href: '/about', label: t('footer.about') },
+      { href: '/sitemap', label: t('footer.sitemap') },
       { href: '/help', label: t('footer.help') },
       { href: '/faq', label: t('footer.faq') },
       { href: '/contact', label: t('footer.contact') },
@@ -34,6 +35,10 @@ export default function Footer() {
       { href: '/privacy', label: t('footer.privacy') },
       { href: '/cookies', label: t('footer.cookies') },
       { href: '/distance-sales', label: t('footer.distanceSales') },
+      { href: '/refund-policy', label: t('footer.refundPolicy') },
+      { href: '/seller-agreement', label: t('footer.sellerAgreement') },
+      { href: '/buyer-protection', label: t('footer.buyerProtection') },
+      { href: '/intellectual-property', label: t('footer.intellectualProperty') },
     ],
   };
 

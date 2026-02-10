@@ -776,6 +776,10 @@
     "privacy": "Gizlilik Politikası",
     "cookies": "Çerez Politikası",
     "distanceSales": "Mesafeli Satış Sözleşmesi",
+    "refundPolicy": "İade Politikası",
+    "sellerAgreement": "Satıcı Sözleşmesi",
+    "buyerProtection": "Alıcı Koruma",
+    "intellectualProperty": "Fikri Mülkiyet",
     "help": "Yardım Merkezi",
     "faq": "Sıkça Sorulan Sorular",
     "guides": "Kullanım Kılavuzları",
@@ -787,6 +791,7 @@
     "authenticity": "Orijinallik",
     "collectorsGuide": "Koleksiyoner Rehberi",
     "copyright": "Tüm hakları saklıdır.",
+    "sitemap": "Site Haritası",
     "categories": "Kategoriler",
     "legal": "Yasal",
     "support": "Destek",
@@ -1139,6 +1144,10 @@
     "termsTitle": "Kullanım Şartları",
     "cookiesTitle": "Çerez Politikası",
     "distanceSalesTitle": "Mesafeli Satış Sözleşmesi",
+    "refundPolicyTitle": "İade Politikası",
+    "sellerAgreementTitle": "Satıcı Sözleşmesi",
+    "buyerProtectionTitle": "Alıcı Koruma",
+    "intellectualPropertyTitle": "Fikri Mülkiyet",
     "savePreferences": "Tercihlerimi Kaydet",
     "acceptAll": "Tümünü Kabul Et",
     "necessaryCookies": "Zorunlu Çerezler",
@@ -1252,6 +1261,46 @@
       "emailValue": "destek@tarodan.com",
       "phoneValue": "+90 212 XXX XX XX",
       "addressValue": "İstanbul, Türkiye"
+    }
+  },
+  "utility": {
+    "sitemap": {
+      "title": "Site Haritası",
+      "subtitle": "Tüm sayfalar kategorilere göre listelenmiştir.",
+      "marketplace": "Pazar",
+      "sell": "Satış",
+      "sellOnSite": "Bu Sitede Sat",
+      "sellerRegister": "Satıcı Kaydı",
+      "businessRegister": "İşletme Kaydı",
+      "account": "Hesap"
+    },
+    "notFound": {
+      "title": "Sayfa bulunamadı",
+      "description": "Aradığınız sayfa mevcut değil veya taşınmış olabilir.",
+      "searchPlaceholder": "Marka, model veya ürün ara...",
+      "searchButton": "Ara",
+      "popularCategories": "Popüler Kategoriler",
+      "goHome": "Ana Sayfaya Dön"
+    },
+    "error500": {
+      "title": "Bir hata oluştu",
+      "description": "Beklenmeyen bir sorun oluştu. Lütfen sayfayı yenileyin veya destek ile iletişime geçin.",
+      "retry": "Sayfayı Yenile",
+      "contactSupport": "Destek ile İletişim"
+    },
+    "maintenance": {
+      "title": "Bakım Çalışması",
+      "description": "Sitemiz şu an güncelleniyor. Kısa süre içinde tekrar hizmetinizdeyiz.",
+      "estimatedTime": "Tahmini süre",
+      "socialTitle": "Bizi takip edin"
+    },
+    "comingSoon": {
+      "title": "Çok Yakında",
+      "subtitle": "Model araba tutkunları için pazar yerimiz açılıyor.",
+      "emailPlaceholder": "E-posta adresiniz",
+      "notifyMe": "Haberdar Et",
+      "countdownLabel": "Açılışa kalan süre",
+      "socialTitle": "Bizi takip edin"
     }
   }
 }
