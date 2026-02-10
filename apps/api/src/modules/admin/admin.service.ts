@@ -605,8 +605,7 @@ export class AdminService {
           orderBy: { createdAt: 'desc' },
           include: {
             receiver: { select: { id: true, displayName: true } },
-            initiatorItems: { include: { product: { select: { id: true, title: true } } } },
-            receiverItems: { include: { product: { select: { id: true, title: true } } } },
+            items: { include: { product: { select: { id: true, title: true } } } },
           },
         },
         receivedTrades: {
@@ -614,8 +613,7 @@ export class AdminService {
           orderBy: { createdAt: 'desc' },
           include: {
             initiator: { select: { id: true, displayName: true } },
-            initiatorItems: { include: { product: { select: { id: true, title: true } } } },
-            receiverItems: { include: { product: { select: { id: true, title: true } } } },
+            items: { include: { product: { select: { id: true, title: true } } } },
           },
         },
         givenRatings: {
@@ -2376,8 +2374,7 @@ export class AdminService {
       include: {
         initiator: { select: { id: true, displayName: true, email: true } },
         receiver: { select: { id: true, displayName: true, email: true } },
-        initiatorItems: { include: { product: { select: { title: true, price: true } } } },
-        receiverItems: { include: { product: { select: { title: true, price: true } } } },
+        items: { include: { product: { select: { title: true, price: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -3909,19 +3906,7 @@ export class AdminService {
         include: {
           initiator: { select: { id: true, displayName: true, email: true } },
           receiver: { select: { id: true, displayName: true, email: true } },
-          initiatorItems: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  price: true,
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
-                },
-              },
-            },
-          },
-          receiverItems: {
+          items: {
             include: {
               product: {
                 select: {
@@ -3974,18 +3959,7 @@ export class AdminService {
             addresses: true,
           },
         },
-        initiatorItems: {
-          include: {
-            product: {
-              include: {
-                images: { orderBy: { sortOrder: 'asc' } },
-                category: true,
-                seller: { select: { id: true, displayName: true } },
-              },
-            },
-          },
-        },
-        receiverItems: {
+        items: {
           include: {
             product: {
               include: {
@@ -4020,8 +3994,7 @@ export class AdminService {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        initiatorItems: true,
-        receiverItems: true,
+        items: true,
         dispute: true,
       },
     });

@@ -30,6 +30,10 @@ export class CreateCollectionDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean = true;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
 
 export class UpdateCollectionDto {
@@ -51,6 +55,10 @@ export class UpdateCollectionDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string | null;
 }
 
 export class AddCollectionItemDto {
@@ -138,6 +146,8 @@ export class CollectionResponseDto {
   id: string;
   userId: string;
   userName: string;
+  categoryId?: string | null;
+  category?: { id: string; name: string; slug: string } | null;
   name: string;
   slug: string;
   description?: string;

@@ -132,8 +132,7 @@ export class ReportsService {
         },
       },
       include: {
-        initiatorItems: true,
-        receiverItems: true,
+        items: true,
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -148,12 +147,14 @@ export class ReportsService {
 
     // Calculate average trade value
     const tradeValues = trades.map((t) => {
-      const initiatorValue = t.initiatorItems.reduce(
-        (sum, item) => sum + parseFloat(item.valueAtTrade.toString()),
+      const initiatorItems = (t.items || []).filter((i: { side: string }) => i.side === 'initiator');
+      const receiverItems = (t.items || []).filter((i: { side: string }) => i.side === 'receiver');
+      const initiatorValue = initiatorItems.reduce(
+        (sum: number, item: { valueAtTrade: { toString: () => string } }) => sum + parseFloat(item.valueAtTrade.toString()),
         0,
       );
-      const receiverValue = t.receiverItems.reduce(
-        (sum, item) => sum + parseFloat(item.valueAtTrade.toString()),
+      const receiverValue = receiverItems.reduce(
+        (sum: number, item: { valueAtTrade: { toString: () => string } }) => sum + parseFloat(item.valueAtTrade.toString()),
         0,
       );
       return (initiatorValue + receiverValue) / 2;

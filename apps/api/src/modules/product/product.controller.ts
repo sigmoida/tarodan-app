@@ -16,6 +16,7 @@ import {
   Headers,
   Req,
   Logger,
+  Header,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -48,6 +49,8 @@ export class ProductController {
    */
   @Get()
   @Public()
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
+  @Header('Pragma', 'no-cache')
   @ApiOperation({ summary: 'Ürün listesi' })
   @ApiResponse({
     status: 200,
@@ -58,7 +61,7 @@ export class ProductController {
     try {
       return await this.productService.findAll(query);
     } catch (err) {
-      this.logger.warn(`findAll failed: ${err}`);
+      this.logger.error('findAll failed', err instanceof Error ? err.stack : String(err));
       return {
         data: [],
         meta: {

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
-import { collectionsApi } from '@/lib/api';
+import { collectionsApi, categoriesApi } from '@/lib/api';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -23,6 +24,19 @@ interface Collection {
   itemCount: number;
   createdAt: string;
   updatedAt: string;
+  categoryId?: string | null;
+  category?: { id: string; name: string; slug: string } | null;
+}
+
+function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
+  const out: { id: string; name: string; slug: string }[] = [];
+  for (const c of tree) {
+    out.push({ id: c.id, name: prefix ? `${prefix} ${c.name}` : c.name, slug: c.slug });
+    if (c.children?.length) {
+      out.push(...flattenCategories(c.children, '—'));
+    }
+  }
+  return out;
 }
 
 // UUID format checker
@@ -45,11 +59,24 @@ export default function EditCollectionPage() {
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState<string>('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+
+  const { data: categoriesTree } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await categoriesApi.findAll();
+      return res.data?.data ?? res.data ?? [];
+    },
+  });
+  const flatCategories = useMemo(
+    () => (Array.isArray(categoriesTree) ? flattenCategories(categoriesTree) : []),
+    [categoriesTree],
+  );
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -92,6 +119,7 @@ export default function EditCollectionPage() {
       // Populate form with existing data
       setName(data.name || '');
       setDescription(data.description || '');
+      setCategoryId(data.categoryId || '');
       setCoverImageUrl(data.coverImageUrl || '');
       setCoverImagePreview(data.coverImageUrl || '');
       setIsPublic(data.isPublic ?? true);
@@ -160,6 +188,7 @@ export default function EditCollectionPage() {
       await collectionsApi.update(collection.id, {
         name: name.trim(),
         description: description.trim() || undefined,
+        categoryId: categoryId || null,
         coverImageUrl: coverImageUrl.trim() || undefined,
         isPublic,
       });
@@ -275,6 +304,25 @@ export default function EditCollectionPage() {
               <p className="mt-1 text-sm text-gray-500">
                 {description.length}/500 {t('collection.characters')}
               </p>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t('common.category')}
+              </label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="">{t('common.none')}</option>
+                {flatCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Cover Image Upload */}

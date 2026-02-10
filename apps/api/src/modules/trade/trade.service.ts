@@ -267,14 +267,7 @@ export class TradeService {
       include: {
         initiator: { select: { id: true, displayName: true } },
         receiver: { select: { id: true, displayName: true } },
-        initiatorItems: {
-          include: {
-            product: {
-              select: { id: true, title: true, images: { take: 1 } },
-            },
-          },
-        },
-        receiverItems: {
+        items: {
           include: {
             product: {
               select: { id: true, title: true, images: { take: 1 } },
@@ -356,23 +349,16 @@ export class TradeService {
         include: {
           initiator: { select: { id: true, displayName: true } },
           receiver: { select: { id: true, displayName: true } },
-          initiatorItems: {
-            include: {
-              product: {
-                select: { id: true, title: true, images: { take: 1 } },
-              },
+        items: {
+          include: {
+            product: {
+              select: { id: true, title: true, images: { take: 1 } },
             },
           },
-          receiverItems: {
-            include: {
-              product: {
-                select: { id: true, title: true, images: { take: 1 } },
-              },
-            },
-          },
-          shipments: true,
-          cashPayment: true,
-          dispute: true,
+        },
+        shipments: true,
+        cashPayment: true,
+        dispute: true,
         },
         orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * pageSize,
@@ -575,15 +561,14 @@ export class TradeService {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        initiatorItems: true,
-        receiverItems: true,
+        items: true,
       },
     });
 
     if (!trade) {
       throw new NotFoundException('Takas bulunamadı');
     }
-    
+
     // Store version for optimistic locking
     const tradeVersion = trade.version;
 
@@ -621,8 +606,8 @@ export class TradeService {
     const originalReceiverId = trade.receiverId; // current user (counter-offerer)
 
     // Get current trade item IDs for comparison
-    const currentInitiatorItemIds = trade.initiatorItems.map(item => item.productId).sort();
-    const currentReceiverItemIds = trade.receiverItems.map(item => item.productId).sort();
+    const currentInitiatorItemIds = (trade.items || []).filter((i: { side: string }) => i.side === 'initiator').map((item: { productId: string }) => item.productId).sort();
+    const currentReceiverItemIds = (trade.items || []).filter((i: { side: string }) => i.side === 'receiver').map((item: { productId: string }) => item.productId).sort();
 
     // Check for identical counter-offer
     const newInitiatorItemIds = dto.initiatorItems.map(i => i.productId).sort();
@@ -1350,7 +1335,7 @@ export class TradeService {
       receiverId: trade.receiverId,
       receiverName: trade.receiver?.displayName || '',
       status: trade.status,
-      initiatorItems: (trade.initiatorItems || [])
+      initiatorItems: (trade.items || [])
         .filter((item: any) => item.side === 'initiator')
         .map((item: any) => ({
           id: item.id,
@@ -1361,7 +1346,7 @@ export class TradeService {
           quantity: item.quantity,
           valueAtTrade: parseFloat(item.valueAtTrade),
         })),
-      receiverItems: (trade.receiverItems || [])
+      receiverItems: (trade.items || [])
         .filter((item: any) => item.side === 'receiver')
         .map((item: any) => ({
           id: item.id,

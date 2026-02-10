@@ -40,4 +40,12 @@ export class UpdateProductDto extends PartialType(CreateProductDto) {
   @IsOptional()
   @IsDateString()
   saleEndDate?: string | null;
+
+  @ApiPropertyOptional({ example: 'uuid-brand-id', description: 'Brand ID' })
+  @IsOptional()
+  brandId?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-car-model-id', description: 'Car Model ID' })
+  @IsOptional()
+  carModelId?: string;
 }

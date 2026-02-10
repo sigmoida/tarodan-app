@@ -9,43 +9,28 @@ import toast from 'react-hot-toast';
 import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
-interface Category {
+interface Brand {
   id: string;
   name: string;
   slug: string;
-  children?: Category[];
 }
 
-const CONDITIONS = [
-  { value: 'new', label: 'Yeni' },
-  { value: 'like_new', label: 'Sıfır Gibi' },
-  { value: 'very_good', label: 'Mükemmel' },
-  { value: 'good', label: 'İyi' },
-  { value: 'fair', label: 'Orta' },
-];
+interface CarModel {
+  id: string;
+  name: string;
+  slug: string;
+  brand: {
+    slug: string;
+  };
+}
 
-const BRANDS = [
-  'Hot Wheels',
-  'Matchbox',
-  'Majorette',
-  'Tomica',
-  'Minichamps',
-  'AutoArt',
-  'Maisto',
-  'Bburago',
-  'Welly',
-  'Diğer',
-];
+const SCALES = ['1:18', '1:24', '1:32', '1:43', '1:64', '1:72', '1:87'];
 
-const SCALES = [
-  '1:18',
-  '1:24',
-  '1:32',
-  '1:43',
-  '1:64',
-  '1:72',
-  '1:87',
-  'Diğer',
+const MATERIALS: { slug: string; label: string }[] = [
+  { slug: 'diecast', label: 'Diecast (Metal)' },
+  { slug: 'resin', label: 'Resin (Reçine)' },
+  { slug: 'composite', label: 'Composite (Kompozit)' },
+  { slug: 'plastic', label: 'Plastic (Plastik)' },
 ];
 
 export default function EditListingPage() {
@@ -53,19 +38,29 @@ export default function EditListingPage() {
   const router = useRouter();
   const id = params.id as string;
   const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
-  
+
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [models, setModels] = useState<CarModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     categoryId: '',
     condition: 'very_good' as string,
-    brand: '',
+    brandId: '',
+    carModelId: '',
     scale: '1:64',
+    material: '' as string,
+    year: '' as string | number,
     isTradeEnabled: false,
+    isPreorder: false,
+    isSet: false,
     quantity: '' as string | number,
     imageUrls: [] as string[],
     status: 'active' as string,
@@ -85,7 +80,7 @@ export default function EditListingPage() {
   // This runs FIRST, before fetchListing
   useEffect(() => {
     if (!id) return;
-    
+
     // Use a small delay to ensure localStorage is ready after page navigation
     const timer = setTimeout(() => {
       const storageKey = `editListingFormData_${id}`;
@@ -95,7 +90,7 @@ export default function EditListingPage() {
         console.log('[EDIT] useEffect [id] - localStorage data exists:', !!savedFormData);
         console.log('[EDIT] useEffect [id] - localStorage data length:', savedFormData?.length || 0);
       }
-      
+
       if (savedFormData) {
         try {
           const parsed = JSON.parse(savedFormData);
@@ -103,13 +98,13 @@ export default function EditListingPage() {
             console.log('[EDIT] useEffect [id] - Parsed localStorage data:', parsed);
             console.log('[EDIT] useEffect [id] - Quantity from localStorage:', parsed.quantity, 'type:', typeof parsed.quantity);
           }
-          
+
           // Always restore if we have data, even if quantity is empty string
-          const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
-            ? String(parsed.quantity) 
+          const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
+            ? String(parsed.quantity)
             : '';
           if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - Setting quantity from localStorage to:', quantityValue);
-          
+
           setFormData(prev => {
             const newData = {
               ...prev,
@@ -128,40 +123,40 @@ export default function EditListingPage() {
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] useEffect [id] - All localStorage keys:', Object.keys(localStorage).filter(k => k.includes('editListing')));
       }
     }, 100); // Small delay to ensure localStorage is ready
-    
+
     return () => clearTimeout(timer);
   }, [id]);
 
   // Save form data to localStorage whenever it changes (debounced)
   useEffect(() => {
     if (!id) return;
-    
+
     // Always save form data, including quantity (even if empty string for unlimited stock)
     const timeoutId = setTimeout(() => {
       const storageKey = `editListingFormData_${id}`;
-      
+
       // Ensure quantity is always saved as string (empty string = unlimited)
-      const quantityToSave = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
-        ? String(formData.quantity) 
+      const quantityToSave = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== ''
+        ? String(formData.quantity)
         : '';
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[EDIT] Save useEffect - quantity:', formData.quantity, '->', quantityToSave, 'type:', typeof formData.quantity);
         console.log('[EDIT] Save useEffect - Full formData:', formData);
       }
-      
+
       const dataToSave = {
         ...formData,
         quantity: quantityToSave,
       };
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[EDIT] Save useEffect - Data to save:', dataToSave);
         console.log('[EDIT] Save useEffect - Storage key:', storageKey);
       }
-      
+
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-      
+
       // Verify it was saved
       const verify = localStorage.getItem(storageKey);
       if (process.env.NODE_ENV === 'development') {
@@ -173,7 +168,7 @@ export default function EditListingPage() {
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] Save useEffect - Verification - parsed quantity:', parsed.quantity);
       }
     }, 300); // Debounce to avoid too many writes
-    
+
     return () => clearTimeout(timeoutId);
   }, [formData, id]);
 
@@ -183,22 +178,22 @@ export default function EditListingPage() {
       router.push('/login');
       return;
     }
-    
+
     // CRITICAL: Load from localStorage FIRST, synchronously, before fetchListing
     // This ensures user's edits are preserved even if fetchListing runs immediately
     const storageKey = `editListingFormData_${id}`;
     const savedFormData = localStorage.getItem(storageKey);
     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Loading from localStorage BEFORE fetchListing:', storageKey, 'exists:', !!savedFormData);
-    
+
     if (savedFormData) {
       try {
         const parsed = JSON.parse(savedFormData);
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Found saved data, setting formData immediately');
-        const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
-          ? String(parsed.quantity) 
+        const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
+          ? String(parsed.quantity)
           : '';
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] Main useEffect - Setting quantity to:', quantityValue);
-        
+
         // Set formData immediately, before fetchListing runs
         setFormData(prev => ({
           ...prev,
@@ -209,19 +204,54 @@ export default function EditListingPage() {
         if (process.env.NODE_ENV === 'development') console.error('[EDIT] Main useEffect - Failed to parse saved form data:', e);
       }
     }
-    
+
     // Then fetch from API (will merge with localStorage data in fetchListing)
+    // Then fetch from API (will merge with localStorage data in fetchListing)
+    fetchBrands();
     fetchListing();
     fetchCategories();
     fetchProductDiscounts();
   }, [id, isAuthenticated]);
+
+  const fetchBrands = async () => {
+    try {
+      const response = await api.get('/brands');
+      setBrands(response.data);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch brands:', error);
+    }
+  };
+
+  const fetchModels = async (brandSlug: string) => {
+    try {
+      const response = await api.get(`/car-models?brand=${brandSlug}`);
+      setModels(response.data);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch models:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (formData.brandId) {
+      // Find brand in brands list to get slug
+      // If brand list is not loaded yet, we can't fetch models yet
+      // BUT fetchListing might populate formData before brands are loaded.
+      // We need to handle that.
+      const selectedBrand = brands.find(b => b.id === formData.brandId);
+      if (selectedBrand) {
+        fetchModels(selectedBrand.slug);
+      }
+    } else {
+      setModels([]);
+    }
+  }, [formData.brandId, brands]);
 
   const fetchProductDiscounts = async () => {
     try {
       const response = await discountsApi.getAll({ limit: 100 });
       const allDiscounts = response.data?.items || response.data || [];
       // Filter discounts that target this product
-      const relevantDiscounts = allDiscounts.filter((d: any) => 
+      const relevantDiscounts = allDiscounts.filter((d: any) =>
         d.scope === 'product' && d.targetProductIds?.includes(id)
       );
       setProductDiscounts(relevantDiscounts);
@@ -245,15 +275,15 @@ export default function EditListingPage() {
           throw myProductError;
         }
       }
-      
+
       const listing = response.data.product || response.data;
-      
+
       // The /products/my/:id endpoint already validates ownership
       // So we don't need to check seller again here
 
       // Check if there's saved form data in localStorage
       const storageKey = `editListingFormData_${id}`;
-      
+
       // Check ALL localStorage keys first for debugging
       const allKeys = Object.keys(localStorage).filter(k => k.includes('editListing'));
       if (process.env.NODE_ENV === 'development') {
@@ -267,7 +297,7 @@ export default function EditListingPage() {
         console.log('[EDIT] fetchListing - localStorage.getItem result type:', typeof savedFormData);
         console.log('[EDIT] fetchListing - localStorage.getItem result length:', savedFormData?.length || 0);
       }
-      
+
       let savedData = null;
       if (savedFormData) {
         try {
@@ -293,12 +323,12 @@ export default function EditListingPage() {
       // API returns: null = unlimited stock, number = limited stock
       // Frontend uses: empty string = unlimited stock, number string = limited stock
       let quantityValue = '';
-      
+
       // First priority: saved data from localStorage (user's current edits)
       if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
         quantityValue = String(savedData.quantity);
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using localStorage quantity:', quantityValue);
-      } 
+      }
       // Second priority: API value from database (null = unlimited, number = limited)
       else if (listing.quantity !== undefined && listing.quantity !== null) {
         quantityValue = String(listing.quantity);
@@ -314,20 +344,20 @@ export default function EditListingPage() {
         quantityValue = '';
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using default empty quantity (unlimited) - API returned:', listing.quantity);
       }
-      
+
       if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Final quantityValue:', quantityValue);
 
       // IMPORTANT: Preserve quantity from localStorage if it exists, even if API says null/undefined
       // This ensures user's edits are not lost when page reloads
       let finalQuantity = quantityValue;
-      
+
       if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
         finalQuantity = String(savedData.quantity);
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - OVERRIDING quantity with localStorage value:', finalQuantity);
       } else {
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using computed quantityValue:', finalQuantity);
       }
-      
+
       if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Final quantity decision:', {
         savedDataExists: !!savedData,
         savedDataQuantity: savedData?.quantity,
@@ -335,12 +365,12 @@ export default function EditListingPage() {
         quantityValue,
         finalQuantity,
       });
-      
+
       // CRITICAL: Preserve quantity from localStorage if it exists
       // Priority: savedData.quantity > prev.quantity (from main useEffect) > finalQuantity > ''
       setFormData(prev => {
         let quantityToUse = finalQuantity;
-        
+
         // First priority: savedData from localStorage (read in fetchListing)
         if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
           quantityToUse = String(savedData.quantity);
@@ -356,33 +386,41 @@ export default function EditListingPage() {
           quantityToUse = finalQuantity;
           if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - Using finalQuantity:', quantityToUse);
         }
-        
+
         if (process.env.NODE_ENV === 'development') console.log('[EDIT] fetchListing - setFormData decision:', {
           savedDataQuantity: savedData?.quantity,
           prevQuantity: prev.quantity,
           finalQuantity,
           quantityToUse,
         });
-        
+
+        const materialFromAttrs = (listing as any).attributes?.find(
+          (a: any) => (a.label === 'Malzeme' || a.group === 'Malzeme' || a.group === 'material')
+        )?.name;
         const newFormData = {
           title: savedData?.title || listing.title || prev.title || '',
           description: savedData?.description || listing.description || prev.description || '',
           price: savedData?.price || listing.price?.toString() || prev.price || '',
           categoryId: savedData?.categoryId || listing.categoryId || listing.category?.id || prev.categoryId || '',
           condition: savedData?.condition || listing.condition || prev.condition || 'very_good',
-          brand: savedData?.brand || listing.brand || prev.brand || '',
+          brandId: savedData?.brandId || listing.brand?.id || prev.brandId || '',
+          carModelId: savedData?.carModelId || listing.carModel?.id || prev.carModelId || '',
           scale: savedData?.scale || listing.scale || prev.scale || '1:64',
+          material: savedData?.material ?? materialFromAttrs ?? (listing as any).material ?? prev.material ?? '',
+          year: savedData?.year ?? (listing as any).year ?? (listing as any).releaseDate ? new Date((listing as any).releaseDate).getFullYear() : prev.year ?? '',
           isTradeEnabled: savedData?.isTradeEnabled !== undefined ? savedData.isTradeEnabled : (listing.isTradeEnabled || listing.trade_available || prev.isTradeEnabled || false),
+          isPreorder: savedData?.isPreorder !== undefined ? savedData.isPreorder : ((listing as any).isPreorder ?? prev.isPreorder ?? false),
+          isSet: savedData?.isSet !== undefined ? savedData.isSet : ((listing as any).isSet ?? prev.isSet ?? false),
           quantity: quantityToUse,
           imageUrls: savedData?.imageUrls?.length > 0 ? savedData.imageUrls : (listing.images?.map((img: any) => img.url || img) || prev.imageUrls || []),
           status: savedData?.status || listing.status || prev.status || 'active',
         };
-        
+
         if (process.env.NODE_ENV === 'development') {
           console.log('[EDIT] fetchListing - Setting formData with quantity:', newFormData.quantity);
           console.log('[EDIT] fetchListing - Full newFormData:', newFormData);
         }
-        
+
         return newFormData;
       });
 
@@ -443,7 +481,7 @@ export default function EditListingPage() {
     try {
       const fileArray = Array.from(files);
       const response = await mediaApi.uploadProductImages(fileArray);
-      
+
       const uploadedUrls = response.data.map((result: any) => result.url);
       setFormData({
         ...formData,
@@ -467,7 +505,7 @@ export default function EditListingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title || !formData.price || !formData.categoryId) {
       toast.error('Lütfen tüm zorunlu alanları doldurun');
       return;
@@ -489,9 +527,14 @@ export default function EditListingPage() {
         price: Number(formData.price),
         categoryId: formData.categoryId,
         condition: formData.condition,
-        brand: formData.brand || undefined,
+        brandId: formData.brandId || undefined,
+        carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
+        material: formData.material || undefined,
+        year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
+        isPreorder: formData.isPreorder,
+        isSet: formData.isSet,
         quantity: formData.quantity && formData.quantity !== '' ? Number(formData.quantity) : null,
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
         status: formData.status,
@@ -508,21 +551,21 @@ export default function EditListingPage() {
         payload.saleStartDate = null;
         payload.saleEndDate = null;
       }
-      
+
       if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - Payload quantity:', payload.quantity, 'from formData.quantity:', formData.quantity);
 
       await listingsApi.update(id, payload as any);
       toast.success('İlanınız güncellendi!');
-      
+
       // Clear saved form data after successful submission
       // Only clear if we're actually navigating away (not just refreshing)
       if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - Clearing localStorage for:', `editListingFormData_${id}`);
       localStorage.removeItem(`editListingFormData_${id}`);
       if (process.env.NODE_ENV === 'development') console.log('[EDIT] handleSubmit - localStorage cleared, redirecting...');
-      
+
       // Small delay to ensure localStorage is cleared before navigation
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       router.push(`/listings/${id}`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to update listing:', error);
@@ -690,14 +733,40 @@ export default function EditListingPage() {
                   Marka
                 </label>
                 <select
-                  value={formData.brand}
-                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  value={formData.brandId}
+                  onChange={(e) => {
+                    const newBrandId = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      brandId: newBrandId,
+                      carModelId: '' // Reset model when brand changes
+                    }));
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">Marka Seçin</option>
-                  {BRANDS.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Model
+                </label>
+                <select
+                  value={formData.carModelId}
+                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  disabled={!formData.brandId || models.length === 0}
+                >
+                  <option value="">Model Seçin</option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
                     </option>
                   ))}
                 </select>
@@ -719,19 +788,55 @@ export default function EditListingPage() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Malzeme
+                </label>
+                <select
+                  value={formData.material}
+                  onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">Malzeme seçin</option>
+                  {MATERIALS.map((m) => (
+                    <option key={m.slug} value={m.slug}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Çıkış yılı
+                </label>
+                <p className="text-xs text-gray-500 mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
+                <select
+                  value={formData.year}
+                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">Yıl seçin</option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Trade Toggle */}
-            <div className={`flex items-center justify-between p-4 rounded-xl border ${
-              limits?.canTrade 
-                ? 'bg-green-50 border-green-200' 
+            <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
+                ? 'bg-green-50 border-green-200'
                 : 'bg-gray-50 border-gray-200'
-            }`}>
+              }`}>
               <div>
                 <label className="font-medium text-gray-900">Takas Aktif</label>
                 <p className="text-sm text-gray-600">
-                  {limits?.canTrade 
-                    ? 'Bu ürünü takas için de açık tutar' 
+                  {limits?.canTrade
+                    ? 'Bu ürünü takas için de açık tutar'
                     : 'Takas özelliği Premium üyelik gerektirir'}
                 </p>
               </div>
@@ -739,14 +844,12 @@ export default function EditListingPage() {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${
-                    formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
                 >
                   <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                      formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
-                    }`}
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               ) : (
@@ -754,6 +857,36 @@ export default function EditListingPage() {
                   Premium'a Geç →
                 </Link>
               )}
+            </div>
+
+            {/* Ön Sipariş */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <label className="font-medium text-gray-900">Ön Sipariş</label>
+                <p className="text-sm text-gray-600">Ürün henüz stokta değil; çıkınca gönderilecek</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-violet-500' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+
+            {/* Set / Paket */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <label className="font-medium text-gray-900">Set / Paket</label>
+                <p className="text-sm text-gray-600">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isSet: !formData.isSet })}
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-sky-500' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
             </div>
 
             {/* Price & Quantity */}
@@ -774,7 +907,7 @@ export default function EditListingPage() {
                   step="0.01"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Stok Miktarı
@@ -825,7 +958,7 @@ export default function EditListingPage() {
                   <ChevronDownIcon className="w-5 h-5 text-gray-500" />
                 )}
               </button>
-              
+
               {showDiscountSection && (
                 <div className="p-4 space-y-4 bg-white">
                   {/* Quick Sale Price */}
@@ -837,7 +970,7 @@ export default function EditListingPage() {
                     <p className="text-sm text-gray-600 mb-4">
                       Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün sayfasında üstü çizili fiyat olarak görünecektir.
                     </p>
-                    
+
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -864,7 +997,7 @@ export default function EditListingPage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -889,7 +1022,7 @@ export default function EditListingPage() {
                         />
                       </div>
                     </div>
-                    
+
                     {saleData.salePrice && saleData.originalPrice && (
                       <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded-lg mb-4">
                         <span>
@@ -900,12 +1033,12 @@ export default function EditListingPage() {
                         </span>
                       </div>
                     )}
-                    
+
                     <p className="text-xs text-gray-500">
                       * Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.
                     </p>
                   </div>
-                  
+
                   {/* Existing Discounts */}
                   {productDiscounts.length > 0 && (
                     <div>
@@ -920,11 +1053,10 @@ export default function EditListingPage() {
                                 {discount.code && <span className="ml-2">Kod: {discount.code}</span>}
                               </p>
                             </div>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              discount.isCurrentlyValid 
-                                ? 'bg-green-100 text-green-700' 
+                            <span className={`px-2 py-1 text-xs rounded-full ${discount.isCurrentlyValid
+                                ? 'bg-green-100 text-green-700'
                                 : 'bg-gray-100 text-gray-600'
-                            }`}>
+                              }`}>
                               {discount.isCurrentlyValid ? 'Aktif' : 'Pasif'}
                             </span>
                           </div>
@@ -932,7 +1064,7 @@ export default function EditListingPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Link to full discount management */}
                   <div className="pt-2 border-t border-gray-100">
                     <Link
@@ -1047,8 +1179,8 @@ export default function EditListingPage() {
                 </button>
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                {formData.status === 'active' 
-                  ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.' 
+                {formData.status === 'active'
+                  ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.'
                   : 'Aktif ilanlar listelemede görünür.'}
               </p>
             </div>

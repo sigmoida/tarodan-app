@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +14,7 @@ import {
   FolderPlusIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
-import { collectionsApi } from '@/lib/api';
+import { collectionsApi, categoriesApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 interface Collection {
@@ -26,7 +27,9 @@ interface Collection {
   createdAt: string;
   viewCount?: number;
   likeCount?: number;
-  userName?: string; // API returns userName directly
+  userName?: string;
+  categoryId?: string | null;
+  category?: { id: string; name: string; slug: string } | null;
   user?: {
     id: string;
     displayName: string;
@@ -35,8 +38,22 @@ interface Collection {
 
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
+// Flatten category tree for dropdown (root + children with indent)
+function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
+  const out: { id: string; name: string; slug: string }[] = [];
+  for (const c of tree) {
+    out.push({ id: c.id, name: prefix ? `${prefix} ${c.name}` : c.name, slug: c.slug });
+    if (c.children?.length) {
+      out.push(...flattenCategories(c.children, '—'));
+    }
+  }
+  return out;
+}
+
 export default function CollectionsPage() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
@@ -45,14 +62,44 @@ export default function CollectionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
   const [showFilters, setShowFilters] = useState(false);
+  const [categorySlug, setCategorySlug] = useState(searchParams.get('category') || '');
 
-  // Public collections: React Query (cache + refetch on sort/search)
+  useEffect(() => {
+    setCategorySlug(searchParams.get('category') || '');
+  }, [searchParams]);
+
+  const setCategoryFilter = (slug: string) => {
+    setCategorySlug(slug);
+    const params = new URLSearchParams(searchParams.toString());
+    if (slug) params.set('category', slug);
+    else params.delete('category');
+    const q = params.toString();
+    router.replace(q ? `?${q}` : '/collections', { scroll: false });
+  };
+
+  // Categories for filter dropdown (refresh=1 so API cache is cleared and we get simplified 8 categories)
+  const { data: categoriesTree } = useQuery({
+    queryKey: ['categories', 'collections'],
+    queryFn: async () => {
+      const res = await categoriesApi.findAll({ refresh: '1' });
+      return res.data?.data ?? res.data ?? [];
+    },
+    meta: { page: 'collections-categories' },
+  });
+  const flatCategories = useMemo(
+    () => (Array.isArray(categoriesTree) ? flattenCategories(categoriesTree) : []),
+    [categoriesTree],
+  );
+
+  // Public collections: React Query (cache + refetch on sort/search/category)
+  const categoryParam = typeof categorySlug === 'string' ? categorySlug.trim() : '';
   const publicQuery = useQuery({
-    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null],
+    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParam || null],
     queryFn: async (): Promise<Collection[]> => {
-      const params: Record<string, any> = {
+      const params: Record<string, unknown> = {
         sortBy,
         ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+        ...(categoryParam ? { category: categoryParam } : {}),
       };
       const response = await collectionsApi.browse(params);
       const data = response.data?.collections || response.data?.data || [];
@@ -233,7 +280,7 @@ export default function CollectionsPage() {
 
           {/* Sort and Filter Controls */}
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700"
@@ -241,6 +288,23 @@ export default function CollectionsPage() {
                 <FunnelIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">{t('product.filters')}</span>
               </button>
+              {activeTab === 'public' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 font-medium">{t('common.category')}:</label>
+                  <select
+                    value={categorySlug}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white min-w-[160px]"
+                  >
+                    <option value="">{t('common.all')}</option>
+                    {flatCategories.map((cat) => (
+                      <option key={cat.id} value={cat.slug}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Sort Dropdown */}
@@ -261,10 +325,13 @@ export default function CollectionsPage() {
           </div>
 
           {/* Results Count */}
-          {displayedCollections.length > 0 && (
+          {(displayedCollections.length > 0 || categoryParam || searchQuery.trim()) && (
             <p className="text-sm text-gray-600">
               {displayedCollections.length} koleksiyon bulundu
-              {searchQuery && ` "${searchQuery}" için`}
+              {categoryParam && flatCategories.find((c) => c.slug === categoryParam) && (
+                <> · Kategori: {flatCategories.find((c) => c.slug === categoryParam)?.name}</>
+              )}
+              {searchQuery.trim() && ` · "${searchQuery}"`}
             </p>
           )}
         </div>
@@ -356,6 +423,7 @@ export default function CollectionsPage() {
       {/* Create Collection Modal */}
       {showCreateModal && (
         <CreateCollectionModal
+          flatCategories={flatCategories}
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
             setShowCreateModal(false);
@@ -406,12 +474,15 @@ export default function CollectionsPage() {
 function CreateCollectionModal({
   onClose,
   onCreated,
+  flatCategories,
 }: {
   onClose: () => void;
   onCreated: () => void;
+  flatCategories: { id: string; name: string; slug: string }[];
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -420,7 +491,12 @@ function CreateCollectionModal({
     setLoading(true);
 
     try {
-      await collectionsApi.create({ name, description, isPublic });
+      await collectionsApi.create({
+        name,
+        description,
+        isPublic,
+        ...(categoryId ? { categoryId } : {}),
+      });
       onCreated();
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
@@ -462,6 +538,21 @@ function CreateCollectionModal({
               placeholder="Koleksiyon hakkında..."
               rows={3}
             />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1 font-medium">Kategori</label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="">Kategori seçin (isteğe bağlı)</option>
+              {flatCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input

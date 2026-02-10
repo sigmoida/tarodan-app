@@ -105,6 +105,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
+    { href: '/brands', label: t('nav.brands') || 'Markalar' },
     { href: '/trades', label: t('nav.trades') },
     { href: '/collections', label: t('nav.collections') },
     { href: '/pricing', label: t('nav.pricing') },
@@ -483,40 +484,30 @@ export default function Navbar() {
             {/* Nav Links - Desktop */}
             <div className="hidden lg:flex items-center gap-6 mr-12">
               {NAV_LINKS.map((link) => {
-                // Takaslar link requires auth for guests
-                if (link.href === '/trades' && !showAuthUI) {
-                  return (
-                    <button
-                      key={link.href}
-                      onClick={() => setShowTradesAuthModal(true)}
-                      className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
-                    >
-                      {link.label}
-                    </button>
-                  );
-                }
-                // Show badge for trades if there are pending trades
-                if (link.href === '/trades' && pendingTradesCount > 0) {
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1"
-                    >
-                      {link.label}
-                      <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
-                        {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
-                      </span>
-                    </Link>
-                  );
-                }
+                const isGuestTrades = link.href === '/trades' && !showAuthUI;
+                const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-white hover:text-orange-100 font-medium transition-colors text-sm"
+                    onClick={(e) => {
+                      if (isGuestTrades) {
+                        e.preventDefault();
+                        setShowTradesAuthModal(true);
+                      }
+                    }}
+                    className={
+                      showTradesBadge
+                        ? 'relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1'
+                        : 'text-white hover:text-orange-100 font-medium transition-colors text-sm'
+                    }
                   >
                     {link.label}
+                    {showTradesBadge && (
+                      <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                        {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

@@ -17,6 +17,21 @@ interface Category {
   children?: Category[];
 }
 
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface CarModel {
+  id: string;
+  name: string;
+  slug: string;
+  brand: {
+    slug: string;
+  };
+}
+
 const getConditions = (locale: string) => [
   { value: 'new', label: locale === 'en' ? 'New' : 'Yeni' },
   { value: 'like_new', label: locale === 'en' ? 'Like New' : 'Sıfır Gibi' },
@@ -49,6 +64,13 @@ const SCALES = [
   '1:87',
 ];
 
+const MATERIALS: { slug: string; label: string; labelEn: string }[] = [
+  { slug: 'diecast', label: 'Diecast (Metal)', labelEn: 'Diecast (Metal)' },
+  { slug: 'resin', label: 'Resin (Reçine)', labelEn: 'Resin' },
+  { slug: 'composite', label: 'Composite (Kompozit)', labelEn: 'Composite' },
+  { slug: 'plastic', label: 'Plastic (Plastik)', labelEn: 'Plastic' },
+];
+
 interface ListingLimits {
   currentCount: number;
   maxListings: number;
@@ -70,15 +92,25 @@ export default function NewListingPage() {
   const [listingLimits, setListingLimits] = useState<ListingLimits | null>(null);
   const [limitsLoading, setLimitsLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [models, setModels] = useState<CarModel[]>([]);
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i); // 2025..1950
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     categoryId: '',
     condition: 'very_good' as string,
-    brand: '',
+    brandId: '',
+    carModelId: '',
     scale: '1:64',
+    material: '' as string,
+    year: '' as string | number,
     isTradeEnabled: false,
+    isPreorder: false,
+    isSet: false,
     quantity: '' as string | number,
     imageUrls: [] as string[],
   });
@@ -96,8 +128,8 @@ export default function NewListingPage() {
             ...prev,
             ...parsed,
             // Ensure quantity is properly handled (empty string for unlimited, number as string)
-            quantity: parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== '' 
-              ? parsed.quantity.toString() 
+            quantity: parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
+              ? parsed.quantity.toString()
               : '',
           }));
         }
@@ -114,13 +146,13 @@ export default function NewListingPage() {
       // Ensure quantity is always saved as string (empty string = unlimited)
       const dataToSave = {
         ...formData,
-        quantity: formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
-          ? String(formData.quantity) 
+        quantity: formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== ''
+          ? String(formData.quantity)
           : '',
       };
       localStorage.setItem('newListingFormData', JSON.stringify(dataToSave));
     }, 300); // Debounce to avoid too many writes
-    
+
     return () => clearTimeout(timeoutId);
   }, [formData]);
 
@@ -129,13 +161,13 @@ export default function NewListingPage() {
     if (authLoading) {
       return;
     }
-    
+
     if (!isAuthenticated) {
       toast.error(locale === 'en' ? 'Please login to create a listing' : 'İlan oluşturmak için giriş yapmalısınız');
       router.push('/login?redirect=/listings/new');
       return;
     }
-    
+
     fetchCategories();
     // Refresh user data first, then update limits
     refreshUser().then(() => {
@@ -196,7 +228,7 @@ export default function NewListingPage() {
         params: { _t: Date.now() }
       });
       const stats = response.data;
-      
+
       const tierName = stats.limits?.tierName || 'Free';
       const tierType = stats.limits?.tierType || 'free';
       const isPremium = tierType === 'premium' || tierType === 'business';
@@ -235,6 +267,39 @@ export default function NewListingPage() {
     }
   };
 
+  const fetchBrands = async () => {
+    try {
+      const response = await api.get('/brands');
+      setBrands(response.data);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch brands:', error);
+    }
+  };
+
+  const fetchModels = async (brandSlug: string) => {
+    try {
+      const response = await api.get(`/car-models?brand=${brandSlug}`);
+      setModels(response.data);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch models:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBrands();
+  }, []);
+
+  useEffect(() => {
+    if (formData.brandId) {
+      const selectedBrand = brands.find(b => b.id === formData.brandId);
+      if (selectedBrand) {
+        fetchModels(selectedBrand.slug);
+      }
+    } else {
+      setModels([]);
+    }
+  }, [formData.brandId, brands]);
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/categories');
@@ -263,7 +328,7 @@ export default function NewListingPage() {
     const brandSlugs = ['hot-wheels', 'hot-wheels-premium', 'hot-wheels-rlc', 'matchbox', 'tomica', 'tomica-limited-vintage', 'majorette', 'm2-machines', 'greenlight', 'johnny-lightning'];
     // Scale slugs to exclude (these are in the Scale dropdown)
     const scaleSlugs = ['scale-118', 'scale-124', 'scale-143', 'scale-164'];
-    
+
     return cats.filter(cat => {
       const slug = cat.slug.toLowerCase();
       // Keep if not a brand or scale category
@@ -283,13 +348,13 @@ export default function NewListingPage() {
 
     // Sadece kalan slot kadar resim al, fazlasını sessizce yoksay
     const filesToUpload = Array.from(files).slice(0, remainingSlots);
-    
+
     if (filesToUpload.length === 0) return;
 
     setUploadingImages(true);
     try {
       const response = await mediaApi.uploadProductImages(filesToUpload);
-      
+
       const uploadedUrls = response.data.map((result: any) => result.url);
       setFormData({
         ...formData,
@@ -313,7 +378,7 @@ export default function NewListingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title || !formData.price || !formData.categoryId) {
       toast.error(locale === 'en' ? 'Please fill in all required fields' : 'Lütfen tüm zorunlu alanları doldurun');
       return;
@@ -338,23 +403,28 @@ export default function NewListingPage() {
         price: Number(formData.price),
         categoryId: formData.categoryId,
         condition: formData.condition,
-        brand: formData.brand || undefined,
+        brandId: formData.brandId || undefined,
+        carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
+        material: formData.material || undefined,
+        year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
+        isPreorder: formData.isPreorder,
+        isSet: formData.isSet,
         quantity: formData.quantity ? Number(formData.quantity) : undefined, // undefined = unlimited stock
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
       };
 
       await listingsApi.create(payload as any);
       toast.success(locale === 'en' ? 'Your listing has been created! Pending approval.' : 'İlanınız oluşturuldu! Onay bekliyor.');
-      
+
       // Clear saved form data after successful submission
       localStorage.removeItem('newListingFormData');
-      
+
       // Refresh user data and listing limits to update the count
       await refreshUser();
       await updateListingLimits();
-      
+
       router.push('/profile/listings?status=pending');
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to create listing:', error);
@@ -407,30 +477,27 @@ export default function NewListingPage() {
               <div className="h-4 bg-gray-200 rounded w-1/3"></div>
             </div>
           ) : listingLimits && (
-            <div className={`mb-6 p-4 rounded-xl border ${
-              listingLimits.isPremium 
-                ? 'bg-yellow-50 border-yellow-200' 
-                : listingLimits.canCreateListing 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-            }`}>
+            <div className={`mb-6 p-4 rounded-xl border ${listingLimits.isPremium
+              ? 'bg-yellow-50 border-yellow-200'
+              : listingLimits.canCreateListing
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
+              }`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`font-medium ${
-                    listingLimits.isPremium 
-                      ? 'text-yellow-800' 
-                      : listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'
-                  }`}>
-                    {listingLimits.maxListings === -1 
+                  <p className={`font-medium ${listingLimits.isPremium
+                    ? 'text-yellow-800'
+                    : listingLimits.canCreateListing ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                    {listingLimits.maxListings === -1
                       ? `Mevcut İlan: ${listingLimits.currentCount} (Sınırsız)`
                       : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxListings}`
                     }
                   </p>
-                  <p className={`text-sm ${
-                    listingLimits.isPremium 
-                      ? 'text-yellow-600' 
-                      : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <p className={`text-sm ${listingLimits.isPremium
+                    ? 'text-yellow-600'
+                    : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
+                    }`}>
                     {listingLimits.membershipTier}
                     {listingLimits.isPremium && ' ⭐'}
                   </p>
@@ -535,16 +602,43 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Marka
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Hot Wheels, Matchbox, Tomica vb.</p>
+                <p className="text-xs text-gray-500 mb-2">Ürünün markasını seçin</p>
                 <select
-                  value={formData.brand}
-                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  value={formData.brandId}
+                  onChange={(e) => {
+                    const newBrandId = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      brandId: newBrandId,
+                      carModelId: '' // Reset model when brand changes
+                    }));
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">Marka Seçin</option>
-                  {BRANDS.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Model
+                </label>
+                <p className="text-xs text-gray-500 mb-2">Varsa model seçin (Opsiyonel)</p>
+                <select
+                  value={formData.carModelId}
+                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  disabled={!formData.brandId || models.length === 0}
+                >
+                  <option value="">Model Seçin</option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
                     </option>
                   ))}
                 </select>
@@ -567,18 +661,59 @@ export default function NewListingPage() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'en' ? 'Material' : 'Malzeme'}
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  {locale === 'en' ? 'Diecast, resin, plastic, etc.' : 'Diecast, reçine, plastik vb.'}
+                </p>
+                <select
+                  value={formData.material}
+                  onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">{locale === 'en' ? 'Select material' : 'Malzeme seçin'}</option>
+                  {MATERIALS.map((m) => (
+                    <option key={m.slug} value={m.slug}>
+                      {locale === 'en' ? m.labelEn : m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'en' ? 'Release year' : 'Çıkış yılı'}
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  {locale === 'en' ? 'Year the model was released (optional)' : 'Modelin çıkış yılı (isteğe bağlı)'}
+                </p>
+                <select
+                  value={formData.year}
+                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">{locale === 'en' ? 'Select year' : 'Yıl seçin'}</option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Trade Toggle */}
-            <div className={`flex items-center justify-between p-4 rounded-xl border ${
-              limits?.canTrade 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-gray-50 border-gray-200'
-            }`}>
+            <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
+              ? 'bg-green-50 border-green-200'
+              : 'bg-gray-50 border-gray-200'
+              }`}>
               <div>
                 <label className="font-medium text-gray-900">Takas Aktif</label>
                 <p className="text-sm text-gray-600">
-                  {limits?.canTrade 
+                  {limits?.canTrade
                     ? (locale === 'en' ? 'Also makes this product available for trade' : 'Bu ürünü takas için de açık tutar')
                     : (locale === 'en' ? 'Trade feature requires Premium membership' : 'Takas özelliği Premium üyelik gerektirir')}
                 </p>
@@ -587,14 +722,12 @@ export default function NewListingPage() {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${
-                    formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
                 >
                   <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                      formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
-                    }`}
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               ) : (
@@ -602,6 +735,40 @@ export default function NewListingPage() {
                   Premium'a Geç →
                 </Link>
               )}
+            </div>
+
+            {/* Ön Sipariş */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <label className="font-medium text-gray-900">{locale === 'en' ? 'Pre-Order' : 'Ön Sipariş'}</label>
+                <p className="text-sm text-gray-600">
+                  {locale === 'en' ? 'Product not yet in stock; will ship when available' : 'Ürün henüz stokta değil; çıkınca gönderilecek'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-violet-500' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+
+            {/* Set / Paket */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <label className="font-medium text-gray-900">{locale === 'en' ? 'Set / Bundle' : 'Set / Paket'}</label>
+                <p className="text-sm text-gray-600">
+                  {locale === 'en' ? 'Multiple models in one listing (e.g. 5-pack, garage set)' : 'Tek ilanda birden fazla model (örn. 5\'li paket, garaj seti)'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isSet: !formData.isSet })}
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-sky-500' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
             </div>
 
             {/* Price & Quantity */}
@@ -615,21 +782,21 @@ export default function NewListingPage() {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                placeholder="0.00"
-                required
-                min={1}
-                max={9999999}
-                step="0.01"
-              />
+                  placeholder="0.00"
+                  required
+                  min={1}
+                  max={9999999}
+                  step="0.01"
+                />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Stok Miktarı
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  {locale === 'en' 
-                    ? 'Leave empty for unlimited stock' 
+                  {locale === 'en'
+                    ? 'Leave empty for unlimited stock'
                     : 'Boş bırakırsanız sınırsız stok olur'}
                 </p>
                 <input

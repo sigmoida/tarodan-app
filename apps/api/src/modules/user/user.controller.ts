@@ -410,8 +410,13 @@ export class UserController {
   @Get('top-collections')
   @Public()
   async getTopCollections(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 20;
-    return this.userService.getTopCollections(limitNum);
+    try {
+      const limitNum = limit ? parseInt(limit, 10) : 20;
+      return await this.userService.getTopCollections(limitNum);
+    } catch (err) {
+      this.logger.warn(`getTopCollections failed: ${err?.message || err}`);
+      return [];
+    }
   }
 
   /**
@@ -478,7 +483,7 @@ export class UserController {
     try {
       return await this.userService.getFeaturedBusiness();
     } catch (err) {
-      this.logger.warn(`getFeaturedBusiness failed: ${err}`);
+      this.logger.warn(`getFeaturedBusiness failed: ${err?.message || err}`);
       return null;
     }
   }

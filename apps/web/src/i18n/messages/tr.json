@@ -88,11 +88,16 @@
     "popular": "Popüler",
     "recommended": "Önerilen",
     "hide": "Gizle",
-    "show": "Göster"
+    "show": "Göster",
+    "home": "Ana Sayfa",
+    "listings": "İlanlar",
+    "category": "Kategori"
   },
   "nav": {
     "home": "Ana Sayfa",
     "listings": "İlanlar",
+    "brands": "Markalar",
+    "models": "Modeller",
     "trades": "Takaslar",
     "collections": "Koleksiyonlar",
     "pricing": "Üyelik",
@@ -161,6 +166,31 @@
     "backToLogin": "Girişe Dön",
     "loginRequired": "Giriş Yapmanız Gerekiyor"
   },
+  "brands": {
+    "title": "Markalar",
+    "subtitle": "Dünyanın en prestijli diecast model araba üreticileri",
+    "searchPlaceholder": "Marka ara...",
+    "products": "ürün",
+    "productsTitle": "İlanları",
+    "noResults": "Marka bulunamadı.",
+    "noProducts": "Bu markaya ait aktif ilan bulunamadı.",
+    "backToAll": "Tüm Markalar",
+    "website": "Web Sitesi"
+  },
+  "models": {
+    "title": "Modeller",
+    "subtitle": "Gerçek araç modellerine göre diecast koleksiyonunuzu keşfedin",
+    "searchPlaceholder": "Model veya marka ara...",
+    "allBrands": "Tüm Markalar",
+    "model": "model",
+    "listings": "ilan",
+    "productsTitle": "İlanları",
+    "noResults": "Model bulunamadı.",
+    "noProducts": "Bu modele ait aktif ilan bulunamadı.",
+    "backToAll": "Tüm Modeller",
+    "present": "Günümüz",
+    "notFound": "Model bulunamadı."
+  },
   "product": {
     "addToCart": "Sepete Ekle",
     "removeFromCart": "Sepetten Çıkar",
@@ -187,6 +217,9 @@
     "shipping": "Kargo",
     "freeShipping": "Ücretsiz Kargo",
     "tradeAvailable": "Takas Yapılabilir",
+    "preOrder": "Ön Sipariş",
+    "limitedEdition": "Limited Edition",
+    "sets": "Setler",
     "tradeNotAvailable": "Takas Yapılmaz",
     "offerAccepted": "Teklif Kabul Edildi",
     "tradeAccepted": "Takas Kabul Edildi",

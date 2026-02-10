@@ -88,11 +88,16 @@
     "popular": "Popular",
     "recommended": "Recommended",
     "hide": "Hide",
-    "show": "Show"
+    "show": "Show",
+    "home": "Home",
+    "listings": "Listings",
+    "category": "Category"
   },
   "nav": {
     "home": "Home",
     "listings": "Listings",
+    "brands": "Brands",
+    "models": "Models",
     "trades": "Trades",
     "collections": "Collections",
     "pricing": "Pricing",
@@ -161,6 +166,31 @@
     "backToLogin": "Back to Login",
     "loginRequired": "Login Required"
   },
+  "brands": {
+    "title": "Brands",
+    "subtitle": "The world's most prestigious diecast model car manufacturers",
+    "searchPlaceholder": "Search brands...",
+    "products": "products",
+    "productsTitle": "Listings",
+    "noResults": "No brands found.",
+    "noProducts": "No active listings found for this brand.",
+    "backToAll": "All Brands",
+    "website": "Website"
+  },
+  "models": {
+    "title": "Models",
+    "subtitle": "Explore diecast collections by real car models",
+    "searchPlaceholder": "Search model or brand...",
+    "allBrands": "All Brands",
+    "model": "model",
+    "listings": "listings",
+    "productsTitle": "Listings",
+    "noResults": "No models found.",
+    "noProducts": "No active listings found for this model.",
+    "backToAll": "All Models",
+    "present": "Present",
+    "notFound": "Model not found."
+  },
   "product": {
     "addToCart": "Add to Cart",
     "removeFromCart": "Remove from Cart",
@@ -187,6 +217,9 @@
     "shipping": "Shipping",
     "freeShipping": "Free Shipping",
     "tradeAvailable": "Trade Available",
+    "preOrder": "Pre-Order",
+    "limitedEdition": "Limited Edition",
+    "sets": "Sets",
     "tradeNotAvailable": "No Trade",
     "offerAccepted": "Offer Accepted",
     "tradeAccepted": "Trade Accepted",

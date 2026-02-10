@@ -79,6 +79,38 @@ export class CreateProductDto {
   isTradeEnabled?: boolean;
 
   @ApiPropertyOptional({
+    example: false,
+    description: 'Whether this is a pre-order listing (product not yet in stock, will ship later)',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Ön sipariş boolean olmalıdır' })
+  isPreorder?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether this is a set/bundle (multi-pack, multiple models in one listing)',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Set/paket boolean olmalıdır' })
+  isSet?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'uuid-brand-id',
+    description: 'Brand ID',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Geçerli bir marka ID giriniz' })
+  brandId?: string;
+
+  @ApiPropertyOptional({
+    example: 'uuid-car-model-id',
+    description: 'Car Model ID',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Geçerli bir model ID giriniz' })
+  carModelId?: string;
+
+  @ApiPropertyOptional({
     example: 5,
     description: 'Stock quantity (null for unlimited stock)',
   })
@@ -87,4 +119,40 @@ export class CreateProductDto {
   @Type(() => Number)
   @Min(1, { message: 'Stok miktarı en az 1 olmalıdır' })
   quantity?: number | null;
+
+  @ApiPropertyOptional({
+    example: '1:64',
+    description: 'Scale (e.g. 1:64, 1/43). Stored as ProductAttribute in group "scale".',
+  })
+  @IsOptional()
+  @IsString()
+  scale?: string;
+
+  @ApiPropertyOptional({
+    example: 'diecast',
+    description: 'Material slug (diecast, resin, composite, plastic). Stored as ProductAttribute in group "material".',
+  })
+  @IsOptional()
+  @IsString()
+  material?: string;
+
+  @ApiPropertyOptional({
+    example: 2023,
+    description: 'Release year of the model (e.g. 2023). Stored as releaseDate (Jan 1 of that year).',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1900, { message: 'Yıl 1900 veya sonrası olmalıdır' })
+  @Max(2100, { message: 'Yıl 2100 veya öncesi olmalıdır' })
+  year?: number;
+
+  @ApiPropertyOptional({
+    example: ['uuid-attr-id'],
+    description: 'Additional attribute IDs. Use material slug for material instead.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  attributeIds?: string[];
 }

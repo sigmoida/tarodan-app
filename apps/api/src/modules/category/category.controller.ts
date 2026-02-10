@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
@@ -27,7 +28,7 @@ export class CategoryController {
 
   /**
    * GET /categories
-   * Get all categories (hierarchical)
+   * Get all categories (hierarchical). ?refresh=1 invalidates cache and returns fresh data.
    */
   @Get()
   @Public()
@@ -36,7 +37,10 @@ export class CategoryController {
     status: 200,
     description: 'Kategori listesi (hiyerarşik)',
   })
-  async findAll() {
+  async findAll(@Query('refresh') refresh?: string) {
+    if (refresh === '1') {
+      await this.categoryService.invalidateCache();
+    }
     return this.categoryService.findAll();
   }
 

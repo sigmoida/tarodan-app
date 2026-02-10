@@ -57,6 +57,9 @@ interface Product {
   likeCount: number;
   createdAt?: string;
   condition?: string;
+  isPreorder?: boolean;
+  isLimited?: boolean;
+  editionNumber?: string;
   rating?: {
     average: number | null;
     count: number;
@@ -206,13 +209,12 @@ export default function Home() {
     isFetchingNextPage,
     isLoading: isLoadingBestSellers,
   } = useInfiniteQuery({
-    queryKey: ['home', 'bestSellers', { sortBy: 'viewCount', sortOrder: 'desc', status: 'active' }],
+    queryKey: ['home', 'bestSellers', { sortBy: 'view_count_desc', status: 'active' }],
     queryFn: async ({ pageParam = 1 }) => {
       const response = await listingsApi.getAll({
         limit: 20,
         page: pageParam,
-        sortBy: 'viewCount',
-        sortOrder: 'desc',
+        sortBy: 'view_count_desc',
         status: 'active',
       });
       const products = response.data.data || response.data.products || [];
@@ -605,7 +607,7 @@ export default function Home() {
                 storageKey="homepage-product-layout"
               />
               <Link
-                href="/listings?sortBy=viewCount"
+                href="/listings?sortBy=view_count_desc"
                 className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1"
               >
                 {locale === 'en' ? 'View All' : 'Tümünü gör'} <ArrowRightIcon className="w-4 h-4" />
@@ -714,10 +716,9 @@ export default function Home() {
                           logContext={{ productId: product.id, page: 'home-grid' }}
                           priority={index === 0}
                         />
-                        {/* View & Like Stats */}
-                        <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <div className="absolute top-3 left-3 flex flex-col items-start gap-2">
                           {(product.viewCount !== undefined && product.viewCount > 0) && (
-                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full shadow-sm">
                               <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -725,16 +726,26 @@ export default function Home() {
                               <span className="text-xs font-semibold">{product.viewCount}</span>
                             </div>
                           )}
-                          {(product.likeCount !== undefined && product.likeCount > 0) && (
-                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
-                              <HandThumbUpIcon className="w-3.5 h-3.5 text-orange-500" />
-                              <span className="text-xs font-semibold">{product.likeCount}</span>
+                          {product.isPreorder && (
+                            <div className="flex items-center gap-1 bg-blue-600 px-2 py-1 rounded-full shadow-sm">
+                              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                              <span className="text-[10px] text-white font-bold uppercase tracking-wider">
+                                {t('product.preOrder') || 'ÖN SİPARİŞ'}
+                              </span>
+                            </div>
+                          )}
+                          {product.isLimited && (
+                            <div className="flex items-center gap-1 bg-amber-500 px-2 py-1 rounded-full shadow-sm">
+                              <StarIcon className="w-3 h-3 text-white" />
+                              <span className="text-[10px] text-white font-bold uppercase tracking-wider">
+                                {t('product.limited') || 'LİMİTED'}
+                              </span>
                             </div>
                           )}
                         </div>
                         {tag && (
                           <div className="absolute top-3 right-3">
-                            <span className={`text-white text-xs px-2 py-1 rounded-full font-semibold ${tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
+                            <span className={`text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider shadow-sm ${tag === 'İndirim' ? 'bg-red-500' : tag === 'Yeni' ? 'bg-green-500' : 'bg-purple-500'
                               }`}>
                               {tag}
                             </span>

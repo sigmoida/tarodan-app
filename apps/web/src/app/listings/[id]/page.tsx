@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -47,6 +47,7 @@ const ReportModal = dynamic(
 );
 import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
+import TrustBadges from '@/components/home/TrustBadges';
 
 interface ProductImage {
   id?: string;
@@ -65,8 +66,14 @@ interface Listing {
   isOnSale?: boolean;
   discountPercent?: number | null;
   images: Array<ProductImage | string>;
-  brand?: string;
+  brand?: {
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+  };
   scale?: string;
+  material?: string;
   year?: number;
   condition?: string;
   trade_available?: boolean;
@@ -91,6 +98,19 @@ interface Listing {
   createdAt?: string;
   viewCount?: number;
   likeCount?: number;
+  attributes?: Array<{
+    id: string;
+    name: string;
+    label: string;
+    value: string;
+    group: string;
+  }>;
+  carModel?: {
+    id: string;
+    name: string;
+    slug: string;
+    brandSlug?: string;
+  };
 }
 
 export default function ListingDetailPage() {
@@ -760,6 +780,38 @@ export default function ListingDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumbs */}
+        <nav aria-label="Breadcrumb" className="flex items-center flex-wrap gap-y-1 text-sm text-gray-500 mb-6 overflow-x-auto whitespace-nowrap pb-2">
+          <Link href="/" className="hover:text-orange-500 transition-colors text-gray-600">
+            {t('common.home')}
+          </Link>
+          <ChevronRightIcon className="w-4 h-4 mx-1 flex-shrink-0 text-gray-400" aria-hidden />
+          <Link href="/listings" className="hover:text-orange-500 transition-colors text-gray-600">
+            {t('common.listings')}
+          </Link>
+          {listing.brand && (
+            <>
+              <ChevronRightIcon className="w-4 h-4 mx-2 flex-shrink-0" />
+              <Link href={`/brands/${listing.brand.slug}`} className="hover:text-orange-500 transition-colors font-medium text-gray-900">
+                {listing.brand.name}
+              </Link>
+            </>
+          )}
+          {listing.carModel && (
+            <>
+              <ChevronRightIcon className="w-4 h-4 mx-2 flex-shrink-0" />
+              <Link
+                href={`/search?carModel=${listing.carModel.slug}`}
+                className="hover:text-orange-500 transition-colors"
+              >
+                {listing.carModel.name}
+              </Link>
+            </>
+          )}
+          <ChevronRightIcon className="w-4 h-4 mx-2 flex-shrink-0" />
+          <span className="text-gray-400 truncate max-w-[200px]">{listing.title}</span>
+        </nav>
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
           <div className="relative">
@@ -865,8 +917,8 @@ export default function ListingDetailPage() {
                   open360View();
                 }}
                 className={`flex-shrink-0 w-20 h-20 rounded-lg flex flex-col items-center justify-center transition-all shadow-md ${images.length > 1
-                    ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 title={locale === 'en' ? '360° View' : '360° Görüntüle'}
                 disabled={images.length <= 1}
@@ -1272,54 +1324,87 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            {/* Quick Info */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-white rounded-xl mb-6">
+            {/* Quick Info - Özet özellikler, tekrarsız */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
               {listing.brand && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">{t('product.brand')}</p>
-                  <p className="font-semibold">{listing.brand}</p>
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.brand')}</p>
+                  <Link href={`/brands/${listing.brand.slug}`} className="font-semibold text-gray-900 hover:text-orange-500 transition-colors">
+                    {listing.brand.name}
+                  </Link>
                 </div>
               )}
-              {listing.scale && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">{t('product.scale')}</p>
-                  <p className="font-semibold">{listing.scale}</p>
-                </div>
-              )}
+              <div className="text-center p-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.scale')}</p>
+                <p className="font-semibold text-gray-900">{listing.scale || '—'}</p>
+              </div>
+              <div className="text-center p-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Material' : 'Malzeme'}</p>
+                <p className="font-semibold text-gray-900">
+                  {listing.material || listing.attributes?.find(a => (a.group === 'material' || a.group === 'Malzeme'))?.value || '—'}
+                </p>
+              </div>
               {listing.category && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">{t('product.category')}</p>
-                  <p className="font-semibold">{listing.category.name}</p>
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.category')}</p>
+                  <p className="font-semibold text-gray-900">{listing.category.name}</p>
                 </div>
               )}
               {listing.condition && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">{locale === 'en' ? 'Condition' : 'Durum'}</p>
-                  <p className="font-semibold">{formatCondition(listing.condition, locale)}</p>
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Condition' : 'Durum'}</p>
+                  <p className="font-semibold text-gray-900">{formatCondition(listing.condition, locale)}</p>
                 </div>
               )}
-              {listing.year && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">Yıl</p>
-                  <p className="font-semibold">{listing.year}</p>
-                </div>
-              )}
+              <div className="text-center p-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Year' : 'Yıl'}</p>
+                <p className="font-semibold text-gray-900">{listing.year ?? '—'}</p>
+              </div>
               {listing.quantity !== undefined && listing.quantity !== null && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">{locale === 'en' ? 'Stock' : 'Stok'}</p>
-                  <p className="font-semibold">
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Stock' : 'Stok'}</p>
+                  <p className="font-semibold text-gray-900">
                     {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : (locale === 'en' ? 'Out of stock' : 'Stokta yok')}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Description */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-2">{t('product.description')}</h2>
-              <p className="text-gray-600 whitespace-pre-line">
+            {/* Description & Details Tabbed Layout would be better, but listing details below description is fine */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <span className="w-1 h-5 bg-orange-500 rounded-full" aria-hidden />
+                {t('product.description')}
+              </h2>
+              <div className="prose prose-sm max-w-none text-gray-600 whitespace-pre-line leading-relaxed">
                 {listing.description || t('product.noDescription')}
-              </p>
+              </div>
+
+              {/* Teknik Özellikler - Quick Info'da olmayan alanlar (tekrar yok) */}
+              {(listing.attributes?.filter((a) => (a.group !== 'scale' && a.group !== 'material' && a.group !== 'Malzeme'))?.length ?? 0) > 0 || listing.carModel ? (
+                <div className="border-t pt-6 mt-6">
+                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-blue-500 rounded-full" aria-hidden />
+                    {locale === 'en' ? 'Technical details' : 'Teknik özellikler'}
+                  </h3>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    {listing.carModel && (
+                      <>
+                        <dt className="text-sm text-gray-500">{locale === 'en' ? 'Model' : 'Model'}</dt>
+                        <dd className="text-sm font-medium text-gray-900">{listing.carModel.name}</dd>
+                      </>
+                    )}
+                    {listing.attributes
+                      ?.filter((attr) => attr.group !== 'scale' && attr.group !== 'material' && attr.group !== 'Malzeme')
+                      ?.map((attr) => (
+                        <Fragment key={attr.id}>
+                          <dt className="text-sm text-gray-500">{attr.label}</dt>
+                          <dd className="text-sm font-medium text-gray-900">{attr.value}</dd>
+                        </Fragment>
+                      ))}
+                  </dl>
+                </div>
+              ) : null}
             </div>
 
             {/* Seller Info */}
@@ -1597,6 +1682,11 @@ export default function ListingDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Trust Badges */}
+      <div className="mt-8 border-t border-gray-100 pt-8">
+        <TrustBadges />
       </div>
 
       {/* Product Reviews Section */}

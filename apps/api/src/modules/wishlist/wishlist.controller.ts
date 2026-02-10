@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { WishlistService } from './wishlist.service';
 import {
@@ -19,6 +20,8 @@ import {
 
 @Controller('wishlist')
 export class WishlistController {
+  private readonly logger = new Logger(WishlistController.name);
+
   constructor(private readonly wishlistService: WishlistService) {}
 
   /**
@@ -27,7 +30,18 @@ export class WishlistController {
    */
   @Get()
   async getWishlist(@Request() req: any): Promise<WishlistResponseDto> {
-    return this.wishlistService.getWishlist(req.user.id);
+    try {
+      return await this.wishlistService.getWishlist(req.user.id);
+    } catch (err) {
+      this.logger.warn(`getWishlist failed: ${err?.message || err}`);
+      return {
+        id: '',
+        userId: req.user.id,
+        items: [],
+        totalItems: 0,
+        createdAt: new Date(),
+      };
+    }
   }
 
   /**

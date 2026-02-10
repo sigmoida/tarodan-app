@@ -1,0 +1,60 @@
+ID;Page Name;Key Features;;
+A1;Admin Login Page;Secure login, 2FA, IP whitelist, session timeout;;
+A2;Dashboard/Overview;KPIs, sales charts, recent orders, user stats, quick actions;;
+A3;Analytics Page;Revenue reports, traffic stats, conversion rates, custom date ranges;;
+A4;Sales Reports;Daily/monthly/yearly sales, export CSV/PDF, charts, comparisons;;
+A5;Orders List;All orders, filter by status, search, bulk actions, export;;
+A6;Order Detail Page;Order info, customer details, items, payment status, actions (refund, cancel);;
+A7;Order Status Management;Update status, add tracking, send notifications, print invoice/label;;takip ekleme bildirim ve fatura yazdırma yok 
+A8;Refunds & Returns;Return requests, process refunds, approval workflow, history;;iade geçmişi sayfası yok
+A9;Products List;All products, search, filter, bulk edit, import/export;;import export yok
+A10;Add Product Page;Product form, images, specs, pricing, inventory, SEO fields;;admin ürün eklemesi yok
+A11;Edit Product Page;Modify product details, update images, pricing, stock;;tam ürün düzenleme formu yok 
+A12;Bulk Product Upload;CSV import, field mapping, validation, preview, import;;
+A13;Inventory Management;Stock levels, low stock alerts, reorder points, stock history;;
+A14;Product Reviews Management;Moderate reviews, approve/reject, respond, filter spam;;ürün yorumları sayfası yok ekstra olarak
+A15;Categories Management;Add/edit/delete categories, hierarchy, drag-drop reorder, images;;drag drop sıralama tam değil
+A16;Manufacturers Management;Add/edit manufacturers, logos, descriptions, product count;;
+A17;Collections Management;Create collections, add products, set visibility, featured;;
+A18;Tags Management;Manage product tags, merge tags, bulk assign;;
+A19;Attributes Management;Define attributes (scale, condition, color), values, groups;;
+A20;Users List;All users, search, filter by role, status, registration date;;
+A21;User Detail Page;User info, order history, activity log, ban/suspend, edit;;
+A22;Sellers Management;Seller applications, approval, commission settings, performance;;ayrı olarak satıcı başvuru onay ve satıcı performans sayfası yok 
+A23;Roles & Permissions;Define roles, assign permissions, user role assignment;;admin panelde rol yönetim sayfası yok 
+A24;Membership Management;View members, manage subscriptions, benefits, cancellations;;
+A25;Pages Management;Static pages (About, FAQ), WYSIWYG editor, SEO settings;;
+A27;FAQ Management;Add/edit FAQs, categories, reorder, search;;
+A28;Banner/Slider Management;Homepage banners, images, links, scheduling, position;;
+A29;Email Templates;Edit email templates, variables, preview, send test;;
+A30;Coupons/Discounts;Create coupons, discount codes, percentage/fixed, validity, usage limits;;
+A31;Promotions Management;Flash sales, bulk discounts, BOGO, scheduling;;
+A32;Trade Requests;Pending trades, monitor trades, dispute resolution, approve/reject;;
+A33;Trade Analytics;Trade volume, popular items, success rates, user engagement;;ayrı analitik sayfası , detaylı metrikler sınırlı 
+A34;Payments & Transactions;All transactions, payment status, refunds, filter by gateway;;
+A35;Seller Payouts;Calculate payouts, payment schedule, transaction history, export;;satıcı banka bilgisi yok ve payout api gerekli
+A36;Commission Settings;Set commission rates, per category/seller, history;;
+A37;Tax Settings;Tax rates by region, tax rules, reporting;;
+A38;Shipping Methods;Add/edit shipping methods, rates, zones, carriers;;
+A39;Shipping Labels;Generate labels, bulk printing, carrier integration;;
+A40;Shipping Zones;Define zones, set rates, country/region mapping;;
+A41;Messages Management;Monitor user messages, spam detection, moderation;;
+A42;Support Tickets;Customer support tickets, assign, respond, track, close;;
+A43;Notifications Management;Send push/email notifications, templates, scheduling, history;;
+A44;General Settings;Site name, logo, contact info, timezone, currency, language;;logo timezone currency tam değil
+A45;Payment Settings;Payment gateways, API keys, test/live mode, currencies;;ayrı ödeme ayarları sayfası yok 
+A46;Email Settings;SMTP config, sender details, test email;;
+A47;Social Media Settings;OAuth credentials, API keys, social links;;
+A48;Security Settings;SSL, firewall rules, IP blocking, session timeout, 2FA;;ayrı güvenlik sayfası yok 
+A49;API Settings;API keys, webhooks, rate limits, documentation;;
+A50;Cache Management;Clear cache, cache settings, performance optimization;;
+A51;Activity Logs;System logs, user actions, admin actions, export logs;;
+A52;Error Logs;Application errors, stack traces, filter by severity;;
+A53;Security Logs;Failed logins, suspicious activity, IP blocks;;
+A54;Email Logs;Sent emails, delivery status, bounces, opens/clicks;;
+A55;Customer Reports;Customer acquisition, lifetime value, retention, segmentation;;ayrı müşteri retention/segment raporu yok 
+A56;Backup & Restore;Database backup, scheduled backups, restore, download;;
+A57;System Updates;Update notifications, change logs, update installation;;
+A58;Database Management;Database optimization, repair, query logs;;
+A59;File Manager;Upload/manage files, images, organize folders, bulk actions;;reklar için medya yükleme var ama tam dosya yöneticisi yok 
+A60;Translation Management;Language files, edit translations, import/export;;

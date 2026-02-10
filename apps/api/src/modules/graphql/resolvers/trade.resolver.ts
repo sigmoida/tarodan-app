@@ -18,18 +18,7 @@ export class TradeResolver {
       include: {
         initiator: true,
         receiver: true,
-        initiatorItems: {
-          include: {
-            product: {
-              include: {
-                seller: true,
-                category: true,
-                images: { orderBy: { sortOrder: 'asc' } },
-              },
-            },
-          },
-        },
-        receiverItems: {
+        items: {
           include: {
             product: {
               include: {
@@ -74,18 +63,7 @@ export class TradeResolver {
         include: {
           initiator: true,
           receiver: true,
-          initiatorItems: {
-            include: {
-              product: {
-                include: {
-                  seller: true,
-                  category: true,
-                  images: { orderBy: { sortOrder: 'asc' } },
-                },
-              },
-            },
-          },
-          receiverItems: {
+          items: {
             include: {
               product: {
                 include: {
@@ -198,8 +176,8 @@ export class TradeResolver {
       createdAt: trade.createdAt,
       initiator: mapUser(trade.initiator),
       receiver: mapUser(trade.receiver),
-      initiatorItems: trade.initiatorItems.map(mapTradeItem),
-      receiverItems: trade.receiverItems.map(mapTradeItem),
+      initiatorItems: (trade.items || []).filter((i: { side: string }) => i.side === 'initiator').map(mapTradeItem),
+      receiverItems: (trade.items || []).filter((i: { side: string }) => i.side === 'receiver').map(mapTradeItem),
       shipments: trade.shipments.map((s: any) => ({
         id: s.id,
         shipperId: s.shipperId,

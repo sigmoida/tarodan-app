@@ -389,7 +389,18 @@ function SearchContent() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product: { id: string; title: string; images?: string[]; price?: number; isTradeEnabled?: boolean; condition?: string; category?: { name: string } }) => (
+                  {products.map((product: {
+                    id: string;
+                    title: string;
+                    images?: string[];
+                    price?: number;
+                    isTradeEnabled?: boolean;
+                    isPreorder?: boolean;
+                    isLimited?: boolean;
+                    editionNumber?: string;
+                    condition?: string;
+                    category?: { name: string }
+                  }) => (
                     <Link
                       key={product.id}
                       href={`/listings/${product.id}`}
@@ -404,12 +415,26 @@ function SearchContent() {
                           fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
                           logContext={{ productId: product.id, page: 'search' }}
                         />
-                        {product.isTradeEnabled && (
-                          <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                            <ArrowsRightLeftIcon className="h-3 w-3" />
-                            {t('nav.trades')}
-                          </span>
-                        )}
+                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          {product.isTradeEnabled && (
+                            <span className="bg-orange-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                              <ArrowsRightLeftIcon className="h-3 w-3" />
+                              {t('nav.trades')}
+                            </span>
+                          )}
+                          {product.isPreorder && (
+                            <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                              <span className="animate-pulse">●</span>
+                              {t('product.preOrder') || 'ÖN SİPARİŞ'}
+                            </span>
+                          )}
+                          {product.isLimited && (
+                            <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                              <span>★</span>
+                              {product.editionNumber ? `${t('product.limited') || 'LİMİTED'} (${product.editionNumber})` : (t('product.limited') || 'LİMİTED')}
+                            </span>
+                          )}
+                        </div>
                         <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm">
                           <HeartIcon className="h-5 w-5 text-gray-700" />
                         </button>

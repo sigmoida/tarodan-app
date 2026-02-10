@@ -21,9 +21,9 @@
     "db:studio": "pnpm --filter @tarodan/api run prisma:studio",
     "db:sync-docker": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-db-docker.ps1",
     "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin.ts",
-    "docker:up": "docker-compose -f infrastructure/docker-compose.yml up -d",
-    "docker:down": "docker-compose -f infrastructure/docker-compose.yml down",
-    "docker:prod": "docker-compose -f infrastructure/docker-compose.prod.yml up -d",
+    "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
+    "docker:prod": "docker compose -f infrastructure/docker-compose.prod.yml up -d",
     "postinstall": "echo Skipping husky"
   },
   "devDependencies": {

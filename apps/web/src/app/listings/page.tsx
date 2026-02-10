@@ -16,7 +16,7 @@ import {
   TagIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { listingsApi, searchApi } from '@/lib/api';
+import { listingsApi, searchApi, categoriesApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
@@ -34,7 +34,12 @@ interface Listing {
   discountPercent?: number | null;
   isOnSale?: boolean;
   images: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
-  brand?: string;
+  brand?: {
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+  } | string;
   scale?: string;
   condition: string;
   trade_available?: boolean;
@@ -69,11 +74,15 @@ export default function ListingsPage() {
   const [filters, setFilters] = useState({
     brand: searchParams.get('brand') || '',
     scale: searchParams.get('scale') || '',
+    material: searchParams.get('material') || '',
     condition: '',
     minPrice: '',
     maxPrice: '',
     tradeOnly: false,
     discountOnly: searchParams.get('discountOnly') === 'true',
+    preOrder: searchParams.get('preOrder') === 'true',
+    limited: searchParams.get('limited') === 'true',
+    set: searchParams.get('set') === 'true',
     sortBy: 'created_desc',
     category: searchParams.get('category') || '',
     manufacturer: searchParams.get('manufacturer') || '',
@@ -84,8 +93,12 @@ export default function ListingsPage() {
     const urlSearch = searchParams.get('search');
     const urlTradeOnly = searchParams.get('tradeOnly');
     const urlDiscountOnly = searchParams.get('discountOnly');
+    const urlPreOrder = searchParams.get('preOrder');
+    const urlLimited = searchParams.get('limited');
+    const urlSet = searchParams.get('set');
     const urlBrand = searchParams.get('brand');
     const urlScale = searchParams.get('scale');
+    const urlMaterial = searchParams.get('material');
     const urlCondition = searchParams.get('condition');
     const urlMinPrice = searchParams.get('minPrice');
     const urlMaxPrice = searchParams.get('maxPrice');
@@ -96,26 +109,44 @@ export default function ListingsPage() {
       ...prev,
       tradeOnly: urlTradeOnly === 'true',
       discountOnly: urlDiscountOnly === 'true',
+      preOrder: urlPreOrder === 'true',
+      limited: urlLimited === 'true',
+      set: urlSet === 'true',
       brand: urlBrand || '',
       scale: urlScale || '',
+      material: urlMaterial || '',
       condition: urlCondition || '',
       minPrice: urlMinPrice || '',
       maxPrice: urlMaxPrice || '',
       sortBy: urlSortBy || 'created_desc',
     }));
+    if (searchParams.get('category')) setFilters(prev => ({ ...prev, category: searchParams.get('category') || '' }));
   }, [searchParams]);
+
+  // Resolve category slug to id when ?category=slug is in URL
+  const categorySlug = filters.category || searchParams.get('category') || '';
+  const { data: categoryBySlug } = useQuery({
+    queryKey: ['categoryBySlug', categorySlug],
+    queryFn: async () => {
+      const res = await categoriesApi.findBySlug(categorySlug);
+      return res.data as { id: string; name: string; slug: string };
+    },
+    enabled: !!categorySlug,
+    staleTime: 5 * 60 * 1000,
+  });
+  const resolvedCategoryId = searchParams.get('categoryId') || categoryBySlug?.id;
 
   // Listings Query
   const { data: listings = [], isLoading } = useQuery({
-    queryKey: ['listings', searchQuery, filters, searchParams.get('categoryId') ?? ''],
+    queryKey: ['listings', searchQuery, filters, resolvedCategoryId ?? ''],
     queryFn: async (): Promise<Listing[]> => {
-      const urlCategoryId = searchParams.get('categoryId');
+      const urlCategoryId = resolvedCategoryId;
       const conditionMap: Record<string, string> = {
         'Yeni': 'new', 'Mükemmel': 'very_good', 'İyi': 'good', 'Orta': 'fair',
       };
       const mappedCondition = filters.condition ? conditionMap[filters.condition] || filters.condition : undefined;
       const sortByMap: Record<string, string> = {
-        'created_desc': 'newest', 'created_asc': 'oldest', 'price_asc': 'price_asc', 'price_desc': 'price_desc',
+        'created_desc': 'newest', 'created_asc': 'oldest', 'view_count_desc': 'popular', 'price_asc': 'price_asc', 'price_desc': 'price_desc',
       };
 
       const buildListParams = (): Record<string, any> => {
@@ -126,8 +157,12 @@ export default function ListingsPage() {
         if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
         if (filters.brand) p.brand = filters.brand;
         if (filters.scale) p.scale = filters.scale;
+        if (filters.material) p.material = filters.material;
         if (filters.tradeOnly) p.tradeOnly = true;
         if (filters.discountOnly) p.discountOnly = true;
+        if (filters.preOrder) p.preOrder = true;
+        if (filters.limited) p.limited = true;
+        if (filters.set) p.set = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
         if (filters.vehicleType) p.vehicleType = filters.vehicleType;
         if (searchQuery?.trim()) p.search = searchQuery.trim();
@@ -217,8 +252,8 @@ export default function ListingsPage() {
 
   const clearFilters = () => {
     setFilters({
-      brand: '', scale: '', condition: '', minPrice: '', maxPrice: '',
-      tradeOnly: false, discountOnly: false, sortBy: 'created_desc', category: '', manufacturer: '', vehicleType: '',
+      brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false, sortBy: 'created_desc', category: '', manufacturer: '', vehicleType: '',
     });
   };
 
@@ -354,6 +389,7 @@ export default function ListingsPage() {
                 >
                   <option value="created_desc">{t('product.sortNewest')}</option>
                   <option value="created_asc">{t('product.sortOldest')}</option>
+                  <option value="view_count_desc">{t('product.sortPopular')}</option>
                   <option value="price_asc">{t('product.sortPriceLow')}</option>
                   <option value="price_desc">{t('product.sortPriceHigh')}</option>
                   <option value="title_asc">A-Z</option>
@@ -367,11 +403,11 @@ export default function ListingsPage() {
               <div className="flex flex-wrap gap-2 mb-4">
                 {[
                   { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
-                  { k: 'scale', v: filters.scale }, { k: 'condition', v: filters.condition },
+                  { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
                   { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-full">
-                    {f.v}
+                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
                     <button onClick={() => setFilters({ ...filters, [f.k]: '' })} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 ))}
@@ -385,6 +421,24 @@ export default function ListingsPage() {
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 text-sm rounded-full">
                     {t('product.tradeAvailable')}
                     <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900"><XMarkIcon className="w-4 h-4" /></button>
+                  </span>
+                )}
+                {filters.preOrder && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-violet-100 text-violet-700 text-sm rounded-full">
+                    {t('product.preOrder')}
+                    <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900"><XMarkIcon className="w-4 h-4" /></button>
+                  </span>
+                )}
+                {filters.limited && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 text-sm rounded-full">
+                    {t('product.limitedEdition')}
+                    <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900"><XMarkIcon className="w-4 h-4" /></button>
+                  </span>
+                )}
+                {filters.set && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-sky-100 text-sky-700 text-sm rounded-full">
+                    {t('product.sets')}
+                    <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-sm text-orange-600 hover:text-orange-700 font-medium">{t('product.clearFilters')}</button>
@@ -433,7 +487,9 @@ export default function ListingsPage() {
                         <div className="flex-1 flex items-center justify-between min-w-0">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">{listing.title}</h3>
-                            <p className="text-sm text-gray-500 mb-1">{listing.brand} • {listing.scale}</p>
+                            <p className="text-sm text-gray-500 mb-1">
+                              {typeof listing.brand === 'object' ? listing.brand.name : listing.brand} • {listing.scale}
+                            </p>
                             {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                               <div className="flex items-center gap-1"><StarIconSolid className="w-3.5 h-3.5 text-yellow-400" /><span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span><span className="text-xs text-gray-500">({listing.rating.count})</span></div>
                             )}
@@ -487,7 +543,9 @@ export default function ListingsPage() {
                         </div>
                         <div className="p-3 flex-1 flex flex-col">
                           <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm mb-1 group-hover:text-orange-600 transition-colors">{listing.title}</h3>
-                          <p className="text-xs text-gray-500 mb-2">{listing.brand} • {listing.scale}</p>
+                          <p className="text-xs text-gray-500 mb-2">
+                            {typeof listing.brand === 'object' ? listing.brand.name : listing.brand} • {listing.scale}
+                          </p>
                           {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                             <div className="flex items-center gap-1 mb-2">
                               <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" /><span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>

@@ -38,6 +38,14 @@ export class ProductQueryDto {
   sellerId?: string;
 
   @ApiPropertyOptional({
+    example: 'uuid-brand-id',
+    description: 'Filter by brand ID',
+  })
+  @IsOptional()
+  @IsString()
+  brandId?: string;
+
+  @ApiPropertyOptional({
     enum: ProductStatus,
     example: 'active',
     description: 'Filter by status',
@@ -72,6 +80,14 @@ export class ProductQueryDto {
   scale?: string;
 
   @ApiPropertyOptional({
+    example: 'diecast',
+    description: 'Filter by material (attribute slug: diecast, resin, composite, plastic)',
+  })
+  @IsOptional()
+  @IsString()
+  material?: string;
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Filter only trade-enabled products',
   })
@@ -88,6 +104,33 @@ export class ProductQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   discountOnly?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter only pre-order products',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  preOrder?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter only limited edition products',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  limited?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter only set/bundle products (multi-pack, car sets)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  set?: boolean;
 
   @ApiPropertyOptional({
     example: 'araba',
@@ -120,11 +163,11 @@ export class ProductQueryDto {
   @ApiPropertyOptional({
     example: 'price_asc',
     description: 'Sort order',
-    enum: ['price_asc', 'price_desc', 'created_asc', 'created_desc', 'title_asc', 'title_desc'],
+    enum: ['price_asc', 'price_desc', 'created_asc', 'created_desc', 'title_asc', 'title_desc', 'view_count_desc', 'view_count_asc'],
   })
   @IsOptional()
   @IsString()
-  sortBy?: 'price_asc' | 'price_desc' | 'created_asc' | 'created_desc' | 'title_asc' | 'title_desc';
+  sortBy?: 'price_asc' | 'price_desc' | 'created_asc' | 'created_desc' | 'title_asc' | 'title_desc' | 'view_count_desc' | 'view_count_asc';
 
   @ApiPropertyOptional({
     example: 1,
@@ -146,4 +189,11 @@ export class ProductQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+  @ApiPropertyOptional({
+    example: 'uuid-brand-id',
+    description: 'Filter by car model ID',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  carModelId?: string;
 }

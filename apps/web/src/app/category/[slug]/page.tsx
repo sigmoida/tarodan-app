@@ -52,8 +52,7 @@ export default function CategoryPage() {
     maxPrice: '',
     condition: '',
     isTradeEnabled: false,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
+    sortBy: 'created_desc' as 'created_desc' | 'created_asc' | 'price_asc' | 'price_desc' | 'title_asc' | 'title_desc',
   });
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
@@ -81,7 +80,6 @@ export default function CategoryPage() {
         page,
         limit: 24,
         sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder,
       };
       if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
       if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
@@ -176,20 +174,18 @@ export default function CategoryPage() {
               </button>
             </div>
 
-            {/* Sort */}
+            {/* Sort - API: created_desc | created_asc | price_asc | price_desc | title_asc | title_desc */}
             <select
-              value={`${filters.sortBy}-${filters.sortOrder}`}
-              onChange={(e) => {
-                const [sortBy, sortOrder] = e.target.value.split('-');
-                setFilters({ ...filters, sortBy, sortOrder });
-              }}
+              value={filters.sortBy}
+              onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as typeof filters.sortBy })}
               className="bg-dark-800 border border-dark-700 rounded-lg px-4 py-2 text-white"
             >
-              <option value="createdAt-desc">En Yeni</option>
-              <option value="createdAt-asc">En Eski</option>
-              <option value="price-asc">Fiyat (Düşükten)</option>
-              <option value="price-desc">Fiyat (Yüksekten)</option>
-              <option value="title-asc">A-Z</option>
+              <option value="created_desc">En Yeni</option>
+              <option value="created_asc">En Eski</option>
+              <option value="price_asc">Fiyat (Düşükten)</option>
+              <option value="price_desc">Fiyat (Yüksekten)</option>
+              <option value="title_asc">A-Z</option>
+              <option value="title_desc">Z-A</option>
             </select>
 
             {/* Filter Toggle */}
@@ -220,8 +216,7 @@ export default function CategoryPage() {
                       maxPrice: '',
                       condition: '',
                       isTradeEnabled: false,
-                      sortBy: 'createdAt',
-                      sortOrder: 'desc',
+                      sortBy: 'created_desc',
                     })}
                     className="text-sm text-primary-400 hover:text-primary-300"
                   >

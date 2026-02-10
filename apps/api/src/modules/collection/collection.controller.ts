@@ -62,12 +62,16 @@ export class CollectionController {
     @Query('pageSize') pageSize?: number,
     @Query('sortBy') sortBy?: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc',
     @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('category') category?: string,
   ): Promise<CollectionListResponseDto> {
     return this.collectionService.browsePublicCollections(
       page,
       pageSize,
       sortBy,
       search,
+      categoryId,
+      category,
     );
   }
 

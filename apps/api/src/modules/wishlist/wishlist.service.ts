@@ -66,11 +66,16 @@ export class WishlistService {
       orderBy: { addedAt: 'desc' },
     });
 
-    // Map items with campaign discount prices
+    // Map items with campaign discount prices (skip deleted products)
     const mappedItems: WishlistItemResponseDto[] = [];
     for (const item of items) {
-      const dto = await this.mapItemToDto(item);
-      mappedItems.push(dto);
+      if (!item.product) continue;
+      try {
+        const dto = await this.mapItemToDto(item);
+        mappedItems.push(dto);
+      } catch (err) {
+        this.logger.warn(`mapItemToDto failed for item ${item.id}: ${err?.message || err}`);
+      }
     }
 
     return {

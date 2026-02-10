@@ -81,9 +81,11 @@ export class CollectionService {
         description: dto.description,
         coverImageUrl: dto.coverImageUrl,
         isPublic: dto.isPublic ?? true,
+        categoryId: dto.categoryId || undefined,
       },
       include: {
         user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
             product: {
@@ -124,6 +126,7 @@ export class CollectionService {
       where: { id: collectionId },
       include: {
         user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
             product: {
@@ -243,6 +246,7 @@ export class CollectionService {
         where: { id: basic.id },
         include: {
           user: { select: { id: true, displayName: true } },
+          category: { select: { id: true, name: true, slug: true } },
           items: {
             include: {
               product: {
@@ -420,14 +424,31 @@ export class CollectionService {
     pageSize?: number,
     sortBy: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc' = 'popular',
     search?: string,
+    categoryId?: string,
+    categorySlug?: string,
   ): Promise<CollectionListResponseDto> {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
+    // Resolve category slug to id if provided (case-insensitive)
+    let resolvedCategoryId = categoryId;
+    if (!resolvedCategoryId && categorySlug?.trim()) {
+      const slug = categorySlug.trim().toLowerCase();
+      const cat = await this.prisma.category.findFirst({
+        where: {
+          slug: { equals: slug, mode: 'insensitive' },
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      resolvedCategoryId = cat?.id ?? undefined;
+    }
+
     // Build where clause
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
+      ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
       ...(search && search.trim() !== '' ? {
         OR: [
           { name: { contains: search.trim(), mode: 'insensitive' } },
@@ -470,6 +491,7 @@ export class CollectionService {
         where,
         include: {
           user: { select: { id: true, displayName: true } },
+          category: { select: { id: true, name: true, slug: true } },
           _count: { select: { items: true } },
         },
         ...(needsInMemorySort
@@ -536,6 +558,8 @@ export class CollectionService {
         id: c.id,
         userId: c.userId,
         userName: c.user.displayName,
+        categoryId: c.categoryId ?? undefined,
+        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
@@ -598,9 +622,15 @@ export class CollectionService {
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.coverImageUrl !== undefined && { coverImageUrl: dto.coverImageUrl }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
+        ...(dto.categoryId !== undefined
+          ? (dto.categoryId == null || dto.categoryId === ''
+            ? { category: { disconnect: true } }
+            : { category: { connect: { id: dto.categoryId } } })
+          : {}),
       },
       include: {
         user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
             product: {
@@ -1358,6 +1388,8 @@ export class CollectionService {
       id: collection.id,
       userId: collection.userId,
       userName: collection.user?.displayName || '',
+      categoryId: collection.categoryId ?? undefined,
+      category: collection.category ? { id: collection.category.id, name: collection.category.name, slug: collection.category.slug } : undefined,
       name: collection.name,
       slug: collection.slug,
       description: collection.description || undefined,

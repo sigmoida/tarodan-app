@@ -10,14 +10,22 @@ export class CategoryService {
     private readonly cache: CacheService,
   ) { }
 
+  /** Cache key for categories list */
+  private static readonly CATEGORIES_CACHE_KEY = 'categories:all';
+
+  /**
+   * Invalidate categories cache (e.g. after seed or admin category change)
+   */
+  async invalidateCache(): Promise<void> {
+    await this.cache.del(CategoryService.CATEGORIES_CACHE_KEY);
+  }
+
   /**
    * Get all active categories (hierarchical)
    */
   async findAll() {
-    const cacheKey = 'categories:all';
-
     return this.cache.getOrSet(
-      cacheKey,
+      CategoryService.CATEGORIES_CACHE_KEY,
       async () => {
         const categories = await this.prisma.category.findMany({
           where: { isActive: true },
@@ -46,7 +54,7 @@ export class CategoryService {
 
         return rootCategories.map((root) => this.buildCategoryTree(root, childrenMap));
       },
-      { ttl: 3600 }, // 1 hour cache for categories
+      { ttl: 300 }, // 5 min cache
     );
   }
 

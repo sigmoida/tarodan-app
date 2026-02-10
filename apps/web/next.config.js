@@ -101,6 +101,20 @@ const nextConfig = {
       fallback: [],
     };
   },
+  async redirects() {
+    return [
+      {
+        source: '/models',
+        destination: '/brands',
+        permanent: true,
+      },
+      {
+        source: '/modeller',
+        destination: '/brands',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 // Sentry configuration options

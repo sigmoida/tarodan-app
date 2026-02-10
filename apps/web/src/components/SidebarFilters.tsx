@@ -29,6 +29,7 @@ interface SidebarFiltersProps {
     filters: {
         brand: string;
         scale: string;
+        material?: string;
         condition: string;
         minPrice: string;
         maxPrice: string;
@@ -78,6 +79,14 @@ const MANUFACTURERS = [
     'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL',
 ];
 
+// Malzeme (Material) - slug matches API attribute group "material"
+const MATERIALS: { slug: string; label: string; labelEn: string }[] = [
+    { slug: 'diecast', label: 'Diecast (Metal)', labelEn: 'Diecast (Metal)' },
+    { slug: 'resin', label: 'Resin (Reçine)', labelEn: 'Resin' },
+    { slug: 'composite', label: 'Composite (Kompozit)', labelEn: 'Composite' },
+    { slug: 'plastic', label: 'Plastic (Plastik)', labelEn: 'Plastic' },
+];
+
 export default function SidebarFilters({
     filters,
     onFilterChange,
@@ -118,6 +127,7 @@ export default function SidebarFilters({
         category: false,
         brand: false,
         scale: false,
+        material: false,
         manufacturer: false,
         condition: false,
         price: false,
@@ -154,6 +164,13 @@ export default function SidebarFilters({
         onFilterChange({
             ...filters,
             scale: filters.scale === scale ? '' : scale,
+        });
+    };
+
+    const handleMaterialChange = (materialSlug: string) => {
+        onFilterChange({
+            ...filters,
+            material: filters.material === materialSlug ? '' : materialSlug,
         });
     };
 
@@ -335,6 +352,39 @@ export default function SidebarFilters({
                                         }`}
                                 >
                                     {scale}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Malzeme (Material) */}
+                <div className="py-3 px-4">
+                    <button
+                        onClick={() => toggleSection('material')}
+                        className="flex items-center justify-between w-full text-left"
+                    >
+                        <span className="font-medium text-gray-900">
+                            {locale === 'en' ? 'Material' : 'Malzeme'}
+                        </span>
+                        {collapsedSections.material ? (
+                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                        ) : (
+                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                        )}
+                    </button>
+                    {!collapsedSections.material && (
+                        <div className="mt-3 space-y-1">
+                            {MATERIALS.map((m) => (
+                                <button
+                                    key={m.slug}
+                                    onClick={() => handleMaterialChange(m.slug)}
+                                    className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded-lg transition-colors ${filters.material === m.slug
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {locale === 'en' ? m.labelEn : m.label}
                                 </button>
                             ))}
                         </div>

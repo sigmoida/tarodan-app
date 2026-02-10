@@ -55,8 +55,8 @@ export class ProductResponseDto {
   @ApiProperty({ example: 'active' })
   status: string;
 
-  @ApiPropertyOptional({ 
-    example: 5, 
+  @ApiPropertyOptional({
+    example: 5,
     description: 'Stock quantity (null for unlimited stock)',
     nullable: true,
   })
@@ -70,6 +70,30 @@ export class ProductResponseDto {
 
   @ApiProperty({ type: ProductCategoryDto })
   category: ProductCategoryDto;
+
+  @ApiPropertyOptional({ type: ProductCategoryDto })
+  brand?: ProductCategoryDto;
+
+  @ApiProperty({ example: false })
+  isPreorder: boolean;
+
+  @ApiPropertyOptional({ example: '2024-06-01T00:00:00.000Z' })
+  releaseDate?: Date;
+
+  @ApiProperty({ example: false })
+  isLimited: boolean;
+
+  @ApiPropertyOptional({ example: '1/500' })
+  editionNumber?: string;
+
+  @ApiPropertyOptional({ example: 500 })
+  editionTotal?: number;
+
+  @ApiProperty({ example: false })
+  isSet: boolean;
+
+  @ApiPropertyOptional({ example: 2 })
+  bundleSize?: number;
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;
