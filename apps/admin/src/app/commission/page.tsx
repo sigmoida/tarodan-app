@@ -50,6 +50,7 @@ interface RuleFormData {
   sellerMax: string;
   buyerMin: string;
   buyerMax: string;
+  priority: number;
   isActive: boolean;
 }
 
@@ -122,6 +123,7 @@ export default function CommissionPage() {
       sellerMax: '',
       buyerMin: '',
       buyerMax: '',
+      priority: 0,
       isActive: true,
     });
     setPreviewPrice('');
@@ -141,6 +143,7 @@ export default function CommissionPage() {
       sellerMax: rule.sellerMax?.toString() || '',
       buyerMin: rule.buyerMin?.toString() || '',
       buyerMax: rule.buyerMax?.toString() || '',
+      priority: (rule as any).priority || 0,
       isActive: rule.isActive,
     });
     setPreviewPrice('');
@@ -221,6 +224,7 @@ export default function CommissionPage() {
         sellerMax: formData.sellerMax ? parseFloat(formData.sellerMax) : null,
         buyerMin: formData.buyerMin ? parseFloat(formData.buyerMin) : null,
         buyerMax: formData.buyerMax ? parseFloat(formData.buyerMax) : null,
+        priority: formData.priority,
         isActive: formData.isActive,
       };
 

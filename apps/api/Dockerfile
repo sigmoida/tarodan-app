@@ -20,11 +20,14 @@ COPY apps/api/prisma ./apps/api/prisma/
 # Install dependencies (monorepo)
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm --filter @tarodan/api prisma generate
-
 # Copy app source
 COPY apps/api ./apps/api
+
+# Generate Prisma client (source'dan sonra, schema'ya erişim için)
+# Prisma generate must run from the app directory
+WORKDIR /app/apps/api
+RUN pnpm prisma generate
+WORKDIR /app
 
 # Build
 RUN pnpm --filter @tarodan/api build
