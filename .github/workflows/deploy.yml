@@ -88,21 +88,21 @@ jobs:
 
             echo "🚀 Deploying ${{ matrix.app_name }} on port $PORT..."
 
-            # GitHub Container Registry'ye login
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            # GitHub Container Registry'ye login (sudo ile)
+            echo "${{ secrets.GHCR_PAT }}" | sudo docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
 
             # Eski container'ı durdur ve sil
-            docker stop $CONTAINER 2>/dev/null || true
-            docker rm $CONTAINER 2>/dev/null || true
+            sudo docker stop $CONTAINER 2>/dev/null || true
+            sudo docker rm $CONTAINER 2>/dev/null || true
 
             # Yeni image'ı çek
-            docker pull $IMAGE
+            sudo docker pull $IMAGE
 
             # Environment file kontrolü ve container başlatma
             ENV_FILE="/root/tarodan-${{ matrix.app_name }}.env"
             if [ -f "$ENV_FILE" ]; then
               echo "📝 Using environment file: $ENV_FILE"
-              docker run -d \
+              sudo docker run -d \
                 --name $CONTAINER \
                 --restart unless-stopped \
                 -p $PORT:$INTERNAL_PORT \
@@ -111,7 +111,7 @@ jobs:
             else
               echo "⚠️  Environment file not found: $ENV_FILE"
               echo "📝 Starting container without env file (you should create .env file on VPS)"
-              docker run -d \
+              sudo docker run -d \
                 --name $CONTAINER \
                 --restart unless-stopped \
                 -p $PORT:$INTERNAL_PORT \
@@ -119,23 +119,23 @@ jobs:
             fi
 
             # Kullanılmayan image'ları temizle
-            docker image prune -f
+            sudo docker image prune -f
 
             # Container'ın başladığını kontrol et
             echo "⏳ Waiting for container to start..."
             sleep 5
             
             # Container durumunu kontrol et
-            if docker ps | grep -q "$CONTAINER"; then
+            if sudo docker ps | grep -q "$CONTAINER"; then
               echo "✅ Container $CONTAINER is running"
               
               # Container loglarını göster (son 20 satır)
               echo "📋 Container logs (last 20 lines):"
-              docker logs --tail 20 $CONTAINER
+              sudo docker logs --tail 20 $CONTAINER
               
               # Port kontrolü
               echo "🔍 Checking port $PORT..."
-              if netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; then
+              if sudo netstat -tuln 2>/dev/null | grep -q ":$PORT " || sudo ss -tuln 2>/dev/null | grep -q ":$PORT "; then
                 echo "✅ Port $PORT is listening"
               else
                 echo "⚠️  Port $PORT might not be listening (check firewall)"
@@ -143,7 +143,7 @@ jobs:
             else
               echo "❌ Container $CONTAINER failed to start!"
               echo "📋 Container logs:"
-              docker logs $CONTAINER 2>&1 || true
+              sudo docker logs $CONTAINER 2>&1 || true
               exit 1
             fi
 
