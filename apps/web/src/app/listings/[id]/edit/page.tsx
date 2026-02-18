@@ -40,6 +40,14 @@ const MATERIALS: { slug: string; label: string }[] = [
   { slug: 'plastic', label: 'Plastic (Plastik)' },
 ];
 
+const CONDITIONS = [
+  { value: 'new', label: 'Yeni' },
+  { value: 'like_new', label: 'Sıfır Gibi' },
+  { value: 'very_good', label: 'Mükemmel' },
+  { value: 'good', label: 'İyi' },
+  { value: 'fair', label: 'Orta' },
+];
+
 export default function EditListingPage() {
   const params = useParams();
   const router = useRouter();
