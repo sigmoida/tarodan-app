@@ -116,16 +116,7 @@ export default function FavoritesPage() {
 
   const handleAddToCart = async (item: WishlistItem) => {
     try {
-      await addToCart({
-        productId: item.productId,
-        title: item.productTitle,
-        price: item.productPrice,
-        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
-        seller: {
-          id: item.sellerId,
-          displayName: item.sellerName,
-        },
-      });
+      await addToCart(item.productId);
       toast.success(t('product.addedToCart'));
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to add to cart:', error);
