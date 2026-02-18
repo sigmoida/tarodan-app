@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslation } from '@/i18n';
-import { BadgeCheckIcon } from '@heroicons/react/24/outline';
+import { CheckBadgeIcon } from '@heroicons/react/24/outline';
 
 export default function AuthenticityPage() {
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ export default function AuthenticityPage() {
           <header className="border-b border-gray-100 px-6 py-8">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-indigo-100 rounded-lg">
-                <BadgeCheckIcon className="w-8 h-8 text-indigo-600" />
+                <CheckBadgeIcon className="w-8 h-8 text-indigo-600" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{t('information.authenticity.title')}</h1>

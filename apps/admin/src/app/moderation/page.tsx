@@ -364,7 +364,7 @@ const ModerationPage = () => {
                         <span>Yorumcu: {item.reviewer.displayName || item.reviewer.email}</span>
                       )}
                       {item.price !== undefined && (
-                        <span>Fiyat: {getProductEffectivePrice(item).toLocaleString('tr-TR')} ₺</span>
+                        <span>Fiyat: {getProductEffectivePrice({ price: item.price }).toLocaleString('tr-TR')} ₺</span>
                       )}
                       {item.score !== undefined && (
                         <span>Puan: {item.score}/5</span>
