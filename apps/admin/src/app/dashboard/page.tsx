@@ -611,7 +611,7 @@ export default function DashboardPage() {
                           const ds = chart.data.datasets[0];
                           const bg = (ds?.backgroundColor ?? []) as string[];
                           return (chart.data.labels ?? []).map((label, i) => ({
-                            text: label,
+                            text: String(label ?? ''),
                             fillStyle: bg[i] ?? '#6b7280',
                             fontColor: bg[i] ?? '#9ca3af',
                             index: i,

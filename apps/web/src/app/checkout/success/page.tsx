@@ -14,7 +14,7 @@ import {
   CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/stores/authStore';
 
 interface OrderDetails {
   id: string;

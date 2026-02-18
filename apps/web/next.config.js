@@ -23,6 +23,19 @@ function getCacheHeaders() {
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  webpack: (config, { isServer }) => {
+    // ESM packages için webpack config
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    return config;
+  },
   // Heroicons: Sadece kullandığımız ikonlar (ok, menü, çöp kutusu vb.) bundle'a girer; kullanılmayanlar kesilir, JS küçülür.
   experimental: {
     optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
