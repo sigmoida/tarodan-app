@@ -121,4 +121,30 @@ jobs:
             # Kullanılmayan image'ları temizle
             docker image prune -f
 
+            # Container'ın başladığını kontrol et
+            echo "⏳ Waiting for container to start..."
+            sleep 5
+            
+            # Container durumunu kontrol et
+            if docker ps | grep -q "$CONTAINER"; then
+              echo "✅ Container $CONTAINER is running"
+              
+              # Container loglarını göster (son 20 satır)
+              echo "📋 Container logs (last 20 lines):"
+              docker logs --tail 20 $CONTAINER
+              
+              # Port kontrolü
+              echo "🔍 Checking port $PORT..."
+              if netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; then
+                echo "✅ Port $PORT is listening"
+              else
+                echo "⚠️  Port $PORT might not be listening (check firewall)"
+              fi
+            else
+              echo "❌ Container $CONTAINER failed to start!"
+              echo "📋 Container logs:"
+              docker logs $CONTAINER 2>&1 || true
+              exit 1
+            fi
+
             echo "✅ ${{ matrix.app_name }} deployed successfully on port $PORT"

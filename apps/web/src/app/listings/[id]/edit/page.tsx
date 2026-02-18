@@ -9,6 +9,13 @@ import toast from 'react-hot-toast';
 import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  children?: Category[];
+}
+
 interface Brand {
   id: string;
   name: string;
