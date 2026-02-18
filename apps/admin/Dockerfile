@@ -6,18 +6,25 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy root package files (monorepo)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
 
-# Install dependencies
+# Copy packages (monorepo dependencies)
+COPY packages ./packages
+
+# Copy app package files
+COPY apps/admin/package.json ./apps/admin/
+
+# Install dependencies (monorepo)
 RUN pnpm install --frozen-lockfile
 
-# Copy source
-COPY . .
+# Copy app source
+COPY apps/admin ./apps/admin
 
 # Build
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm build
+RUN pnpm --filter @tarodan/admin build
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -32,9 +39,9 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy built files
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/apps/admin/public ./public
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/.next/static ./.next/static
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app

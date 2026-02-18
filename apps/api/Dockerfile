@@ -6,21 +6,28 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
-COPY prisma ./prisma/
+# Copy root package files (monorepo)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
 
-# Install dependencies
+# Copy packages (monorepo dependencies)
+COPY packages ./packages
+
+# Copy app package files
+COPY apps/api/package.json ./apps/api/
+COPY apps/api/prisma ./apps/api/prisma/
+
+# Install dependencies (monorepo)
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
-RUN pnpm prisma generate
+RUN pnpm --filter @tarodan/api prisma generate
 
-# Copy source
-COPY . .
+# Copy app source
+COPY apps/api ./apps/api
 
 # Build
-RUN pnpm build
+RUN pnpm --filter @tarodan/api build
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -34,10 +41,10 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
 # Copy built files
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./package.json
+COPY --from=builder /app/apps/api/prisma ./prisma
 
 # Set ownership
 RUN chown -R nestjs:nodejs /app

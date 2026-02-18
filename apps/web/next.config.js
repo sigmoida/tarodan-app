@@ -21,6 +21,7 @@ function getCacheHeaders() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   // Heroicons: Sadece kullandığımız ikonlar (ok, menü, çöp kutusu vb.) bundle'a girer; kullanılmayanlar kesilir, JS küçülür.
   experimental: {

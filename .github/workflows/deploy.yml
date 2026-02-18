@@ -1,51 +1,47 @@
 # =============================================================================
-# TARODAN CD Pipeline (Deployment)
-# Based on PROJECT.md specifications
+# TARODAN - Otomatik Deployment (Master Branch)
+# Master branch'e push yapıldığında otomatik olarak build edilir ve VPS'e deploy edilir
 # =============================================================================
 
-name: Deploy
+name: Tarodan Deploy
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - staging
-          - production
+    branches: ['master']
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  USERNAME: ${{ github.actor }}
 
 jobs:
-  # ===========================================================================
-  # BUILD AND PUSH IMAGES
-  # ===========================================================================
-  build:
-    name: Build Images
+  build-and-deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - app: api
+          # API - NestJS Backend
+          - app_name: api
+            dockerfile: ./apps/api/Dockerfile
             context: ./apps/api
-          - app: web
-            context: ./frontend/web
-          - app: admin
-            context: ./frontend/admin
-    outputs:
-      api-image: ${{ steps.image.outputs.api }}
-      web-image: ${{ steps.image.outputs.web }}
-      admin-image: ${{ steps.image.outputs.admin }}
+            port: 3001
+            internal_port: 3001
+
+          # Web - Next.js Public Web
+          - app_name: web
+            dockerfile: ./apps/web/Dockerfile
+            context: ./apps/web
+            port: 3000
+            internal_port: 3000
+
+          # Admin - Next.js Admin Panel
+          - app_name: admin
+            dockerfile: ./apps/admin/Dockerfile
+            context: ./apps/admin
+            port: 3002
+            internal_port: 3002
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,136 +49,69 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ env.USERNAME }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest
-
-      - name: Build and push
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
+          context: .
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.USERNAME }}/tarodan-${{ matrix.app_name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Set image output
-        id: image
-        run: echo "${{ matrix.app }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:sha-${{ github.sha }}" >> $GITHUB_OUTPUT
-
-  # ===========================================================================
-  # DATABASE MIGRATION
-  # ===========================================================================
-  migrate:
-    name: Run Migrations
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: '20'
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # Değişkenler
+            IMAGE="${{ env.REGISTRY }}/${{ env.USERNAME }}/tarodan-${{ matrix.app_name }}:latest"
+            CONTAINER="tarodan-${{ matrix.app_name }}"
+            PORT="${{ matrix.port }}"
+            INTERNAL_PORT="${{ matrix.internal_port }}"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '9'
+            echo "🚀 Deploying ${{ matrix.app_name }} on port $PORT..."
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            # GitHub Container Registry'ye login
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ env.USERNAME }} --password-stdin
 
-      - name: Run migrations
-        run: pnpm --filter @tarodan/api prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+            # Eski container'ı durdur ve sil
+            docker stop $CONTAINER 2>/dev/null || true
+            docker rm $CONTAINER 2>/dev/null || true
 
-  # ===========================================================================
-  # DEPLOY TO COOLIFY
-  # ===========================================================================
-  deploy:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build, migrate]
-    environment:
-      name: ${{ github.event.inputs.environment || 'production' }}
-      url: ${{ vars.APP_URL }}
-    steps:
-      - name: Deploy via Coolify Webhook
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"tag": "sha-${{ github.sha }}"}' \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+            # Yeni image'ı çek
+            docker pull $IMAGE
 
-      - name: Wait for deployment
-        run: sleep 60
+            # Environment file kontrolü ve container başlatma
+            ENV_FILE="/root/tarodan-${{ matrix.app_name }}.env"
+            if [ -f "$ENV_FILE" ]; then
+              echo "📝 Using environment file: $ENV_FILE"
+              docker run -d \
+                --name $CONTAINER \
+                --restart unless-stopped \
+                -p $PORT:$INTERNAL_PORT \
+                --env-file $ENV_FILE \
+                $IMAGE
+            else
+              echo "⚠️  Environment file not found: $ENV_FILE"
+              echo "📝 Starting container without env file (you should create .env file on VPS)"
+              docker run -d \
+                --name $CONTAINER \
+                --restart unless-stopped \
+                -p $PORT:$INTERNAL_PORT \
+                $IMAGE
+            fi
 
-      - name: Health check
-        run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.API_URL }}/health)
-          if [ $response != "200" ]; then
-            echo "Health check failed with status $response"
-            exit 1
-          fi
-          echo "Health check passed!"
+            # Kullanılmayan image'ları temizle
+            docker image prune -f
 
-  # ===========================================================================
-  # POST-DEPLOYMENT
-  # ===========================================================================
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: always()
-    steps:
-      - name: Notify on success
-        if: needs.deploy.result == 'success'
-        run: |
-          echo "Deployment successful! 🚀"
-          # Add Slack/Discord notification here
-
-      - name: Notify on failure
-        if: needs.deploy.result == 'failure'
-        run: |
-          echo "Deployment failed! ❌"
-          # Add Slack/Discord notification here
-
-  # ===========================================================================
-  # SENTRY RELEASE
-  # ===========================================================================
-  sentry:
-    name: Create Sentry Release
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Create Sentry release
-        uses: getsentry/action-release@v1
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-        with:
-          environment: ${{ github.event.inputs.environment || 'production' }}
-          version: ${{ github.sha }}
+            echo "✅ ${{ matrix.app_name }} deployed successfully on port $PORT"
