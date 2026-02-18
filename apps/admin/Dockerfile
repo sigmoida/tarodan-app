@@ -38,10 +38,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy built files
+# Copy built files (standalone includes node_modules)
 COPY --from=builder /app/apps/admin/public ./public
 COPY --from=builder /app/apps/admin/.next/standalone ./
 COPY --from=builder /app/apps/admin/.next/static ./.next/static
+
+# Verify server.js exists
+RUN ls -la . || (echo "ERROR: standalone directory is empty!" && exit 1)
+RUN test -f server.js || (echo "ERROR: server.js not found in standalone build!" && exit 1)
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app

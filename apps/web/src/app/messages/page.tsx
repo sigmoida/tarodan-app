@@ -297,43 +297,9 @@ export default function MessagesPage() {
     }
   }, [messages.length, selectedThread?.id]);
 
-  const loadThreads = async () => {
-    try {
-      const response = await messagesApi.getThreads();
-      const rawThreads = response.data.data || response.data.threads || [];
-      const transformedThreads = rawThreads.map((t: any) => {
-        if (t.otherUser) return t;
-        const isParticipant1 = t.participant1Id === user?.id;
-        return {
-          ...t,
-          otherUser: {
-            id: isParticipant1 ? t.participant2Id : t.participant1Id,
-            displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
-            avatarUrl: null,
-          },
-          lastMessage: t.lastMessage ? { ...t.lastMessage, isFromMe: t.lastMessage.senderId === user?.id } : undefined,
-          product: t.productId ? { id: t.productId, title: t.productTitle || (locale === 'en' ? 'Product' : 'Ürün'), imageUrl: t.productImage } : undefined,
-        };
-      });
-      setThreads(transformedThreads);
-    } catch (error) {
-      console.error('Threads load error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMessages = async (threadId: string) => {
-    try {
-      const response = await messagesApi.getMessages(threadId);
-      const messages = response.data.data || response.data.messages || [];
-      const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      setMessages(sortedMessages);
-      await loadThreads();
-    } catch (error) {
-      console.error('Messages load error:', error);
-    }
-  };
+  // loadThreads ve loadMessages fonksiyonları artık kullanılmıyor
+  // useQuery hook'ları otomatik olarak yönetiyor
+  // Eğer manuel refresh gerekiyorsa queryClient.invalidateQueries kullanılmalı
 
   const handleMessageChange = (text: string) => {
     setNewMessage(text);

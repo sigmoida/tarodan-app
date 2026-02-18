@@ -49,6 +49,10 @@ COPY --from=builder /app/apps/api/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
 
+# Verify dist/main.js exists
+RUN ls -la dist/ || (echo "ERROR: dist directory is empty!" && exit 1)
+RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found!" && exit 1)
+
 # Set ownership
 RUN chown -R nestjs:nodejs /app
 
