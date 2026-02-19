@@ -17,8 +17,8 @@ COPY packages ./packages
 COPY apps/api/package.json ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma/
 
-# Install dependencies (monorepo)
-RUN pnpm install --frozen-lockfile
+# Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
+RUN pnpm install --frozen-lockfile --shamefully-hoist
 
 # Copy app source
 COPY apps/api ./apps/api
@@ -39,12 +39,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nestjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nestjs
 
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/node_modules ./node_modules
+# Copy root node_modules (hoisted = real files, not symlinks)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
 

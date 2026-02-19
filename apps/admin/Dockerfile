@@ -16,8 +16,8 @@ COPY packages ./packages
 # Copy app package files
 COPY apps/admin/package.json ./apps/admin/
 
-# Install dependencies (monorepo)
-RUN pnpm install --frozen-lockfile
+# Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
+RUN pnpm install --frozen-lockfile --shamefully-hoist
 
 # Copy app source
 COPY apps/admin ./apps/admin
@@ -35,10 +35,11 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copy standalone build (outputFileTracingRoot creates monorepo-aware structure)
+# Copy standalone build (outputFileTracingRoot makes monorepo-aware output)
+# With outputFileTracingRoot, server.js is at apps/admin/server.js
 COPY --from=builder /app/apps/admin/.next/standalone ./
 COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
 COPY --from=builder /app/apps/admin/public ./apps/admin/public
@@ -48,11 +49,9 @@ RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
-WORKDIR /app/apps/admin
-
 EXPOSE 3002
 
 ENV PORT=3002
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/admin/server.js"]
