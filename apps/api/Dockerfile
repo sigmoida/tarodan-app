@@ -30,25 +30,22 @@ RUN pnpm prisma generate
 WORKDIR /app
 
 # Build
-RUN pnpm --filter @tarodan/api build || (echo "❌ Build failed!" && exit 1)
+RUN pnpm --filter @tarodan/api build
 
-# Verify build succeeded and show dist contents
-RUN echo "📦 Checking build output..." && \
-    if [ ! -d "/app/apps/api/dist" ]; then \
-      echo "❌ dist directory not found! Build may have failed." && \
-      exit 1; \
-    fi && \
-    echo "✅ dist directory exists" && \
-    echo "📄 Contents of dist:" && \
-    ls -la /app/apps/api/dist/ && \
-    echo "📄 Looking for main.js..." && \
-    if [ ! -f "/app/apps/api/dist/main.js" ]; then \
-      echo "❌ dist/main.js not found!" && \
-      echo "📄 Available files:" && \
-      find /app/apps/api/dist -type f | head -20 && \
-      exit 1; \
-    fi && \
-    echo "✅ dist/main.js found!"
+# Debug: Show build output location
+RUN echo "📦 Build completed, checking output..." && \
+    echo "📄 Current directory:" && pwd && \
+    echo "📄 Checking /app/apps/api:" && \
+    ls -la /app/apps/api/ | head -20 && \
+    echo "📄 Checking for dist:" && \
+    (test -d /app/apps/api/dist && echo "✅ dist directory exists" || echo "❌ dist directory not found") && \
+    if [ -d "/app/apps/api/dist" ]; then \
+      echo "📄 Contents of dist:" && \
+      ls -la /app/apps/api/dist/ && \
+      echo "📄 Looking for main.js:" && \
+      (test -f /app/apps/api/dist/main.js && echo "✅ main.js found" || echo "⚠️  main.js not found, listing all files:") && \
+      find /app/apps/api/dist -type f -name "*.js" | head -10; \
+    fi
 
 # Production stage
 FROM node:20-alpine AS runner

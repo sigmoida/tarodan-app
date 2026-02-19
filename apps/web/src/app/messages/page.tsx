@@ -278,11 +278,8 @@ export default function MessagesPage() {
     }
   };
 
-  useEffect(() => {
-    if (selectedThread) {
-      loadMessages(selectedThread.id);
-    }
-  }, [selectedThread]);
+  // Messages are automatically loaded by useQuery when selectedThread changes
+  // No need for manual loadMessages call
 
   const scrollChatToBottom = () => {
     requestAnimationFrame(() => {

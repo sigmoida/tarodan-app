@@ -26,6 +26,20 @@ COPY apps/admin ./apps/admin
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @tarodan/admin build
 
+# Debug: Check standalone build output
+RUN echo "📦 Checking standalone build..." && \
+    if [ ! -d "/app/apps/admin/.next/standalone" ]; then \
+      echo "❌ .next/standalone not found! Build may have failed." && \
+      exit 1; \
+    fi && \
+    echo "✅ .next/standalone exists" && \
+    echo "📄 Contents:" && \
+    ls -la /app/apps/admin/.next/standalone/ && \
+    echo "📄 Checking for node_modules:" && \
+    (test -d /app/apps/admin/.next/standalone/node_modules && echo "✅ node_modules found" || echo "⚠️  node_modules not found in standalone") && \
+    echo "📄 Checking for server.js:" && \
+    (test -f /app/apps/admin/.next/standalone/server.js && echo "✅ server.js found" || echo "❌ server.js not found")
+
 # Production stage
 FROM node:20-alpine AS runner
 
@@ -43,9 +57,15 @@ COPY --from=builder /app/apps/admin/public ./public
 COPY --from=builder /app/apps/admin/.next/standalone ./
 COPY --from=builder /app/apps/admin/.next/static ./.next/static
 
-# Verify server.js exists
-RUN ls -la . || (echo "ERROR: standalone directory is empty!" && exit 1)
-RUN test -f server.js || (echo "ERROR: server.js not found in standalone build!" && exit 1)
+# Verify standalone build structure
+RUN echo "📦 Verifying standalone build..." && \
+    ls -la . && \
+    echo "📄 Checking for server.js:" && \
+    (test -f server.js && echo "✅ server.js found" || (echo "❌ server.js not found!" && exit 1)) && \
+    echo "📄 Checking for node_modules:" && \
+    (test -d node_modules && echo "✅ node_modules found" || (echo "❌ node_modules not found in standalone!" && ls -la . && exit 1)) && \
+    echo "📄 Checking for next in node_modules:" && \
+    (test -d node_modules/next && echo "✅ next module found" || (echo "❌ next module not found!" && ls -la node_modules/ 2>/dev/null | head -20 || echo "node_modules is empty or missing" && exit 1))
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app
