@@ -13,9 +13,152 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # =========================================================================
+  # Infrastructure: PostgreSQL, Redis, MinIO, Elasticsearch, MailHog
+  # =========================================================================
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy infrastructure services via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            echo "🏗️ Deploying infrastructure services..."
+
+            # Docker network oluştur (yoksa)
+            docker network create tarodan-network 2>/dev/null || true
+
+            # docker-compose.yml dosyasını oluştur
+            mkdir -p /root/tarodan-infra
+            cat > /root/tarodan-infra/docker-compose.yml << 'COMPOSE_EOF'
+            version: '3.8'
+
+            name: tarodan
+
+            services:
+              # PostgreSQL Database
+              postgres:
+                image: postgres:15-alpine
+                container_name: tarodan-postgres
+                environment:
+                  POSTGRES_USER: postgres
+                  POSTGRES_PASSWORD: postgres
+                  POSTGRES_DB: tarodan
+                ports:
+                  - "5432:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U postgres"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                networks:
+                  - tarodan-network
+
+              # Redis Cache
+              redis:
+                image: redis:7-alpine
+                container_name: tarodan-redis
+                ports:
+                  - "6379:6379"
+                volumes:
+                  - redis_data:/data
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                networks:
+                  - tarodan-network
+
+              # MinIO Object Storage
+              minio:
+                image: minio/minio:latest
+                container_name: tarodan-minio
+                command: server /data --console-address ":9001"
+                environment:
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                ports:
+                  - "9000:9000"
+                  - "9001:9001"
+                volumes:
+                  - minio_data:/data
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+                  interval: 30s
+                  timeout: 20s
+                  retries: 3
+                networks:
+                  - tarodan-network
+
+              # Elasticsearch for Search
+              elasticsearch:
+                image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+                container_name: tarodan-elasticsearch
+                environment:
+                  - discovery.type=single-node
+                  - xpack.security.enabled=false
+                  - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+                ports:
+                  - "9200:9200"
+                volumes:
+                  - elasticsearch_data:/usr/share/elasticsearch/data
+                healthcheck:
+                  test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 5
+                networks:
+                  - tarodan-network
+
+              # MailHog for Email Testing
+              mailhog:
+                image: mailhog/mailhog:latest
+                container_name: tarodan-mailhog
+                ports:
+                  - "1025:1025"
+                  - "8025:8025"
+                networks:
+                  - tarodan-network
+
+            volumes:
+              postgres_data:
+              redis_data:
+              minio_data:
+              elasticsearch_data:
+
+            networks:
+              tarodan-network:
+                external: true
+            COMPOSE_EOF
+
+            # Docker compose ile servisleri başlat
+            cd /root/tarodan-infra
+            docker compose up -d
+
+            # Servislerin başlamasını bekle
+            echo "⏳ Waiting for services to start..."
+            sleep 10
+
+            # Durum kontrolü
+            echo "📋 Infrastructure status:"
+            docker compose ps
+
+            echo "✅ Infrastructure deployment complete!"
+
+  # =========================================================================
+  # Application Builds: API, Web, Admin
+  # =========================================================================
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
+    needs: deploy-infrastructure
     permissions:
       contents: read
       packages: write
@@ -26,21 +169,18 @@ jobs:
           # API - NestJS Backend
           - app_name: api
             dockerfile: ./apps/api/Dockerfile
-            context: ./apps/api
             port: 3001
             internal_port: 3001
 
           # Web - Next.js Public Web
           - app_name: web
             dockerfile: ./apps/web/Dockerfile
-            context: ./apps/web
             port: 3000
             internal_port: 3000
 
           # Admin - Next.js Admin Panel
           - app_name: admin
             dockerfile: ./apps/admin/Dockerfile
-            context: ./apps/admin
             port: 3002
             internal_port: 3002
 
@@ -91,6 +231,9 @@ jobs:
             # GitHub Container Registry'ye login
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
 
+            # Docker network (infrastructure ile aynı network)
+            docker network create tarodan-network 2>/dev/null || true
+
             # Eski container'ı durdur ve sil
             docker stop $CONTAINER 2>/dev/null || true
             docker rm $CONTAINER 2>/dev/null || true
@@ -105,6 +248,7 @@ jobs:
               docker run -d \
                 --name $CONTAINER \
                 --restart unless-stopped \
+                --network tarodan-network \
                 -p $PORT:$INTERNAL_PORT \
                 --env-file $ENV_FILE \
                 $IMAGE
@@ -114,6 +258,7 @@ jobs:
               docker run -d \
                 --name $CONTAINER \
                 --restart unless-stopped \
+                --network tarodan-network \
                 -p $PORT:$INTERNAL_PORT \
                 $IMAGE
             fi
@@ -124,22 +269,12 @@ jobs:
             # Container'ın başladığını kontrol et
             echo "⏳ Waiting for container to start..."
             sleep 5
-            
+
             # Container durumunu kontrol et
             if docker ps | grep -q "$CONTAINER"; then
               echo "✅ Container $CONTAINER is running"
-              
-              # Container loglarını göster (son 20 satır)
               echo "📋 Container logs (last 20 lines):"
               docker logs --tail 20 $CONTAINER
-              
-              # Port kontrolü
-              echo "🔍 Checking port $PORT..."
-              if netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; then
-                echo "✅ Port $PORT is listening"
-              else
-                echo "⚠️  Port $PORT might not be listening (check firewall)"
-              fi
             else
               echo "❌ Container $CONTAINER failed to start!"
               echo "📋 Container logs:"

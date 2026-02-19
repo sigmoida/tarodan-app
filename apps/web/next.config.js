@@ -1,4 +1,5 @@
 const { withSentryConfig } = require('@sentry/nextjs');
+const path = require('path');
 
 /**
  * Cache headers (browser / CDN) – sadece /public altındaki statik dosyalar.
@@ -22,6 +23,7 @@ function getCacheHeaders() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config

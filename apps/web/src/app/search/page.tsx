@@ -445,7 +445,7 @@ function SearchContent() {
                     id: string;
                     title: string;
                     images?: string[];
-                    price?: number;
+                    price: number;
                     isTradeEnabled?: boolean;
                     isPreorder?: boolean;
                     isLimited?: boolean;
