@@ -342,7 +342,6 @@ CREATE INDEX "products_car_model_id_idx" ON "products"("car_model_id");
 CREATE INDEX "products_is_preorder_idx" ON "products"("is_preorder");
 CREATE INDEX "products_is_limited_idx" ON "products"("is_limited");
 CREATE INDEX "products_is_set_idx" ON "products"("is_set");
-CREATE INDEX "products_sale_start_date_sale_end_date_idx" ON "products"("sale_start_date", "sale_end_date");
 CREATE INDEX "collections_category_id_idx" ON "collections"("category_id");
 
 -- =============================================
