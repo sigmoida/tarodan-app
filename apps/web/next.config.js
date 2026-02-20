@@ -23,7 +23,6 @@ function getCacheHeaders() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
@@ -35,11 +34,11 @@ const nextConfig = {
         tls: false,
       };
     }
-    
+
     return config;
   },
-  // Heroicons: Sadece kullandığımız ikonlar (ok, menü, çöp kutusu vb.) bundle'a girer; kullanılmayanlar kesilir, JS küçülür.
   experimental: {
+    outputFileTracingRoot: path.join(__dirname, '../../'),
     optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
   },
   async headers() {
