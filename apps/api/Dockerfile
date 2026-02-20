@@ -3,7 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
+# Install OpenSSL and pnpm
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 
 # Copy root package files (monorepo)
@@ -37,6 +38,9 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+# Install OpenSSL (needed for Prisma)
+RUN apk add --no-cache openssl
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
