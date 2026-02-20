@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Ensure devDependencies are installed during build
+ENV NODE_ENV=development
+
 # Install pnpm
 RUN npm install -g pnpm
 
