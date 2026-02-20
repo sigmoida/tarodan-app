@@ -25,7 +25,8 @@ RUN pnpm install --frozen-lockfile --shamefully-hoist
 # Copy app source
 COPY apps/admin ./apps/admin
 
-# Build
+# Switch to production for Next.js build
+ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @tarodan/admin build
 
