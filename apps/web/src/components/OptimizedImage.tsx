@@ -11,6 +11,22 @@ const DEFAULT_PLACEHOLDER =
 /** Default sizes for fill images: responsive grid (e.g. 3 cols desktop, 2 tablet, 1 mobile) */
 const DEFAULT_FILL_SIZES = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
 
+/**
+ * Validate that a string is a valid image src for Next.js Image component.
+ * Accepts: http(s) URLs, absolute paths (/...), data URIs, blob URIs.
+ * Rejects: bare S3 keys like "dev/products/..." which crash Next.js Image.
+ */
+export function isValidImageSrc(src: unknown): boolean {
+  if (!src || typeof src !== 'string') return false;
+  return (
+    src.startsWith('http://') ||
+    src.startsWith('https://') ||
+    src.startsWith('/') ||
+    src.startsWith('data:') ||
+    src.startsWith('blob:')
+  );
+}
+
 interface OptimizedImageProps extends Omit<ImageProps, 'onError'> {
   fallbackSrc?: string;
   logContext?: Record<string, unknown>;
@@ -47,16 +63,21 @@ export default function OptimizedImage({
 }: OptimizedImageProps) {
   // When using fill, Next.js requires "sizes" for optimal srcset. Apply default if missing.
   const effectiveSizes = props.fill && !sizes ? DEFAULT_FILL_SIZES : sizes;
-  const [imgSrc, setImgSrc] = useState(src);
+
+  // Validate src before passing to Next.js Image — bare S3 keys crash rendering
+  const safeSrc = (typeof src === 'string' && !isValidImageSrc(src)) ? fallbackSrc : src;
+
+  const [imgSrc, setImgSrc] = useState(safeSrc);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // Sync state when src prop changes
   useEffect(() => {
-    setImgSrc(src);
+    const validated = (typeof src === 'string' && !isValidImageSrc(src)) ? fallbackSrc : src;
+    setImgSrc(validated);
     setHasError(false);
     setRetryCount(0);
-  }, [src]);
+  }, [src, fallbackSrc]);
 
   const handleError = useCallback(() => {
     const errorDetails = {
@@ -134,8 +155,8 @@ export function getOptimizedImageUrl(
   placeholder: string = DEFAULT_PLACEHOLDER
 ): string {
   if (!image) return placeholder;
-  if (typeof image === 'string') return image;
-  if ('url' in image && image.url) return image.url;
+  const raw = typeof image === 'string' ? image : ('url' in image ? image.url : null);
+  if (raw && isValidImageSrc(raw)) return raw;
   return placeholder;
 }
 

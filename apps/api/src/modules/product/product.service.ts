@@ -1577,10 +1577,14 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
             }
           }
 
-          // 5. Fallback: Orijinal URL'yi döndür (placeholder, external URL, veya expire olmuş presigned URL)
+          // 5. Fallback: Only return the original URL if it's a valid HTTP(S) URL.
+          //    Raw S3 keys (e.g. "dev/products/...") are NOT valid browser URLs and crash the frontend.
+          const fallbackUrl = img.url && (img.url.startsWith('http://') || img.url.startsWith('https://'))
+            ? img.url
+            : null;
           return {
             id: img.id,
-            url: img.url,
+            url: fallbackUrl,
             sortOrder: img.sortOrder,
           };
         }) || []

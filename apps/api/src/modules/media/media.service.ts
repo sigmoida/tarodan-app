@@ -104,6 +104,18 @@ export class MediaService {
         mimeType: uploadResult.mimeType,
       };
 
+      // Generate a presigned download URL so the frontend can preview / store it
+      try {
+        result.url = await this.storageService.getPresignedDownloadUrl(
+          bucket,
+          uploadResult.key,
+          3600, // 1 hour
+        );
+      } catch (err: any) {
+        this.logger.warn(`Presigned URL generation failed for ${uploadResult.key}: ${err.message}`);
+        // Fallback: keep url undefined — frontend should handle this gracefully
+      }
+
       // Generate thumbnail if requested and sharp is available
       if (generateThumbnail && file.mimetype.startsWith('image/') && sharp) {
         const thumbBuffer = await sharp(file.buffer)

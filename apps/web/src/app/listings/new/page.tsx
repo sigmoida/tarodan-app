@@ -355,7 +355,9 @@ export default function NewListingPage() {
     try {
       const response = await mediaApi.uploadProductImages(filesToUpload);
 
-      const uploadedUrls = response.data.map((result: any) => result.url);
+      const uploadedUrls = response.data
+        .map((result: any) => result.url || result.key)
+        .filter(Boolean);
       setFormData({
         ...formData,
         imageUrls: [...formData.imageUrls, ...uploadedUrls],

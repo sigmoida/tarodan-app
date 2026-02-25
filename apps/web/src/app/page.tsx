@@ -5,7 +5,7 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import OptimizedImage, { getOptimizedImageUrl } from '@/components/OptimizedImage';
+import OptimizedImage, { getOptimizedImageUrl, isValidImageSrc } from '@/components/OptimizedImage';
 import {
   ArrowRightIcon,
   HandThumbUpIcon,
@@ -305,8 +305,9 @@ export default function Home() {
   const getImageUrl = (image: any): string => {
     const placeholder = locale === 'en' ? 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Product' : 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
     if (!image) return placeholder;
-    if (typeof image === 'string') return image;
-    return image.url || placeholder;
+    const raw = typeof image === 'string' ? image : image.url;
+    if (raw && isValidImageSrc(raw)) return raw;
+    return placeholder;
   };
 
   const getProductTag = (product: Product): string | null => {

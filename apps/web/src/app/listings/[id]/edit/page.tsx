@@ -497,7 +497,9 @@ export default function EditListingPage() {
       const fileArray = Array.from(files);
       const response = await mediaApi.uploadProductImages(fileArray);
 
-      const uploadedUrls = response.data.map((result: any) => result.url);
+      const uploadedUrls = response.data
+        .map((result: any) => result.url || result.key)
+        .filter(Boolean);
       setFormData({
         ...formData,
         imageUrls: [...formData.imageUrls, ...uploadedUrls],
