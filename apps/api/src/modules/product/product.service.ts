@@ -19,6 +19,7 @@ import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
 import { DiscountService } from '../discount/discount.service';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class ProductService implements OnModuleInit {
@@ -40,6 +41,7 @@ export class ProductService implements OnModuleInit {
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
     private readonly discountService: DiscountService,
+    private readonly storageService: StorageService,
   ) { }
 
   /**
@@ -1387,6 +1389,57 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   }
 
   /**
+   * Extract S3 key from presigned URL or return original if not a presigned URL
+   * Example: https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/products/...?X-Amz-Signature=...
+   * Returns: dev/products/...
+   */
+  private extractKeyFromUrl(url: string): string | null {
+    try {
+      // Eğer presigned URL ise (X-Amz-Signature içeriyorsa)
+      if (url.includes('X-Amz-Signature') || url.includes('amzn-tarodan.s3.eu-west-1.amazonaws.com')) {
+        const urlObj = new URL(url);
+        // Path'den key'i extract et: /dev/products/... -> dev/products/...
+        const path = urlObj.pathname;
+        if (path.startsWith('/')) {
+          return path.substring(1); // İlk / karakterini kaldır
+        }
+        return path;
+      }
+      // Eğer zaten key formatındaysa (dev/ veya prod/ ile başlıyorsa)
+      if (url.includes('dev/') || url.includes('prod/')) {
+        // Query string varsa kaldır
+        try {
+          const urlObj = new URL(url, 'http://dummy.com'); // Relative URL için dummy base
+          return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+        } catch {
+          return url; // URL parse edilemezse direkt kullan
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Find MediaFile key by productId as fallback
+   */
+  private async findMediaFileKeyByProductId(productId: string): Promise<string | null> {
+    try {
+      const mediaFile = await this.prisma.mediaFile.findFirst({
+        where: {
+          entityType: 'product',
+          entityId: productId,
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      return mediaFile?.key || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Format product response
    */
   private async formatProductResponse(product: any) {
@@ -1478,11 +1531,60 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
       quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null, // null = unlimited stock
-      images: product.images?.map((img: any) => ({
-        id: img.id,
-        url: img.url,
-        sortOrder: img.sortOrder,
-      })) || [],
+      images: await Promise.all(
+        product.images?.map(async (img: any) => {
+          let s3Key: string | null = null;
+
+          // 1. Eğer zaten S3 key formatındaysa (dev/ veya prod/ ile başlıyorsa ve presigned URL değilse)
+          if (img.url && !img.url.includes('X-Amz-Signature')) {
+            if (img.url.includes('dev/') || img.url.includes('prod/')) {
+              // Query string varsa kaldır
+              try {
+                const urlObj = new URL(img.url, 'http://dummy.com');
+                s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+              } catch {
+                s3Key = img.url; // URL parse edilemezse direkt kullan
+              }
+            }
+          }
+
+          // 2. Eğer presigned URL ise, key'i extract et
+          if (!s3Key && img.url && (img.url.includes('X-Amz-Signature') || img.url.includes('amzn-tarodan.s3'))) {
+            s3Key = this.extractKeyFromUrl(img.url);
+          }
+
+          // 3. Eğer hala key bulamadıysak, MediaFile'dan bul (fallback)
+          if (!s3Key) {
+            s3Key = await this.findMediaFileKeyByProductId(product.id);
+          }
+
+          // 4. Eğer key bulunduysa, presigned URL oluştur
+          if (s3Key) {
+            try {
+              const presignedUrl = await this.storageService.getPresignedDownloadUrl(
+                'products',
+                s3Key,
+                3600 // 1 saat
+              );
+              return {
+                id: img.id,
+                url: presignedUrl,
+                sortOrder: img.sortOrder,
+              };
+            } catch (error) {
+              // Presigned URL oluşturulamazsa, orijinal URL'yi döndür
+              this.logger.warn(`Failed to generate presigned URL for ${s3Key}: ${error}`);
+            }
+          }
+
+          // 5. Fallback: Orijinal URL'yi döndür (placeholder, external URL, veya expire olmuş presigned URL)
+          return {
+            id: img.id,
+            url: img.url,
+            sortOrder: img.sortOrder,
+          };
+        }) || []
+      ),
       rating: {
         average: ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null,
         count: ratingStats._count || 0,

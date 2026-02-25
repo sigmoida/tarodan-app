@@ -22,6 +22,7 @@ import { MembershipService } from '../membership/membership.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
+import { StorageService } from '../storage/storage.service';
 import * as https from 'https';
 import * as http from 'http';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,6 +45,7 @@ export class CollectionService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly mediaService: MediaService,
+    private readonly storageService: StorageService,
   ) {}
 
   // ==========================================================================
@@ -767,19 +769,27 @@ export class CollectionService {
             .resize(1200, 600, { fit: 'cover' })
             .toBuffer();
 
-          // Upload to MinIO using MediaService
+          // Upload to S3 using MediaService
           const uploadResult = await this.mediaService.uploadBuffer(resizedBuffer, {
             folder: 'collection-covers',
             mimeType: 'image/jpeg',
+            bucket: 'collections',
           });
+
+          // Generate presigned URL
+          const presignedUrl = await this.storageService.getPresignedDownloadUrl(
+            'collections',
+            uploadResult.key,
+            3600 * 24 * 7 // 7 days
+          );
 
           // Update collection
           await this.prisma.collection.update({
             where: { id: collectionId },
-            data: { coverImageUrl: uploadResult.url },
+            data: { coverImageUrl: presignedUrl },
           });
 
-          return uploadResult.url;
+          return presignedUrl;
         } catch (error) {
           this.logger.error(`Failed to generate single cover image: ${error.message}`);
           return null;
@@ -832,19 +842,27 @@ export class CollectionService {
 
       const finalBuffer = await composite.composite(composites).jpeg().toBuffer();
 
-      // Upload to MinIO using MediaService
+      // Upload to S3 using MediaService
       const uploadResult = await this.mediaService.uploadBuffer(finalBuffer, {
         folder: 'collection-covers',
         mimeType: 'image/jpeg',
+        bucket: 'collections',
       });
+
+      // Generate presigned URL
+      const presignedUrl = await this.storageService.getPresignedDownloadUrl(
+        'collections',
+        uploadResult.key,
+        3600 * 24 * 7 // 7 days
+      );
 
       // Update collection
       await this.prisma.collection.update({
         where: { id: collectionId },
-        data: { coverImageUrl: uploadResult.url },
+        data: { coverImageUrl: presignedUrl },
       });
 
-      return uploadResult.url;
+      return presignedUrl;
     } catch (error) {
       this.logger.error(`Failed to generate cover image: ${error.message}`);
       return null;

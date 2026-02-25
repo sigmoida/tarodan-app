@@ -5,9 +5,10 @@ import { PrismaModule } from '../../prisma';
 import { MembershipModule } from '../membership/membership.module';
 import { MediaModule } from '../media/media.module';
 import { NotificationModule } from '../notification/notification.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [PrismaModule, MembershipModule, MediaModule, forwardRef(() => NotificationModule)],
+  imports: [PrismaModule, MembershipModule, MediaModule, StorageModule, forwardRef(() => NotificationModule)],
   controllers: [CollectionController],
   providers: [CollectionService],
   exports: [CollectionService],

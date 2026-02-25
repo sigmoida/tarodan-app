@@ -60,7 +60,7 @@ import { SentryModule } from './modules/sentry';
 // Health check for monitoring
 import { HealthModule } from './modules/health';
 
-// Media/File uploads (MinIO)
+// Media/File uploads (AWS S3)
 import { MediaModule } from './modules/media';
 
 // Event service for queue publishing
@@ -85,7 +85,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env.local', '.env', 'env.txt'], // env.txt de okunabilir
     }),
 
     // Rate limiting
@@ -130,7 +130,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     SecurityModule,     // GAP-004 to GAP-009, GAP-017, GAP-018: Security & Auth
 
     // PHASE 4 - Infrastructure Modules
-    StorageModule,      // GAP-007: MinIO File Storage (HIGH)
+    StorageModule,      // GAP-007: AWS S3 File Storage (HIGH)
     SearchModule,       // GAP-008: Elasticsearch Search (HIGH) - Enabled for improved search
     PaymentProvidersModule, // GAP-015 & GAP-016: iyzico & Aras Kargo
 

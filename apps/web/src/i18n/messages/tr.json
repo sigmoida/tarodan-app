@@ -192,6 +192,7 @@
     "notFound": "Model bulunamadı."
   },
   "product": {
+    "title": "Ürünler",
     "addToCart": "Sepete Ekle",
     "removeFromCart": "Sepetten Çıkar",
     "buyNow": "Hemen Al",

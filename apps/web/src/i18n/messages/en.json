@@ -192,6 +192,7 @@
     "notFound": "Model not found."
   },
   "product": {
+    "title": "Products",
     "addToCart": "Add to Cart",
     "removeFromCart": "Remove from Cart",
     "buyNow": "Buy Now",

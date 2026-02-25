@@ -1,8 +1,8 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as Minio from 'minio';
 import { v4 as uuidv4 } from 'uuid';
 import { MembershipService } from '../membership/membership.service';
+import { StorageService, UploadOptions as StorageUploadOptions } from '../storage/storage.service';
 
 // Sharp is optional - image resizing will be skipped if not available
 let sharp: any;
@@ -13,7 +13,7 @@ try {
 }
 
 export interface UploadOptions {
-  bucket?: string;
+  bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
   folder?: string;
   maxSize?: number;
   allowedTypes?: string[];
@@ -26,7 +26,7 @@ export interface UploadOptions {
 }
 
 export interface UploadResult {
-  url: string;
+  url?: string; // Deprecated - presigned URL için kullanılmalı
   key: string;
   bucket: string;
   size: number;
@@ -37,57 +37,13 @@ export interface UploadResult {
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  private readonly minioClient: Minio.Client;
-  private readonly defaultBucket: string;
+  private readonly defaultBucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets' = 'products';
 
   constructor(
     private configService: ConfigService,
     private membershipService: MembershipService,
-  ) {
-    const portStr = this.configService.get<string>('MINIO_PORT') || '9000';
-    const port = parseInt(portStr, 10);
-    
-    // Parse useSSL as boolean - env vars come as strings
-    const useSSLStr = this.configService.get<string>('MINIO_USE_SSL') || 'false';
-    const useSSL = useSSLStr === 'true' || useSSLStr === '1';
-    
-    this.minioClient = new Minio.Client({
-      endPoint: this.configService.get<string>('MINIO_ENDPOINT') || 'localhost',
-      port: port,
-      useSSL: useSSL,
-      accessKey: this.configService.get<string>('MINIO_ACCESS_KEY') || 'minioadmin',
-      secretKey: this.configService.get<string>('MINIO_SECRET_KEY') || 'minioadmin',
-    });
-
-    this.defaultBucket = this.configService.get<string>('MINIO_BUCKET') || 'tarodan';
-    this.ensureBucket();
-  }
-
-  private async ensureBucket(): Promise<void> {
-    try {
-      const exists = await this.minioClient.bucketExists(this.defaultBucket);
-      if (!exists) {
-        await this.minioClient.makeBucket(this.defaultBucket);
-        this.logger.log(`Bucket '${this.defaultBucket}' created`);
-
-        // Set bucket policy for public read
-        const policy = {
-          Version: '2012-10-17',
-          Statement: [
-            {
-              Effect: 'Allow',
-              Principal: { AWS: ['*'] },
-              Action: ['s3:GetObject'],
-              Resource: [`arn:aws:s3:::${this.defaultBucket}/*`],
-            },
-          ],
-        };
-        await this.minioClient.setBucketPolicy(this.defaultBucket, JSON.stringify(policy));
-      }
-    } catch (error) {
-      this.logger.error(`Failed to ensure bucket: ${error.message}`);
-    }
-  }
+    private storageService: StorageService,
+  ) {}
 
   async upload(
     file: Express.Multer.File,
@@ -119,7 +75,6 @@ export class MediaService {
     // Generate unique filename
     const ext = file.originalname.split('.').pop();
     const filename = `${uuidv4()}.${ext}`;
-    const key = `${folder}/${filename}`;
 
     try {
       let buffer = file.buffer;
@@ -131,18 +86,22 @@ export class MediaService {
           .toBuffer();
       }
 
-      // Upload main file
-      await this.minioClient.putObject(bucket, key, buffer, buffer.length, {
-        'Content-Type': file.mimetype,
-      });
+      // Upload main file using StorageService
+      const uploadResult = await this.storageService.uploadFile(
+        buffer,
+        {
+          bucket,
+          folder,
+          filename,
+          mimeType: file.mimetype,
+        }
+      );
 
-      const url = this.getPublicUrl(bucket, key);
       const result: UploadResult = {
-        url,
-        key,
-        bucket,
-        size: buffer.length,
-        mimeType: file.mimetype,
+        key: uploadResult.key,
+        bucket: uploadResult.bucket,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
       };
 
       // Generate thumbnail if requested and sharp is available
@@ -151,17 +110,23 @@ export class MediaService {
           .resize(200, 200, { fit: 'cover' })
           .toBuffer();
 
-        const thumbKey = `${folder}/thumbnails/${filename}`;
-        await this.minioClient.putObject(bucket, thumbKey, thumbBuffer, thumbBuffer.length, {
-          'Content-Type': file.mimetype,
-        });
+        const thumbFilename = `thumb_${filename}`;
+        const thumbResult = await this.storageService.uploadFile(
+          thumbBuffer,
+          {
+            bucket,
+            folder: `${folder}/thumbnails`,
+            filename: thumbFilename,
+            mimeType: file.mimetype,
+          }
+        );
 
-        result.thumbnail = this.getPublicUrl(bucket, thumbKey);
+        result.thumbnail = thumbResult.key;
       }
 
-      this.logger.log(`File uploaded: ${key}`);
+      this.logger.log(`File uploaded: ${uploadResult.key}`);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Upload failed: ${error.message}`);
       throw new BadRequestException('File upload failed');
     }
@@ -176,9 +141,9 @@ export class MediaService {
 
   async delete(key: string, bucket: string = this.defaultBucket): Promise<void> {
     try {
-      await this.minioClient.removeObject(bucket, key);
+      await this.storageService.deleteFile(bucket, key);
       this.logger.log(`File deleted: ${key}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Delete failed: ${error.message}`);
       throw new BadRequestException('File deletion failed');
     }
@@ -186,9 +151,10 @@ export class MediaService {
 
   async deleteMultiple(keys: string[], bucket: string = this.defaultBucket): Promise<void> {
     try {
-      await this.minioClient.removeObjects(bucket, keys);
+      const files = keys.map(key => ({ bucket, key }));
+      await this.storageService.deleteFiles(files);
       this.logger.log(`Files deleted: ${keys.length} items`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Bulk delete failed: ${error.message}`);
       throw new BadRequestException('Bulk file deletion failed');
     }
@@ -199,7 +165,7 @@ export class MediaService {
     bucket: string = this.defaultBucket,
     expiry: number = 3600
   ): Promise<string> {
-    return this.minioClient.presignedGetObject(bucket, key, expiry);
+    return this.storageService.getPresignedDownloadUrl(bucket, key, expiry);
   }
 
   async getPresignedUploadUrl(
@@ -207,7 +173,7 @@ export class MediaService {
     bucket: string = this.defaultBucket,
     expiry: number = 3600
   ): Promise<string> {
-    return this.minioClient.presignedPutObject(bucket, key, expiry);
+    return this.storageService.getPresignedUploadUrl(bucket, key, expiry);
   }
 
   async uploadBuffer(
@@ -216,38 +182,35 @@ export class MediaService {
       folder?: string;
       filename?: string;
       mimeType?: string;
-      bucket?: string;
+      bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
     } = {},
   ): Promise<UploadResult> {
     const bucket = options.bucket || this.defaultBucket;
     const folder = options.folder || 'uploads';
     const filename = options.filename || `${uuidv4()}.jpg`;
     const mimeType = options.mimeType || 'image/jpeg';
-    const key = `${folder}/${filename}`;
 
     try {
-      await this.minioClient.putObject(bucket, key, buffer, buffer.length, {
-        'Content-Type': mimeType,
-      });
+      const uploadResult = await this.storageService.uploadFile(
+        buffer,
+        {
+          bucket,
+          folder,
+          filename,
+          mimeType,
+        }
+      );
 
-      const url = this.getPublicUrl(bucket, key);
       return {
-        url,
-        key,
-        bucket,
-        size: buffer.length,
-        mimeType,
+        key: uploadResult.key,
+        bucket: uploadResult.bucket,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Buffer upload failed: ${error.message}`);
       throw new BadRequestException('Buffer upload failed');
     }
-  }
-
-  private getPublicUrl(bucket: string, key: string): string {
-    const endpoint = this.configService.get<string>('MINIO_PUBLIC_URL') ||
-      `http://${this.configService.get<string>('MINIO_ENDPOINT')}:${this.configService.get<number>('MINIO_PORT')}`;
-    return `${endpoint}/${bucket}/${key}`;
   }
 
   async copyFile(
@@ -257,9 +220,32 @@ export class MediaService {
     destBucket: string = this.defaultBucket
   ): Promise<void> {
     try {
-      const copySource = `/${sourceBucket}/${sourceKey}`;
-      const conditions = new Minio.CopyConditions();
-      await this.minioClient.copyObject(destBucket, destKey, copySource, conditions);
+      // S3'te copy işlemi için önce source'u indir, sonra yeni yere yükle
+      const sourcePresignedUrl = await this.storageService.getPresignedDownloadUrl(
+        sourceBucket,
+        sourceKey,
+        3600
+      );
+      
+      // Fetch source file
+      const response = await fetch(sourcePresignedUrl);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      
+      // Get file info from database to get mimeType
+      // For now, we'll try to infer from key or use default
+      const mimeType = 'application/octet-stream'; // Default
+      
+      // Upload to destination
+      await this.storageService.uploadFile(
+        buffer,
+        {
+          bucket: destBucket as 'products' | 'avatars' | 'documents' | 'collections' | 'tickets',
+          folder: destKey.substring(0, destKey.lastIndexOf('/')),
+          filename: destKey.substring(destKey.lastIndexOf('/') + 1),
+          mimeType,
+        }
+      );
+      
       this.logger.log(`File copied from ${sourceKey} to ${destKey}`);
     } catch (error: any) {
       this.logger.error(`Copy failed: ${error.message}`);
@@ -267,7 +253,22 @@ export class MediaService {
     }
   }
 
-  async getFileInfo(key: string, bucket: string = this.defaultBucket): Promise<Minio.BucketItemStat> {
-    return this.minioClient.statObject(bucket, key);
+  async getFileInfo(key: string, bucket: string = this.defaultBucket): Promise<{ size: number; lastModified: Date; contentType: string }> {
+    // S3'te file info için presigned URL ile HEAD request yapabiliriz
+    // Veya database'den bilgi alabiliriz
+    // Şimdilik basit bir implementasyon
+    try {
+      const presignedUrl = await this.storageService.getPresignedDownloadUrl(bucket, key, 60);
+      const response = await fetch(presignedUrl, { method: 'HEAD' });
+      
+      return {
+        size: parseInt(response.headers.get('content-length') || '0', 10),
+        lastModified: new Date(response.headers.get('last-modified') || Date.now()),
+        contentType: response.headers.get('content-type') || 'application/octet-stream',
+      };
+    } catch (error: any) {
+      this.logger.error(`Get file info failed: ${error.message}`);
+      throw new BadRequestException('Get file info failed');
+    }
   }
 }

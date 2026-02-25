@@ -5,8 +5,7 @@
 import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
-import { ConfigService } from '@nestjs/config';
-import * as Minio from 'minio';
+import { StorageService } from '../modules/storage/storage.service';
 
 export interface ImageJobData {
   sourceKey: string;
@@ -29,17 +28,8 @@ const DEFAULT_THUMBNAIL_SIZES = [
 @Processor('image')
 export class ImageWorker {
   private readonly logger = new Logger(ImageWorker.name);
-  private minioClient: Minio.Client;
 
-  constructor(private readonly configService: ConfigService) {
-    this.minioClient = new Minio.Client({
-      endPoint: this.configService.get('MINIO_ENDPOINT', 'localhost'),
-      port: parseInt(this.configService.get('MINIO_PORT', '9000')),
-      useSSL: this.configService.get('MINIO_USE_SSL', 'false') === 'true',
-      accessKey: this.configService.get('MINIO_ACCESS_KEY', 'minioadmin'),
-      secretKey: this.configService.get('MINIO_SECRET_KEY', 'minioadmin'),
-    });
-  }
+  constructor(private readonly storageService: StorageService) {}
 
   @Process('process')
   async handleProcess(job: Job<ImageJobData>) {
@@ -55,14 +45,15 @@ export class ImageWorker {
     } = job.data;
 
     try {
-      // Download original image from MinIO
-      const imageStream = await this.minioClient.getObject(bucket, sourceKey);
-      const chunks: Buffer[] = [];
-
-      for await (const chunk of imageStream) {
-        chunks.push(chunk);
-      }
-      const originalBuffer = Buffer.concat(chunks);
+      // Download original image from S3 using presigned URL
+      const presignedUrl = await this.storageService.getPresignedDownloadUrl(
+        bucket,
+        sourceKey,
+        3600
+      );
+      
+      const response = await fetch(presignedUrl);
+      const originalBuffer = Buffer.from(await response.arrayBuffer());
 
       this.logger.log(`Downloaded image: ${sourceKey}, size: ${originalBuffer.length} bytes`);
 
@@ -89,12 +80,19 @@ export class ImageWorker {
           //   .toBuffer();
           
           // For now, we'll upload the original as a placeholder
-          await this.minioClient.putObject(
-            bucket,
-            thumbnailKey,
+          // Extract folder from sourceKey if exists
+          const folderMatch = sourceKey.match(/^(.+\/)/);
+          const folder = folderMatch ? folderMatch[1] : '';
+          const filename = thumbnailKey.replace(folder, '');
+          
+          await this.storageService.uploadFile(
             originalBuffer,
-            originalBuffer.length,
-            { 'Content-Type': 'image/jpeg' },
+            {
+              bucket: bucket as 'products' | 'avatars' | 'documents' | 'collections' | 'tickets',
+              folder: folder.replace(/\/$/, ''),
+              filename,
+              mimeType: 'image/jpeg',
+            }
           );
 
           results.thumbnails.push({
@@ -108,7 +106,7 @@ export class ImageWorker {
       }
 
       return { success: true, results };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to process image ${sourceKey}: ${error.message}`);
       throw error;
     }
@@ -123,10 +121,10 @@ export class ImageWorker {
 
     for (const key of keys) {
       try {
-        await this.minioClient.removeObject(bucket, key);
+        await this.storageService.deleteFile(bucket, key);
         results.push({ key, deleted: true });
         this.logger.log(`Deleted image: ${key}`);
-      } catch (error) {
+      } catch (error: any) {
         results.push({ key, deleted: false, error: error.message });
         this.logger.error(`Failed to delete image ${key}: ${error.message}`);
       }

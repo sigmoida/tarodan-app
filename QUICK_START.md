@@ -8,7 +8,7 @@ Bu dosya, projeyi başlatmak için gereken tüm terminal komutlarını içerir.
 # 1. Bağımlılıkları yükle
 pnpm install
 
-# 2. Docker servislerini başlat (PostgreSQL, Redis, MinIO, Elasticsearch, MailHog)
+# 2. Docker servislerini başlat (PostgreSQL, Redis, Elasticsearch, MailHog)
 pnpm docker:up
 
 # 3. Veritabanı migrasyonlarını çalıştır
@@ -48,11 +48,11 @@ ADMIN_URL="http://localhost:3002"
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ELASTICSEARCH_NODE="http://localhost:9200"
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tarodan
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=dev
 IYZICO_API_KEY=sandbox-test-api-key
 IYZICO_SECRET_KEY=sandbox-test-secret-key
 IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
@@ -75,7 +75,7 @@ EOF
 cat > apps/web/.env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
+# NEXT_PUBLIC_STORAGE_URL no longer needed (using presigned URLs)
 NEXT_PUBLIC_APP_NAME=Tarodan
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 EOF
@@ -87,7 +87,7 @@ EOF
 cat > apps/admin/.env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
+# NEXT_PUBLIC_STORAGE_URL no longer needed (using presigned URLs)
 NEXT_PUBLIC_APP_NAME=Tarodan Admin
 NEXT_PUBLIC_APP_URL=http://localhost:3002
 EOF
@@ -205,7 +205,6 @@ pnpm --filter @tarodan/api build
 - **Admin**: http://localhost:3002
 - **API**: http://localhost:3001
 - **API Docs**: http://localhost:3001/api/docs
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
 - **MailHog**: http://localhost:8025
 - **Prisma Studio**: `pnpm db:studio` sonrası http://localhost:5555
 

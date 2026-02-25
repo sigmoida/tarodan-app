@@ -1,7 +1,7 @@
 'use client';
 
 import Image, { ImageProps } from 'next/image';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as Sentry from '@sentry/nextjs';
 
 // Default placeholder for broken images (data URL avoids external SSL / ERR_CERT_AUTHORITY_INVALID)
@@ -50,6 +50,13 @@ export default function OptimizedImage({
   const [imgSrc, setImgSrc] = useState(src);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Sync state when src prop changes
+  useEffect(() => {
+    setImgSrc(src);
+    setHasError(false);
+    setRetryCount(0);
+  }, [src]);
 
   const handleError = useCallback(() => {
     const errorDetails = {

@@ -1,8 +1,10 @@
 import { PrismaClient, ProductStatus } from '@prisma/client';
-import * as Minio from 'minio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import { StorageService } from '../src/modules/storage/storage.service';
+import { PrismaService } from '../src/prisma';
 
 const prisma = new PrismaClient();
 
@@ -13,24 +15,25 @@ interface PhotoFile {
   buffer: Buffer;
 }
 
-// Initialize MinIO client
-const initMinIOClient = (): Minio.Client | null => {
+// Initialize StorageService for script
+const initStorageService = (): StorageService | null => {
   try {
-    const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
-    const port = parseInt(process.env.MINIO_PORT || '9000', 10);
-    const useSSL = process.env.MINIO_USE_SSL === 'true';
-    const accessKey = process.env.MINIO_ACCESS_KEY || 'minioadmin';
-    const secretKey = process.env.MINIO_SECRET_KEY || 'minioadmin';
+    // Create mock ConfigService
+    const configService = {
+      get: (key: string, defaultValue?: any) => {
+        return process.env[key] || defaultValue;
+      },
+    } as any;
 
-    return new Minio.Client({
-      endPoint: endpoint,
-      port: port,
-      useSSL: useSSL,
-      accessKey: accessKey,
-      secretKey: secretKey,
-    });
+    // Create PrismaService instance
+    const prismaService = new PrismaService();
+
+    // Create StorageService instance
+    const storageService = new StorageService(configService, prismaService);
+    
+    return storageService;
   } catch (error) {
-    console.error('⚠️ Failed to initialize MinIO client:', error);
+    console.error('⚠️ Failed to initialize StorageService:', error);
     return null;
   }
 };
@@ -88,59 +91,33 @@ const loadPhotosFromFolder = (): PhotoFile[] => {
   return photos;
 };
 
-// Upload photo to MinIO
-const uploadPhotoToMinIO = async (
-  minioClient: Minio.Client,
+// Upload photo to S3 using StorageService
+const uploadPhotoToS3 = async (
+  storageService: StorageService,
   photo: PhotoFile,
-  bucket: string = 'products',
+  bucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets' = 'products',
   folder: string = 'product-images'
-): Promise<{ url: string; key: string } | null> => {
+): Promise<{ key: string } | null> => {
   try {
-    // Ensure bucket exists
-    const bucketExists = await minioClient.bucketExists(bucket);
-    if (!bucketExists) {
-      await minioClient.makeBucket(bucket, 'tr-istanbul');
-      console.log(`✅ Created MinIO bucket: ${bucket}`);
-
-      // Set public read policy
-      const policy = {
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Principal: { AWS: ['*'] },
-            Action: ['s3:GetObject'],
-            Resource: [`arn:aws:s3:::${bucket}/*`],
-          },
-        ],
-      };
-      await minioClient.setBucketPolicy(bucket, JSON.stringify(policy));
-    }
-
-    // Generate unique key
+    // Generate unique filename
     const uniqueId = randomUUID().substring(0, 8);
     const ext = path.extname(photo.filename);
-    const key = `${folder}/${uniqueId}-${photo.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filename = `${uniqueId}-${photo.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-    // Upload to MinIO
-    await minioClient.putObject(
-      bucket,
-      key,
+    // Upload to S3 using StorageService
+    const result = await storageService.uploadFile(
       photo.buffer,
-      photo.buffer.length,
       {
-        'Content-Type': photo.mimeType,
+        bucket,
+        folder,
+        filename,
+        mimeType: photo.mimeType,
       }
     );
 
-    // Generate public URL
-    const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
-    const port = process.env.MINIO_PORT || '9000';
-    const url = `http://${endpoint}:${port}/${bucket}/${key}`;
-
-    return { url, key };
-  } catch (error) {
-    console.error(`⚠️ Failed to upload photo ${photo.filename} to MinIO:`, error);
+    return { key: result.key };
+  } catch (error: any) {
+    console.error(`⚠️ Failed to upload photo ${photo.filename} to S3:`, error.message);
     return null;
   }
 };
@@ -148,10 +125,18 @@ const uploadPhotoToMinIO = async (
 async function main() {
   console.log('🖼️  Starting to add images to all products...\n');
 
-  // Initialize MinIO
-  const minioClient = initMinIOClient();
-  if (!minioClient) {
-    console.error('❌ MinIO client not available. Exiting.');
+  // Initialize StorageService
+  const storageService = initStorageService();
+  if (!storageService) {
+    console.error('❌ StorageService not available. Exiting.');
+    process.exit(1);
+  }
+
+  // Initialize storage service
+  await storageService.onModuleInit();
+  
+  if (!storageService.isStorageAvailable()) {
+    console.error('❌ S3 storage not available. Exiting.');
     process.exit(1);
   }
 
@@ -162,15 +147,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Upload photos to MinIO
-  console.log(`📤 Uploading ${photos.length} photos to MinIO...`);
-  const uploadedPhotos: Array<{ url: string; key: string; filename: string; photo: PhotoFile }> = [];
+  // Upload photos to S3
+  console.log(`📤 Uploading ${photos.length} photos to S3...`);
+  const uploadedPhotos: Array<{ key: string; filename: string; photo: PhotoFile }> = [];
   
   for (const photo of photos) {
-    const result = await uploadPhotoToMinIO(minioClient, photo);
+    const result = await uploadPhotoToS3(storageService, photo);
     if (result) {
       uploadedPhotos.push({
-        url: result.url,
         key: result.key,
         filename: photo.filename,
         photo: photo,
@@ -183,7 +167,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos to MinIO\n`);
+  console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos to S3\n`);
 
   // Get all products (all statuses)
   const allProducts = await prisma.product.findMany({
@@ -204,8 +188,7 @@ async function main() {
     const hasRealImage = product.images.some(img => 
       img.url && 
       !img.url.includes('placeholder') && 
-      !img.url.includes('via.placeholder') &&
-      (img.url.includes('localhost:9000') || img.url.includes('minio') || img.minioKey)
+      !img.url.includes('via.placeholder')
     );
     const hasAnyImage = product.images.length > 0;
 
@@ -232,15 +215,27 @@ async function main() {
       addedCount++;
     }
 
-    // Create new image
-    await prisma.productImage.create({
-      data: {
-        productId: product.id,
-        url: selectedPhoto.url,
-        minioKey: selectedPhoto.key,
-        sortOrder: 0,
-      },
-    });
+    // Generate presigned URL for the image
+    try {
+      const presignedUrl = await storageService.getPresignedDownloadUrl(
+        'products',
+        selectedPhoto.key,
+        3600 * 24 * 7 // 7 days expiry
+      );
+
+      // Create new image
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: presignedUrl, // Store presigned URL temporarily
+          sortOrder: 0,
+        },
+      });
+    } catch (error: any) {
+      console.error(`⚠️ Failed to generate presigned URL for ${selectedPhoto.key}:`, error.message);
+      // Skip this product
+      skippedCount++;
+    }
   }
 
   console.log('\n✅ Process completed!');

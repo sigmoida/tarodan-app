@@ -7,24 +7,26 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
-import * as Minio from 'minio';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
-import * as path from 'path';
 
 export interface UploadResult {
   key: string;
-  url: string;
+  // URL artık presigned URL değil, sadece identifier
+  // Gerçek erişim için getPresignedDownloadUrl() kullanılmalı
+  url?: string; // Deprecated - sadece backward compatibility için
   bucket: string;
   size: number;
   mimeType: string;
 }
 
 export interface UploadOptions {
-  bucket: string;
+  bucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
   folder?: string;
   filename?: string;
   mimeType?: string;
-  isPublic?: boolean;
+  isPublic?: boolean; // Artık kullanılmıyor, her şey private
   entityType?: string;
   entityId?: string;
 }
@@ -35,164 +37,160 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private minioClient: Minio.Client;
-  private readonly buckets = ['products', 'avatars', 'documents', 'collections', 'tickets'];
-  private isMinioAvailable = false;
+  private s3Client: S3Client;
+  private readonly baseBucket: string;
+  private readonly envPrefix: string;
+  private isS3Available = false;
+
+  // Bucket tipleri -> klasör isimleri mapping
+  private readonly bucketFolders = {
+    products: 'products',
+    avatars: 'avatars',
+    documents: 'documents',
+    collections: 'collections',
+    tickets: 'tickets',
+  };
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {}
-
-  async onModuleInit() {
-    // Initialize MinIO client with correct default credentials from docker-compose.dev.yml
-    this.minioClient = new Minio.Client({
-      endPoint: this.configService.get('MINIO_ENDPOINT', 'localhost'),
-      port: parseInt(this.configService.get('MINIO_PORT', '9000')),
-      useSSL: this.configService.get('MINIO_USE_SSL', 'false') === 'true',
-      accessKey: this.configService.get('MINIO_ACCESS_KEY', 'tarodan_minio'),
-      secretKey: this.configService.get('MINIO_SECRET_KEY', 'tarodan_minio_secret_2024'),
+  ) {
+    // S3 Client oluştur
+    this.s3Client = new S3Client({
+      region: this.configService.get('AWS_REGION', 'eu-west-1'),
+      credentials: {
+        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID')!,
+        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY')!,
+      },
     });
 
-    // Try to connect and ensure buckets exist
+    this.baseBucket = this.configService.get('S3_BUCKET', 'amzn-tarodan');
+    
+    // Environment prefix belirle
+    const nodeEnv = this.configService.get('NODE_ENV', 'development');
+    this.envPrefix = this.configService.get('S3_ENV_PREFIX') || 
+                    (nodeEnv === 'production' ? 'prod' : 'dev');
+
+    this.logger.log(`S3 Storage initialized: ${this.baseBucket} (${this.envPrefix})`);
+  }
+
+  async onModuleInit() {
     try {
-      await this.ensureBucketsExist();
-      this.isMinioAvailable = true;
-      this.logger.log('MinIO connection established');
-    } catch (error) {
-      this.logger.warn('MinIO is not available. File uploads will be disabled.');
-      this.isMinioAvailable = false;
+      // Bucket'ın varlığını kontrol et
+      await this.s3Client.send(
+        new HeadBucketCommand({ Bucket: this.baseBucket })
+      );
+      this.isS3Available = true;
+      this.logger.log(`✅ AWS S3 connection established: ${this.baseBucket}`);
+    } catch (error: any) {
+      this.logger.error(`❌ AWS S3 connection failed: ${error.message}`);
+      this.isS3Available = false;
     }
   }
 
   /**
-   * Check if MinIO storage is available
+   * Check if S3 storage is available
    */
   isStorageAvailable(): boolean {
-    return this.isMinioAvailable;
+    return this.isS3Available;
   }
 
   /**
-   * Ensure all required buckets exist
-   */
-  private async ensureBucketsExist(): Promise<void> {
-    for (const bucket of this.buckets) {
-      try {
-        const exists = await this.minioClient.bucketExists(bucket);
-        if (!exists) {
-          await this.minioClient.makeBucket(bucket, 'tr-istanbul');
-          this.logger.log('Created MinIO bucket');
-
-          // Set public read policy for products and avatars
-          if (['products', 'avatars', 'collections'].includes(bucket)) {
-            const policy = {
-              Version: '2012-10-17',
-              Statement: [
-                {
-                  Effect: 'Allow',
-                  Principal: { AWS: ['*'] },
-                  Action: ['s3:GetObject'],
-                  Resource: [`arn:aws:s3:::${bucket}/*`],
-                },
-              ],
-            };
-            await this.minioClient.setBucketPolicy(bucket, JSON.stringify(policy));
-          }
-        }
-      } catch (error) {
-        this.logger.warn('Failed to create bucket');
-      }
-    }
-  }
-
-  /**
-   * Upload file from buffer
+   * Ana upload fonksiyonu - "create content" tarzı
+   * Seed script'lerinde de kullanılabilir
+   * Tüm dosya yüklemeleri bu fonksiyon üzerinden yapılır
    */
   async uploadFile(
     buffer: Buffer,
     options: UploadOptions,
     uploaderId?: string,
   ): Promise<UploadResult> {
-    // Check if MinIO is available
-    if (!this.isMinioAvailable) {
+    if (!this.isS3Available) {
       throw new BadRequestException(
-        'Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin veya sistem yöneticisiyle iletişime geçin.'
+        'Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.'
       );
     }
 
-    // Validate bucket
-    if (!this.buckets.includes(options.bucket)) {
-      throw new BadRequestException(`Geçersiz bucket: ${options.bucket}`);
+    // Bucket tipini validate et
+    if (!this.bucketFolders[options.bucket]) {
+      throw new BadRequestException(`Geçersiz bucket tipi: ${options.bucket}`);
     }
 
-    // Validate file size
+    // Dosya boyutu kontrolü
     if (buffer.length > MAX_FILE_SIZE) {
       throw new BadRequestException('Dosya boyutu çok büyük (max 10MB)');
     }
 
-    // Validate mime type for images
-    if (options.bucket === 'products' || options.bucket === 'avatars') {
+    // Resim dosyaları için mime type kontrolü
+    if (['products', 'avatars', 'collections'].includes(options.bucket)) {
       if (!options.mimeType || !ALLOWED_IMAGE_TYPES.includes(options.mimeType)) {
-        throw new BadRequestException('Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.');
+        throw new BadRequestException(
+          'Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.'
+        );
       }
     }
 
-    // Generate unique key
+    // Unique key oluştur
     const ext = this.getExtension(options.mimeType || 'application/octet-stream');
     const uniqueId = crypto.randomBytes(16).toString('hex');
     const filename = options.filename || `${uniqueId}${ext}`;
-    const folder = options.folder ? `${options.folder}/` : '';
-    const key = `${folder}${filename}`;
+    
+    // Klasör yapısı: {env}/{bucketType}/{folder}/{filename}
+    // Örnek: dev/products/product-images/abc123.jpg
+    const bucketFolder = this.bucketFolders[options.bucket];
+    const customFolder = options.folder ? `${options.folder}/` : '';
+    const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
 
     try {
-      // Upload to MinIO
-      await this.minioClient.putObject(
-        options.bucket,
-        key,
-        buffer,
-        buffer.length,
-        {
-          'Content-Type': options.mimeType || 'application/octet-stream',
+      // S3'e yükle - PRIVATE (public read yok)
+      const command = new PutObjectCommand({
+        Bucket: this.baseBucket,
+        Key: key,
+        Body: buffer,
+        ContentType: options.mimeType || 'application/octet-stream',
+        // Public erişim YOK - sadece presigned URL ile erişilebilir
+        Metadata: {
+          'uploader-id': uploaderId || '',
+          'entity-type': options.entityType || '',
+          'entity-id': options.entityId || '',
         },
-      );
+      });
 
-      // Generate URL
-      const baseUrl = this.configService.get('MINIO_PUBLIC_URL', 
-        `http://${this.configService.get('MINIO_ENDPOINT', 'localhost')}:${this.configService.get('MINIO_PORT', '9000')}`
-      );
-      const url = `${baseUrl}/${options.bucket}/${key}`;
+      await this.s3Client.send(command);
 
-      // Store in database
+      // Database'e kaydet
+      // URL artık presigned URL değil, sadece identifier olarak key kullanılıyor
       await this.prisma.mediaFile.create({
         data: {
-          bucket: options.bucket,
-          key,
+          bucket: options.bucket, // Orijinal bucket tipi (products, avatars, vs.)
+          key,                     // Full S3 key (dev/products/...)
           filename,
           mimeType: options.mimeType || 'application/octet-stream',
           size: buffer.length,
           uploaderId,
           entityType: options.entityType,
           entityId: options.entityId,
-          isPublic: options.isPublic ?? true,
-          url,
+          isPublic: false, // Artık her şey private
+          url: key, // URL yerine key saklanıyor, presigned URL endpoint'ten alınacak
         },
       });
 
+      this.logger.log(`✅ File uploaded (private): ${key}`);
+
       return {
         key,
-        url,
-        bucket: options.bucket,
+        bucket: options.bucket, // Orijinal bucket tipi
         size: buffer.length,
         mimeType: options.mimeType || 'application/octet-stream',
       };
-    } catch (error) {
-      this.logger.error('MinIO upload error');
+    } catch (error: any) {
+      this.logger.error(`❌ S3 upload error: ${error.message}`, error);
       throw new InternalServerErrorException('Dosya yükleme başarısız');
     }
   }
 
   /**
-   * Upload multiple files
+   * Multiple files upload
    */
   async uploadFiles(
     files: Array<{ buffer: Buffer; mimeType: string; filename?: string }>,
@@ -221,18 +219,29 @@ export class StorageService implements OnModuleInit {
    * Delete file
    */
   async deleteFile(bucket: string, key: string): Promise<void> {
-    // Always delete from database even if MinIO is unavailable
+    // Database'den sil
     await this.prisma.mediaFile.deleteMany({
       where: { bucket, key },
     });
 
-    // Try to delete from MinIO if available
-    if (this.isMinioAvailable) {
+    // S3'ten sil
+    if (this.isS3Available) {
       try {
-        await this.minioClient.removeObject(bucket, key);
-      } catch (error) {
-        this.logger.warn('MinIO delete error');
-        // Don't throw - database record is already deleted
+        // Key zaten full path içeriyor (dev/products/...)
+        // Eğer sadece relative key geliyorsa, env prefix ekle
+        const fullKey = key.startsWith(this.envPrefix) 
+          ? key 
+          : `${this.envPrefix}/${this.bucketFolders[bucket as keyof typeof this.bucketFolders]}/${key}`;
+
+        const command = new DeleteObjectCommand({
+          Bucket: this.baseBucket,
+          Key: fullKey,
+        });
+
+        await this.s3Client.send(command);
+        this.logger.log(`✅ File deleted: ${fullKey}`);
+      } catch (error: any) {
+        this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
       }
     }
   }
@@ -247,57 +256,110 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Get presigned URL for upload
+   * Presigned URL for upload (client-side upload için)
    */
   async getPresignedUploadUrl(
     bucket: string,
     key: string,
     expirySeconds = 3600,
   ): Promise<string> {
-    if (!this.isMinioAvailable) {
+    if (!this.isS3Available) {
       throw new BadRequestException('Dosya yükleme servisi şu anda kullanılamıyor.');
     }
 
-    if (!this.buckets.includes(bucket)) {
+    const bucketFolder = this.bucketFolders[bucket as keyof typeof this.bucketFolders];
+    if (!bucketFolder) {
       throw new BadRequestException(`Geçersiz bucket: ${bucket}`);
     }
 
+    // Key zaten full path içeriyorsa kullan, değilse oluştur
+    const fullKey = key.startsWith(this.envPrefix)
+      ? key
+      : `${this.envPrefix}/${bucketFolder}/${key}`;
+
     try {
-      return await this.minioClient.presignedPutObject(bucket, key, expirySeconds);
-    } catch (error) {
-      this.logger.error('MinIO presigned URL error');
+      const command = new PutObjectCommand({
+        Bucket: this.baseBucket,
+        Key: fullKey,
+      });
+
+      return await getSignedUrl(this.s3Client, command, { expiresIn: expirySeconds });
+    } catch (error: any) {
+      this.logger.error(`❌ Presigned upload URL error: ${error.message}`);
       throw new InternalServerErrorException('Presigned URL oluşturulamadı');
     }
   }
 
   /**
-   * Get presigned URL for download
+   * Presigned URL for download - ANA ERİŞİM YÖNTEMİ
+   * Tüm dosyalar bu yöntemle erişilir (private bucket)
    */
   async getPresignedDownloadUrl(
     bucket: string,
     key: string,
     expirySeconds = 3600,
   ): Promise<string> {
-    if (!this.isMinioAvailable) {
+    if (!this.isS3Available) {
       throw new BadRequestException('Dosya indirme servisi şu anda kullanılamıyor.');
     }
 
+    const bucketFolder = this.bucketFolders[bucket as keyof typeof this.bucketFolders];
+    // Key zaten full path içeriyorsa kullan, değilse oluştur
+    const fullKey = key.startsWith(this.envPrefix)
+      ? key
+      : `${this.envPrefix}/${bucketFolder}/${key}`;
+
     try {
-      return await this.minioClient.presignedGetObject(bucket, key, expirySeconds);
-    } catch (error) {
-      this.logger.error('MinIO presigned URL error');
+      const command = new GetObjectCommand({
+        Bucket: this.baseBucket,
+        Key: fullKey,
+      });
+
+      return await getSignedUrl(this.s3Client, command, { expiresIn: expirySeconds });
+    } catch (error: any) {
+      this.logger.error(`❌ Presigned download URL error: ${error.message}`);
       throw new InternalServerErrorException('Presigned URL oluşturulamadı');
     }
   }
 
   /**
-   * Get files by entity
+   * Get files by entity - presigned URL'ler ile birlikte
    */
-  async getFilesByEntity(entityType: string, entityId: string) {
-    return this.prisma.mediaFile.findMany({
+  async getFilesByEntity(
+    entityType: string, 
+    entityId: string,
+    includePresignedUrls = true,
+    expirySeconds = 3600
+  ) {
+    const files = await this.prisma.mediaFile.findMany({
       where: { entityType, entityId },
       orderBy: { createdAt: 'asc' },
     });
+
+    // Presigned URL'leri ekle
+    if (includePresignedUrls && this.isS3Available) {
+      const filesWithUrls = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const presignedUrl = await this.getPresignedDownloadUrl(
+              file.bucket,
+              file.key,
+              expirySeconds
+            );
+            return {
+              ...file,
+              presignedUrl,
+            };
+          } catch (error) {
+            this.logger.warn(`Failed to generate presigned URL for ${file.key}`);
+            return file;
+          }
+        })
+      );
+      return filesWithUrls;
+    }
+
+    return files;
   }
 
   /**
@@ -317,10 +379,9 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Validate image for product (diecast relevance check ready)
+   * Validate image for product
    */
   async validateProductImage(buffer: Buffer): Promise<{ valid: boolean; reason?: string }> {
-    // Basic validation - size and type
     if (buffer.length < 1024) {
       return { valid: false, reason: 'Resim çok küçük' };
     }
@@ -328,13 +389,6 @@ export class StorageService implements OnModuleInit {
     if (buffer.length > MAX_FILE_SIZE) {
       return { valid: false, reason: 'Resim çok büyük (max 10MB)' };
     }
-
-    // AI validation placeholder - can integrate with image classification API
-    // For now, always return valid
-    // In production, this would call an AI service to check:
-    // - Is it a diecast model car?
-    // - Is it offensive content?
-    // - Is it unrelated content?
 
     return { valid: true };
   }

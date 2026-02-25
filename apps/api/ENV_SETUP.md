@@ -134,17 +134,19 @@ REDIS_PORT=6379
 REDIS_URL=redis://localhost:6379
 ```
 
-### 5. MinIO (Object Storage)
+### 5. AWS S3 (Object Storage)
 
-Varsayılan olarak Docker Compose ile MinIO çalışır:
+AWS S3 kullanılıyor. Credentials'ları AWS Console'dan alın:
 
 ```env
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tarodan
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=dev
 ```
+
+**Not:** Tüm dosyalar private olarak saklanır ve sadece presigned URL'ler ile erişilebilir.
 
 ## Güvenlik Notları
 
@@ -187,4 +189,4 @@ Environment variable'ları ayarladıktan sonra:
 Sorun yaşıyorsanız:
 1. Terminal loglarını kontrol edin
 2. `.env` dosyasındaki değerlerin doğru olduğundan emin olun
-3. Gerekli servislerin (PostgreSQL, Redis, MinIO) çalıştığından emin olun
+3. Gerekli servislerin (PostgreSQL, Redis) çalıştığından ve AWS S3 credentials'larının ayarlandığından emin olun

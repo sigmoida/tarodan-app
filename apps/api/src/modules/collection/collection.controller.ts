@@ -19,6 +19,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CollectionService } from './collection.service';
 import { MediaService } from '../media/media.service';
+import { StorageService } from '../storage/storage.service';
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -37,6 +38,7 @@ export class CollectionController {
   constructor(
     private readonly collectionService: CollectionService,
     private readonly mediaService: MediaService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -275,9 +277,15 @@ export class CollectionController {
       try {
         const uploadResult = await this.mediaService.upload(imageFile, {
           folder: 'collection-items',
+          bucket: 'collections',
           resize: { width: 800, height: 800, fit: 'cover' },
         });
-        imageUrl = uploadResult.url;
+        // Generate presigned URL
+        imageUrl = await this.storageService.getPresignedDownloadUrl(
+          'collections',
+          uploadResult.key,
+          3600 * 24 * 7 // 7 days
+        );
       } catch (error: any) {
         throw new BadRequestException('Resim yükleme başarısız: ' + (error.message || 'Bilinmeyen hata'));
       }
@@ -337,9 +345,15 @@ export class CollectionController {
     try {
       const uploadResult = await this.mediaService.upload(coverFile, {
         folder: 'collection-covers',
+        bucket: 'collections',
         resize: { width: 1200, height: 600, fit: 'cover' },
       });
-      coverImageUrl = uploadResult.url;
+      // Generate presigned URL
+      coverImageUrl = await this.storageService.getPresignedDownloadUrl(
+        'collections',
+        uploadResult.key,
+        3600 * 24 * 7 // 7 days
+      );
     } catch (error: any) {
       throw new BadRequestException('Kapak resmi yükleme başarısız: ' + (error.message || 'Bilinmeyen hata'));
     }

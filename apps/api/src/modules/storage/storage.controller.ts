@@ -40,7 +40,7 @@ export class StorageController {
       }),
     )
     file: Express.Multer.File,
-    @Body('bucket') bucket: string,
+    @Body('bucket') bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets',
     @Body('folder') folder?: string,
     @Body('entityType') entityType?: string,
     @Body('entityId') entityId?: string,
@@ -48,7 +48,7 @@ export class StorageController {
     return this.storageService.uploadFile(
       file.buffer,
       {
-        bucket: bucket || 'documents',
+        bucket: (bucket || 'documents') as 'products' | 'avatars' | 'documents' | 'collections' | 'tickets',
         folder,
         filename: file.originalname,
         mimeType: file.mimetype,
@@ -132,7 +132,7 @@ export class StorageController {
    * POST /storage/presigned-url
    */
   @Post('presigned-url')
-  async getPresignedUrl(
+  async getPresignedUploadUrl(
     @Body('bucket') bucket: string,
     @Body('key') key: string,
     @Body('expiry') expiry?: number,
@@ -143,6 +143,25 @@ export class StorageController {
       expiry,
     );
     return { url };
+  }
+
+  /**
+   * Get presigned download URL for file access
+   * GET /storage/presigned/:bucket/*
+   */
+  @Get('presigned/:bucket/*')
+  async getPresignedDownloadUrl(
+    @Param('bucket') bucket: string,
+    @Param() params: any,
+    @Query('expiry') expiry?: number,
+  ) {
+    const key = params['0'];
+    const url = await this.storageService.getPresignedDownloadUrl(
+      bucket,
+      key,
+      expiry ? parseInt(expiry.toString()) : 3600,
+    );
+    return { url, expiresIn: expiry || 3600 };
   }
 
   /**
@@ -161,14 +180,21 @@ export class StorageController {
   }
 
   /**
-   * Get files by entity
-   * GET /storage/entity/:entityType/:entityId
+   * Get files by entity with presigned URLs
+   * GET /storage/entity/:entityType/:entityId?includeUrls=true&expiry=3600
    */
   @Get('entity/:entityType/:entityId')
   async getFilesByEntity(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
+    @Query('includeUrls') includeUrls?: string,
+    @Query('expiry') expiry?: number,
   ) {
-    return this.storageService.getFilesByEntity(entityType, entityId);
+    return this.storageService.getFilesByEntity(
+      entityType,
+      entityId,
+      includeUrls !== 'false', // Default true
+      expiry ? parseInt(expiry.toString()) : 3600,
+    );
   }
 }

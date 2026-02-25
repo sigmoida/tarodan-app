@@ -84,6 +84,10 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'autopartia.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'amzn-tarodan.s3.eu-west-1.amazonaws.com',
+      },
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

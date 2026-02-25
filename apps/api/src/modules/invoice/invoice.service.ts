@@ -184,7 +184,7 @@ export class InvoiceService {
     // Generate PDF buffer from data
     const pdfBuffer = await this.generatePdfFromData(invoiceData);
 
-    // Store in MinIO
+    // Store in S3
     let pdfUrl = '';
     try {
       if (this.storageService.isStorageAvailable()) {
@@ -200,7 +200,12 @@ export class InvoiceService {
             entityId: orderId,
           },
         );
-        pdfUrl = uploadResult.url;
+        // Generate presigned URL for invoice (valid for 7 days)
+        pdfUrl = await this.storageService.getPresignedDownloadUrl(
+          'documents',
+          uploadResult.key,
+          3600 * 24 * 7 // 7 days
+        );
       }
     } catch (error) {
       this.logger.error('Failed to upload invoice PDF:', error);
