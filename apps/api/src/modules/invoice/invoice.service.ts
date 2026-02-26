@@ -1,6 +1,6 @@
 /**
  * Invoice Service
- * Generates PDF invoices for orders and stores them in MinIO
+ * Generates PDF invoices for orders and stores them in AWS S3
  * 
  * Requirement: "After payment, invoices will be sent to users automatically" (requirements.txt)
  */

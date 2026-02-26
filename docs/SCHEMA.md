@@ -101,18 +101,18 @@ Bu doküman Tarodan projesinin tüm mimari şemalarını, diyagramlarını ve g�
 ├─────────────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                                  │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐                    │
-│  │ PostgreSQL   │   │    Redis     │   │Elasticsearch │   │    MinIO     │                    │
-│  │   :5432      │   │    :6379     │   │    :9200     │   │    :9000     │                    │
+│  │ PostgreSQL   │   │    Redis     │   │Elasticsearch │   │   AWS S3     │                    │
+│  │   :5432      │   │    :6379     │   │    :9200     │   │              │                    │
 │  │              │   │              │   │              │   │              │                    │
 │  │ • Users      │   │ • Sessions   │   │ • Product    │   │ • Images     │                    │
 │  │ • Products   │   │ • Cache      │   │   Search     │   │ • Avatars    │                    │
 │  │ • Orders     │   │ • Queue Jobs │   │ • Full-text  │   │ • Documents  │                    │
 │  │ • Payments   │   │ • Pub/Sub    │   │ • Filters    │   │ • Reports    │                    │
 │  │ • Shipments  │   │ • Rate Limit │   │ • Analytics  │   │              │                    │
-│  │ • Analytics  │   │ • Admin Sess │   │              │   │ S3 Compatible│                    │
+│  │ • Analytics  │   │ • Admin Sess │   │              │   │ Presigned URL│                    │
 │  │              │   │              │   │              │   │              │                    │
-│  │ 32GB RAM     │   │ 8GB RAM      │   │ 16GB RAM     │   │ 2TB Storage  │                    │
-│  │ Backups:Daily│   │ Persist: AOF │   │ Replicas: 1  │   │ Replicas: 1  │                    │
+│  │ 32GB RAM     │   │ 8GB RAM      │   │ 16GB RAM     │   │ amzn-tarodan │                    │
+│  │ Backups:Daily│   │ Persist: AOF │   │ Replicas: 1  │   │ eu-west-1    │                    │
 │  └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘                    │
 │                                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -381,7 +381,7 @@ tarodan/
 │       │   │   ├── swap/                 # Swap/trade
 │       │   │   ├── notification/         # Notifications
 │       │   │   ├── search/               # Elasticsearch
-│       │   │   ├── media/                # MinIO integration
+│       │   │   ├── media/                # AWS S3 integration
 │       │   │   │
 │       │   │   └── admin/                # 🔐 Admin Module
 │       │   │       ├── admin.module.ts
@@ -989,7 +989,7 @@ Result: %4 komisyon uygulanır (250 × 0.04 = 10 TL)
 │   │  • tarodan.com          → web:3000                   │  │
 │   │  • admin.tarodan.com    → admin:3002                 │  │
 │   │  • api.tarodan.com      → api:3001                   │  │
-│   │  • storage.tarodan.com  → minio:9000                 │  │
+│   │  • storage: AWS S3 (presigned URLs)                   │  │
 │   │  • grafana.tarodan.com  → grafana:3003               │  │
 │   │                                                      │  │
 │   │  SSL: Let's Encrypt (auto-renew)                     │  │
@@ -1009,10 +1009,10 @@ Result: %4 komisyon uygulanır (250 × 0.04 = 10 TL)
 │   │      ┌──────────┼─────────┼────────┐                │  │
 │   │      │          │         │        │                │  │
 │   │      ▼          ▼         ▼        ▼                │  │
-│   │  ┌────────┐ ┌──────┐ ┌────────┐ ┌──────┐           │  │
-│   │  │postgres│ │redis │ │elastic │ │minio │           │  │
-│   │  │:5432   │ │:6379 │ │:9200   │ │:9000 │           │  │
-│   │  └────────┘ └──────┘ └────────┘ └──────┘           │  │
+│   │  ┌────────┐ ┌──────┐ ┌────────┐                      │  │
+│   │  │postgres│ │redis │ │elastic │                      │  │
+│   │  │:5432   │ │:6379 │ │:9200   │                      │  │
+│   │  └────────┘ └──────┘ └────────┘                      │  │
 │   │                                                      │  │
 │   │  Internal DNS Resolution:                           │  │
 │   │  postgres.tarodan-network → 172.20.0.2              │  │
@@ -1052,14 +1052,14 @@ Result: %4 komisyon uygulanır (250 × 0.04 = 10 TL)
 │  ├── Build: apps/api/Dockerfile                             │
 │  ├── Port: 3001 (internal)                                  │
 │  ├── Replicas: 2                                            │
-│  ├── Depends: postgres, redis, elasticsearch, minio         │
+│  ├── Depends: postgres, redis, elasticsearch                │
 │  └── Labels: traefik.enable, api.tarodan.com                │
 │                                                              │
 │  worker (BullMQ)                                            │
 │  ├── Build: apps/api/Dockerfile                             │
 │  ├── Command: node dist/workers/main.js                     │
 │  ├── Replicas: 2                                            │
-│  └── Depends: redis, postgres, minio                        │
+│  └── Depends: redis, postgres                               │
 │                                                              │
 │  postgres                                                    │
 │  ├── Image: postgres:16-alpine                              │
@@ -1078,12 +1078,6 @@ Result: %4 komisyon uygulanır (250 × 0.04 = 10 TL)
 │  ├── Port: 9200 (internal only)                             │
 │  ├── Volume: elasticsearch-data                             │
 │  └── Resources: 2 CPU, 2GB RAM                              │
-│                                                              │
-│  minio                                                       │
-│  ├── Image: minio/minio:latest                              │
-│  ├── Port: 9000 (S3 API), 9001 (Console)                    │
-│  ├── Volume: minio-data                                     │
-│  └── Labels: storage.tarodan.com, minio.tarodan.com         │
 │                                                              │
 │  prometheus                                                  │
 │  ├── Image: prom/prometheus:latest                          │
@@ -1364,10 +1358,10 @@ Admin User Login
 │    │ :5432   │     │  :6379  │     │  :9200  │            │
 │    └─────────┘     └─────────┘     └─────────┘            │
 │                                                              │
-│    ┌─────────┐     ┌─────────┐     ┌─────────┐            │
-│    │  minio  │     │ worker  │     │prometheus│           │
-│    │ :9000   │     │  (x2)   │     │ +grafana │           │
-│    └─────────┘     └─────────┘     └─────────┘            │
+│    ┌─────────┐     ┌─────────┐                             │
+│    │ worker  │     │prometheus│                            │
+│    │  (x2)   │     │ +grafana │                            │
+│    └─────────┘     └─────────┘                             │
 │                                                              │
 │  Resource Allocation:                                       │
 │  ├── Web: 1GB RAM × 2                                      │
@@ -1377,7 +1371,7 @@ Admin User Login
 │  ├── PostgreSQL: 4GB RAM                                   │
 │  ├── Redis: 2GB RAM                                        │
 │  ├── Elasticsearch: 2GB RAM                                │
-│  ├── MinIO: 1GB RAM                                        │
+│  ├── S3: AWS managed (no local RAM)                        │
 │  ├── Monitoring: 2GB RAM                                   │
 │  └── System: 4GB RAM                                       │
 │      Total: ~26GB / 32GB                                    │
@@ -1417,13 +1411,13 @@ Admin User Login
                                                           │
                                                           │
                                                  ┌────────▼──────────┐
-                                                 │  STORAGE NODE     │
-                                                 │  4 vCPU, 8GB      │
-                                                 │  2TB HDD          │
+                                                 │  STORAGE          │
+                                                 │  AWS S3           │
+                                                 │  amzn-tarodan     │
                                                  ├───────────────────┤
-                                                 │ • MinIO           │
+                                                 │ • Images          │
+                                                 │ • Documents       │
                                                  │ • Backups         │
-                                                 │ • Logs Archive    │
                                                  └───────────────────┘
 
 Benefits:

@@ -9,7 +9,7 @@ Bu dokümantasyon, Tarodan projesini production ortamına deploy etmek için en 
 - **Database**: PostgreSQL 16
 - **Cache/Queue**: Redis 7
 - **Search**: Elasticsearch 8.12
-- **Storage**: MinIO (S3 compatible)
+- **Storage**: AWS S3
 - **Monorepo**: pnpm workspace + Turbo
 - **Node.js**: 20 LTS
 - **Docker**: Mevcut Dockerfile'lar
@@ -31,7 +31,7 @@ Bu dokümantasyon, Tarodan projesini production ortamına deploy etmek için en 
 
 **Dezavantajlar:**
 - ⚠️ Elasticsearch için ayrı servis gerekir (Upstash Search veya Elastic Cloud)
-- ⚠️ MinIO için ayrı servis gerekir (veya S3 kullan)
+- ⚠️ AWS S3 credentials gerekir
 
 **Fiyatlandırma:**
 - Starter: $5/ay (kredi)
@@ -334,10 +334,12 @@ REDIS_URL=redis://...
 JWT_SECRET=...
 JWT_REFRESH_SECRET=...
 
-# MinIO/S3
-MINIO_ENDPOINT=...
-MINIO_ACCESS_KEY=...
-MINIO_SECRET_KEY=...
+# AWS S3
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=prod
 
 # Elasticsearch
 ELASTICSEARCH_NODE=...

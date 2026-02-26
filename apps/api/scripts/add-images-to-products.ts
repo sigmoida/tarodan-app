@@ -215,25 +215,17 @@ async function main() {
       addedCount++;
     }
 
-    // Generate presigned URL for the image
+    // Store S3 key in the database (presigned URL is generated on-demand by the API)
     try {
-      const presignedUrl = await storageService.getPresignedDownloadUrl(
-        'products',
-        selectedPhoto.key,
-        3600 * 24 * 7 // 7 days expiry
-      );
-
-      // Create new image
       await prisma.productImage.create({
         data: {
           productId: product.id,
-          url: presignedUrl, // Store presigned URL temporarily
+          url: selectedPhoto.key, // S3 key: "dev/products/product-images/abc123.jpg"
           sortOrder: 0,
         },
       });
     } catch (error: any) {
-      console.error(`⚠️ Failed to generate presigned URL for ${selectedPhoto.key}:`, error.message);
-      // Skip this product
+      console.error(`⚠️ Failed to create image record for ${selectedPhoto.key}:`, error.message);
       skippedCount++;
     }
   }

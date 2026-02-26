@@ -59,24 +59,6 @@ const nextConfig = {
         hostname: 'localhost',
       },
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '9000',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.minio.tarodan.com',
-      },
-      {
-        protocol: 'http',
-        hostname: 'minio',
-        port: '9000',
-      },
-      {
-        protocol: 'https',
-        hostname: 'storage.tarodan.com',
-      },
-      {
         protocol: 'https',
         hostname: 'autopartia.com',
       },
@@ -85,8 +67,14 @@ const nextConfig = {
         hostname: 'autopartia.com',
       },
       {
+        // AWS S3 presigned URL'ler (amzn-tarodan bucket)
         protocol: 'https',
         hostname: 'amzn-tarodan.s3.eu-west-1.amazonaws.com',
+      },
+      {
+        // AWS S3 presigned URL'ler (alternatif format)
+        protocol: 'https',
+        hostname: 's3.eu-west-1.amazonaws.com',
       },
     ],
     dangerouslyAllowSVG: true,

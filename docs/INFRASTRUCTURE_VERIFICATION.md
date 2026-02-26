@@ -22,7 +22,7 @@ This document verifies that the Docker Compose structure defined in section 5.2 
 | 6 | postgres | 16-alpine, 4GB RAM | 15-alpine, 2GB RAM | ⚠️ Acceptable |
 | 7 | redis | 7-alpine, appendonly | 7-alpine, appendonly | ✅ Match |
 | 8 | elasticsearch | 8.12.0, 2GB RAM | 8.11.1, 2GB RAM | ⚠️ Acceptable |
-| 9 | minio | latest, 9000/9001 | latest, 9000/9001 | ✅ Match |
+| 9 | ~~minio~~ AWS S3 | N/A (managed) | AWS S3 via SDK | ✅ Migrated |
 | 10 | prometheus | latest, 9090 | latest, 9090 | ✅ Match |
 | 11 | grafana | latest, 3003 | latest, 3003 | ✅ Match |
 | 12 | loki | latest, 3100 | latest, 3100 | ✅ Match |
@@ -91,7 +91,7 @@ This document verifies that the Docker Compose structure defined in section 5.2 
 | Build context | apps/api/Dockerfile | ../apps/api | ✅ |
 | Internal port | 3001 | 3001 | ✅ |
 | Replicas | 2 | 2 | ✅ |
-| Depends on | postgres, redis, elasticsearch, minio | postgres, redis, elasticsearch | ⚠️ |
+| Depends on | postgres, redis, elasticsearch | postgres, redis, elasticsearch | ✅ |
 | Traefik labels | api.tarodan.com | api.${DOMAIN} | ✅ |
 
 **Additional Features Implemented:**
@@ -100,7 +100,7 @@ This document verifies that the Docker Compose structure defined in section 5.2 
 - Memory limits (1G)
 - All database/cache environment variables
 
-**Note:** MinIO is not an explicit dependency but is configured via environment variables and accessible on the network.
+**Note:** Object storage is now handled by AWS S3 (not a container dependency).
 
 ---
 
@@ -111,9 +111,9 @@ This document verifies that the Docker Compose structure defined in section 5.2 
 | Build context | apps/api/Dockerfile | ../apps/api | ✅ |
 | Startup command | node dist/workers/main.js | node dist/worker.js | ⚠️ |
 | Replicas | 2 | 2 | ✅ |
-| Depends on | redis, postgres, minio | redis, postgres | ⚠️ |
+| Depends on | redis, postgres | redis, postgres | ✅ |
 
-**Note:** Command path difference is cosmetic - both point to the worker entry point. MinIO accessible via network.
+**Note:** Command path difference is cosmetic - both point to the worker entry point. AWS S3 accessible via SDK.
 
 ---
 
@@ -166,16 +166,17 @@ This document verifies that the Docker Compose structure defined in section 5.2 
 
 ---
 
-### 9. MinIO (S3 Compatible Object Storage)
+### 9. AWS S3 (Object Storage - Migrated from MinIO)
 
-| Attribute | 5.2 Spec | Implementation | Match |
-|-----------|----------|----------------|-------|
-| Image | minio/minio:latest | minio/minio:latest | ✅ |
-| S3 API Port | 9000 | 9000 | ✅ |
-| Console Port | 9001 | 9001 | ✅ |
-| Volume | minio-data | minio_data | ✅ |
-| Traefik: storage | storage.tarodan.com | storage.${DOMAIN} | ✅ |
-| Traefik: console | minio.tarodan.com | minio.${DOMAIN} | ✅ |
+| Attribute | Previous (MinIO) | Current (AWS S3) | Status |
+|-----------|-----------------|-------------------|--------|
+| Service | minio/minio container | AWS S3 managed | ✅ Migrated |
+| Bucket | tarodan | amzn-tarodan | ✅ |
+| Region | N/A | eu-west-1 | ✅ |
+| Access | Direct ports 9000/9001 | Presigned URLs via SDK | ✅ |
+| Auth | MINIO_ACCESS_KEY/SECRET | AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY | ✅ |
+
+**Note:** MinIO container has been removed. Object storage is now handled by AWS S3 directly via the `@aws-sdk/client-s3` package in the API.
 
 ---
 
@@ -240,7 +241,7 @@ tarodan-network (bridge)
 ├── postgres ────────┐
 ├── redis ───────────┤
 ├── elasticsearch ───┼── Data Layer
-├── minio ───────────┘
+│   (AWS S3 - external)
 ├── prometheus ──────┐
 ├── grafana ─────────┼── Monitoring Layer
 └── loki ────────────┘
@@ -258,7 +259,7 @@ All services are on the same `tarodan-network` bridge network, with only Traefik
 | traefik_logs | traefik | Access logs |
 | postgres_data | postgres | Database files |
 | redis_data | redis | Persistence (AOF) |
-| minio_data | minio | Object storage |
+| ~~minio_data~~ | N/A | Migrated to AWS S3 |
 | elasticsearch_data | elasticsearch | Search indices |
 | prometheus_data | prometheus | Time-series metrics |
 | grafana_data | grafana | Dashboards/settings |
@@ -299,7 +300,7 @@ All 12 services defined in section 5.2 (Docker Compose Structure) are fully impl
 
 1. **Core Infrastructure:** Traefik with SSL, rate limiting, and security headers
 2. **Application Layer:** Web (2x), Admin (1x), API (2x), Worker (2x)
-3. **Data Layer:** PostgreSQL, Redis, Elasticsearch, MinIO
+3. **Data Layer:** PostgreSQL, Redis, Elasticsearch, AWS S3 (external)
 4. **Monitoring Layer:** Prometheus, Grafana, Loki + exporters
 
 Minor version differences are documented and acceptable for production deployment.

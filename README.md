@@ -40,7 +40,7 @@ tarodan/
 - **Database**: PostgreSQL + Prisma ORM
 - **Cache**: Redis
 - **Search**: Elasticsearch
-- **Storage**: MinIO (S3-compatible)
+- **Storage**: AWS S3
 - **Queue**: Bull (Redis-backed)
 
 ### Frontend
@@ -69,7 +69,7 @@ tarodan/
 # Bağımlılıkları yükle
 pnpm install
 
-# Docker servislerini başlat (PostgreSQL, Redis, MinIO, etc.)
+# Docker servislerini başlat (PostgreSQL, Redis, Elasticsearch, etc.)
 pnpm docker:up
 
 # Veritabanı migrasyonlarını çalıştır
@@ -91,10 +91,11 @@ Her uygulama için `.env.local` dosyası oluşturun:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tarodan"
 REDIS_URL="redis://localhost:6379"
 JWT_SECRET="your-jwt-secret"
-MINIO_ENDPOINT="localhost"
-MINIO_PORT=9000
-MINIO_ACCESS_KEY="minioadmin"
-MINIO_SECRET_KEY="minioadmin"
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+AWS_REGION="eu-west-1"
+S3_BUCKET="amzn-tarodan"
+S3_ENV_PREFIX="dev"
 
 # apps/web/.env.local
 NEXT_PUBLIC_API_URL="http://localhost:3001"
@@ -117,7 +118,6 @@ Geliştirme ortamında:
 - **Admin**: http://localhost:3002
 - **API**: http://localhost:3001
 - **API Docs**: http://localhost:3001/api/docs
-- **MinIO Console**: http://localhost:9001
 - **Mailhog**: http://localhost:8025
 
 ## 📝 Lisans

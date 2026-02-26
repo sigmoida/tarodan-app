@@ -10,7 +10,7 @@ Projeyi ilk kez başlatıyorsanız, aşağıdaki komutları sırayla çalıştı
 # 1. Bağımlılıkları yükle
 pnpm install
 
-# 2. Docker servislerini başlat (PostgreSQL, Redis, MinIO, Elasticsearch, MailHog)
+# 2. Docker servislerini başlat (PostgreSQL, Redis, Elasticsearch, MailHog)
 pnpm docker:up
 
 # 3. Veritabanı migrasyonlarını çalıştır
@@ -51,11 +51,11 @@ ADMIN_URL="http://localhost:3002"
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ELASTICSEARCH_NODE="http://localhost:9200"
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tarodan
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=dev
 IYZICO_API_KEY=sandbox-test-api-key
 IYZICO_SECRET_KEY=sandbox-test-secret-key
 IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
@@ -75,7 +75,6 @@ ADMIN_SESSION_TIMEOUT=1800
 @"
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
 NEXT_PUBLIC_APP_NAME=Tarodan
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 "@ | Out-File -FilePath apps/web/.env.local -Encoding utf8
@@ -84,7 +83,6 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 @"
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
 NEXT_PUBLIC_APP_NAME=Tarodan Admin
 NEXT_PUBLIC_APP_URL=http://localhost:3002
 "@ | Out-File -FilePath apps/admin/.env.local -Encoding utf8
@@ -108,11 +106,11 @@ ADMIN_URL="http://localhost:3002"
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ELASTICSEARCH_NODE="http://localhost:9200"
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tarodan
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=dev
 IYZICO_API_KEY=sandbox-test-api-key
 IYZICO_SECRET_KEY=sandbox-test-secret-key
 IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
@@ -132,7 +130,6 @@ EOF
 cat > apps/web/.env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
 NEXT_PUBLIC_APP_NAME=Tarodan
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 EOF
@@ -141,7 +138,6 @@ EOF
 cat > apps/admin/.env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
 NEXT_PUBLIC_APP_NAME=Tarodan Admin
 NEXT_PUBLIC_APP_URL=http://localhost:3002
 EOF
@@ -207,7 +203,7 @@ docker-compose -f infrastructure/docker-compose.yml logs -f
 # Belirli bir servisin loglarını görüntüle
 docker-compose -f infrastructure/docker-compose.yml logs -f postgres
 docker-compose -f infrastructure/docker-compose.yml logs -f redis
-docker-compose -f infrastructure/docker-compose.yml logs -f minio
+docker-compose -f infrastructure/docker-compose.yml logs -f elasticsearch
 ```
 
 ### Geliştirme Sunucuları
@@ -250,9 +246,6 @@ Kurulum tamamlandıktan sonra aşağıdaki adreslere erişebilirsiniz:
 - **Admin Paneli**: http://localhost:3002
 - **API**: http://localhost:3001
 - **API Dokümantasyonu (Swagger)**: http://localhost:3001/api/docs
-- **MinIO Console**: http://localhost:9001
-  - Kullanıcı adı: `minioadmin`
-  - Şifre: `minioadmin`
 - **MailHog (Email Test)**: http://localhost:8025
 - **Prisma Studio**: `pnpm db:studio` komutunu çalıştırdıktan sonra http://localhost:5555
 
@@ -273,14 +266,13 @@ Seed işleminden sonra aşağıdaki test hesaplarını kullanabilirsiniz:
 
 ## ⚠️ Sorun Giderme
 
-### API başlamıyor: "Can't reach database server" / "Failed to ensure bucket: ECONNREFUSED"
+### API başlamıyor: "Can't reach database server"
 
 Terminalde şunları görüyorsanız:
 - `PrismaClientInitializationError: Can't reach database server at localhost:5432`
-- `[MediaService] Failed to ensure bucket: connect ECONNREFUSED ::1:9000`
 - `[Bootstrap] Failed to start application`
 
-**Sebep:** PostgreSQL ve MinIO çalışmıyor; API bu servislere bağlanamıyor.
+**Sebep:** PostgreSQL çalışmıyor; API bu servise bağlanamıyor.
 
 **Çözüm:** Önce Docker servislerini başlatın, sonra `pnpm dev` çalıştırın:
 
@@ -329,18 +321,6 @@ pnpm --filter @tarodan/api prisma generate
 
 # Veritabanı bağlantısını test et
 pnpm db:studio
-```
-
-### MinIO Bağlantı Hatası
-
-```bash
-# MinIO servisinin çalıştığını kontrol et
-docker ps | grep minio
-
-# MinIO Console'a giriş yap
-# http://localhost:9001
-# Kullanıcı: minioadmin
-# Şifre: minioadmin
 ```
 
 ### Elasticsearch Bağlantı Hatası

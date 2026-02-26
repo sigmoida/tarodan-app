@@ -66,7 +66,7 @@
 | **Database** | PostgreSQL | ACID, row-locking, JSONB |
 | **Cache/Queue** | Redis + BullMQ | Hızlı, güvenilir |
 | **Search** | Elasticsearch | Full-text, faceted search |
-| **Storage** | MinIO (S3) | Self-hosted, uygun maliyet |
+| **Storage** | AWS S3 | Managed, yüksek ölçeklenebilirlik |
 | **Deployment** | Coolify (Self-hosted) | PaaS deneyimi, kontrol |
 
 ### Sistem Diyagramı
@@ -174,9 +174,10 @@ Redis: 7.x
 Elasticsearch: 8.12.x
   - Indices: products, users, analytics
 
-MinIO: Latest
-  - Protocol: S3 Compatible
-  - Buckets: media, documents, reports
+AWS S3:
+  - Bucket: amzn-tarodan
+  - Region: eu-west-1
+  - Presigned URLs for secure access
 ```
 
 ### DevOps & Infrastructure
@@ -312,7 +313,7 @@ tarodan/
 **Sorumluluk:** Ürün kataloğu yönetimi
 
 - CRUD operations
-- Image upload (MinIO)
+- Image upload (AWS S3)
 - Category management
 - Search indexing (Elasticsearch)
 - Favorite/wishlist
@@ -791,7 +792,7 @@ services:
   - postgres       # Database
   - redis          # Cache + Queue
   - elasticsearch  # Search
-  - minio          # Object storage
+  # Storage: AWS S3 (managed, not containerized)
   - prometheus     # Metrics
   - grafana        # Visualization
   - loki           # Logs
@@ -818,8 +819,6 @@ Traefik (Reverse Proxy)
 │          redis                  │
 │            ↓                    │
 │        elasticsearch            │
-│            ↓                    │
-│          minio                  │
 └─────────────────────────────────┘
 ```
 
@@ -829,7 +828,7 @@ Traefik (Reverse Proxy)
 tarodan.com              → Public web
 admin.tarodan.com        → Admin panel
 api.tarodan.com          → API
-storage.tarodan.com      → MinIO
+storage: AWS S3 (amzn-tarodan.s3.eu-west-1.amazonaws.com)
 grafana.tarodan.com      → Monitoring
 coolify.tarodan.com      → Deployment platform
 ```

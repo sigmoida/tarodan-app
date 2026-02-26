@@ -57,12 +57,12 @@ REDIS_PORT=6379
 # Elasticsearch
 ELASTICSEARCH_NODE="http://localhost:9200"
 
-# MinIO (Docker Compose ile uyumlu)
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tarodan
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=eu-west-1
+S3_BUCKET=amzn-tarodan
+S3_ENV_PREFIX=dev
 
 # Payment - iyzico (Test credentials)
 IYZICO_API_KEY=sandbox-test-api-key
@@ -97,9 +97,6 @@ ADMIN_SESSION_TIMEOUT=1800
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
 
-# MinIO/Storage Configuration
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
-
 # App Configuration
 NEXT_PUBLIC_APP_NAME=Tarodan
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -114,9 +111,6 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_PREFIX=/api
 
-# Storage Configuration
-NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
-
 # App Configuration
 NEXT_PUBLIC_APP_NAME=Tarodan Admin
 NEXT_PUBLIC_APP_URL=http://localhost:3002
@@ -124,7 +118,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3002
 
 ### 4. Docker Servislerini Başlatın
 
-PostgreSQL, Redis, MinIO, Elasticsearch ve MailHog servislerini başlatın:
+PostgreSQL, Redis, Elasticsearch ve MailHog servislerini başlatın:
 
 ```bash
 pnpm docker:up
@@ -145,7 +139,6 @@ docker ps
 Şu servisler çalışıyor olmalı:
 - `tarodan-postgres` (Port: 5432)
 - `tarodan-redis` (Port: 6379)
-- `tarodan-minio` (Port: 9000, Console: 9001)
 - `tarodan-elasticsearch` (Port: 9200)
 - `tarodan-mailhog` (SMTP: 1025, Web UI: 8025)
 
@@ -249,9 +242,6 @@ Geliştirme ortamında:
 - **Admin Paneli**: http://localhost:3002
 - **API**: http://localhost:3001
 - **API Dokümantasyonu (Swagger)**: http://localhost:3001/api/docs
-- **MinIO Console**: http://localhost:9001
-  - Username: `minioadmin`
-  - Password: `minioadmin`
 - **MailHog (Email Test)**: http://localhost:8025
 - **Prisma Studio**: `pnpm db:studio` komutu ile başlatılır
 
@@ -345,18 +335,6 @@ Eğer bir port zaten kullanılıyorsa:
 
 3. `.env` dosyasındaki `DATABASE_URL`'in doğru olduğundan emin olun.
 
-### MinIO Bağlantı Hatası
-
-1. MinIO servisinin çalıştığını kontrol edin:
-   ```bash
-   docker ps | grep minio
-   ```
-
-2. MinIO Console'a giriş yapıp bucket'ların oluşturulduğunu kontrol edin:
-   - http://localhost:9001
-   - Username: `minioadmin`
-   - Password: `minioadmin`
-
 ### Elasticsearch Bağlantı Hatası
 
 1. Elasticsearch servisinin çalıştığını kontrol edin:
@@ -385,7 +363,7 @@ pnpm --filter @tarodan/api prisma generate
 
 3. **Veritabanı Yedekleme**: Production'da düzenli veritabanı yedeklemesi yapın.
 
-4. **MinIO Bucket'ları**: Seed işlemi sırasında gerekli bucket'lar otomatik oluşturulur.
+4. **AWS S3**: Dosya depolaması AWS S3 üzerinden yapılır. Geliştirme için AWS credentials gereklidir.
 
 5. **Elasticsearch**: İlk başlatmada Elasticsearch'in hazır olması biraz zaman alabilir.
 

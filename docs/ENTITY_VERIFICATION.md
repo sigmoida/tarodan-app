@@ -424,7 +424,7 @@ The Prisma schema includes several additional models not specified in 4.1.txt:
 | Invoice | Billing/invoicing |
 | TwoFactorSecret, PasswordResetToken, EmailVerificationToken, RefreshToken | Auth tokens |
 | AdminSession | Admin session management |
-| MediaFile | MinIO file tracking |
+| MediaFile | AWS S3 file tracking |
 | CsrfToken, CacheEntry | Security & caching |
 | NotificationLog, PushToken | Notification system |
 | SearchIndex | Elasticsearch indexing |
