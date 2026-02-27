@@ -7,7 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api, paymentsApi } from '@/lib/api';
-import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface OrderDetail {
@@ -258,7 +258,9 @@ export default function OrderDetailPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-3xl">🚗</div>
+                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                      <TagIcon className="w-8 h-8 text-gray-300" />
+                    </div>
                   )}
                 </div>
                 <div className="flex-1">

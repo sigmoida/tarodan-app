@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -273,36 +274,36 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Left - Hero */}
-      <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-12">
-        <div className="max-w-lg text-white text-center">
+      {/* Left - Brand panel (no emoji, professional) */}
+      <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-16 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+        <div className="max-w-md text-white text-center relative z-10">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="space-y-6"
           >
-            <div className="text-8xl mb-8">🚗</div>
-            <h2 className="text-3xl font-bold mb-4">
+            <h2 className="text-2xl font-semibold tracking-tight text-white">
               {locale === 'en' ? 'Grow Your Collection' : 'Koleksiyonunuzu Büyütün'}
             </h2>
-            <p className="text-gray-300 text-lg">
+            <p className="text-sm text-gray-400 leading-relaxed">
               {locale === 'en' 
                 ? 'Sign up for free, publish your first 5 listings for free. Enrich your collection with the trade feature.'
                 : 'Ücretsiz üye olun, ilk 5 ilanınızı ücretsiz yayınlayın. Takas özelliğiyle koleksiyonunuzu zenginleştirin.'}
             </p>
-            
-            <div className="mt-12 grid grid-cols-3 gap-6 text-center">
+            <div className="pt-8 grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-4xl font-bold">10K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Listings' : 'İlan'}</p>
+                <p className="text-2xl font-semibold text-white">10K+</p>
+                <p className="text-gray-400 text-xs">{locale === 'en' ? 'Listings' : 'İlan'}</p>
               </div>
               <div>
-                <p className="text-4xl font-bold">5K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Members' : 'Üye'}</p>
+                <p className="text-2xl font-semibold text-white">5K+</p>
+                <p className="text-gray-400 text-xs">{locale === 'en' ? 'Members' : 'Üye'}</p>
               </div>
               <div>
-                <p className="text-4xl font-bold">2K+</p>
-                <p className="text-gray-400 text-sm">{locale === 'en' ? 'Trades' : 'Takas'}</p>
+                <p className="text-2xl font-semibold text-white">2K+</p>
+                <p className="text-gray-400 text-xs">{locale === 'en' ? 'Trades' : 'Takas'}</p>
               </div>
             </div>
           </motion.div>
@@ -310,25 +311,29 @@ export default function RegisterPage() {
       </div>
 
       {/* Right - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 sm:p-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-8">
-              <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
-                <span className="text-white text-2xl">🚗</span>
-              </div>
-              <span className="font-display font-bold text-2xl">
+          <div className="mb-10">
+            <Link href="/" className="inline-flex items-center gap-3 mb-10">
+              <Image
+                src="/tarodan-logo.jpg"
+                alt="Tarodan"
+                width={40}
+                height={40}
+                className="rounded-lg object-contain"
+              />
+              <span className="font-display font-bold text-xl tracking-tight text-gray-900">
                 TARODAN
               </span>
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-1.5">
               {t('auth.createAccount')}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-sm text-gray-500 font-normal">
               {locale === 'en' ? 'Join the collectors' : 'Koleksiyonerlere katılın'}
             </p>
           </div>

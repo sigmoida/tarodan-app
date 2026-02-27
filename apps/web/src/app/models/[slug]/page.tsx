@@ -5,6 +5,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { FaceFrownIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
 interface Brand {
@@ -97,7 +98,9 @@ export default function ModelDetailPage() {
     if (error || !model) {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-                <div className="text-6xl mb-4">😔</div>
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+                    <FaceFrownIcon className="w-8 h-8 text-gray-400" />
+                </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('models.notFound')}</h2>
                 <Link href="/models" className="mt-4 text-primary-600 font-semibold flex items-center gap-2 hover:underline">
                     ← {t('models.backToAll')}
@@ -174,7 +177,9 @@ export default function ModelDetailPage() {
 
                 {products.length === 0 ? (
                     <div className="bg-white rounded-3xl border border-gray-100 p-20 text-center shadow-sm">
-                        <div className="text-6xl mb-4 opacity-30">📦</div>
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+                            <ArchiveBoxIcon className="w-8 h-8 text-gray-300" />
+                        </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">{t('models.noProducts')}</h3>
                         <p className="text-gray-500 max-w-md mx-auto">{t('models.noProductsDesc') || 'Şu an bu model için aktif bir ilan bulunmuyor. Kendi ilanınızı vererek ilk satıcı olabilirsiniz!'}</p>
                         <Link href="/listings/new" className="mt-8 inline-block px-8 py-3 bg-primary-500 text-white rounded-xl font-bold shadow-lg shadow-primary-100 hover:bg-primary-600 transition-all transform hover:-translate-y-1">

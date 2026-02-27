@@ -123,7 +123,7 @@ export default function BrandsPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="sticky top-6 z-40 mb-16 max-w-4xl mx-auto"
+                    className="sticky top-6 z-30 mb-16 max-w-4xl mx-auto"
                 >
                     <div className="glass-panel p-2 rounded-full shadow-xl shadow-gray-200/50 border border-white/60 backdrop-blur-xl bg-white/80 flex items-center gap-2">
                         <div className="relative flex-1">
@@ -185,8 +185,8 @@ export default function BrandsPage() {
                         animate={{ opacity: 1, scale: 1 }}
                         className="text-center py-32"
                     >
-                        <div className="inline-flex items-center justify-center w-24 h-24 bg-gray-50 rounded-full mb-6">
-                            <span className="text-4xl">🔍</span>
+                        <div className="inline-flex items-center justify-center w-24 h-24 bg-gray-100 rounded-full mb-6 text-gray-400">
+                            <MagnifyingGlassIcon className="w-12 h-12" aria-hidden />
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 mb-2">Sonuç Bulunamadı</h3>
                         <p className="text-gray-500 mb-8">"{searchQuery}" aramasıyla eşleşen marka yok.</p>

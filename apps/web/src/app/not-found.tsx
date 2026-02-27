@@ -4,21 +4,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { HomeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';
 
 const POPULAR_LINKS = [
-  { href: '/listings', labelKey: 'nav.listings' },
-  { href: '/trades', labelKey: 'nav.trades' },
-  { href: '/collections', labelKey: 'nav.collections' },
-  { href: '/brands', labelKey: 'nav.brands' },
-  { href: '/sell', labelKey: 'utility.sitemap.sellOnSite' },
-  { href: '/about', labelKey: 'footer.about' },
-  { href: '/contact', labelKey: 'footer.contact' },
-  { href: '/sitemap', labelKey: 'footer.sitemap' },
+  { href: '/listings', label: 'İlanlar' },
+  { href: '/trades', label: 'Takaslar' },
+  { href: '/collections', label: 'Koleksiyonlar' },
+  { href: '/brands', label: 'Markalar' },
+  { href: '/contact', label: 'İletişim' },
+  { href: '/sitemap', label: 'Site Haritası' },
 ];
 
 export default function NotFound() {
-  const { t } = useTranslation();
   const router = useRouter();
   const [query, setQuery] = useState('');
 
@@ -31,9 +27,9 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
       <div className="text-center max-w-lg w-full">
-        <p className="text-6xl font-bold text-primary-500 mb-4">404</p>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('utility.notFound.title')}</h1>
-        <p className="text-gray-600 mb-8">{t('utility.notFound.description')}</p>
+        <p className="text-6xl font-bold text-orange-500 mb-4">404</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Sayfa bulunamadı</h1>
+        <p className="text-gray-600 mb-8">Aradığınız sayfa mevcut değil veya taşınmış olabilir.</p>
 
         <form onSubmit={handleSearch} className="flex gap-2 mb-8 max-w-md mx-auto">
           <div className="relative flex-1">
@@ -42,28 +38,28 @@ export default function NotFound() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('utility.notFound.searchPlaceholder')}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="İlanlarda ara..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
           <button
             type="submit"
-            className="px-5 py-3 rounded-xl bg-primary-500 text-white font-medium hover:bg-primary-600 transition-colors"
+            className="px-5 py-3 rounded-xl bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors"
           >
-            {t('utility.notFound.searchButton')}
+            Ara
           </button>
         </form>
 
         <div className="mb-8 text-left max-w-md mx-auto">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('utility.notFound.popularCategories')}</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Popüler sayfalar</h2>
           <div className="flex flex-wrap gap-2">
             {POPULAR_LINKS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:border-primary-500 hover:text-primary-600 text-sm transition-colors"
+                className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 text-sm transition-colors"
               >
-                {t(item.labelKey)}
+                {item.label}
               </Link>
             ))}
           </div>
@@ -71,10 +67,10 @@ export default function NotFound() {
 
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-500 text-white font-semibold hover:bg-primary-600 transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors"
         >
           <HomeIcon className="w-5 h-5" />
-          {t('utility.notFound.goHome')}
+          Ana Sayfaya Dön
         </Link>
       </div>
     </div>

@@ -73,6 +73,7 @@ const CATEGORY_BAR_ITEMS = {
         { label: 'Ön Sipariş', href: '/listings?preOrder=true' },
         { label: 'Limited Edition', href: '/listings?limited=true' },
         { label: 'Setler', href: '/listings?set=true' },
+        { label: 'Koleksiyonlar', href: '/collections' },
         { label: 'Markalar', href: '/brands' },
         { label: 'Üreticiler', dropdown: 'manufacturers' },
         { label: 'Ölçek', dropdown: 'scales' },
@@ -84,6 +85,7 @@ const CATEGORY_BAR_ITEMS = {
         { label: 'Pre-Order', href: '/listings?preOrder=true' },
         { label: 'Limited Edition', href: '/listings?limited=true' },
         { label: 'Sets', href: '/listings?set=true' },
+        { label: 'Collections', href: '/collections' },
         { label: 'Brands', href: '/brands' },
         { label: 'Manufacturers', dropdown: 'manufacturers' },
         { label: 'Scale', dropdown: 'scales' },
@@ -120,9 +122,9 @@ export default function CategoryNavBar() {
     }, []);
 
     return (
-        <nav ref={navRef} className="bg-gray-100 border-b border-gray-200 relative z-40">
+        <nav ref={navRef} className="bg-surface-alt border-b border-gray-200 relative z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center h-11 gap-1 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
                     {categoryItems.map((item, index) => (
                         <div
                             key={item.label}
@@ -133,19 +135,16 @@ export default function CategoryNavBar() {
                             {item.href ? (
                                 <Link
                                     href={item.href}
-                                    className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-md transition-colors"
+                                    className="nav-link-animated"
                                 >
                                     {item.label}
                                 </Link>
                             ) : (
                                 <button
-                                    className={`whitespace-nowrap px-3 py-2 text-sm font-medium flex items-center gap-1 rounded-md transition-colors ${activeDropdown === item.dropdown
-                                        ? 'text-orange-600 bg-orange-50'
-                                        : 'text-gray-700 hover:text-orange-600 hover:bg-orange-50'
-                                        }`}
+                                    className={`nav-link-animated flex items-center gap-1 ${activeDropdown === item.dropdown ? 'text-heading font-semibold' : ''}`}
                                 >
                                     {item.label}
-                                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
+                                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
                                 </button>
                             )}
                         </div>
@@ -162,7 +161,7 @@ export default function CategoryNavBar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-50"
+                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-[100]"
                         onMouseEnter={() => handleMouseEnter('manufacturers')}
                         onMouseLeave={handleMouseLeave}
                     >
@@ -200,7 +199,7 @@ export default function CategoryNavBar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-50"
+                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-[100]"
                         onMouseEnter={() => handleMouseEnter('scales')}
                         onMouseLeave={handleMouseLeave}
                     >

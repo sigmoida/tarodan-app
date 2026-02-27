@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -11,15 +11,13 @@ import {
   FunnelIcon,
   ArrowsRightLeftIcon,
   XMarkIcon,
-  ClockIcon,
   StarIcon,
   TagIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { listingsApi, searchApi, categoriesApi } from '@/lib/api';
+import { listingsApi, categoriesApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
-import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 import SidebarFilters from '@/components/SidebarFilters';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
 
@@ -61,15 +59,8 @@ export default function ListingsPage() {
   const searchParams = useSearchParams();
   const { t } = useTranslation();
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [showRecentSearches, setShowRecentSearches] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const recentSearchesRef = useRef<HTMLDivElement>(null);
-
-  // Recent searches store
-  const { searches: recentSearches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
 
   const [filters, setFilters] = useState({
     brand: searchParams.get('brand') || '',
@@ -90,7 +81,6 @@ export default function ListingsPage() {
   });
 
   useEffect(() => {
-    const urlSearch = searchParams.get('search');
     const urlTradeOnly = searchParams.get('tradeOnly');
     const urlDiscountOnly = searchParams.get('discountOnly');
     const urlPreOrder = searchParams.get('preOrder');
@@ -104,7 +94,6 @@ export default function ListingsPage() {
     const urlMaxPrice = searchParams.get('maxPrice');
     const urlSortBy = searchParams.get('sortBy');
 
-    if (urlSearch) setSearchQuery(urlSearch);
     setFilters(prev => ({
       ...prev,
       tradeOnly: urlTradeOnly === 'true',
@@ -138,16 +127,13 @@ export default function ListingsPage() {
 
   // Listings Query
   const { data: listings = [], isLoading } = useQuery({
-    queryKey: ['listings', searchQuery, filters, resolvedCategoryId ?? ''],
+    queryKey: ['listings', filters, resolvedCategoryId ?? ''],
     queryFn: async (): Promise<Listing[]> => {
       const urlCategoryId = resolvedCategoryId;
       const conditionMap: Record<string, string> = {
         'Yeni': 'new', 'Mükemmel': 'very_good', 'İyi': 'good', 'Orta': 'fair',
       };
       const mappedCondition = filters.condition ? conditionMap[filters.condition] || filters.condition : undefined;
-      const sortByMap: Record<string, string> = {
-        'created_desc': 'newest', 'created_asc': 'oldest', 'view_count_desc': 'popular', 'price_asc': 'price_asc', 'price_desc': 'price_desc',
-      };
 
       const buildListParams = (): Record<string, any> => {
         const p: Record<string, any> = { limit: 100, page: 1 };
@@ -165,90 +151,15 @@ export default function ListingsPage() {
         if (filters.set) p.set = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
         if (filters.vehicleType) p.vehicleType = filters.vehicleType;
-        if (searchQuery?.trim()) p.search = searchQuery.trim();
         return p;
       };
 
-      const useDbOnly = filters.discountOnly === true;
-      if (useDbOnly) {
-        const response = await listingsApi.getAll(buildListParams());
-        return response.data.data || response.data.products || [];
-      }
-      if (searchQuery?.trim()) {
-        try {
-          const esParams: Record<string, any> = { pageSize: 100, page: 1 };
-          if (urlCategoryId) esParams.categoryId = urlCategoryId;
-          if (mappedCondition) esParams.condition = mappedCondition;
-          if (filters.minPrice) esParams.minPrice = Number(filters.minPrice);
-          if (filters.maxPrice) esParams.maxPrice = Number(filters.maxPrice);
-          if (filters.sortBy) esParams.sortBy = sortByMap[filters.sortBy] || 'relevance';
-          if (filters.brand) esParams.brand = filters.brand;
-          if (filters.scale) esParams.scale = filters.scale;
-          if (filters.manufacturer) esParams.manufacturer = filters.manufacturer;
-          const response = await searchApi.products(searchQuery.trim(), esParams);
-          const results = response.data.results || response.data.data || [];
-          if (results.length > 0) {
-            return results.map((r: any) => ({
-              id: r.id,
-              title: r.title,
-              price: r.price,
-              oldPrice: r.oldPrice ?? undefined,
-              originalPrice: r.originalPrice ?? r.oldPrice ?? undefined,
-              salePrice: r.salePrice ?? undefined,
-              isOnSale: r.isOnSale ?? undefined,
-              discountPercent: r.discountPercent ?? undefined,
-              description: r.description,
-              condition: r.condition,
-              images: r.imageUrl ? [{ url: r.imageUrl }] : (r.images || []),
-              seller: r.seller || { displayName: r.sellerName },
-              category: { name: r.categoryName },
-              isTradeEnabled: r.isTradeEnabled || r.trade_available || false,
-              rating: r.rating || (r.averageRating ? { average: r.averageRating, count: r.ratingCount || 0 } : undefined),
-            }));
-          }
-          const dbResponse = await listingsApi.getAll(buildListParams());
-          return dbResponse.data.data || dbResponse.data.products || [];
-        } catch {
-          const dbResponse = await listingsApi.getAll(buildListParams());
-          return dbResponse.data.data || dbResponse.data.products || [];
-        }
-      }
       const params = buildListParams();
       const response = await listingsApi.getAll(params);
       return response.data.data || response.data.products || [];
     },
     meta: { page: 'listings' },
   });
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) addSearch(searchQuery.trim());
-    setShowRecentSearches(false);
-  };
-
-  const handleRecentSearchClick = (query: string) => {
-    setSearchQuery(query);
-    setShowRecentSearches(false);
-    addSearch(query);
-    const params = new URLSearchParams(window.location.search);
-    params.set('search', query);
-    router.push(`/listings?${params.toString()}`);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        recentSearchesRef.current &&
-        !recentSearchesRef.current.contains(event.target as Node) &&
-        searchInputRef.current &&
-        !searchInputRef.current.contains(event.target as Node)
-      ) {
-        setShowRecentSearches(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const clearFilters = () => {
     setFilters({
@@ -273,57 +184,11 @@ export default function ListingsPage() {
           filters.brand ? `${filters.brand} Model Araç Koleksiyonu` : t('product.title')}
       </h1>
 
-      {/* Header Search Only */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <form onSubmit={handleSearch} className="flex-1 w-full relative" role="search" aria-label="Ürün ara">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={t('nav.searchPlaceholderMobile')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowRecentSearches(true)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-              </div>
-
-              {/* Recent Searches Dropdown */}
-              {showRecentSearches && recentSearches.length > 0 && (
-                <div ref={recentSearchesRef} className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <ClockIcon className="w-4 h-4" />{t('search.recentSearches')}
-                    </span>
-                    <button type="button" onClick={(e) => { e.preventDefault(); clearSearches(); }} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
-                      {t('search.clearAll')}
-                    </button>
-                  </div>
-                  <ul>
-                    {recentSearches.map((query, index) => (
-                      <li key={index}>
-                        <button type="button" onClick={() => handleRecentSearchClick(query)} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center justify-between group">
-                          <span className="flex items-center gap-2"><ClockIcon className="w-4 h-4 text-gray-400" />{query}</span>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); removeSearch(query); }} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"><XMarkIcon className="w-4 h-4" /></button>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </form>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-72 flex-shrink-0">
-            <div className="sticky top-24">
+            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded-xl border border-gray-100 shadow-soft">
               <SidebarFilters
                 filters={filters}
                 onFilterChange={setFilters}
@@ -337,8 +202,8 @@ export default function ListingsPage() {
           {showMobileSidebar && (
             <div className="fixed inset-0 z-50 lg:hidden">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowMobileSidebar(false)} />
-              <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-xl overflow-y-auto">
-                <div className="sticky top-0 flex items-center justify-between p-4 bg-white border-b border-gray-100 z-10">
+              <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-xl flex flex-col overflow-y-auto">
+                <div className="flex-shrink-0 flex items-center justify-between p-4 bg-white border-b border-gray-100 z-10">
                   <span className="font-semibold text-gray-900">{t('product.filters')}</span>
                   <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                     <XMarkIcon className="w-5 h-5" />
@@ -371,8 +236,8 @@ export default function ListingsPage() {
                     <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">{activeFilterCount}</span>
                   )}
                 </button>
-                <p className="text-sm text-gray-600">
-                  <span className="font-semibold text-gray-900">{listings.length}</span> ürün bulundu
+                <p className="text-base font-semibold text-gray-900">
+                  {listings.length} <span className="font-normal text-gray-500">ürün bulundu</span>
                 </p>
               </div>
 
@@ -445,6 +310,8 @@ export default function ListingsPage() {
               </div>
             )}
 
+            <div className="border-b border-gray-200 pb-4 mb-6" />
+
             {/* GRID */}
             {isLoading ? (
               <div className={
@@ -458,7 +325,9 @@ export default function ListingsPage() {
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
-                <div className="text-6xl mb-4">🔍</div>
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+                  <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+                </div>
                 <p className="text-gray-500 text-lg mb-2">{t('product.noListings')}</p>
                 {activeFilterCount > 0 && (
                   <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">{t('product.clearFilters')}</button>

@@ -5,10 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bars3Icon,
-  XMarkIcon,
   MagnifyingGlassIcon,
   ShoppingCartIcon,
   UserCircleIcon,
@@ -23,11 +20,12 @@ import {
   ArrowRightOnRectangleIcon,
   CurrencyDollarIcon,
   SparklesIcon,
+  ChevronDownIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { messagesApi, api, wishlistApi } from '@/lib/api';
-import NotificationBell from '@/components/notifications/NotificationBell';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 
@@ -37,12 +35,11 @@ const AuthRequiredModal = dynamic(
 );
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
-import CategoryMegaMenu from './CategoryMegaMenu';
+import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 
 export default function Navbar() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { itemCount: cartCount } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -50,6 +47,13 @@ export default function Navbar() {
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTradesAuthModal, setShowTradesAuthModal] = useState(false);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
+  const accountDropdownLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const { addSearch, searches: recentSearches } = useRecentSearchesStore();
   const [topAds, setTopAds] = useState<Array<{
     id: string;
     title: string;
@@ -97,6 +101,30 @@ export default function Navbar() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node)) {
+        setShowAccountDropdown(false);
+      }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchQuery.trim();
+    if (trimmed) {
+      addSearch(trimmed);
+      setSearchQuery('');
+      setShowSearchDropdown(false);
+      router.push(`/listings?search=${encodeURIComponent(trimmed)}`);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -284,13 +312,13 @@ export default function Navbar() {
             </div>
           ) : (
             <div
-              className="w-full relative flex items-center justify-center border-b border-gray-700 text-white text-xs font-medium"
+              className="w-full flex items-center justify-center border-b border-gray-700 text-white text-xs font-medium flex-shrink-0 overflow-hidden"
               style={{
                 height: isMobile ? 40 : 50,
                 backgroundColor: '#1f2937',
               }}
             >
-              🎉 {t('nav.banner')}
+              <span className="truncate px-4">🎉 {t('nav.banner')}</span>
             </div>
           )}
         </>
@@ -298,405 +326,265 @@ export default function Navbar() {
 
       <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-20">
-            {/* Logo */}
-            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <div className="flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
+            {/* Logo - navbarın en soluna dayalı */}
+            <Link href="/" className="flex-shrink-0 flex items-center hover:opacity-90 transition-opacity -ml-1 h-8">
               <Image
                 src="/tarodan-logo.jpg"
                 alt="Tarodan Logo"
-                width={160}
-                height={52}
-                className="object-contain"
-                style={{ width: 'auto', height: 'auto' }}
+                width={120}
+                height={38}
+                className="object-contain max-h-8 w-auto"
                 priority
               />
             </Link>
 
-            {/* Spacer - search moved to GlobalSearchBar below header */}
-            <div className="hidden md:block flex-1 min-w-0 mx-4 lg:mx-8" />
-
-            {/* Nav Links - Desktop */}
-            <div className="hidden lg:flex items-center gap-6 mr-12">
-              {NAV_LINKS.map((link) => {
-                const isGuestTrades = link.href === '/trades' && !showAuthUI;
-                const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={(e) => {
-                      if (isGuestTrades) {
-                        e.preventDefault();
-                        setShowTradesAuthModal(true);
-                      }
-                    }}
-                    className={
-                      showTradesBadge
-                        ? 'relative text-white hover:text-orange-100 font-medium transition-colors text-sm flex items-center gap-1'
-                        : 'text-white hover:text-orange-100 font-medium transition-colors text-sm'
-                    }
-                  >
-                    {link.label}
-                    {showTradesBadge && (
-                      <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
-                        {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Right Actions - same wrapper (div) in both branches to avoid hydration mismatch */}
-            <div className="flex items-center gap-4 ml-8">
-              {showAuthUI ? (
-                <div className="flex items-center gap-4">
-                  {/* Yeni İlan Ekle Butonu - Desktop */}
-                  <Link
-                    href="/listings/new"
-                    className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                    <span>{t('nav.newListing')}</span>
-                  </Link>
-                  <Link
-                    href="/messages"
-                    className="p-2 text-white hover:text-orange-100 transition-colors relative"
-                  >
-                    <ChatBubbleLeftRightIcon className="w-6 h-6" />
-                    {unreadMessageCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                        {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
-                      </span>
-                    )}
-                  </Link>
-                  <Link
-                    href="/favorites"
-                    className="p-2 text-white hover:text-orange-100 transition-colors relative hidden sm:block"
-                  >
-                    <HeartIcon className="w-6 h-6" />
-                    {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
-                        {wishlistCount > 9 ? '9+' : wishlistCount}
-                      </span>
-                    )}
-                  </Link>
-                  <NotificationBell />
-                  <Link
-                    href="/cart"
-                    className="p-2 text-white hover:text-orange-100 transition-colors relative"
-                  >
-                    <ShoppingCartIcon className="w-6 h-6" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-orange-500 text-xs rounded-full flex items-center justify-center font-semibold">
-                        {cartCount > 9 ? '9+' : cartCount}
-                      </span>
-                    )}
-                  </Link>
-                  <div className="relative group">
-                    <Link
-                      href="/profile"
-                      className="p-2 text-white hover:text-orange-100 transition-colors flex items-center gap-2"
-                    >
-                      <UserCircleIcon className="w-7 h-7" />
-                      {user && (
-                        <span className="hidden lg:block text-sm font-medium text-white">
-                          {user.displayName}
-                        </span>
-                      )}
-                    </Link>
-                    {/* Dropdown menu */}
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
-                      {/* User info header */}
-                      <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-100 relative">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
-                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                          </div>
-                          {/* Language Switcher - Top Right */}
-                          <div className="flex-shrink-0">
-                            <LanguageSwitcher variant="minimal" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Quick Actions */}
-                      <div className="py-2">
+            {/* Arama - ortada */}
+            <div ref={searchContainerRef} className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4">
+              <div className="w-full max-w-md relative flex-shrink-0">
+              <form onSubmit={handleSearchSubmit} className="relative h-9 block">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
+                  <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
+                </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowSearchDropdown(true)}
+                  placeholder={t('nav.searchPlaceholder')}
+                  className="w-full h-9 pl-9 pr-3 bg-white/95 rounded-md text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
+                  aria-label={t('nav.searchPlaceholder')}
+                />
+              </form>
+              {showSearchDropdown && (
+                <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
+                  {recentSearches.length > 0 && (
+                    <div className="px-3 py-1">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{locale === 'en' ? 'Recent' : 'Son aramalar'}</p>
+                      {recentSearches.slice(0, 5).map((s) => (
                         <Link
-                          href="/profile"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          key={s}
+                          href={`/listings?search=${encodeURIComponent(s)}`}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                          onClick={() => setShowSearchDropdown(false)}
                         >
-                          <UserCircleIcon className="w-5 h-5" />
-                          {t('profile.myProfile')}
+                          {s}
                         </Link>
-                        <Link
-                          href="/profile/listings"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <ShoppingBagIcon className="w-5 h-5" />
-                          {t('nav.myListings')}
-                        </Link>
-                        <Link
-                          href="/orders"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <TagIcon className="w-5 h-5" />
-                          {t('order.myOrders')}
-                        </Link>
-                        <Link
-                          href="/offers"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <div className="relative">
-                            <CurrencyDollarIcon className="w-5 h-5" />
-                            {pendingOffersCount > 0 && (
-                              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                {pendingOffersCount > 9 ? '9+' : pendingOffersCount}
-                              </span>
-                            )}
-                          </div>
-                          {t('offer.myOffers')}
-                          {pendingOffersCount > 0 && (
-                            <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full">
-                              {pendingOffersCount}
-                            </span>
-                          )}
-                        </Link>
-                        <Link
-                          href="/favorites"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <HeartIcon className="w-5 h-5" />
-                          {t('nav.favorites')}
-                        </Link>
-                        <Link
-                          href="/profile/membership"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <SparklesIcon className="w-5 h-5" />
-                          {t('membership.title')}
-                        </Link>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="border-t border-gray-100"></div>
-
-                      {/* Settings & Support */}
-                      <div className="py-2">
-                        <Link
-                          href="/profile/addresses"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <MapPinIcon className="w-5 h-5" />
-                          {t('address.myAddresses')}
-                        </Link>
-                        <Link
-                          href="/profile/settings"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        >
-                          <CogIcon className="w-5 h-5" />
-                          {t('nav.settings')}
-                        </Link>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="border-t border-gray-100"></div>
-
-                      {/* Logout */}
-                      <div className="py-2">
-                        <button
-                          onClick={() => {
-                            logout();
-                            router.push('/');
-                            setIsOpen(false);
-                          }}
-                          className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                          {t('common.logout')}
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4">
-                  {/* İlan Ver - Guest Desktop (Link to avoid hydration mismatch: server/client must both render <a> first) */}
+                  )}
                   <Link
-                    href="/listings/new"
-                    className="hidden md:flex items-center gap-1.5 bg-white text-orange-500 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
-                    onClick={(e) => { e.preventDefault(); setShowAuthModal(true); }}
+                    href="/listings"
+                    className={`block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 ${recentSearches.length > 0 ? 'border-t border-gray-100 mt-1' : ''}`}
+                    onClick={() => setShowSearchDropdown(false)}
                   >
-                    <PlusIcon className="w-4 h-4" />
-                    <span>{t('nav.newListing')}</span>
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:block"
-                  >
-                    {t('common.login')}
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="bg-white text-orange-500 px-4 py-2 rounded-xl font-medium hover:bg-orange-50 transition-colors"
-                  >
-                    {t('common.register')}
-                  </Link>
-                  <Link
-                    href="/cart"
-                    className="text-white hover:text-orange-100 font-medium transition-colors hidden sm:flex items-center gap-1"
-                  >
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    {t('nav.cart')}
+                    {locale === 'en' ? 'Browse all listings' : 'Tüm ilanları gör'}
                   </Link>
                 </div>
               )}
+              </div>
+            </div>
 
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="lg:hidden p-2 text-white"
+            {/* Right - İlan Ver + Menü + Hesap dropdown */}
+            <div ref={accountDropdownRef} className="flex items-center gap-2 flex-shrink-0">
+              {/* İlan Ver - her zaman görünür */}
+              <Link
+                href="/listings/new"
+                className="flex items-center justify-center gap-1.5 h-9 px-4 bg-white text-orange-500 rounded-md text-sm font-medium hover:bg-orange-50 transition-colors"
+                onClick={(e) => { if (!showAuthUI) { e.preventDefault(); setShowAuthModal(true); } }}
               >
-                {isOpen ? (
-                  <XMarkIcon className="w-6 h-6" />
-                ) : (
-                  <Bars3Icon className="w-6 h-6" />
+                <PlusIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('nav.newListing')}</span>
+              </Link>
+
+              {/* Hesap dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  if (accountDropdownLeaveTimer.current) {
+                    clearTimeout(accountDropdownLeaveTimer.current);
+                    accountDropdownLeaveTimer.current = null;
+                  }
+                  setShowAccountDropdown(true);
+                }}
+                onMouseLeave={() => {
+                  accountDropdownLeaveTimer.current = setTimeout(() => setShowAccountDropdown(false), 150);
+                }}
+              >
+                <button
+                  onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                  className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-orange-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors"
+                >
+                  <UserCircleIcon className="w-5 h-5" />
+                  <span className="hidden sm:inline">{showAuthUI ? (user?.displayName || t('nav.account')) : t('common.login')}</span>
+                  <ChevronDownIcon className={`w-4 h-4 transition-transform ${showAccountDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showAccountDropdown && (
+                  <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]">
+                    {showAuthUI ? (
+                      <>
+                        {/* Profil - en üstte, profesyonel */}
+                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="block px-4 py-3 hover:bg-orange-50/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
+                              {(user?.displayName || user?.email || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
+                              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                              {membershipTier !== 'free' && (
+                                <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded">
+                                  {membershipTier}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                        <div className="border-t border-gray-100 my-1" />
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <MagnifyingGlassIcon className="w-5 h-5" />
+                          {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
+                        </Link>
+                        {NAV_LINKS.filter((l) => !['/listings', '/brands', '/collections'].includes(l.href)).map((link) => {
+                          const isGuestTrades = link.href === '/trades' && !showAuthUI;
+                          const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
+                          return (
+                            <Link
+                              key={link.href}
+                              href={link.href}
+                              onClick={(e) => {
+                                if (isGuestTrades) {
+                                  e.preventDefault();
+                                  setShowTradesAuthModal(true);
+                                }
+                                setShowAccountDropdown(false);
+                              }}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                            >
+                              {link.label}
+                              {showTradesBadge && (
+                                <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                                  {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                        <div className="border-t border-gray-100 my-1" />
+                        <Link href="/messages" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                          {t('nav.messages')}
+                          {unreadMessageCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
+                        </Link>
+                        <Link href="/favorites" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <HeartIcon className="w-5 h-5" />
+                          {t('nav.favorites')}
+                          {wishlistCount > 0 && <span className="ml-auto text-xs text-gray-500">{wishlistCount}</span>}
+                        </Link>
+                        <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <BellIcon className="w-5 h-5" />
+                          {t('nav.notifications')}
+                        </Link>
+                        <div className="border-t border-gray-100 my-1" />
+                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <UserCircleIcon className="w-5 h-5" />
+                          {t('profile.myProfile')}
+                        </Link>
+                        <Link href="/profile/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <ShoppingBagIcon className="w-5 h-5" />
+                          {t('nav.myListings')}
+                        </Link>
+                        <Link href="/orders" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <TagIcon className="w-5 h-5" />
+                          {t('order.myOrders')}
+                        </Link>
+                        <Link href="/offers" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <CurrencyDollarIcon className="w-5 h-5" />
+                          {t('offer.myOffers')}
+                          {pendingOffersCount > 0 && <span className="ml-auto text-xs text-red-600">{pendingOffersCount}</span>}
+                        </Link>
+                        <div className="border-t border-gray-100 my-1" />
+                        <div className="px-4 py-2">
+                          <LanguageSwitcher variant="minimal" />
+                        </div>
+                        <button onClick={() => { logout(); router.push('/'); setShowAccountDropdown(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
+                          <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                          {t('common.logout')}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <UserCircleIcon className="w-6 h-6 text-orange-500" />
+                            <span className="text-sm font-semibold text-orange-500">{t('common.login')}</span>
+                          </div>
+                        </div>
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                          <MagnifyingGlassIcon className="w-5 h-5" />
+                          {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
+                        </Link>
+                        {NAV_LINKS.filter((l) => !['/listings', '/brands', '/collections'].includes(l.href)).map((link) => {
+                          const isGuestTrades = link.href === '/trades' && !showAuthUI;
+                          return (
+                            <Link
+                              key={link.href}
+                              href={link.href}
+                              onClick={(e) => {
+                                if (isGuestTrades) {
+                                  e.preventDefault();
+                                  setShowTradesAuthModal(true);
+                                }
+                                setShowAccountDropdown(false);
+                              }}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                            >
+                              {link.label}
+                            </Link>
+                          );
+                        })}
+                        <div className="border-t border-gray-100 my-1" />
+                        <div className="p-4 space-y-2">
+                          <Link
+                            href="/login"
+                            onClick={() => setShowAccountDropdown(false)}
+                            className="flex items-center justify-center w-full py-2.5 px-4 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                          >
+                            {t('common.login')}
+                          </Link>
+                          <Link
+                            href="/register"
+                            onClick={() => setShowAccountDropdown(false)}
+                            className="flex items-center justify-center w-full py-2.5 px-4 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                          >
+                            {t('common.register')}
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
+
+              {/* Sepet - en sağda, Giriş Yap'ın sağında ikon + yazı */}
+              <Link
+                href="/cart"
+                className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-orange-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors relative"
+                title={t('nav.cart')}
+              >
+                <ShoppingCartIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">{t('nav.cart')}</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-white text-orange-500 text-xs rounded-full flex items-center justify-center font-semibold">
+                    {cartCount > 9 ? '9+' : cartCount}
+                  </span>
+                )}
+              </Link>
+
             </div>
           </div>
         </div>
-
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden border-t border-orange-600 bg-orange-500"
-            >
-              <div className="px-4 py-4 space-y-4">
-                {/* Arama: Sayfada hemen altında GlobalSearchBar kullanılır */}
-                <Link
-                  href="/listings"
-                  className="flex items-center gap-2 py-2 text-white hover:text-orange-100 font-medium"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <MagnifyingGlassIcon className="w-5 h-5" />
-                  {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
-                </Link>
-
-                {/* Mobile Nav Links - always use Link to avoid hydration mismatch */}
-                {NAV_LINKS.map((link) => {
-                  const isGuestTrades = link.href === '/trades' && !showAuthUI;
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="block py-2 text-white hover:text-orange-100 font-medium text-left w-full"
-                      onClick={(e) => {
-                        if (isGuestTrades) { e.preventDefault(); setShowTradesAuthModal(true); }
-                        setIsOpen(false);
-                      }}
-                    >
-                      {link.label}
-                    </Link>
-                  );
-                })}
-
-                {/* Mobile Auth Links */}
-                <div className="border-t border-orange-600 pt-4 mt-4">
-                  {showAuthUI ? (
-                    <div className="space-y-2">
-                      {/* Yeni İlan Ekle Butonu - Mobile */}
-                      <Link
-                        href="/listings/new"
-                        className="flex items-center justify-center gap-2 bg-white text-orange-500 px-4 py-2.5 rounded-lg font-medium hover:bg-orange-50 transition-colors mb-4"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>{t('nav.newListing')}</span>
-                      </Link>
-                      <Link
-                        href="/profile"
-                        className="block py-2 text-white hover:text-orange-100 font-medium"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {t('profile.myProfile')}
-                      </Link>
-                      <Link
-                        href="/profile/listings"
-                        className="block py-2 text-white hover:text-orange-100 font-medium"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {t('nav.myListings')}
-                      </Link>
-                      <Link
-                        href="/orders"
-                        className="block py-2 text-white hover:text-orange-100 font-medium"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {t('order.myOrders')}
-                      </Link>
-                      <Link
-                        href="/offers"
-                        className="flex items-center gap-2 py-2 text-white hover:text-orange-100 font-medium"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {t('offer.myOffers')}
-                        {pendingOffersCount > 0 && (
-                          <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
-                            {pendingOffersCount}
-                          </span>
-                        )}
-                      </Link>
-                      {/* Language Switcher - Mobile */}
-                      <div className="py-2">
-                        <LanguageSwitcher variant="buttons" />
-                      </div>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setIsOpen(false);
-                        }}
-                        className="block w-full text-left py-2 text-red-500 hover:text-red-600 font-medium"
-                      >
-                        {t('common.logout')}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {/* İlan Ver butonu - Guest Mobile */}
-                      <button
-                        onClick={() => {
-                          setIsOpen(false);
-                          setShowAuthModal(true);
-                        }}
-                        className="flex items-center justify-center gap-2 w-full bg-white text-orange-500 px-4 py-2.5 rounded-lg font-medium hover:bg-orange-50 transition-colors mb-4"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>{t('nav.newListing')}</span>
-                      </button>
-                      {/* Language Switcher - Mobile Guest */}
-                      <div className="py-2">
-                        <LanguageSwitcher variant="buttons" />
-                      </div>
-                      <Link
-                        href="/login"
-                        className="block py-2.5 text-center text-white hover:text-orange-100 font-medium rounded-lg hover:bg-white/10 transition-colors"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {t('common.login')}
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Auth Required Modal for İlan Ver */}
         <AuthRequiredModal

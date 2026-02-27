@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import { BookOpenIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -122,7 +123,9 @@ export default function LikedCollectionsPage() {
           </div>
         ) : collections.length === 0 ? (
           <div className="text-center py-12 bg-gray-800 rounded-xl">
-            <div className="text-6xl mb-4">📚</div>
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-700 rounded-full mb-4">
+              <BookOpenIcon className="w-8 h-8 text-gray-400" />
+            </div>
             <p className="text-gray-400 text-lg">{t('collection.noLikedCollections')}</p>
             <p className="text-gray-500 mt-2">{t('collection.exploreTip')}</p>
             <Link
@@ -168,7 +171,7 @@ export default function LikedCollectionsPage() {
                               />
                             ) : (
                               <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                                <span className="text-2xl">🚗</span>
+                                <ArchiveBoxIcon className="w-6 h-6 text-gray-400" />
                               </div>
                             )}
                           </div>
@@ -183,7 +186,7 @@ export default function LikedCollectionsPage() {
                     ) : (
                       // Empty state
                       <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-6xl opacity-50">📦</span>
+                        <ArchiveBoxIcon className="w-10 h-10 text-gray-500" />
                       </div>
                     )}
 

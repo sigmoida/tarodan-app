@@ -216,7 +216,7 @@ export default function SidebarFilters({
     );
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[calc(100vh-150px)] flex flex-col">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export default function SidebarFilters({
             </div>
 
             {/* Filter Sections */}
-            <div className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <div className="divide-y divide-gray-100">
 
                 {/* Araç Türü (Vehicle Type) */}
                 <div className="py-3 px-4">
@@ -258,7 +258,7 @@ export default function SidebarFilters({
                         )}
                     </button>
                     {!collapsedSections.category && (
-                        <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                        <div className="mt-3 space-y-1">
                             {VEHICLE_TYPES.map((type) => (
                                 <button
                                     key={type.value}
@@ -302,7 +302,7 @@ export default function SidebarFilters({
                                 onChange={(e) => setBrandSearch(e.target.value)}
                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 mb-2"
                             />
-                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                            <div className="space-y-1">
                                 {filteredBrands.map((brand) => (
                                     <label
                                         key={brand}
@@ -415,7 +415,7 @@ export default function SidebarFilters({
                                 onChange={(e) => setManufacturerSearch(e.target.value)}
                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 mb-2"
                             />
-                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                            <div className="space-y-1">
                                 {filteredManufacturers.map((manufacturer) => (
                                     <label
                                         key={manufacturer}
