@@ -25,7 +25,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, user, setUser } = useAuthStore();
+  const { isAuthenticated, user, setUser, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -51,20 +51,20 @@ export default function EditProfilePage() {
       return;
     }
     if (user) {
-      const hasCompanyName = !!(user as any).companyName;
+      const hasCompanyName = !!user.companyName;
       setFormData({
         displayName: user.displayName || '',
         email: user.email || '',
         phone: user.phone || '',
-        birthDate: (user as any).birthDate ? new Date((user as any).birthDate).toISOString().split('T')[0] : '',
-        bio: (user as any).bio || '',
-        isCorporateSeller: hasCompanyName || (user as any).isCorporateSeller || false,
-        companyName: (user as any).companyName || '',
-        taxId: (user as any).taxId || '',
-        taxOffice: (user as any).taxOffice || '',
+        birthDate: user.birthDate ? new Date(user.birthDate).toISOString().split('T')[0] : '',
+        bio: user.bio || '',
+        isCorporateSeller: hasCompanyName || false,
+        companyName: user.companyName || '',
+        taxId: user.taxId || '',
+        taxOffice: '',
       });
-      if ((user as any).profilePhotoUrl || (user as any).avatarUrl) {
-        setProfilePhoto((user as any).profilePhotoUrl || (user as any).avatarUrl);
+      if (user.avatarUrl) {
+        setProfilePhoto(user.avatarUrl);
       }
     }
   }, [isAuthenticated, user]);
@@ -85,20 +85,35 @@ export default function EditProfilePage() {
 
     setUploadingPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'profile');
+      // 1. Upload to /storage/avatar (proper avatars bucket, entity type = user)
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
 
-      const response = await api.post('/media/upload', formData, {
+      const uploadResponse = await api.post('/storage/avatar', uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const uploadedUrl = response.data.url || response.data.fileUrl;
-      const updateResponse = await api.patch('/users/me', { profilePhotoUrl: uploadedUrl });
-      const updatedUser = updateResponse.data.user || updateResponse.data;
+      const s3Key = uploadResponse.data.key; // e.g. "dev/avatars/userId/abc123.jpg"
       
-      setProfilePhoto(uploadedUrl);
-      setUser(updatedUser);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Avatar uploaded, S3 key:', s3Key);
+      }
+
+      // 2. Save S3 key to user record
+      await api.patch('/users/me', { avatarUrl: s3Key });
+
+      // 3. Get presigned URL for immediate display
+      try {
+        const presignedResponse = await api.get(`/storage/presigned/avatars/${s3Key}`);
+        const displayUrl = presignedResponse.data.url;
+        setProfilePhoto(displayUrl);
+      } catch {
+        // Fallback: use a temporary object URL for display
+        setProfilePhoto(URL.createObjectURL(file));
+      }
+
+      // 4. Refresh user data in store
+      await refreshUser();
       toast.success(locale === 'en' ? 'Profile photo updated' : 'Profil fotoğrafı güncellendi');
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Photo upload error:', error);
@@ -112,12 +127,46 @@ export default function EditProfilePage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await api.patch('/users/me', formData);
-      const updatedUser = response.data.user || response.data;
-      setUser(updatedUser);
+      // Prepare data to send
+      const dataToSend: any = { ...formData };
+      
+      // Remove email - it's read-only and not in the DTO
+      delete dataToSend.email;
+      
+      // Convert empty strings to undefined to avoid validation errors
+      Object.keys(dataToSend).forEach((key) => {
+        if (dataToSend[key] === '') {
+          dataToSend[key] = undefined;
+        }
+      });
+      
+      if (!isBusinessTier) {
+        // Remove business information fields for non-business users
+        delete dataToSend.companyName;
+        delete dataToSend.taxId;
+        delete dataToSend.taxOffice;
+        delete dataToSend.isCorporateSeller;
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Profile update request:', dataToSend);
+      }
+      
+      const response = await api.patch('/users/me', dataToSend);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Profile update response:', response.data);
+      }
+      
+      // Refresh user data in store (runs through mapApiUser for proper field mapping)
+      await refreshUser();
       setSaved(true);
       toast.success(locale === 'en' ? 'Profile updated successfully!' : 'Profil başarıyla güncellendi!');
       setTimeout(() => setSaved(false), 3000);
+      // Redirect to profile page after successful update
+      setTimeout(() => {
+        router.push('/profile');
+      }, 1000);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Profile update error:', error);
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to update profile' : 'Profil güncellenemedi'));
@@ -306,7 +355,8 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {/* Business Information Card */}
+          {/* Business Information Card - Only visible for business tier users */}
+          {isBusinessTier && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center justify-between">
@@ -314,115 +364,80 @@ export default function EditProfilePage() {
                   <BuildingOfficeIcon className="w-5 h-5 text-orange-500" />
                   {locale === 'en' ? 'Business Information' : 'İşletme Bilgileri'}
                 </h2>
-                {isBusinessTier && (
-                  <span className="px-3 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
-                    {locale === 'en' ? 'Business Tier' : 'İş Üyeliği'}
-                  </span>
-                )}
+                <span className="px-3 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
+                  {locale === 'en' ? 'Business Tier' : 'İş Üyeliği'}
+                </span>
               </div>
             </div>
             
-            <div className="p-6">
-              {!isBusinessTier && (
-                <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-xl">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {locale === 'en' ? 'Corporate Seller' : 'Kurumsal Satıcı'}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {locale === 'en' ? 'Enable if you sell on behalf of a company' : 'Şirket adına satış yapıyorsanız aktifleştirin'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, isCorporateSeller: !formData.isCorporateSeller })}
-                    className={`relative w-14 h-8 rounded-full transition-colors ${
-                      formData.isCorporateSeller ? 'bg-orange-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                        formData.isCorporateSeller ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+            <div className="p-6 space-y-5">
+              {/* Company Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {locale === 'en' ? 'Company Name' : 'Şirket / Ticari Unvan'}
+                  <span className="text-red-500"> *</span>
+                </label>
+                <div className="relative">
+                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    placeholder="ABC Ltd. Şti."
+                    required
+                  />
                 </div>
-              )}
+                {!formData.companyName && (
+                  <p className="text-xs text-orange-600 mt-1.5 flex items-center gap-1">
+                    ⚠️ {locale === 'en' ? 'Company name is required for business tier' : 'İşletme panelini kullanmak için şirket adı zorunludur'}
+                  </p>
+                )}
+              </div>
 
-              {(formData.isCorporateSeller || isBusinessTier) && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="space-y-5"
-                >
-                  {/* Company Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {locale === 'en' ? 'Company Name' : 'Şirket / Ticari Unvan'}
-                      {isBusinessTier && <span className="text-red-500"> *</span>}
-                    </label>
-                    <div className="relative">
-                      <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.companyName}
-                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
-                        placeholder="ABC Ltd. Şti."
-                        required={isBusinessTier}
-                      />
-                    </div>
-                    {isBusinessTier && !formData.companyName && (
-                      <p className="text-xs text-orange-600 mt-1.5 flex items-center gap-1">
-                        ⚠️ {locale === 'en' ? 'Company name is required for business tier' : 'İşletme panelini kullanmak için şirket adı zorunludur'}
-                      </p>
-                    )}
+              {/* Tax Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {locale === 'en' ? 'Tax ID' : 'Vergi Kimlik No'}
+                  </label>
+                  <div className="relative">
+                    <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.taxId}
+                      onChange={(e) => setFormData({ ...formData, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                      placeholder="1234567890"
+                      maxLength={11}
+                    />
                   </div>
+                </div>
 
-                  {/* Tax Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {locale === 'en' ? 'Tax ID' : 'Vergi Kimlik No'}
-                      </label>
-                      <div className="relative">
-                        <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                          type="text"
-                          value={formData.taxId}
-                          onChange={(e) => setFormData({ ...formData, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
-                          placeholder="1234567890"
-                          maxLength={11}
-                        />
-                      </div>
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {locale === 'en' ? 'Tax Office' : 'Vergi Dairesi'}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.taxOffice}
+                    onChange={(e) => setFormData({ ...formData, taxOffice: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    placeholder="Kadıköy VD"
+                  />
+                </div>
+              </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {locale === 'en' ? 'Tax Office' : 'Vergi Dairesi'}
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.taxOffice}
-                        onChange={(e) => setFormData({ ...formData, taxOffice: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
-                        placeholder="Kadıköy VD"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                    <p className="text-sm text-blue-700">
-                      ℹ️ {locale === 'en' 
-                        ? 'Business information is used for invoicing. Incorrect information may result in legal liability.' 
-                        : 'Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi girişi yasal sorumluluk doğurabilir.'}
-                    </p>
-                  </div>
-                </motion.div>
-              )}
+              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <p className="text-sm text-blue-700">
+                  ℹ️ {locale === 'en' 
+                    ? 'Business information is used for invoicing. Incorrect information may result in legal liability.' 
+                    : 'Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi girişi yasal sorumluluk doğurabilir.'}
+                </p>
+              </div>
             </div>
           </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">

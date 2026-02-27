@@ -19,6 +19,7 @@
     "db:migrate:deploy": "pnpm --filter @tarodan/api run prisma:migrate:deploy",
     "db:push": "pnpm --filter @tarodan/api run prisma:push",
     "db:seed": "pnpm --filter @tarodan/api run prisma:seed",
+    "db:reset": "pnpm --filter @tarodan/api run prisma:migrate:reset",
     "db:studio": "pnpm --filter @tarodan/api run prisma:studio",
     "db:sync-docker": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-db-docker.ps1",
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",

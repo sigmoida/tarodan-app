@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, MaxLength, Matches, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, MinLength, MaxLength, Matches, IsDateString, IsBoolean, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -17,6 +17,7 @@ export class UpdateProfileDto {
     description: 'Phone number',
   })
   @IsOptional()
+  @ValidateIf((o, value) => value !== null && value !== undefined && value !== '')
   @Matches(/^\+90[0-9]{10}$/, {
     message: 'Geçerli bir Türkiye telefon numarası giriniz (+905XXXXXXXXX)',
   })
@@ -53,6 +54,7 @@ export class UpdateProfileDto {
     description: 'Tax ID number',
   })
   @IsOptional()
+  @ValidateIf((o, value) => value !== null && value !== undefined && value !== '')
   @IsString()
   @Matches(/^[0-9]{10,11}$/, {
     message: 'Vergi kimlik numarası 10-11 haneli olmalıdır',
@@ -75,4 +77,12 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   isCorporateSeller?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'dev/avatars/user-id/abc123.jpg',
+    description: 'Avatar URL or S3 key',
+  })
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }

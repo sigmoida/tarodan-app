@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { StorageService } from '../storage/storage.service';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -23,7 +24,29 @@ export class UserService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) {}
+
+  /**
+   * Resolve avatarUrl - if it's an S3 key, generate presigned URL
+   * If it's already an http(s) URL, return as-is
+   */
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    // Already a full URL - return as-is
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    // S3 key - resolve to presigned URL
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400); // 24 hours
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve avatar presigned URL for key: ${avatarUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
 
   /**
    * Find user by ID
@@ -118,10 +141,14 @@ export class UserService {
       expiresAt: null,
     };
 
+    // Resolve avatar URL (S3 key → presigned URL)
+    const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+
     // Remove raw membership and add the mapped membershipInfo
     const { membership: rawMembership, ...rest } = user;
     return { 
       ...rest, 
+      avatarUrl: resolvedAvatarUrl,
       membership: membershipInfo,
       listingCount,
     };
@@ -141,8 +168,26 @@ export class UserService {
       taxId?: string;
       taxOffice?: string;
       isCorporateSeller?: boolean;
+      avatarUrl?: string;
     },
   ) {
+    // Check if user is business tier - only business tier users should have business info
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        membership: {
+          include: { tier: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    const isBusinessTier = user.membership?.tier?.type === 'business';
+    const isCorporateSeller = data.isCorporateSeller === true;
+
     // Check phone uniqueness if being updated
     if (data.phone) {
       const existingPhone = await this.prisma.user.findFirst({
@@ -166,19 +211,43 @@ export class UserService {
     if (data.birthDate !== undefined) {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
-    if (data.companyName !== undefined) {
-      updateData.companyName = data.companyName || null;
+    
+    // Only process business information if user is business tier or isCorporateSeller is true
+    if (isBusinessTier || isCorporateSeller) {
+      if (data.companyName !== undefined) {
+        updateData.companyName = data.companyName || null;
+      }
+      if (data.taxId !== undefined) {
+        updateData.taxId = data.taxId || null;
+      }
+    } else {
+      // For non-business users without corporate seller flag, clear business info if it exists
+      if (data.companyName !== undefined || data.taxId !== undefined) {
+        updateData.companyName = null;
+        updateData.taxId = null;
+      }
     }
-    if (data.taxId !== undefined) {
-      updateData.taxId = data.taxId || null;
+    // Handle avatar URL (S3 key)
+    if (data.avatarUrl !== undefined) {
+      updateData.avatarUrl = data.avatarUrl || null;
     }
+
     // Note: taxOffice is not in schema, so we skip it
     // Note: isCorporateSeller is a frontend-only flag, not stored in DB
 
-    return this.prisma.user.update({
+    // Check if there's any data to update
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('Güncellenecek alan bulunamadı');
+    }
+
+    // Update user
+    await this.prisma.user.update({
       where: { id: userId },
       data: updateData,
     });
+
+    // Return updated user in the same format as findByIdWithAddresses
+    return this.findByIdWithAddresses(userId);
   }
 
   /**
@@ -645,8 +714,12 @@ export class UserService {
       }),
     ]);
 
+    // Resolve avatar URL (S3 key → presigned URL)
+    const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+
     return {
       ...user,
+      avatarUrl: resolvedAvatarUrl,
       stats: {
         totalListings,
         totalSales,
@@ -1325,7 +1398,7 @@ export class UserService {
       company: {
         name: user.companyName,
         displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
+        avatarUrl: await this.resolveAvatarUrl(user.avatarUrl),
         isVerified: user.isVerified,
       },
     };
@@ -1390,7 +1463,7 @@ export class UserService {
       take: limit,
     });
 
-    return collections.map((collection) => {
+    return Promise.all(collections.map(async (collection) => {
       const items = collection.items.map((item) => ({
         id: item.id,
         productId: item.productId,
@@ -1410,13 +1483,13 @@ export class UserService {
         user: {
           id: collection.user.id,
           displayName: collection.user.displayName,
-          avatarUrl: collection.user.avatarUrl,
+          avatarUrl: await this.resolveAvatarUrl(collection.user.avatarUrl),
           bio: collection.user.bio,
           isVerified: collection.user.isVerified,
         },
         items,
       };
-    });
+    }));
   }
 
   async getFeaturedCollector() {
@@ -1519,7 +1592,7 @@ export class UserService {
       user: {
         id: topCollection.user.id,
         displayName: topCollection.user.displayName,
-        avatarUrl: topCollection.user.avatarUrl,
+        avatarUrl: await this.resolveAvatarUrl(topCollection.user.avatarUrl),
         bio: topCollection.user.bio,
         isVerified: topCollection.user.isVerified,
       },
@@ -1731,7 +1804,7 @@ export class UserService {
       id: topBusiness.user.id,
       displayName: topBusiness.user.displayName,
       companyName: topBusiness.user.companyName,
-      avatarUrl: topBusiness.user.avatarUrl,
+      avatarUrl: await this.resolveAvatarUrl(topBusiness.user.avatarUrl),
       bio: topBusiness.user.bio,
       isVerified: topBusiness.user.isVerified,
       stats: {
@@ -1798,10 +1871,12 @@ export class UserService {
 
         const score = salesCount * 10 + (ratings._avg?.score || 0) * 20 + seller._count.products * 2;
 
+        const resolvedAvatar = await this.resolveAvatarUrl(seller.avatarUrl);
+
         return {
           id: seller.id,
           displayName: seller.displayName,
-          avatarUrl: seller.avatarUrl,
+          avatarUrl: resolvedAvatar,
           bio: seller.bio,
           isVerified: seller.isVerified,
           rating: ratings._avg?.score || 0,

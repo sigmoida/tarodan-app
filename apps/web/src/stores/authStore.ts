@@ -39,6 +39,7 @@ interface User {
   // Profile
   avatarUrl?: string;
   bio?: string;
+  birthDate?: string;
 }
 
 // Membership limits per tier
@@ -119,6 +120,7 @@ const mapApiUser = (apiUser: any): User => ({
   totalRatings: apiUser.totalRatings || apiUser.total_ratings || 0,
   avatarUrl: apiUser.avatarUrl || apiUser.avatar_url,
   bio: apiUser.bio,
+  birthDate: apiUser.birthDate || apiUser.birth_date || null,
 });
 
 interface AuthState {

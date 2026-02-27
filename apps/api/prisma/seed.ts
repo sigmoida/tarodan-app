@@ -735,23 +735,33 @@ async function main() {
   for (let i = 3; i < users.length; i++) {
     const city = cities[i % cities.length];
     const district = districts[i % districts.length];
-    const address = await prisma.address.upsert({
-      where: { id: `address-${users[i].id}` },
-      update: {},
-      create: {
-        id: `address-${users[i].id}`,
+    // Check if address already exists for this user
+    const existingAddress = await prisma.address.findFirst({
+      where: {
         userId: users[i].id,
         title: 'Ev',
-        fullName: users[i].displayName,
-        phone: users[i].phone || '+905550000000',
-        city: city,
-        district: district,
-        address: `${users[i].displayName} Mahallesi, Koleksiyon Sokak No: ${i}`,
-        zipCode: `${34000 + i * 100}`,
-        isDefault: true,
       },
     });
-    addresses.push(address);
+    
+    if (!existingAddress) {
+      // Let Prisma generate UUID automatically (don't set id manually)
+      const address = await prisma.address.create({
+        data: {
+          userId: users[i].id,
+          title: 'Ev',
+          fullName: users[i].displayName,
+          phone: users[i].phone || '+905550000000',
+          city: city,
+          district: district,
+          address: `${users[i].displayName} Mahallesi, Koleksiyon Sokak No: ${i}`,
+          zipCode: `${34000 + i * 100}`,
+          isDefault: true,
+        },
+      });
+      addresses.push(address);
+    } else {
+      addresses.push(existingAddress);
+    }
   }
 
   console.log(`✅ Created ${addresses.length} addresses`);
