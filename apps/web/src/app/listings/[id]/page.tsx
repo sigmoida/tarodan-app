@@ -45,7 +45,7 @@ const ReportModal = dynamic(
   withChunkErrorLogging(() => import('@/components/ReportModal'), 'ReportModal'),
   { ssr: false }
 );
-import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartOutlineIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import TrustBadges from '@/components/home/TrustBadges';
 
@@ -1414,7 +1414,7 @@ export default function ListingDetailPage() {
                   {isAuthenticated ? (
                     <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
                       <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
-                        <span className="text-xl">👤</span>
+                        <UserIcon className="w-6 h-6 text-gray-400" />
                       </div>
                     </Link>
                   ) : (
@@ -1423,14 +1423,14 @@ export default function ListingDetailPage() {
                         setAuthModalConfig({
                           title: t('product.viewSellerProfile'),
                           message: t('product.viewSellerProfileMsg'),
-                          icon: <span className="text-4xl">👤</span>,
+                          icon: <UserIcon className="w-10 h-10 text-gray-400" />,
                         });
                         setShowAuthModal(true);
                       }}
                       className="flex-shrink-0"
                     >
                       <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
-                        <span className="text-xl">👤</span>
+                        <UserIcon className="w-6 h-6 text-gray-400" />
                       </div>
                     </button>
                   )}
@@ -1445,7 +1445,7 @@ export default function ListingDetailPage() {
                           setAuthModalConfig({
                             title: t('product.viewSellerProfile'),
                             message: t('product.viewSellerProfileMsg'),
-                            icon: <span className="text-4xl">👤</span>,
+                            icon: <UserIcon className="w-10 h-10 text-gray-400" />,
                           });
                           setShowAuthModal(true);
                         }}

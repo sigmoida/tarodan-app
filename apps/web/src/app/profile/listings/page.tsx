@@ -14,6 +14,7 @@ import {
   PencilIcon,
   EyeIcon,
   TrashIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -192,7 +193,9 @@ export default function ProfileListingsPage() {
           </div>
         ) : listings.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl">
-            <div className="text-6xl mb-4">📦</div>
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+              <ArchiveBoxIcon className="w-8 h-8 text-gray-400" />
+            </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {activeFilter ? 'Bu filtreye uygun ilan yok' : 'Henüz ilanınız yok'}
             </h3>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, TruckIcon, MapPinIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, TruckIcon, MapPinIcon, MagnifyingGlassIcon, TagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { ordersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
@@ -229,7 +229,9 @@ export default function TrackOrderPage() {
                   {order.product?.image ? (
                     <Image src={order.product.image} alt={order.product.title} width={80} height={80} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl">🚗</div>
+                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                      <TagIcon className="w-6 h-6 text-gray-300" />
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

@@ -8,7 +8,7 @@ import Image from 'next/image';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
-import { UserMinusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { UserMinusIcon, ArrowLeftIcon, UserIcon } from '@heroicons/react/24/outline';
 
 interface FollowedUser {
   id: string;
@@ -90,7 +90,7 @@ export default function FollowingPage() {
         ) : following.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">👤</span>
+              <UserIcon className="w-8 h-8 text-gray-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
               Henüz kimseyi takip etmiyorsunuz

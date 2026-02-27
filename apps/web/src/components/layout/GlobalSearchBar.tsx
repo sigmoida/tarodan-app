@@ -49,18 +49,18 @@ export default function GlobalSearchBar() {
   };
 
   return (
-    <div ref={containerRef} className="bg-white border-b border-gray-200 py-3">
+    <div ref={containerRef} className="bg-white border-b border-gray-100 py-3">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative">
           <form onSubmit={handleSubmit} className="relative">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowDropdown(true)}
               placeholder={t('nav.searchPlaceholder')}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 transition-all placeholder:text-gray-500 text-gray-900"
+              className="w-full pl-12 pr-4 py-3 bg-surface border border-gray-200 rounded-md shadow-inner-soft focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-all duration-200 ease-premium placeholder:text-subtle text-heading"
               aria-label={t('nav.searchPlaceholder')}
             />
           </form>

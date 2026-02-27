@@ -153,7 +153,7 @@ export default function CategoryMegaMenu() {
                     className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-orange-600 transition-colors"
                   >
                     <span className="flex items-center gap-2">
-                      <span className="text-lg">🏎️</span>
+                      <TruckIcon className="w-5 h-5 text-gray-500" />
                       {menu.brands.label}
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />

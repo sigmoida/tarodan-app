@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/i18n/LanguageContext';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
 interface Brand {
@@ -144,7 +145,9 @@ export default function ModelsPage() {
                 {/* No Results */}
                 {!loading && filtered.length === 0 && (
                     <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-                        <div className="text-6xl mb-4">🔍</div>
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+                            <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+                        </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">{t('models.noResults')}</h3>
                         <p className="text-gray-500">{t('models.searchNoResultDesc') || 'Lütfen farklı bir arama yapmayı deneyin.'}</p>
                         <button

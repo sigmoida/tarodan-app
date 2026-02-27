@@ -12,7 +12,7 @@ import { NotificationService } from '../notification/notification.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
 import { TaxService } from '../tax';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 
 // Invoice generation service using pdfkit for reliable PDF creation
 // Turkish character support via system font fallbacks or embedded fonts

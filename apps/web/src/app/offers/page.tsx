@@ -391,7 +391,7 @@ export default function OffersPage() {
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">
-                            <span className="text-5xl">🚗</span>
+                            <TagIcon className="w-10 h-10 text-orange-400" />
                           </div>
                         )}
                         {/* Discount Badge */}

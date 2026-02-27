@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, RectangleStackIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, RectangleStackIcon, ArchiveBoxIcon, BookOpenIcon } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
@@ -405,7 +405,9 @@ function ProductRow({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+          <div className="w-full h-full flex items-center justify-center bg-gray-700">
+            <ArchiveBoxIcon className="w-6 h-6 text-gray-500" />
+          </div>
         )}
       </div>
       <div className="flex-1 min-w-0">
@@ -450,7 +452,9 @@ function CollectionRow({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">📚</div>
+          <div className="w-full h-full flex items-center justify-center bg-gray-700">
+            <BookOpenIcon className="w-6 h-6 text-gray-500" />
+          </div>
         )}
       </div>
       <div className="flex-1 min-w-0">

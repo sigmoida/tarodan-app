@@ -8,7 +8,7 @@ import { api, listingsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import OptimizedImage from '@/components/OptimizedImage';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
-import { ArrowLeftIcon, GlobeAltIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, GlobeAltIcon, CalendarIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Brand {
@@ -287,7 +287,9 @@ export default function BrandDetailPage() {
                             animate={{ opacity: 1, scale: 1 }}
                             className="bg-white rounded-[2.5rem] border border-gray-100 p-24 text-center shadow-sm"
                         >
-                            <div className="text-7xl mb-6 opacity-20">🏎️</div>
+                            <div className="inline-flex items-center justify-center w-24 h-24 bg-gray-50 rounded-full mb-6">
+                                <ArchiveBoxIcon className="w-10 h-10 text-gray-300" />
+                            </div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-3">{t('brands.noProducts') || 'İlan Bulunamadı'}</h3>
                             <p className="text-gray-500 max-w-md mx-auto mb-8">
                                 {selectedModelId
