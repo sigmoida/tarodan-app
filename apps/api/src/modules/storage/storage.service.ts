@@ -37,10 +37,11 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private s3Client: S3Client;
+  private s3Client: S3Client | null = null;
   private readonly baseBucket: string;
   private readonly envPrefix: string;
   private isS3Available = false;
+  private hasCredentials = false;
 
   // Bucket tipleri -> klasör isimleri mapping
   private readonly bucketFolders = {
@@ -55,15 +56,6 @@ export class StorageService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    // S3 Client oluştur
-    this.s3Client = new S3Client({
-      region: this.configService.get('AWS_REGION', 'eu-west-1'),
-      credentials: {
-        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID')!,
-        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY')!,
-      },
-    });
-
     this.baseBucket = this.configService.get('S3_BUCKET', 'amzn-tarodan');
     
     // Environment prefix belirle
@@ -71,10 +63,37 @@ export class StorageService implements OnModuleInit {
     this.envPrefix = this.configService.get('S3_ENV_PREFIX') || 
                     (nodeEnv === 'production' ? 'prod' : 'dev');
 
+    // Credentials kontrolü - yoksa S3Client oluşturma
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+
+    if (!accessKeyId || !secretAccessKey) {
+      this.logger.warn('⚠️ AWS S3 credentials not configured. Storage will be unavailable.');
+      this.hasCredentials = false;
+      return;
+    }
+
+    this.hasCredentials = true;
+
+    // S3 Client oluştur
+    this.s3Client = new S3Client({
+      region: this.configService.get('AWS_REGION', 'eu-west-1'),
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
+
     this.logger.log(`S3 Storage initialized: ${this.baseBucket} (${this.envPrefix})`);
   }
 
   async onModuleInit() {
+    if (!this.hasCredentials || !this.s3Client) {
+      this.logger.warn('⚠️ Skipping S3 bucket check - no credentials configured.');
+      this.isS3Available = false;
+      return;
+    }
+
     try {
       // Bucket'ın varlığını kontrol et
       await this.s3Client.send(

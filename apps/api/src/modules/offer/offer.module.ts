@@ -5,9 +5,10 @@ import { OfferService } from './offer.service';
 import { PrismaModule } from '../../prisma';
 import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, EventModule, forwardRef(() => NotificationModule)],
+  imports: [PrismaModule, ConfigModule, EventModule, forwardRef(() => NotificationModule), StorageModule],
   controllers: [OfferController],
   providers: [OfferService],
   exports: [OfferService],

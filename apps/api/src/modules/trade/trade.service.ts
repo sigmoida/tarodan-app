@@ -4,12 +4,14 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Optional,
   Inject,
   forwardRef,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { MembershipService } from '../membership/membership.service';
+import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import {
@@ -43,6 +45,8 @@ export class TradeService {
     private readonly membershipService: MembershipService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) {}
 
   // ==========================================================================
@@ -289,7 +293,7 @@ export class TradeService {
       throw new ForbiddenException('Bu takası görüntüleme yetkiniz yok');
     }
 
-    return this.mapToResponseDto(trade);
+    return await this.mapToResponseDto(trade);
   }
 
   // ==========================================================================
@@ -368,7 +372,7 @@ export class TradeService {
     ]);
 
     return {
-      trades: trades.map((t) => this.mapToResponseDto(t)),
+      trades: await Promise.all(trades.map((t) => this.mapToResponseDto(t))),
       total,
       page,
       pageSize,
@@ -1319,7 +1323,24 @@ export class TradeService {
     return trade;
   }
 
-  private mapToResponseDto(trade: any): TradeResponseDto {
+  /**
+   * Resolve product image URL (S3 key -> presigned URL)
+   */
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private async mapToResponseDto(trade: any): Promise<TradeResponseDto> {
     const initiatorShipment = trade.shipments?.find(
       (s: any) => s.shipperId === trade.initiatorId,
     );
@@ -1335,28 +1356,28 @@ export class TradeService {
       receiverId: trade.receiverId,
       receiverName: trade.receiver?.displayName || '',
       status: trade.status,
-      initiatorItems: (trade.items || [])
+      initiatorItems: await Promise.all((trade.items || [])
         .filter((item: any) => item.side === 'initiator')
-        .map((item: any) => ({
+        .map(async (item: any) => ({
           id: item.id,
           productId: item.productId,
           productTitle: item.product?.title || '',
-          productImage: item.product?.images?.[0]?.url,
+          productImage: await this.resolveProductImageUrl(item.product?.images?.[0]?.url),
           side: item.side,
           quantity: item.quantity,
           valueAtTrade: parseFloat(item.valueAtTrade),
-        })),
-      receiverItems: (trade.items || [])
+        }))),
+      receiverItems: await Promise.all((trade.items || [])
         .filter((item: any) => item.side === 'receiver')
-        .map((item: any) => ({
+        .map(async (item: any) => ({
           id: item.id,
           productId: item.productId,
           productTitle: item.product?.title || '',
-          productImage: item.product?.images?.[0]?.url,
+          productImage: await this.resolveProductImageUrl(item.product?.images?.[0]?.url),
           side: item.side,
           quantity: item.quantity,
           valueAtTrade: parseFloat(item.valueAtTrade),
-        })),
+        }))),
       cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
       cashPayerId: trade.cashPayerId || undefined,
       cashCommission: trade.cashCommission

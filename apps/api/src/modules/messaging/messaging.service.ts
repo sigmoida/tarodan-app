@@ -3,11 +3,13 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Optional,
   Logger,
   Inject,
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { StorageService } from '../storage/storage.service';
 import { ContentFilterService } from './content-filter.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -36,7 +38,26 @@ export class MessagingService {
     private readonly contentFilterService: ContentFilterService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) {}
+
+  /**
+   * Resolve product image URL (S3 key -> presigned URL)
+   */
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
 
   // ==========================================================================
   // CREATE THREAD & SEND FIRST MESSAGE
@@ -296,7 +317,7 @@ export class MessagingService {
           participant2Name: participant2?.displayName || '',
           productId: thread.productId || undefined,
           productTitle: product?.title,
-          productImage: product?.images?.[0]?.url,
+          productImage: await this.resolveProductImageUrl(product?.images?.[0]?.url),
           lastMessage: lastMessage
             ? this.mapMessageToDto(lastMessage)
             : undefined,
@@ -376,7 +397,7 @@ export class MessagingService {
       participant2Name: participant2?.displayName || '',
       productId: thread.productId || undefined,
       productTitle: product?.title,
-      productImage: product?.images?.[0]?.url,
+      productImage: await this.resolveProductImageUrl(product?.images?.[0]?.url),
       lastMessage: lastMessage
         ? this.mapMessageToDto(lastMessage)
         : undefined,

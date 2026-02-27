@@ -103,7 +103,7 @@ export class CollectionService {
       },
     });
 
-    return this.mapCollectionToDto(collection, false);
+    return await this.mapCollectionToDto(collection, false);
   }
 
   // ==========================================================================
@@ -219,7 +219,7 @@ export class CollectionService {
       }
     }
 
-    return this.mapCollectionToDto(collection, isLiked);
+    return await this.mapCollectionToDto(collection, isLiked);
   }
 
   // ==========================================================================
@@ -343,7 +343,7 @@ export class CollectionService {
       }
     }
 
-    return this.mapCollectionToDto(collection, isLiked);
+    return await this.mapCollectionToDto(collection, isLiked);
   }
 
   // ==========================================================================
@@ -397,21 +397,21 @@ export class CollectionService {
     }
 
     return {
-      collections: collections.map((c) => ({
+      collections: await Promise.all(collections.map(async (c) => ({
         id: c.id,
         userId: c.userId,
         userName: c.user.displayName,
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
-        coverImageUrl: c.coverImageUrl || undefined,
+        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
         isPublic: c.isPublic,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
         itemCount: c._count?.items ?? 0,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
-      })),
+      }))),
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -556,7 +556,7 @@ export class CollectionService {
     }
 
     return {
-      collections: collections.map((c) => ({
+      collections: await Promise.all(collections.map(async (c) => ({
         id: c.id,
         userId: c.userId,
         userName: c.user.displayName,
@@ -565,14 +565,14 @@ export class CollectionService {
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
-        coverImageUrl: c.coverImageUrl || undefined,
+        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
         isPublic: c.isPublic,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
         itemCount: c._count?.items ?? 0,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
-      })),
+      }))),
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -649,7 +649,7 @@ export class CollectionService {
     });
 
     // Check if user has liked this collection (owner always false)
-    return this.mapCollectionToDto(updated, false);
+    return await this.mapCollectionToDto(updated, false);
   }
 
   // ==========================================================================
@@ -692,7 +692,7 @@ export class CollectionService {
       },
     });
 
-    return this.mapCollectionToDto(updated, false);
+    return await this.mapCollectionToDto(updated, false);
   }
 
   // ==========================================================================
@@ -745,13 +745,13 @@ export class CollectionService {
         return null;
       }
 
-      // Get image URLs from items
+      // Get image URLs from items (resolve S3 keys to presigned URLs)
       const imageUrls: string[] = [];
       for (const item of collection.items) {
-        if (item.customImageUrl) {
-          imageUrls.push(item.customImageUrl);
-        } else if (item.product?.images?.[0]?.url) {
-          imageUrls.push(item.product.images[0].url);
+        const rawUrl = item.customImageUrl || item.product?.images?.[0]?.url;
+        if (rawUrl) {
+          const resolved = await this.resolveProductImageUrl(rawUrl);
+          if (resolved) imageUrls.push(resolved);
         }
         if (imageUrls.length >= 4) break;
       }
@@ -776,20 +776,13 @@ export class CollectionService {
             bucket: 'collections',
           });
 
-          // Generate presigned URL
-          const presignedUrl = await this.storageService.getPresignedDownloadUrl(
-            'collections',
-            uploadResult.key,
-            3600 * 24 * 7 // 7 days
-          );
-
-          // Update collection
+          // Save S3 key to DB (not presigned URL - it would expire)
           await this.prisma.collection.update({
             where: { id: collectionId },
-            data: { coverImageUrl: presignedUrl },
+            data: { coverImageUrl: uploadResult.key },
           });
 
-          return presignedUrl;
+          return uploadResult.key;
         } catch (error) {
           this.logger.error(`Failed to generate single cover image: ${error.message}`);
           return null;
@@ -849,20 +842,13 @@ export class CollectionService {
         bucket: 'collections',
       });
 
-      // Generate presigned URL
-      const presignedUrl = await this.storageService.getPresignedDownloadUrl(
-        'collections',
-        uploadResult.key,
-        3600 * 24 * 7 // 7 days
-      );
-
-      // Update collection
+      // Save S3 key to DB (not presigned URL - it would expire)
       await this.prisma.collection.update({
         where: { id: collectionId },
-        data: { coverImageUrl: presignedUrl },
+        data: { coverImageUrl: uploadResult.key },
       });
 
-      return presignedUrl;
+      return uploadResult.key;
     } catch (error) {
       this.logger.error(`Failed to generate cover image: ${error.message}`);
       return null;
@@ -962,7 +948,7 @@ export class CollectionService {
         },
       });
 
-      return this.mapItemToDto(item);
+      return await this.mapItemToDto(item);
     }
 
     // Custom product logic
@@ -993,7 +979,7 @@ export class CollectionService {
       },
     });
 
-    return this.mapItemToDto(item);
+    return await this.mapItemToDto(item);
   }
 
   // ==========================================================================
@@ -1357,21 +1343,23 @@ export class CollectionService {
         }),
       ]);
 
-      const collections = likedCollections
+      const validLikes = likedCollections
         .filter(like => {
           if (!like.collection) return false;
           if (!like.collection.isPublic && like.collection.userId !== userId) return false;
           return true;
-        })
-        .map(like => {
+        });
+
+      const collections = (await Promise.all(
+        validLikes.map(async (like) => {
           try {
-            return this.mapCollectionToDto(like.collection, true);
+            return await this.mapCollectionToDto(like.collection, true);
           } catch (err) {
             this.logger.error('getLikedCollections: error mapping collection');
             return null;
           }
         })
-        .filter(collection => collection !== null);
+      )).filter(collection => collection !== null);
 
       return {
         collections,
@@ -1401,7 +1389,38 @@ export class CollectionService {
       .replace(/^-|-$/g, '');
   }
 
-  private mapCollectionToDto(collection: any, isLiked?: boolean): CollectionResponseDto {
+  /**
+   * Resolve coverImageUrl - if it's an S3 key, generate presigned URL
+   * If it's already an http(s) URL, return as-is
+   */
+  private async resolveCoverImageUrl(url: string | null | undefined): Promise<string | undefined> {
+    if (!url) return undefined;
+    // Already a full URL - return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // S3 key - resolve to presigned URL
+    try {
+      return await this.storageService.getPresignedDownloadUrl('collections', url, 86400); // 24 hours
+    } catch (e: any) {
+      this.logger.warn(`Failed to resolve cover image presigned URL for key: ${url} - ${e.message}`);
+      return undefined;
+    }
+  }
+
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    try {
+      return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+    } catch (e: any) {
+      this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+      return null;
+    }
+  }
+
+  private async mapCollectionToDto(collection: any, isLiked?: boolean): Promise<CollectionResponseDto> {
+    // Resolve coverImageUrl (S3 key -> presigned URL)
+    const resolvedCoverUrl = await this.resolveCoverImageUrl(collection.coverImageUrl);
+
     return {
       id: collection.id,
       userId: collection.userId,
@@ -1411,20 +1430,20 @@ export class CollectionService {
       name: collection.name,
       slug: collection.slug,
       description: collection.description || undefined,
-      coverImageUrl: collection.coverImageUrl || undefined,
+      coverImageUrl: resolvedCoverUrl,
       isPublic: collection.isPublic,
       viewCount: collection.viewCount ?? 0,
       likeCount: collection.likeCount ?? 0,
       itemCount: collection.items?.length ?? 0,
       items: (collection.items && Array.isArray(collection.items)) 
-        ? collection.items.map((item: any) => {
+        ? (await Promise.all(collection.items.map(async (item: any) => {
             try {
-              return this.mapItemToDto(item);
+              return await this.mapItemToDto(item);
             } catch (itemError) {
               this.logger.warn('mapCollectionToDto: error mapping item');
               return null;
             }
-          }).filter((item: any) => item !== null)
+          }))).filter((item: any) => item !== null)
         : [],
       isLiked: isLiked ?? false,
       createdAt: collection.createdAt,
@@ -1432,7 +1451,7 @@ export class CollectionService {
     };
   }
 
-  private mapItemToDto(item: any): CollectionItemResponseDto {
+  private async mapItemToDto(item: any): Promise<CollectionItemResponseDto> {
     try {
       // Check if this is a custom product (no productId)
       if (!item.productId) {
@@ -1486,7 +1505,7 @@ export class CollectionService {
         id: item.id || '',
         productId: product.id || '',
         productTitle: product.title || 'İsimsiz Ürün',
-        productImage: firstImage?.url || undefined,
+        productImage: (await this.resolveProductImageUrl(firstImage?.url)) || undefined,
         productPrice: product.price ? parseFloat(String(product.price)) : 0,
         sortOrder: item.sortOrder || 0,
         isFeatured: item.isFeatured || false,

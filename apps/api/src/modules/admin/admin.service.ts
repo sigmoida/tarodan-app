@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { StorageService } from '../storage/storage.service';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -56,7 +58,23 @@ export class AdminService {
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) { }
+
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
 
   // ==================== COMMISSION RULES ====================
 
@@ -689,11 +707,11 @@ export class AdminService {
       lastLoginAt: user.lastLoginAt ?? null,
       lastActivityAt: user.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
-      products: user.products.map((p) => ({
+      products: await Promise.all(user.products.map(async (p) => ({
         ...p,
         price: Number(p.price),
-        imageUrl: p.images?.[0]?.url || null,
-      })),
+        imageUrl: (await this.resolveProductImageUrl(p.images?.[0]?.url)) || null,
+      }))),
       recentOrders: allOrders,
       recentTrades: allTrades.map((t) => ({
         ...t,
@@ -7026,7 +7044,7 @@ export class AdminService {
       likeCount: collection.likeCount,
       itemCount: collection.items.length,
       owner: collection.user,
-      items: collection.items.map(item => ({
+      items: await Promise.all(collection.items.map(async item => ({
         id: item.id,
         productId: item.productId,
         sortOrder: item.sortOrder,
@@ -7034,11 +7052,14 @@ export class AdminService {
           id: item.product.id,
           title: item.product.title,
           price: Number(item.product.price),
-          images: item.product.images,
+          images: await Promise.all((item.product.images || []).map(async (img: any) => ({
+            ...img,
+            url: (await this.resolveProductImageUrl(img.url)) || img.url,
+          }))),
         } : null,
         customTitle: item.customTitle,
         customImageUrl: item.customImageUrl,
-      })),
+      }))),
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
     };

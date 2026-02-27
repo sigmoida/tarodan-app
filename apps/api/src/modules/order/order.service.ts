@@ -3,12 +3,14 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Optional,
   Logger,
   Inject,
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { EventService } from '../events';
@@ -45,6 +47,8 @@ export class OrderService {
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly discountCalculator: DiscountCalculator,
+    @Optional()
+    private readonly storageService: StorageService,
   ) {}
 
   // Shipping cost settings
@@ -860,7 +864,7 @@ export class OrderService {
       // Store productId for cache invalidation
       productIdForCache = offer.productId;
 
-      return this.formatOrderResponse(order, buyerId);
+      return await this.formatOrderResponse(order, buyerId);
     });
 
     // Invalidate product cache after successful transaction
@@ -1107,7 +1111,7 @@ export class OrderService {
       });
 
       return {
-        ...this.formatOrderResponse(order, guestUser.id),
+        ...(await this.formatOrderResponse(order, guestUser.id)),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
         productId: dto.productId, // Include for cache invalidation
@@ -1165,7 +1169,7 @@ export class OrderService {
       product: {
         id: order.product.id,
         title: order.product.title,
-        image: order.product.images?.[0]?.url,
+        image: await this.resolveProductImageUrl(order.product.images?.[0]?.url),
       },
       seller: order.seller,
       shippingAddress: order.shippingAddress,
@@ -1227,7 +1231,7 @@ export class OrderService {
     });
 
     return {
-      data: orders.map((o) => this.formatOrderResponse(o, userId)),
+      data: await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId))),
       meta: {
         total,
         page,
@@ -1276,7 +1280,7 @@ export class OrderService {
       throw new ForbiddenException('Bu siparişi görüntüleme yetkiniz yok');
     }
 
-    return this.formatOrderResponse(order, userId);
+    return await this.formatOrderResponse(order, userId);
   }
 
   /**
@@ -1370,7 +1374,7 @@ export class OrderService {
       },
     });
 
-    return this.formatOrderResponse(updatedOrder, userId);
+    return await this.formatOrderResponse(updatedOrder, userId);
   }
 
   /**
@@ -1455,7 +1459,7 @@ export class OrderService {
 
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 
-      return this.formatOrderResponse(cancelledOrder, userId);
+      return await this.formatOrderResponse(cancelledOrder, userId);
     });
   }
 
@@ -1504,7 +1508,7 @@ export class OrderService {
       },
     });
 
-    return this.formatOrderResponse(updatedOrder, sellerId);
+    return await this.formatOrderResponse(updatedOrder, sellerId);
   }
 
   /**
@@ -1580,17 +1584,35 @@ export class OrderService {
 
     // Note: This will trigger seller payout release in PaymentModule
 
-    return this.formatOrderResponse(updatedOrder, buyerId);
+    return await this.formatOrderResponse(updatedOrder, buyerId);
+  }
+
+  /**
+   * Resolve product image URL (S3 key -> presigned URL)
+   */
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
   }
 
   /**
    * Format order response
    */
-  private formatOrderResponse(order: any, userId: string) {
+  private async formatOrderResponse(order: any, userId: string) {
+    const resolvedImageUrl = await this.resolveProductImageUrl(order.product?.images?.[0]?.url);
     const product = order.product ? {
       id: order.product.id,
       title: order.product.title,
-      imageUrl: order.product.images?.[0]?.url,
+      imageUrl: resolvedImageUrl,
       status: order.product.status,
     } : null;
     

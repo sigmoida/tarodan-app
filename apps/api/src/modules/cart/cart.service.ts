@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { DiscountService } from '../discount/discount.service';
+import { StorageService } from '../storage/storage.service';
 import {
   AddToCartDto,
   UpdateCartItemDto,
@@ -34,6 +36,8 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) { }
 
   /**
@@ -461,11 +465,14 @@ export class CartService {
         warnings.push(`"${product.title}" artık satışta değil`);
       }
 
+      // Resolve product image URL (S3 key -> presigned URL)
+      const resolvedImage = await this.resolveProductImageUrl(product.images?.[0]?.url);
+
       items.push({
         id: item.id,
         productId: product.id,
         productTitle: product.title,
-        productImage: product.images?.[0]?.url || null,
+        productImage: resolvedImage,
         sellerId: product.sellerId,
         sellerName: product.seller?.displayName || 'Satıcı',
         quantity: item.quantity,
@@ -792,5 +799,24 @@ export class CartService {
       discountAmount: totalDiscountAmount,
       appliedDiscounts,
     };
+  }
+
+  /**
+   * Resolve product image URL (S3 key -> presigned URL)
+   */
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    // Already a full URL - return as-is
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    // S3 key - resolve to presigned URL
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600); // 1 hour
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL for key: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
   }
 }

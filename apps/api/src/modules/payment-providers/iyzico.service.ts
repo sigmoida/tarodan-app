@@ -21,7 +21,11 @@ export class IyzicoService {
       'https://sandbox-api.iyzipay.com',
     );
 
-    this.isConfigured = !!(apiKey && secretKey);
+    // Check for valid credentials (not empty and not placeholder values)
+    const placeholders = ['your-iyzico-api-key-here', 'your-iyzico-secret-key-here', 'sandbox-test-api-key', 'sandbox-test-secret-key'];
+    const hasValidApiKey = apiKey && !placeholders.includes(apiKey);
+    const hasValidSecretKey = secretKey && !placeholders.includes(secretKey);
+    this.isConfigured = !!(hasValidApiKey && hasValidSecretKey);
 
     if (this.isConfigured) {
       this.iyzipay = new Iyzipay({
@@ -29,9 +33,10 @@ export class IyzicoService {
         secretKey,
         uri: baseUrl,
       });
-      this.logger.log('Iyzico service initialized');
+      this.logger.log(`✅ Iyzico service initialized (apiKey: ${apiKey.substring(0, 6)}..., baseUrl: ${baseUrl})`);
     } else {
-      this.logger.warn('Iyzico API credentials not configured');
+      this.logger.warn('⚠️ Iyzico API credentials not configured or using placeholder values. Payment will be unavailable.');
+      this.logger.warn('Get real sandbox credentials from: https://sandbox-merchant.iyzipay.com/');
     }
   }
 
@@ -105,7 +110,7 @@ export class IyzicoService {
         }
 
         if (result.status === 'failure') {
-          this.logger.warn('Iyzico checkout form init failed');
+          this.logger.warn(`Iyzico checkout form failed: errorCode=${result.errorCode}, errorMessage=${result.errorMessage}, errorGroup=${result.errorGroup}`);
           reject(new BadRequestException(result.errorMessage || 'iyzico işlemi başarısız'));
           return;
         }
@@ -397,7 +402,8 @@ export class IyzicoService {
         }
 
         if (result.status === 'failure') {
-          this.logger.warn(`Iyzico 3DS failed: ${result.errorMessage}`);
+          this.logger.warn(`Iyzico 3DS failed: errorCode=${result.errorCode}, errorMessage=${result.errorMessage}, errorGroup=${result.errorGroup}`);
+          this.logger.warn(`Iyzico 3DS full response: ${JSON.stringify({ status: result.status, errorCode: result.errorCode, errorMessage: result.errorMessage, errorGroup: result.errorGroup, locale: result.locale, systemTime: result.systemTime, conversationId: result.conversationId })}`);
           reject(new BadRequestException(result.errorMessage || 'Ödeme başlatılamadı'));
           return;
         }

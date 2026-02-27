@@ -14,6 +14,7 @@ import { AdvertisementModule } from '../advertisement/advertisement.module';
 import { MediaModule } from '../media/media.module';
 import { DiscountModule } from '../discount/discount.module';
 import { EventModule } from '../events/event.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { EventModule } from '../events/event.module';
     MediaModule,
     DiscountModule,
     EventModule,
+    StorageModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ScheduledNotificationScheduler],

@@ -4,11 +4,13 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Optional,
   Logger,
   Inject,
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { StorageService } from '../storage/storage.service';
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from './dto';
 import { OfferStatus, ProductStatus, OrderStatus, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +30,8 @@ export class OfferService {
     private readonly eventService: EventService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Optional()
+    private readonly storageService: StorageService,
   ) {
     this.offerExpiryHours = parseInt(
       this.configService.get('OFFER_EXPIRY_HOURS') || '24',
@@ -199,7 +203,7 @@ export class OfferService {
       this.logger.error(`[CreateOffer] Failed to send offer notification:`, error);
     }
 
-    return this.formatOfferResponse(result.offer);
+    return await this.formatOfferResponse(result.offer);
   }
 
   /**
@@ -372,7 +376,7 @@ export class OfferService {
       this.logger.error(`Failed to send offer accepted notification: ${error}`);
     }
 
-    return this.formatOfferResponse(result.offer);
+    return await this.formatOfferResponse(result.offer);
   }
 
   /**
@@ -432,7 +436,7 @@ export class OfferService {
       this.logger.error(`Failed to send offer rejected notification: ${error}`);
     }
 
-    return this.formatOfferResponse(rejectedOffer);
+    return await this.formatOfferResponse(rejectedOffer);
   }
 
   /**
@@ -518,7 +522,7 @@ export class OfferService {
         },
       });
 
-      return this.formatOfferResponse(counterOffer);
+      return await this.formatOfferResponse(counterOffer);
     });
   }
 
@@ -565,7 +569,7 @@ export class OfferService {
       },
     });
 
-    return this.formatOfferResponse(cancelledOffer);
+    return await this.formatOfferResponse(cancelledOffer);
   }
 
   /**
@@ -643,7 +647,7 @@ export class OfferService {
     });
 
     return {
-      data: offers.map((o) => this.formatOfferResponse(o)),
+      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
       meta: {
         total,
         page,
@@ -683,7 +687,7 @@ export class OfferService {
       throw new ForbiddenException('Bu teklifi görüntüleme yetkiniz yok');
     }
 
-    return this.formatOfferResponse(offer);
+    return await this.formatOfferResponse(offer);
   }
 
   /**
@@ -736,7 +740,7 @@ export class OfferService {
     });
 
     return {
-      data: offers.map((o) => this.formatOfferResponse(o)),
+      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
       meta: {
         total,
         page,
@@ -747,9 +751,26 @@ export class OfferService {
   }
 
   /**
+   * Resolve product image URL (S3 key -> presigned URL)
+   */
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Format offer response with expiration info
    */
-  private formatOfferResponse(offer: any) {
+  private async formatOfferResponse(offer: any) {
     const now = new Date();
     const expiresAt = new Date(offer.expiresAt);
     const isExpired = now > expiresAt && offer.status === OfferStatus.pending;
@@ -774,7 +795,7 @@ export class OfferService {
         id: offer.product.id,
         title: offer.product.title,
         price: Number(offer.product.price),
-        imageUrl: offer.product.images?.[0]?.url,
+        imageUrl: await this.resolveProductImageUrl(offer.product.images?.[0]?.url),
         status: offer.product.status,
       },
       buyer: offer.buyer,

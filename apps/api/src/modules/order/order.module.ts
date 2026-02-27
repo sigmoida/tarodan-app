@@ -5,6 +5,7 @@ import { PrismaModule } from '../../prisma';
 import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
 import { DiscountModule } from '../discount';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { DiscountModule } from '../discount';
     EventModule,
     forwardRef(() => NotificationModule),
     DiscountModule,
+    StorageModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

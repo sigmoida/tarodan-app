@@ -89,6 +89,23 @@ export class InvoiceService {
   ) { }
 
   /**
+   * Resolve invoice pdfUrl - if it's an S3 key, generate presigned URL
+   * If it's already an http(s) URL, return as-is
+   */
+  private async resolveInvoicePdfUrl(pdfUrl: string | null | undefined): Promise<string | null> {
+    if (!pdfUrl) return null;
+    // Already a full URL - return as-is
+    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) return pdfUrl;
+    // S3 key - resolve to presigned URL
+    try {
+      return await this.storageService.getPresignedDownloadUrl('documents', pdfUrl, 3600 * 24); // 24 hours
+    } catch (e: any) {
+      this.logger.warn(`Failed to resolve invoice PDF presigned URL for key: ${pdfUrl} - ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Generate invoice for an order
    */
   async generateForOrder(orderId: string): Promise<{
@@ -184,7 +201,7 @@ export class InvoiceService {
     // Generate PDF buffer from data
     const pdfBuffer = await this.generatePdfFromData(invoiceData);
 
-    // Store in S3
+    // Store in S3 - save S3 key (not presigned URL, it would expire)
     let pdfUrl = '';
     try {
       if (this.storageService.isStorageAvailable()) {
@@ -200,12 +217,8 @@ export class InvoiceService {
             entityId: orderId,
           },
         );
-        // Generate presigned URL for invoice (valid for 7 days)
-        pdfUrl = await this.storageService.getPresignedDownloadUrl(
-          'documents',
-          uploadResult.key,
-          3600 * 24 * 7 // 7 days
-        );
+        // Save S3 key to DB (not presigned URL - it would expire)
+        pdfUrl = uploadResult.key;
       }
     } catch (error) {
       this.logger.error('Failed to upload invoice PDF:', error);
@@ -230,9 +243,12 @@ export class InvoiceService {
 
     this.logger.log(`Invoice ${invoiceNumber} generated for order ${order.orderNumber}`);
 
+    // Resolve S3 key to presigned URL for the response
+    const resolvedPdfUrl = await this.resolveInvoicePdfUrl(pdfUrl);
+
     return {
       invoiceNumber,
-      pdfUrl,
+      pdfUrl: resolvedPdfUrl || '',
       htmlContent,
     };
   }
@@ -724,7 +740,11 @@ export class InvoiceService {
       }
     }
 
-    return invoice;
+    // Resolve pdfUrl (S3 key -> presigned URL)
+    return {
+      ...invoice,
+      pdfUrl: await this.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
+    };
   }
 
   /**
@@ -733,7 +753,7 @@ export class InvoiceService {
   async getUserInvoices(userId: string, type: 'buyer' | 'seller' = 'buyer') {
     const where = type === 'buyer' ? { buyerId: userId } : { sellerId: userId };
 
-    return this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -744,6 +764,14 @@ export class InvoiceService {
         },
       },
     });
+
+    // Resolve pdfUrl (S3 key -> presigned URL) for each invoice
+    return Promise.all(
+      invoices.map(async (invoice) => ({
+        ...invoice,
+        pdfUrl: await this.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
+      }))
+    );
   }
 
   /**

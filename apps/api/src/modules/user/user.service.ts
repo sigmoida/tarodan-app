@@ -48,6 +48,20 @@ export class UserService {
     return null;
   }
 
+  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      } catch (e: any) {
+        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+        return null;
+      }
+    }
+    return null;
+  }
+
   /**
    * Find user by ID
    */
@@ -1464,13 +1478,13 @@ export class UserService {
     });
 
     return Promise.all(collections.map(async (collection) => {
-      const items = collection.items.map((item) => ({
+      const items = await Promise.all(collection.items.map(async (item) => ({
         id: item.id,
         productId: item.productId,
         productTitle: item.product?.title || item.customTitle || 'Ürün',
         productPrice: item.product?.price ? Number(item.product.price) : null,
-        productImage: item.customImageUrl || (item.product?.images?.[0]?.url),
-      }));
+        productImage: await this.resolveProductImageUrl(item.customImageUrl || item.product?.images?.[0]?.url),
+      })));
 
       return {
         id: collection.id,
@@ -1596,15 +1610,15 @@ export class UserService {
         bio: topCollection.user.bio,
         isVerified: topCollection.user.isVerified,
       },
-      items: displayItems
+      items: await Promise.all(displayItems
         .filter(item => item.product !== null)
-        .map(item => ({
+        .map(async item => ({
           id: item.id,
           productId: item.product!.id,
           productTitle: item.product!.title,
           productPrice: Number(item.product!.price),
-          productImage: item.product!.images[0]?.url,
-        })),
+          productImage: await this.resolveProductImageUrl(item.product!.images[0]?.url),
+        }))),
     };
   }
 
@@ -1748,16 +1762,16 @@ export class UserService {
     const topCollections = collectionsWithScores.slice(0, 4).map(item => item.collection);
 
     // Format collections with preview items (only active products)
-    const formattedCollections = topCollections.map(collection => {
-      const activeItems = collection.items
+    const formattedCollections = await Promise.all(topCollections.map(async collection => {
+      const activeItems = await Promise.all(collection.items
         .filter(item => item.product && item.product.status === 'active')
         .slice(0, 3)
-        .map(item => ({
+        .map(async item => ({
           id: item.id,
           productTitle: item.product!.title,
           productPrice: Number(item.product!.price),
-          productImage: item.product!.images[0]?.url,
-        }));
+          productImage: await this.resolveProductImageUrl(item.product!.images[0]?.url),
+        })));
 
       return {
         id: collection.id,
@@ -1768,7 +1782,7 @@ export class UserService {
         _count: collection._count,
         items: activeItems,
       };
-    });
+    }));
 
     // Get business's featured products (top performing products)
     // Priority: featured products, then by engagement score (views + likes)
