@@ -1,9 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { HandThumbUpIcon, StarIcon } from '@heroicons/react/24/solid';
 import Badge from './Badge';
+
+const CARD_PLACEHOLDERS = [
+  'https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels',
+  'https://placehold.co/400x400/e3f2fd/1565c0?text=Diecast+Model',
+  'https://placehold.co/400x400/fce4ec/c62828?text=Koleksiyon',
+  'https://placehold.co/400x400/e8f5e9/2e7d32?text=Model+Araba',
+  'https://placehold.co/400x400/f3e5f5/6a1b9a?text=Premium',
+  'https://placehold.co/400x400/fff8e1/f57f17?text=Rare+Model',
+];
 
 interface ProductCardProduct {
   id: string;
@@ -44,6 +54,10 @@ export default function ProductCard({
   priority = false,
   locale = 'tr',
 }: ProductCardProps) {
+  const fallbackIdx = product.id ? product.id.charCodeAt(0) % CARD_PLACEHOLDERS.length : 0;
+  const [imgSrc, setImgSrc] = useState(imageUrl || CARD_PLACEHOLDERS[fallbackIdx]);
+  const handleImgError = () => setImgSrc(CARD_PLACEHOLDERS[fallbackIdx]);
+
   const formatCurrency = (n: number) =>
     n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20BA';
 
@@ -51,14 +65,15 @@ export default function ProductCard({
     return (
       <Link href={`/listings/${product.id}`}>
         <div className="card-premium flex gap-4 p-4">
-          <div className="relative w-32 h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
+          <div className="relative w-32 h-32 flex-shrink-0 bg-surface-alt rounded overflow-hidden">
             <Image
-              src={imageUrl}
+              src={imgSrc}
               alt={product.title}
               fill
               className="object-cover"
               unoptimized
               priority={priority}
+              onError={handleImgError}
             />
             {tag && (
               <div className="absolute top-2 right-2">
@@ -115,16 +130,17 @@ export default function ProductCard({
       <div className="card-premium overflow-hidden">
         <div className="relative aspect-square bg-surface-alt">
           <Image
-            src={imageUrl}
+            src={imgSrc}
             alt={product.title}
             fill
             className="object-cover"
             unoptimized
             priority={priority}
+            onError={handleImgError}
           />
           <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
             {(product.viewCount ?? 0) > 0 && (
-              <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-soft">
+              <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-soft">
                 <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -134,7 +150,7 @@ export default function ProductCard({
             )}
             {product.isPreorder && (
               <Badge variant="preorder">
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-white rounded-sm animate-pulse" />
                 {locale === 'en' ? 'PRE-ORDER' : 'ON SIPARIS'}
               </Badge>
             )}

@@ -442,6 +442,13 @@ export const categoriesApi = {
   findBySlug: (slug: string) => api.get(`/categories/slug/${slug}`),
 };
 
+// Manufacturers
+export const manufacturersApi = {
+  findAll: () => api.get('/manufacturers'),
+  findOne: (id: string) => api.get(`/manufacturers/${id}`),
+  findBySlug: (slug: string) => api.get(`/manufacturers/slug/${slug}`),
+};
+
 // Membership
 export const membershipApi = {
   getTiers: () => api.get('/membership/tiers'),

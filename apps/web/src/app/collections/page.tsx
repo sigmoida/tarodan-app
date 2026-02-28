@@ -204,7 +204,7 @@ export default function CollectionsPage() {
           {isAuthenticated && limits?.canCreateCollections && (
             <button
               onClick={handleCreateClick}
-              className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded transition-colors"
             >
               + {t('collection.createCollection')}
             </button>
@@ -212,7 +212,7 @@ export default function CollectionsPage() {
           {isAuthenticated && !limits?.canCreateCollections && (
             <Link
               href="/pricing"
-              className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg transition-colors"
+              className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded transition-colors"
             >
               {t('membership.upgrade')}
             </Link>
@@ -227,7 +227,7 @@ export default function CollectionsPage() {
                 setActiveTab('public');
                 setSearchQuery('');
               }}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded transition-colors ${
                 activeTab === 'public'
                   ? 'bg-primary-500 text-white'
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -240,7 +240,7 @@ export default function CollectionsPage() {
                 setActiveTab('mine');
                 setSearchQuery('');
               }}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded transition-colors ${
                 activeTab === 'mine'
                   ? 'bg-primary-500 text-white'
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -266,7 +266,7 @@ export default function CollectionsPage() {
                   handleSearch();
                 }
               }}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
             />
             {searchQuery && (
               <button
@@ -283,7 +283,7 @@ export default function CollectionsPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors text-gray-700"
               >
                 <FunnelIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">{t('product.filters')}</span>
@@ -294,7 +294,7 @@ export default function CollectionsPage() {
                   <select
                     value={categorySlug}
                     onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white min-w-[160px]"
+                    className="px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white min-w-[160px]"
                   >
                     <option value="">{t('common.all')}</option>
                     {flatCategories.map((cat) => (
@@ -313,7 +313,7 @@ export default function CollectionsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                className="px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
               >
                 <option value="popular">{t('common.popular')}</option>
                 <option value="recent">{t('common.newest')}</option>
@@ -339,7 +339,7 @@ export default function CollectionsPage() {
         {/* Collections Grid */}
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500" />
           </div>
         ) : displayedCollections.length === 0 ? (
           <div className="text-center py-12">
@@ -353,7 +353,7 @@ export default function CollectionsPage() {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="mt-4 px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
+                className="mt-4 px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
               >
                 {t('common.clear')}
               </button>
@@ -361,7 +361,7 @@ export default function CollectionsPage() {
             {activeTab === 'mine' && !searchQuery && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="mt-4 px-6 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg transition-colors"
+                className="mt-4 px-6 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded transition-colors"
               >
                 {t('collection.createCollection')}
               </button>
@@ -373,7 +373,7 @@ export default function CollectionsPage() {
               <Link
                 key={collection.id}
                 href={`/collections/${collection.id}`}
-                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:ring-2 hover:ring-primary-500 transition-all"
+                className="bg-white rounded overflow-hidden shadow-sm hover:shadow-md hover:ring-2 hover:ring-primary-500 transition-all"
               >
                 <div className="aspect-video bg-gray-100 relative">
                   {collection.coverImageUrl ? (
@@ -392,11 +392,11 @@ export default function CollectionsPage() {
                   )}
                   <div className="absolute top-2 right-2">
                     {collection.isPublic ? (
-                      <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-full">
+                      <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-sm">
                         {t('collection.isPublic')}
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-500/90 text-white text-xs rounded-full">
+                      <span className="px-2 py-1 bg-gray-500/90 text-white text-xs rounded-sm">
                         {t('collection.isPrivate')}
                       </span>
                     )}
@@ -438,9 +438,9 @@ export default function CollectionsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl max-w-md w-full p-6 text-center"
+            className="bg-white rounded max-w-md w-full p-6 text-center"
           >
-            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-amber-100 rounded flex items-center justify-center mx-auto mb-4">
               <FolderPlusIcon className="w-8 h-8 text-amber-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">
@@ -453,13 +453,13 @@ export default function CollectionsPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowPremiumModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors"
               >
                 Vazgeç
               </button>
               <Link
                 href="/membership"
-                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors text-center"
+                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded font-medium hover:bg-primary-600 transition-colors text-center"
               >
                 Üyeliği Yükselt
               </Link>
@@ -515,7 +515,7 @@ function CreateCollectionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+      <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
         <h2 className="text-xl font-semibold mb-4 text-gray-900">Yeni Koleksiyon</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -524,7 +524,7 @@ function CreateCollectionModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Hot Wheels Koleksiyonum"
               required
             />
@@ -534,7 +534,7 @@ function CreateCollectionModal({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Koleksiyon hakkında..."
               rows={3}
             />
@@ -544,7 +544,7 @@ function CreateCollectionModal({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="">Kategori seçin (isteğe bağlı)</option>
               {flatCategories.map((cat) => (
@@ -570,14 +570,14 @@ function CreateCollectionModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
+              className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors font-medium"
             >
               İptal
             </button>
             <button
               type="submit"
               disabled={loading || !name}
-              className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {loading ? 'Oluşturuluyor...' : 'Oluştur'}
             </button>

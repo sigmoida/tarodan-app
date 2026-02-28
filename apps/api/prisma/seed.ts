@@ -298,6 +298,46 @@ async function main() {
   console.log(`✅ Created ${categories.length} categories (vehicle types only)`);
 
   // ==========================================================================
+  // 1b. Create Manufacturers
+  // ==========================================================================
+  console.log('Creating manufacturers...');
+
+  const manufacturerData = [
+    { name: 'Hot Wheels', slug: 'hot-wheels', country: 'ABD', description: 'Mattel tarafından üretilen diecast model araba markası' },
+    { name: 'Matchbox', slug: 'matchbox', country: 'İngiltere', description: 'Lesney Products tarafından başlatılan diecast model markası' },
+    { name: 'Majorette', slug: 'majorette', country: 'Fransa', description: 'Fransız diecast model araba üreticisi' },
+    { name: 'Tomica', slug: 'tomica', country: 'Japonya', description: 'Takara Tomy tarafından üretilen Japon diecast model markası' },
+    { name: 'Bburago', slug: 'bburago', country: 'İtalya', description: 'İtalyan diecast model araba üreticisi' },
+    { name: 'Maisto', slug: 'maisto', country: 'ABD', description: 'Amerikan diecast model araba üreticisi' },
+    { name: 'AUTOart', slug: 'autoart', country: 'Hong Kong', description: 'Yüksek kaliteli koleksiyon diecast model üreticisi' },
+    { name: 'Minichamps', slug: 'minichamps', country: 'Almanya', description: 'Alman model araba üreticisi, özellikle F1 modelleri' },
+    { name: 'Kyosho', slug: 'kyosho', country: 'Japonya', description: 'Japon model araba ve RC araç üreticisi' },
+    { name: 'CMC', slug: 'cmc', country: 'Almanya', description: 'Premium koleksiyon modelleri üreticisi' },
+    { name: 'GT Spirit', slug: 'gt-spirit', country: 'Fransa', description: 'Resin model araba üreticisi' },
+    { name: 'Almost Real', slug: 'almost-real', country: 'Çin', description: 'Yüksek detaylı diecast model üreticisi' },
+    { name: 'Spark', slug: 'spark', country: 'Çin', description: 'Resin model araba üreticisi, yarış modelleri' },
+    { name: 'Schuco', slug: 'schuco', country: 'Almanya', description: 'Alman model araba üreticisi' },
+    { name: 'Norev', slug: 'norev', country: 'Fransa', description: 'Fransız diecast model üreticisi' },
+    { name: 'Oxford Diecast', slug: 'oxford-diecast', country: 'İngiltere', description: 'İngiliz diecast model üreticisi' },
+    { name: 'Greenlight', slug: 'greenlight', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
+    { name: 'ERTL', slug: 'ertl', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
+    { name: 'Tamiya', slug: 'tamiya', country: 'Japonya', description: 'Japon model kit ve diecast üreticisi' },
+    { name: 'Welly', slug: 'welly', country: 'Hong Kong', description: 'Diecast model araba üreticisi' },
+  ];
+
+  const manufacturers = await Promise.all(
+    manufacturerData.map((m, i) =>
+      prisma.manufacturer.upsert({
+        where: { slug: m.slug },
+        update: { name: m.name, country: m.country, description: m.description },
+        create: { ...m, sortOrder: i + 1 },
+      })
+    )
+  );
+
+  console.log(`✅ Created ${manufacturers.length} manufacturers`);
+
+  // ==========================================================================
   // 2. Create Membership Tiers
   // ==========================================================================
   console.log('Creating membership tiers...');
@@ -871,6 +911,25 @@ async function main() {
     ProductStatus.inactive, // 5% inactive
   ];
 
+  const resolveManufacturer = (title: string) => {
+    const lowerTitle = title.toLowerCase();
+    const mapping: Record<string, string> = {
+      'hot wheels': 'hot-wheels', 'matchbox': 'matchbox', 'majorette': 'majorette',
+      'tomica': 'tomica', 'bburago': 'bburago', 'maisto': 'maisto',
+      'autoart': 'autoart', 'minichamps': 'minichamps', 'kyosho': 'kyosho',
+      'cmc': 'cmc', 'gt spirit': 'gt-spirit', 'almost real': 'almost-real',
+      'spark': 'spark', 'schuco': 'schuco', 'norev': 'norev',
+      'oxford diecast': 'oxford-diecast', 'greenlight': 'greenlight',
+      'ertl': 'ertl', 'tamiya': 'tamiya', 'welly': 'welly',
+    };
+    for (const [keyword, slug] of Object.entries(mapping)) {
+      if (lowerTitle.includes(keyword)) {
+        return manufacturers.find((m) => m.slug === slug)?.id ?? null;
+      }
+    }
+    return null;
+  };
+
   // Create 100+ products
   for (let i = 0; i < 120; i++) {
     const template = productTemplates[i % productTemplates.length];
@@ -878,6 +937,7 @@ async function main() {
     const category = categories.find((c) => c.slug === template.cat) || categories[0];
     const price = randomPrice(template.price[0], template.price[1]);
     const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const manufacturerId = resolveManufacturer(template.title);
     
     const product = await prisma.product.create({
       data: {
@@ -888,9 +948,10 @@ async function main() {
         price: price,
         condition: template.cond,
         status: status,
-        isTradeEnabled: i % 2 === 0 || seller.displayName.includes('Premium') || seller.displayName.includes('Business'), // More products trade enabled, especially for premium/business users
+        isTradeEnabled: i % 2 === 0 || seller.displayName.includes('Premium') || seller.displayName.includes('Business'),
         viewCount: Math.floor(Math.random() * 500),
         createdAt: randomPastDate(60),
+        manufacturerId: manufacturerId,
       },
     });
     products.push(product);

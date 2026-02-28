@@ -96,7 +96,7 @@ export default function TradesPage() {
     };
     const Icon = config.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-sm text-sm font-medium ${config.color}`}>
         <Icon className="w-4 h-4" />
         {config.label}
       </span>
@@ -110,7 +110,7 @@ export default function TradesPage() {
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-32 bg-gray-200 rounded" />
             ))}
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function TradesPage() {
               <button
                 key={f.value || 'all'}
                 onClick={() => setStatusFilter(f.value)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${statusFilter === f.value
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded font-medium transition-colors ${statusFilter === f.value
                     ? 'bg-orange-500 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
@@ -158,7 +158,7 @@ export default function TradesPage() {
 
         {/* Trades List */}
         {trades.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
+          <div className="bg-white rounded p-12 text-center border border-gray-200">
             <ArrowsRightLeftIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
               {t('trade.noTrades')}
@@ -168,7 +168,7 @@ export default function TradesPage() {
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded font-medium transition-colors"
             >
               {t('cart.browseListings')}
             </Link>
@@ -198,7 +198,7 @@ export default function TradesPage() {
                 <Link
                   key={trade.id}
                   href={`/trades/${trade.id}`}
-                  className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all"
+                  className="block bg-white rounded p-6 border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all"
                 >
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex-1">
@@ -220,8 +220,8 @@ export default function TradesPage() {
                       </p>
                       <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                         {myItems.map((item, idx) => (
-                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                            <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                            <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-200 flex-shrink-0">
                               <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
@@ -252,7 +252,7 @@ export default function TradesPage() {
 
                     {/* Arrow */}
                     <div className="hidden md:flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-sm bg-orange-100 flex items-center justify-center">
                         <ArrowsRightLeftIcon className="w-6 h-6 text-orange-600" />
                       </div>
                     </div>
@@ -264,8 +264,8 @@ export default function TradesPage() {
                       </p>
                       <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                         {theirItems.map((item, idx) => (
-                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                            <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                            <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-200 flex-shrink-0">
                               <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
@@ -301,7 +301,7 @@ export default function TradesPage() {
                   </div>
 
                   {(trade.cashAmount && trade.cashAmount > 0) && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded-lg p-3">
+                    <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded p-3">
                       <p className="text-sm text-gray-700">
                         {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                       </p>

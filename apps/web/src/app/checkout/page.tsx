@@ -115,17 +115,7 @@ export default function CheckoutPage() {
   const [cardCvc, setCardCvc] = useState('');
   const [saveCard, setSaveCard] = useState(false);
 
-  // Coupon code state
-  const [couponCode, setCouponCode] = useState('');
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<{
-    code: string;
-    name: string;
-    discountAmount: number;
-    type: string;
-    value: number;
-  } | null>(null);
-  const [couponError, setCouponError] = useState<string | null>(null);
+  // Coupon removed
 
   // Phone formatting helper
   const formatPhoneNumber = (value: string): string => {
@@ -170,52 +160,8 @@ export default function CheckoutPage() {
       seller: { id: item.sellerId, displayName: item.sellerName },
     }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
-  const discountAmount = appliedCoupon?.discountAmount || 0;
-  const grandTotal = Math.max(0, subtotal - discountAmount + shippingCost);
+  const grandTotal = Math.max(0, subtotal + shippingCost);
 
-  // Apply coupon code
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      setCouponError(locale === 'en' ? 'Please enter a coupon code' : 'Lütfen kupon kodu girin');
-      return;
-    }
-
-    setCouponLoading(true);
-    setCouponError(null);
-
-    try {
-      const response = await api.post('/discounts/validate', {
-        code: couponCode.trim(),
-        cartItems: directProduct
-          ? [{ productId: directProduct.productId, quantity: 1 }]
-          : cartItems.map((item: { productId: string; quantity: number }) => ({ productId: item.productId, quantity: item.quantity })),
-      });
-
-      if (response.data.isValid && response.data.discount) {
-        setAppliedCoupon({
-          code: response.data.discount.code,
-          name: response.data.discount.name,
-          discountAmount: response.data.discount.estimatedDiscount,
-          type: response.data.discount.type,
-          value: response.data.discount.value,
-        });
-        setCouponCode('');
-        toast.success(locale === 'en' ? 'Coupon applied!' : 'Kupon uygulandı!');
-      } else {
-        setCouponError(response.data.error || (locale === 'en' ? 'Invalid coupon' : 'Geçersiz kupon'));
-      }
-    } catch (error: any) {
-      setCouponError(error.response?.data?.message || (locale === 'en' ? 'Failed to apply coupon' : 'Kupon uygulanamadı'));
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-
-  // Remove applied coupon
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponError(null);
-  };
 
   useEffect(() => {
     if (directProductId) {
@@ -558,12 +504,10 @@ export default function CheckoutPage() {
               productId: string;
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
-              couponCode?: string;
               billingAddressId?: string;
               billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
             } = {
               productId: item.productId,
-              ...(appliedCoupon && { couponCode: appliedCoupon.code }),
             };
 
             if (validAddressId) {
@@ -937,7 +881,7 @@ export default function CheckoutPage() {
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-sm transition-colors"
           >
             <ArrowLeftIcon className="w-6 h-6" />
           </button>
@@ -953,7 +897,7 @@ export default function CheckoutPage() {
           ].map((s, index) => (
             <div key={s.step} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${step >= s.step
+                className={`w-10 h-10 rounded-sm flex items-center justify-center font-semibold transition-colors ${step >= s.step
                   ? 'bg-primary-500 text-white'
                   : 'bg-gray-200 text-gray-500'
                   }`}
@@ -993,7 +937,7 @@ export default function CheckoutPage() {
                         {addresses.map((addr) => (
                           <label
                             key={addr.id}
-                            className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedAddressId === addr.id
+                            className={`block p-4 border-2 rounded cursor-pointer transition-all ${selectedAddressId === addr.id
                               ? 'border-primary-500 bg-primary-50'
                               : 'border-gray-200 hover:border-gray-300'
                               }`}
@@ -1022,7 +966,7 @@ export default function CheckoutPage() {
 
                     {/* Add New Address */}
                     {showAddressForm ? (
-                      <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 space-y-4">
+                      <div className="border-2 border-dashed border-gray-200 rounded p-4 space-y-4">
                         <input
                           type="text"
                           placeholder={locale === 'en' ? 'Address Title (e.g. Home, Work)' : 'Adres Başlığı (örn: Ev, İş)'}
@@ -1039,7 +983,7 @@ export default function CheckoutPage() {
                             className="input"
                           />
                           <div className="flex">
-                            <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg">
+                            <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l">
                               +90
                             </span>
                             <input
@@ -1082,7 +1026,7 @@ export default function CheckoutPage() {
                     ) : (
                       <button
                         onClick={() => setShowAddressForm(true)}
-                        className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center gap-2"
+                        className="w-full p-4 border-2 border-dashed border-gray-300 rounded text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center gap-2"
                       >
                         <PlusIcon className="w-5 h-5" />
                         {t('checkout.addNewAddress')}
@@ -1092,7 +1036,7 @@ export default function CheckoutPage() {
                 ) : (
                   /* Guest Checkout Form */
                   <div className="space-y-4">
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
                       <p className="text-sm text-yellow-800">
                         {locale === 'en' ? 'You are shopping without logging in. Enter your email to track your order.' : 'Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.'}
                       </p>
@@ -1117,7 +1061,7 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div className="flex">
-                      <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg">
+                      <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l">
                         +90
                       </span>
                       <input
@@ -1150,7 +1094,7 @@ export default function CheckoutPage() {
                         className="input"
                       />
                       <div className="flex">
-                        <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm">
+                        <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm">
                           +90
                         </span>
                         <input
@@ -1216,7 +1160,7 @@ export default function CheckoutPage() {
                   </label>
 
                   {!billingSameAsShipping && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-4">
+                    <div className="mt-4 p-4 bg-gray-50 rounded space-y-4">
                       <p className="text-sm text-gray-600">{t('checkout.enterBillingAddress')}</p>
                       <div className="grid sm:grid-cols-2 gap-3">
                         <input
@@ -1227,7 +1171,7 @@ export default function CheckoutPage() {
                           className="input"
                         />
                         <div className="flex">
-                          <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm">+90</span>
+                          <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm">+90</span>
                           <input
                             type="tel"
                             placeholder="5XX XXX XX XX"
@@ -1295,7 +1239,7 @@ export default function CheckoutPage() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <label
-                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedCarrier === 'aras'
+                      className={`block p-4 border-2 rounded cursor-pointer transition-all ${selectedCarrier === 'aras'
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
                         }`}
@@ -1312,7 +1256,7 @@ export default function CheckoutPage() {
                       </div>
                     </label>
                     <label
-                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedCarrier === 'yurtici'
+                      className={`block p-4 border-2 rounded cursor-pointer transition-all ${selectedCarrier === 'yurtici'
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
                         }`}
@@ -1340,7 +1284,7 @@ export default function CheckoutPage() {
                 </h3>
                 <div className="space-y-3">
                   <label
-                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentProvider === 'iyzico'
+                    className={`block p-4 border-2 rounded cursor-pointer transition-all ${paymentProvider === 'iyzico'
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                       }`}
@@ -1364,7 +1308,7 @@ export default function CheckoutPage() {
                   </label>
 
                   <label
-                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentProvider === 'paytr'
+                    className={`block p-4 border-2 rounded cursor-pointer transition-all ${paymentProvider === 'paytr'
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                       }`}
@@ -1389,7 +1333,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Card Information */}
-                <div className="mt-6 p-4 bg-white border border-gray-200 rounded-xl">
+                <div className="mt-6 p-4 bg-white border border-gray-200 rounded">
                   <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5 text-primary-500" />
                     {locale === 'en' ? 'Card Information' : 'Kart Bilgileri'}
@@ -1403,7 +1347,7 @@ export default function CheckoutPage() {
                         {savedCards.map((card) => (
                           <label
                             key={card.id}
-                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${!useNewCard && selectedSavedCard === card.id
+                            className={`flex items-center gap-3 p-3 border-2 rounded cursor-pointer transition-all ${!useNewCard && selectedSavedCard === card.id
                               ? 'border-primary-500 bg-primary-50'
                               : 'border-gray-200 hover:border-gray-300'
                               }`}
@@ -1427,7 +1371,7 @@ export default function CheckoutPage() {
                               </p>
                             </div>
                             {card.isDefault && (
-                              <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-full">
+                              <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
                                 Varsayılan
                               </span>
                             )}
@@ -1436,7 +1380,7 @@ export default function CheckoutPage() {
 
                         {/* New Card Option */}
                         <label
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${useNewCard
+                          className={`flex items-center gap-3 p-3 border-2 rounded cursor-pointer transition-all ${useNewCard
                             ? 'border-primary-500 bg-primary-50'
                             : 'border-gray-200 hover:border-gray-300'
                             }`}
@@ -1469,7 +1413,7 @@ export default function CheckoutPage() {
                           value={cardName}
                           onChange={(e) => setCardName(e.target.value.toUpperCase())}
                           placeholder="AD SOYAD"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         />
                       </div>
 
@@ -1486,7 +1430,7 @@ export default function CheckoutPage() {
                             setCardNumber(formatted);
                           }}
                           placeholder="0000 0000 0000 0000"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                         />
                       </div>
 
@@ -1508,7 +1452,7 @@ export default function CheckoutPage() {
                             }}
                             placeholder="AA/YY"
                             maxLength={5}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                            className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                           />
                         </div>
                         <div>
@@ -1521,7 +1465,7 @@ export default function CheckoutPage() {
                             onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
                             placeholder="•••"
                             maxLength={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                            className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                           />
                         </div>
                       </div>
@@ -1552,7 +1496,7 @@ export default function CheckoutPage() {
                         onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
                         placeholder="•••"
                         maxLength={3}
-                        className="w-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        className="w-32 px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                       />
                     </div>
                   )}
@@ -1564,7 +1508,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Invoice Info */}
-                <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+                <div className="mt-6 p-4 bg-gray-50 rounded">
                   <h3 className="font-medium text-gray-900 mb-2">Fatura Bilgisi</h3>
                   <p className="text-sm text-gray-600">
                     Ödeme tamamlandıktan sonra faturanız e-posta adresinize otomatik olarak gönderilecektir.
@@ -1598,8 +1542,8 @@ export default function CheckoutPage() {
                 {/* Order Items */}
                 <div className="space-y-4 mb-6">
                   {checkoutItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200">
+                    <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded">
+                      <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
                         <Image
                           src={item.imageUrl}
                           alt={item.title}
@@ -1628,7 +1572,7 @@ export default function CheckoutPage() {
 
                 {/* Delivery Address */}
                 {isAuthenticated && selectedAddressId && (
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="mb-6 p-4 bg-gray-50 rounded">
                     <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Delivery Address' : 'Teslimat Adresi'}</p>
                     {(() => {
                       const addr = addresses.find((a) => a.id === selectedAddressId);
@@ -1642,7 +1586,7 @@ export default function CheckoutPage() {
                 )}
 
                 {/* Payment Method */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-6 p-4 bg-gray-50 rounded">
                   <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}</p>
                   <p className="font-medium">
                     {paymentProvider === 'iyzico'
@@ -1652,7 +1596,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Security Notice */}
-                <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg mb-6">
+                <div className="flex items-start gap-3 p-4 bg-green-50 rounded mb-6">
                   <ShieldCheckIcon className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-green-800">Güvenli Alışveriş</p>
@@ -1697,7 +1641,7 @@ export default function CheckoutPage() {
               <div className="space-y-3 mb-4">
                 {checkoutItems.slice(0, 3).map((item) => (
                   <div key={item.id} className="flex gap-3">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                    <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
                       <Image
                         src={item.imageUrl}
                         alt={item.title}
@@ -1728,70 +1672,11 @@ export default function CheckoutPage() {
 
               <hr className="my-4" />
 
-              {/* Coupon Code Input */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <TagIcon className="w-4 h-4 inline-block mr-1" />
-                  {locale === 'en' ? 'Coupon Code' : 'Kupon Kodu'}
-                </label>
-
-                {appliedCoupon ? (
-                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div>
-                      <p className="font-medium text-green-800">{appliedCoupon.code}</p>
-                      <p className="text-xs text-green-600">{appliedCoupon.name}</p>
-                      <p className="text-sm font-semibold text-green-700">
-                        -{appliedCoupon.discountAmount.toFixed(2)} TL
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleRemoveCoupon}
-                      className="p-1 hover:bg-green-100 rounded-full transition-colors"
-                      title={locale === 'en' ? 'Remove coupon' : 'Kuponu kaldır'}
-                    >
-                      <XMarkIcon className="w-5 h-5 text-green-700" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => {
-                        setCouponCode(e.target.value.toUpperCase());
-                        setCouponError(null);
-                      }}
-                      placeholder={locale === 'en' ? 'Enter code' : 'Kod girin'}
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                    <button
-                      onClick={handleApplyCoupon}
-                      disabled={couponLoading || !couponCode.trim()}
-                      className="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {couponLoading ? '...' : (locale === 'en' ? 'Apply' : 'Uygula')}
-                    </button>
-                  </div>
-                )}
-
-                {couponError && (
-                  <p className="mt-2 text-xs text-red-600">{couponError}</p>
-                )}
-              </div>
-
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
                   <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
-
-                {/* Discount Breakdown */}
-                {appliedCoupon && (
-                  <div className="flex justify-between text-green-600">
-                    <span>{locale === 'en' ? 'Discount' : 'İndirim'} ({appliedCoupon.code})</span>
-                    <span className="font-medium">-{appliedCoupon.discountAmount.toFixed(2)} TL</span>
-                  </div>
-                )}
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
@@ -1806,14 +1691,6 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
-                {/* Total Savings */}
-                {discountAmount > 0 && (
-                  <div className="p-2 bg-green-50 rounded-lg">
-                    <p className="text-xs text-green-700 font-medium text-center">
-                      {locale === 'en' ? 'You save' : 'Kazancınız'}: {discountAmount.toFixed(2)} TL 🎉
-                    </p>
-                  </div>
-                )}
 
                 <hr />
                 <div className="flex justify-between text-lg">

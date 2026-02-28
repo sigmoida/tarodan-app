@@ -281,6 +281,9 @@ export class ProductService implements OnModuleInit {
   /**
    * Get paginated products with filters
    * GET /products
+   *
+   * Primary path: Elasticsearch (fast filtering + sorting)
+   * Fallback: PostgreSQL via Prisma (when ES unavailable)
    */
   async findAll(query: ProductQueryDto) {
     const {
@@ -304,399 +307,308 @@ export class ProductService implements OnModuleInit {
       limit = 20,
       carModelId,
       brandId,
+      manufacturerId,
     } = query;
 
-    // Build cache key from query params
     const cacheKey = `products:list:${JSON.stringify({
-      search,
-      categoryId,
-      sellerId,
+      search, categoryId, sellerId,
       status: status || ProductStatus.active,
+      condition, brand, brandId, manufacturerId,
+      scale, material: materialSlug,
+      tradeOnly, discountOnly, preOrder, limited,
+      set: query.set, vehicleType: query.vehicleType,
+      minPrice, maxPrice, sortBy, page, limit, carModelId,
+    })}`;
+
+    const runListQuery = async () => {
+      // ── Try Elasticsearch first ──
+      if (this.searchService.isAvailable()) {
+        try {
+          const esResult = await this.findAllViaElasticsearch(query);
+          if (esResult) return esResult;
+        } catch (err) {
+          this.logger.warn('ES findAll failed, falling back to PostgreSQL');
+        }
+      }
+
+      // ── PostgreSQL fallback ──
+      return this.findAllViaPostgres(query);
+    };
+
+    return this.cache.getOrSet(cacheKey, runListQuery, { ttl: 300 });
+  }
+
+  /**
+   * ES-based product listing: query ES for IDs + total, then hydrate via Prisma
+   */
+  private async findAllViaElasticsearch(query: ProductQueryDto) {
+    const {
+      search, categoryId, sellerId, condition, brand, scale,
+      material: materialSlug, tradeOnly, discountOnly, preOrder,
+      limited, set: setFilter, minPrice, maxPrice, sortBy,
+      page = 1, limit = 20, brandId, manufacturerId,
+    } = query;
+
+    const esOptions = {
+      query: search || undefined,
+      categoryId,
+      brandId,
+      manufacturerId,
+      sellerId,
       condition,
       brand,
-      brandId,
       scale,
       material: materialSlug,
+      manufacturer: query.manufacturer,
       tradeOnly,
       discountOnly,
       preOrder,
       limited,
-      set: query.set,
+      set: setFilter,
       vehicleType: query.vehicleType,
       minPrice,
       maxPrice,
-      sortBy,
       page,
-      limit,
-      carModelId,
-    })}`;
-
-    const runListQuery = async () => {
-        // Build where clause
-        const where: Prisma.ProductWhereInput = {
-          // IMPORTANT: Public listings MUST only show active products
-          // Ignore any status parameter from query - only active products are visible publicly
-          status: ProductStatus.active,
-          // Exclude membership virtual products (used only for payment processing)
-          NOT: { id: { startsWith: 'membership-' } },
-          // Only show products with available stock (quantity > 0 or quantity is null for unlimited)
-          AND: [
-            {
-              OR: [
-                { quantity: { gt: 0 } },
-                { quantity: null },
-              ],
-            },
-          ],
-        };
-
-        if (search) {
-          const searchCondition = {
-            OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { description: { contains: search, mode: 'insensitive' } },
-            ],
-          };
-          where.AND = where.AND ? [...(where.AND as any[]), searchCondition] : [searchCondition];
-        }
-
-        if (brandId) {
-          where.brandId = brandId;
-        } else if (brand) {
-          // Brand filter - search in title (since brand is typically in product title)
-          // only if brandId is not provided
-          where.title = { contains: brand, mode: 'insensitive' };
-        }
-
-        if (carModelId) {
-          where.carModelId = carModelId;
-        }
-
-        // Scale filter - search in title or description
-        if (scale) {
-          const scaleCondition = {
-            OR: [
-              { title: { contains: scale, mode: 'insensitive' } },
-              { description: { contains: scale, mode: 'insensitive' } },
-            ],
-          };
-          where.AND = where.AND ? [...(where.AND as any[]), scaleCondition] : [scaleCondition];
-        }
-
-        // Material filter - by attribute (Malzeme group, slug: diecast, resin, composite, plastic)
-        if (materialSlug) {
-          where.productAttributes = {
-            some: {
-              attribute: {
-                isActive: true,
-                group: { slug: 'material', isActive: true },
-                slug: materialSlug,
-              },
-            },
-          };
-        }
-
-        // Vehicle type filter - search in title or description with related terms
-        if (query.vehicleType) {
-          const vehicleTypeSearchTerms: Record<string, string[]> = {
-            'araba': ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'],
-            'motosiklet': ['motosiklet', 'motorcycle', 'motor', 'bike'],
-            'motorsports': ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'],
-            'acil-durum': ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'],
-            'ticari': ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'],
-            'insaat': ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'],
-            'tarim': ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'],
-            'askeri': ['askeri', 'military', 'tank', 'zırhlı', 'armored'],
-            'gemi': ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'],
-            'tren': ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'],
-            'ucak': ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'],
-            'set': ['set', 'koleksiyon', 'collection', 'paket', 'bundle'],
-          };
-
-          const searchTerms = vehicleTypeSearchTerms[query.vehicleType] || [query.vehicleType];
-          const vehicleTypeConditions = searchTerms.map(term => ({
-            OR: [
-              { title: { contains: term, mode: 'insensitive' } },
-              { description: { contains: term, mode: 'insensitive' } },
-            ],
-          }));
-
-          // Match any of the search terms
-          const vehicleTypeCondition = { OR: vehicleTypeConditions };
-          where.AND = where.AND ? [...(where.AND as any[]), vehicleTypeCondition] : [vehicleTypeCondition];
-        }
-
-        // Trade only filter
-        if (tradeOnly) {
-          where.isTradeEnabled = true;
-        }
-
-        // Pre-order filter
-        if (preOrder) {
-          where.isPreorder = true;
-        }
-
-        // Limited edition filter
-        if (limited) {
-          where.isLimited = true;
-        }
-
-        // Set/bundle filter (car sets, multi-pack)
-        if (setFilter) {
-          where.isSet = true;
-        }
-
-        // Discount only filter – A + oldPrice: indirimde = oldPrice dolu ve tarih geçerli
-        // Discount only filter - Combined Manual (oldPrice) + Campaign (DiscountService)
-        if (discountOnly) {
-          const now = new Date();
-
-          // 1. Manual discounts (oldPrice defined)
-          const manualDiscountCondition = {
-            AND: [
-              { oldPrice: { not: null } },
-              { OR: [{ saleStartDate: null }, { saleStartDate: { lte: now } }] },
-              { OR: [{ saleEndDate: null }, { saleEndDate: { gte: now } }] },
-            ],
-          };
-
-          // 2. Active campaign discounts
-          const criteria = await this.discountService.getActiveDiscountCriteria();
-
-          // If global discount exists, ALL products are discounted -> Apply NO filter
-          // If NOT global, apply filter: (Manual OR Seller-Scope OR Category-Scope OR Product-Scope)
-          if (!criteria.hasGlobal) {
-            const campaignConditions: any[] = [];
-
-            if (criteria.sellerIds.length > 0) {
-              campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
-            }
-
-            if (criteria.categoryIds.length > 0) {
-              campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
-            }
-
-            if (criteria.productIds.length > 0) {
-              campaignConditions.push({ id: { in: criteria.productIds } });
-            }
-
-            const combinedCondition = {
-              OR: [manualDiscountCondition, ...campaignConditions],
-            };
-
-            where.AND = where.AND
-              ? [...(where.AND as any[]), combinedCondition]
-              : [combinedCondition];
-          }
-        }
-
-        if (categoryId) {
-          where.categoryId = categoryId;
-        }
-
-        if (sellerId) {
-          where.sellerId = sellerId;
-        }
-
-        if (condition) {
-          where.condition = condition as any; // ProductCondition enum
-        }
-
-        if (minPrice !== undefined || maxPrice !== undefined) {
-          where.price = {};
-          if (minPrice !== undefined) {
-            where.price.gte = minPrice;
-          }
-          if (maxPrice !== undefined) {
-            where.price.lte = maxPrice;
-          }
-        }
-
-        // Build order by
-        let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
-        const useScoring = !sortBy; // Use scoring only if no explicit sortBy is provided
-
-        switch (sortBy) {
-          case 'price_asc':
-            orderBy = { price: 'asc' };
-            break;
-          case 'price_desc':
-            orderBy = { price: 'desc' };
-            break;
-          case 'created_asc':
-            orderBy = { createdAt: 'asc' };
-            break;
-          case 'created_desc':
-            orderBy = { createdAt: 'desc' };
-            break;
-          case 'title_asc':
-            orderBy = { title: 'asc' };
-            break;
-          case 'title_desc':
-            orderBy = { title: 'desc' };
-            break;
-          case 'view_count_asc':
-            orderBy = { viewCount: 'asc' };
-            break;
-          case 'view_count_desc':
-            orderBy = { viewCount: 'desc' };
-            break;
-        }
-
-        // Count total
-        const total = await this.prisma.product.count({ where });
-
-        // Fetch products with membership info if using scoring
-        const products = await this.prisma.product.findMany({
-          where,
-          orderBy: useScoring ? undefined : orderBy, // Skip orderBy if using scoring
-          skip: useScoring ? 0 : (page - 1) * limit, // Fetch all if scoring, then paginate after
-          take: useScoring ? undefined : limit,
-          include: {
-            images: { orderBy: { sortOrder: 'asc' }, take: 1 }, // Only first image for list
-            seller: useScoring
-              ? {
-                include: {
-                  membership: {
-                    include: {
-                      tier: {
-                        select: {
-                          type: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              }
-              : {
-                select: {
-                  id: true,
-                  displayName: true,
-                  isVerified: true,
-                  sellerType: true,
-                },
-              },
-            category: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
-            brand: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                logo: true,
-              },
-            },
-            carModel: {
-              include: {
-                brand: {
-                  select: {
-                    slug: true,
-                  },
-                },
-              },
-            },
-            productAttributes: {
-              include: {
-                attribute: {
-                  include: {
-                    group: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        // Calculate scores and sort if using scoring
-        let productsToReturn = products;
-        if (useScoring) {
-          productsToReturn = products
-            .map((product) => {
-              // Calculate membership score
-              let membershipScore = 1; // Default: Free tier
-              // Check if seller has active membership
-              const seller = product.seller as any;
-              const membership = seller?.membership;
-              if (membership && membership.status === 'active' && membership.tier?.type) {
-                const tierType = membership.tier.type;
-                if (tierType === 'premium' || tierType === 'business') {
-                  membershipScore = 3;
-                } else {
-                  membershipScore = 1;
-                }
-              }
-
-              // Calculate view count score
-              const viewCount = product.viewCount || 0;
-              let viewScore = 1;
-              if (viewCount >= 10000) {
-                viewScore = 3;
-              } else if (viewCount >= 1000) {
-                viewScore = 2;
-              }
-
-              // Calculate like count score
-              const likeCount = product.likeCount || 0;
-              let likeScore = 1;
-              if (likeCount >= 100) {
-                likeScore = 3;
-              } else if (likeCount >= 50) {
-                likeScore = 2;
-              }
-
-              // Total score
-              const totalScore = membershipScore + viewScore + likeScore;
-
-              return {
-                ...product,
-                _score: totalScore,
-                _random: Math.random(), // For randomizing same scores
-              };
-            })
-            .sort((a, b) => {
-              // Sort by score (desc), then random for same scores
-              if (b._score !== a._score) {
-                return b._score - a._score;
-              }
-              return b._random - a._random;
-            })
-            .slice((page - 1) * limit, page * limit) // Paginate after sorting
-            .map(({ _score, _random, ...product }) => {
-              // Clean up seller object - remove membership if it was included
-              const cleanedProduct = { ...product };
-              if ((cleanedProduct.seller as any).membership) {
-                cleanedProduct.seller = {
-                  id: cleanedProduct.seller.id,
-                  displayName: (cleanedProduct.seller as any).displayName,
-                  isVerified: (cleanedProduct.seller as any).isVerified,
-                  sellerType: (cleanedProduct.seller as any).sellerType,
-                };
-              }
-              return cleanedProduct;
-            });
-        }
-
-        const formattedProducts = await Promise.all(
-          productsToReturn.map((p) => this.formatProductResponse(p))
-        );
-
-        return {
-          data: formattedProducts,
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-          },
-        };
+      pageSize: limit,
+      sortBy: sortBy || 'relevance',
     };
 
-    return this.cache.getOrSet(cacheKey, runListQuery, { ttl: 300 });
+    const esResult = await this.searchService.searchProductIds(esOptions);
+    if (esResult.ids.length === 0 && !search) {
+      return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+    }
+    if (esResult.ids.length === 0) return null; // let fallback handle text search
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: esResult.ids } },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        seller: {
+          select: { id: true, displayName: true, isVerified: true, sellerType: true },
+        },
+        category: { select: { id: true, name: true, slug: true } },
+        brand: { select: { id: true, name: true, slug: true, logo: true } },
+        manufacturer: { select: { id: true, name: true, slug: true } },
+        carModel: { include: { brand: { select: { slug: true } } } },
+        productAttributes: { include: { attribute: { include: { group: true } } } },
+      },
+    });
+
+    // Preserve ES ordering
+    const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));
+    products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+
+    const formattedProducts = await Promise.all(
+      products.map((p) => this.formatProductResponse(p)),
+    );
+
+    return {
+      data: formattedProducts,
+      meta: {
+        total: esResult.total,
+        page,
+        limit,
+        totalPages: Math.ceil(esResult.total / limit),
+      },
+    };
+  }
+
+  /**
+   * Original PostgreSQL-based listing (fallback)
+   */
+  private async findAllViaPostgres(query: ProductQueryDto) {
+    const {
+      search, categoryId, sellerId, condition, brand, scale,
+      material: materialSlug, tradeOnly, discountOnly, preOrder,
+      limited, set: setFilter, minPrice, maxPrice, sortBy,
+      page = 1, limit = 20, carModelId, brandId, manufacturerId,
+    } = query;
+
+    const where: Prisma.ProductWhereInput = {
+      status: ProductStatus.active,
+      NOT: { id: { startsWith: 'membership-' } },
+      AND: [{ OR: [{ quantity: { gt: 0 } }, { quantity: null }] }],
+    };
+
+    if (search) {
+      const searchCondition = {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+      where.AND = where.AND ? [...(where.AND as any[]), searchCondition] : [searchCondition];
+    }
+
+    if (brandId) {
+      where.brandId = brandId;
+    } else if (brand) {
+      where.title = { contains: brand, mode: 'insensitive' };
+    }
+
+    if (manufacturerId) {
+      where.manufacturerId = manufacturerId;
+    }
+
+    if (carModelId) where.carModelId = carModelId;
+
+    if (scale) {
+      const scaleCondition = {
+        OR: [
+          { title: { contains: scale, mode: 'insensitive' } },
+          { description: { contains: scale, mode: 'insensitive' } },
+        ],
+      };
+      where.AND = where.AND ? [...(where.AND as any[]), scaleCondition] : [scaleCondition];
+    }
+
+    if (materialSlug) {
+      where.productAttributes = {
+        some: {
+          attribute: {
+            isActive: true,
+            group: { slug: 'material', isActive: true },
+            slug: materialSlug,
+          },
+        },
+      };
+    }
+
+    if (query.vehicleType) {
+      const vehicleTypeSearchTerms: Record<string, string[]> = {
+        'araba': ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'],
+        'motosiklet': ['motosiklet', 'motorcycle', 'motor', 'bike'],
+        'motorsports': ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'],
+        'acil-durum': ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'],
+        'ticari': ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'],
+        'insaat': ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'],
+        'tarim': ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'],
+        'askeri': ['askeri', 'military', 'tank', 'zırhlı', 'armored'],
+        'gemi': ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'],
+        'tren': ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'],
+        'ucak': ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'],
+        'set': ['set', 'koleksiyon', 'collection', 'paket', 'bundle'],
+      };
+      const searchTerms = vehicleTypeSearchTerms[query.vehicleType] || [query.vehicleType];
+      const vehicleTypeCondition = {
+        OR: searchTerms.map((term) => ({
+          OR: [
+            { title: { contains: term, mode: 'insensitive' } },
+            { description: { contains: term, mode: 'insensitive' } },
+          ],
+        })),
+      };
+      where.AND = where.AND ? [...(where.AND as any[]), vehicleTypeCondition] : [vehicleTypeCondition];
+    }
+
+    if (tradeOnly) where.isTradeEnabled = true;
+    if (preOrder) where.isPreorder = true;
+    if (limited) where.isLimited = true;
+    if (setFilter) where.isSet = true;
+
+    if (discountOnly) {
+      const now = new Date();
+      const manualDiscountCondition = {
+        AND: [
+          { oldPrice: { not: null } },
+          { OR: [{ saleStartDate: null }, { saleStartDate: { lte: now } }] },
+          { OR: [{ saleEndDate: null }, { saleEndDate: { gte: now } }] },
+        ],
+      };
+      const criteria = await this.discountService.getActiveDiscountCriteria();
+      if (!criteria.hasGlobal) {
+        const campaignConditions: any[] = [];
+        if (criteria.sellerIds.length > 0) campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
+        if (criteria.categoryIds.length > 0) campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
+        if (criteria.productIds.length > 0) campaignConditions.push({ id: { in: criteria.productIds } });
+        const combinedCondition = { OR: [manualDiscountCondition, ...campaignConditions] };
+        where.AND = where.AND ? [...(where.AND as any[]), combinedCondition] : [combinedCondition];
+      }
+    }
+
+    if (categoryId) where.categoryId = categoryId;
+    if (sellerId) where.sellerId = sellerId;
+    if (condition) where.condition = condition as any;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      if (minPrice !== undefined) where.price.gte = minPrice;
+      if (maxPrice !== undefined) where.price.lte = maxPrice;
+    }
+
+    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+    const useScoring = !sortBy;
+    switch (sortBy) {
+      case 'price_asc': orderBy = { price: 'asc' }; break;
+      case 'price_desc': orderBy = { price: 'desc' }; break;
+      case 'created_asc': orderBy = { createdAt: 'asc' }; break;
+      case 'created_desc': orderBy = { createdAt: 'desc' }; break;
+      case 'title_asc': orderBy = { title: 'asc' }; break;
+      case 'title_desc': orderBy = { title: 'desc' }; break;
+      case 'view_count_asc': orderBy = { viewCount: 'asc' }; break;
+      case 'view_count_desc': orderBy = { viewCount: 'desc' }; break;
+    }
+
+    const total = await this.prisma.product.count({ where });
+    const products = await this.prisma.product.findMany({
+      where,
+      orderBy: useScoring ? undefined : orderBy,
+      skip: useScoring ? 0 : (page - 1) * limit,
+      take: useScoring ? undefined : limit,
+      include: {
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        seller: useScoring
+          ? { include: { membership: { include: { tier: { select: { type: true } } } } } }
+          : { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        brand: { select: { id: true, name: true, slug: true, logo: true } },
+        manufacturer: { select: { id: true, name: true, slug: true } },
+        carModel: { include: { brand: { select: { slug: true } } } },
+        productAttributes: { include: { attribute: { include: { group: true } } } },
+      },
+    });
+
+    let productsToReturn = products;
+    if (useScoring) {
+      productsToReturn = products
+        .map((product) => {
+          let membershipScore = 1;
+          const seller = product.seller as any;
+          const membership = seller?.membership;
+          if (membership && membership.status === 'active' && membership.tier?.type) {
+            const tierType = membership.tier.type;
+            if (tierType === 'premium' || tierType === 'business') membershipScore = 3;
+          }
+          const viewCount = product.viewCount || 0;
+          let viewScore = viewCount >= 10000 ? 3 : viewCount >= 1000 ? 2 : 1;
+          const likeCount = product.likeCount || 0;
+          let likeScore = likeCount >= 100 ? 3 : likeCount >= 50 ? 2 : 1;
+          return { ...product, _score: membershipScore + viewScore + likeScore, _random: Math.random() };
+        })
+        .sort((a, b) => b._score !== a._score ? b._score - a._score : b._random - a._random)
+        .slice((page - 1) * limit, page * limit)
+        .map(({ _score, _random, ...product }) => {
+          const cleanedProduct = { ...product };
+          if ((cleanedProduct.seller as any).membership) {
+            cleanedProduct.seller = {
+              id: cleanedProduct.seller.id,
+              displayName: (cleanedProduct.seller as any).displayName,
+              isVerified: (cleanedProduct.seller as any).isVerified,
+              sellerType: (cleanedProduct.seller as any).sellerType,
+            };
+          }
+          return cleanedProduct;
+        });
+    }
+
+    const formattedProducts = await Promise.all(
+      productsToReturn.map((p) => this.formatProductResponse(p)),
+    );
+
+    return {
+      data: formattedProducts,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
@@ -735,6 +647,13 @@ export class ProductService implements OnModuleInit {
                 name: true,
                 slug: true,
                 logo: true,
+              },
+            },
+            manufacturer: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
               },
             },
             productAttributes: {
@@ -1661,6 +1580,13 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           slug: product.brand.slug,
         }
         : undefined,
+      manufacturer: product.manufacturer
+        ? {
+          id: product.manufacturer.id,
+          name: product.manufacturer.name,
+          slug: product.manufacturer.slug,
+        }
+        : undefined,
       carModel: product.carModel
         ? {
           id: product.carModel.id,
@@ -2016,17 +1942,22 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       orderBy: { name: 'asc' },
     });
 
-    // 3. Scales & Manufacturers (Static for now, but served from API)
+    // 3. Scales (static) & Manufacturers (from DB)
     const scales = [
       '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
       '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'
     ];
 
-    const manufacturers = [
-      'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
-      'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
-      'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL'
-    ];
+    const manufacturerRecords = await this.prisma.manufacturer.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const manufacturers = manufacturerRecords.map((m) => ({
+      id: m.id,
+      name: m.name,
+      slug: m.slug,
+    }));
 
     // 4. Materials (from Attribute group "material" - Malzeme)
     const materialAttrs = await this.prisma.attribute.findMany({

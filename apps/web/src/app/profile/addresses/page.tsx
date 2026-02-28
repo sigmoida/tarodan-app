@@ -62,14 +62,44 @@ export default function AddressesPage() {
 
   const invalidateAddresses = () => queryClient.invalidateQueries({ queryKey: ['profile-addresses'] });
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.fullName.trim()) {
+      toast.error(locale === 'en' ? 'Full name is required' : 'Ad soyad zorunludur');
+      return;
+    }
+    if (!formData.phone || formData.phone.replace(/\D/g, '').length < 12) {
+      toast.error(locale === 'en' ? 'Valid phone number is required' : 'Geçerli bir telefon numarası giriniz');
+      return;
+    }
+    if (!formData.city) {
+      toast.error(locale === 'en' ? 'Please select a city' : 'Lütfen şehir seçiniz');
+      return;
+    }
+    if (!formData.district) {
+      toast.error(locale === 'en' ? 'Please select a district' : 'Lütfen ilçe seçiniz');
+      return;
+    }
+    if (!formData.address.trim() || formData.address.trim().length < 10) {
+      toast.error(locale === 'en' ? 'Address must be at least 10 characters' : 'Adres en az 10 karakter olmalıdır');
+      return;
+    }
+
+    const dataToSend = {
+      ...formData,
+      title: formData.title.trim() || (locale === 'en' ? 'Home' : 'Ev'),
+    };
+
+    setIsSaving(true);
     try {
       if (editingId) {
-        await addressesApi.update(editingId, formData);
+        await addressesApi.update(editingId, dataToSend);
         toast.success(t('address.updated'));
       } else {
-        await addressesApi.create(formData);
+        await addressesApi.create(dataToSend);
         toast.success(t('address.added'));
       }
       setShowForm(false);
@@ -78,7 +108,10 @@ export default function AddressesPage() {
       await invalidateAddresses();
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to save address:', error);
-      toast.error(error.response?.data?.message || t('address.saveFailed'));
+      const msg = error.response?.data?.message || error.message || t('address.saveFailed');
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -140,7 +173,7 @@ export default function AddressesPage() {
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-lg" />
+              <div key={i} className="h-32 bg-gray-200 rounded" />
             ))}
           </div>
         </div>
@@ -174,11 +207,11 @@ export default function AddressesPage() {
                 setEditingId(null);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
             >
               <PlusIcon className="w-5 h-5" />
               {t('address.newAddress')}
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-sm">
                 {addresses.length}/3
               </span>
             </button>
@@ -187,7 +220,7 @@ export default function AddressesPage() {
 
         {/* Address Limit Warning */}
         {addresses.length >= 3 && !showForm && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
+          <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
@@ -210,7 +243,7 @@ export default function AddressesPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-6 mb-6"
+            className="bg-white rounded shadow-sm p-6 mb-6"
           >
             <h2 className="text-xl font-semibold mb-4">
               {editingId ? t('address.editAddress') : t('address.addNewAddress')}
@@ -224,7 +257,7 @@ export default function AddressesPage() {
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-gray-300 rounded"
                   placeholder={locale === 'en' ? 'Home, Work, etc.' : 'Ev, İş, vb.'}
                 />
               </div>
@@ -238,7 +271,7 @@ export default function AddressesPage() {
                     type="text"
                     value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-4 py-2 border border-gray-300 rounded"
                     required
                   />
                 </div>
@@ -248,7 +281,7 @@ export default function AddressesPage() {
                     {t('checkout.phone')} <span className="text-red-500">*</span>
                   </label>
                   <div className="flex">
-                    <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm font-medium">
+                    <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-500 text-sm font-medium">
                       +90
                     </span>
                     <input
@@ -261,7 +294,7 @@ export default function AddressesPage() {
                       }}
                       placeholder="5XX XXX XX XX"
                       maxLength={14}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-r-lg"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-r"
                       required
                     />
                   </div>
@@ -292,7 +325,7 @@ export default function AddressesPage() {
                 <textarea
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-gray-300 rounded"
                   rows={3}
                   required
                 />
@@ -306,7 +339,7 @@ export default function AddressesPage() {
                   type="text"
                   value={formData.zipCode}
                   onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-gray-300 rounded"
                 />
               </div>
 
@@ -331,15 +364,18 @@ export default function AddressesPage() {
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+                  disabled={isSaving}
+                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-60"
                 >
-                  {editingId ? t('common.update') : t('common.save')}
+                  {isSaving
+                    ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...')
+                    : editingId ? t('common.update') : t('common.save')}
                 </button>
               </div>
             </form>
@@ -347,11 +383,11 @@ export default function AddressesPage() {
         )}
 
         {addresses.length === 0 && !showForm ? (
-          <div className="text-center py-16 bg-white rounded-xl">
+          <div className="text-center py-16 bg-white rounded">
             <p className="text-gray-600 text-lg mb-4">{t('address.noAddresses')}</p>
             <button
               onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
+              className="px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
             >
               {t('address.addFirstAddress')}
             </button>
@@ -363,7 +399,7 @@ export default function AddressesPage() {
                 key={address.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-sm p-6"
+                className="bg-white rounded shadow-sm p-6"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -386,7 +422,7 @@ export default function AddressesPage() {
                     {!address.isDefault && (
                       <button
                         onClick={() => handleSetDefault(address.id)}
-                        className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg"
+                        className="p-2 text-primary-500 hover:bg-primary-50 rounded"
                         title={t('address.makeDefault')}
                       >
                         <CheckIcon className="w-5 h-5" />
@@ -394,14 +430,14 @@ export default function AddressesPage() {
                     )}
                     <button
                       onClick={() => handleEdit(address)}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded"
                       title={t('common.edit')}
                     >
                       <PencilIcon className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => handleDelete(address.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      className="p-2 text-red-500 hover:bg-red-50 rounded"
                       title={t('common.delete')}
                     >
                       <TrashIcon className="w-5 h-5" />

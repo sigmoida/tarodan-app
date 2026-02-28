@@ -35,22 +35,23 @@ export default function TrustBadges() {
   const badges = TRUST_BADGES[locale as 'tr' | 'en'];
 
   return (
-    <section className="py-6 bg-white border-y border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+    <section className="py-5 bg-white border-t border-gray-200">
+      <div className="px-3 sm:px-4 lg:px-6">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3">
           {badges.map((badge, index) => {
             const Icon = badge.icon;
             return (
               <motion.div
                 key={badge.label}
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05, duration: 0.3 }}
-                className="flex flex-col items-center text-center px-2 py-2"
+                transition={{ delay: index * 0.04, duration: 0.25 }}
+                className="flex flex-col items-center text-center px-2 py-3 bg-gray-50 border border-gray-100"
+                style={{borderRadius:'4px'}}
               >
-                <Icon className="w-5 h-5 text-primary-500 mb-1.5" />
-                <p className="text-sm font-semibold text-heading">{badge.label}</p>
-                <p className="text-xs text-muted mt-0.5 hidden md:block">{badge.description}</p>
+                <Icon className="w-5 h-5 text-orange-500 mb-1.5" />
+                <p className="text-[11px] sm:text-xs font-semibold text-gray-900 leading-tight">{badge.label}</p>
+                <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 hidden md:block">{badge.description}</p>
               </motion.div>
             );
           })}

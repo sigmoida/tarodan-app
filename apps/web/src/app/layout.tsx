@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import Navbar from '@/components/layout/Navbar';
-import CategoryNavBar from '@/components/layout/CategoryNavBar';
+import CategoryNavBarWrapper from '@/components/layout/CategoryNavBarWrapper';
 import Footer from '@/components/layout/Footer';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 import { LanguageProvider } from '@/i18n/LanguageContext';
@@ -50,7 +50,7 @@ export default function RootLayout({
         <LanguageProvider>
           <QueryProvider>
             <Navbar />
-            <CategoryNavBar />
+            <CategoryNavBarWrapper />
             <main className="flex-1">
               {children}
             </main>
@@ -61,9 +61,11 @@ export default function RootLayout({
               toastOptions={{
                 duration: 4000,
                 style: {
-                  background: '#333',
+                  background: '#1a1a1a',
                   color: '#fff',
-                  borderRadius: '12px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  padding: '12px 16px',
                 },
               }}
             />

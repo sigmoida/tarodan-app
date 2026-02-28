@@ -493,32 +493,33 @@ export default function NewListingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href="/listings"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors mb-6 text-sm"
         >
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-4 h-4" />
           İlanlara Dön
         </Link>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm p-6 md:p-8"
         >
-          <h1 className="text-3xl font-bold mb-2">Yeni İlan Oluştur</h1>
-          <p className="text-gray-600 mb-4">
-            Ürününüzü koleksiyoncularla buluşturun. İlk ilanınızı oluşturduğunuzda otomatik olarak satıcı hesabınız aktifleşir.
-          </p>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Yeni İlan Oluştur</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Ürününüzü koleksiyoncularla buluşturun
+            </p>
+          </div>
 
           {/* Listing Limit Info */}
           {limitsLoading ? (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl animate-pulse">
+            <div className="mb-5 p-3 bg-gray-50 rounded animate-pulse">
               <div className="h-4 bg-gray-200 rounded w-1/3"></div>
             </div>
           ) : listingLimits && (
-            <div className={`mb-6 p-4 rounded-xl border ${listingLimits.isPremium
+            <div className={`mb-5 p-3 rounded border text-sm ${listingLimits.isPremium
               ? 'bg-yellow-50 border-yellow-200'
               : listingLimits.canCreateListing
                 ? 'bg-green-50 border-green-200'
@@ -535,16 +536,9 @@ export default function NewListingPage() {
                       : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxListings}`
                     }
                   </p>
-                  <p className={`text-sm ${listingLimits.isPremium
-                    ? 'text-yellow-600'
-                    : listingLimits.canCreateListing ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                    {listingLimits.membershipTier}
-                    {listingLimits.isPremium && ' ⭐'}
-                  </p>
                   {listingLimits.remainingListings !== -1 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Kalan ilan hakkı: {listingLimits.remainingListings}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Kalan: {listingLimits.remainingListings}
                     </p>
                   )}
                 </div>
@@ -553,59 +547,58 @@ export default function NewListingPage() {
                     Premium'a Geç
                   </Link>
                 )}
-                {listingLimits.canCreateListing && !listingLimits.isPremium && listingLimits.maxListings !== -1 && listingLimits.remainingListings <= 2 && (
-                  <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                    Daha fazla ilan için →
-                  </Link>
-                )}
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Başlık <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                placeholder="Örn: Hot Wheels '69 Camaro Z28"
-                required
-                minLength={5}
-                maxLength={200}
-              />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Section: Basic Info */}
+            <div className="bg-white rounded border border-gray-100 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Temel Bilgiler</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Başlık <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-400 bg-white"
+                    placeholder="Örn: Hot Wheels '69 Camaro Z28"
+                    required
+                    minLength={5}
+                    maxLength={200}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Açıklama
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-400 bg-white"
+                    placeholder="Ürün hakkında detaylı bilgi..."
+                    rows={4}
+                    maxLength={5000}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Açıklama
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                placeholder="Ürün hakkında detaylı bilgi..."
-                rows={5}
-                maxLength={5000}
-              />
-            </div>
-
-            {/* Category & Condition */}
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* Section: Product Details */}
+            <div className="bg-white rounded border border-gray-100 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Ürün Detayları</h2>
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ürün Tipi <span className="text-red-500">*</span>
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Ürününüzün genel kategorisi (Vintage, Limited Edition, vb.)</p>
                 <select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                   required
                 >
                   <option value="">Kategori Seçin</option>
@@ -621,11 +614,10 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ürün Durumu <span className="text-red-500">*</span>
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Ürünün fiziksel kondisyonu</p>
                 <select
                   value={formData.condition}
                   onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                   required
                 >
                   {CONDITIONS.map((cond) => (
@@ -637,13 +629,11 @@ export default function NewListingPage() {
               </div>
             </div>
 
-            {/* Brand & Scale */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Marka
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Ürünün markasını seçin</p>
                 <select
                   value={formData.brandId}
                   onChange={(e) => {
@@ -651,10 +641,10 @@ export default function NewListingPage() {
                     setFormData(prev => ({
                       ...prev,
                       brandId: newBrandId,
-                      carModelId: '' // Reset model when brand changes
+                      carModelId: ''
                     }));
                   }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">Marka Seçin</option>
                   {brands.map((brand) => (
@@ -669,11 +659,10 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Model
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Varsa model seçin (Opsiyonel)</p>
                 <select
                   value={formData.carModelId}
                   onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                   disabled={!formData.brandId || models.length === 0}
                 >
                   <option value="">Model Seçin</option>
@@ -689,11 +678,10 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ölçek
                 </label>
-                <p className="text-xs text-gray-500 mb-2">1:64, 1:43, 1:18 vb.</p>
                 <select
                   value={formData.scale}
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   {SCALES.map((scale) => (
                     <option key={scale} value={scale}>
@@ -707,13 +695,10 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {locale === 'en' ? 'Material' : 'Malzeme'}
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  {locale === 'en' ? 'Diecast, resin, plastic, etc.' : 'Diecast, reçine, plastik vb.'}
-                </p>
                 <select
                   value={formData.material}
                   onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">{locale === 'en' ? 'Select material' : 'Malzeme seçin'}</option>
                   {MATERIALS.map((m) => (
@@ -728,13 +713,10 @@ export default function NewListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {locale === 'en' ? 'Release year' : 'Çıkış yılı'}
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  {locale === 'en' ? 'Year the model was released (optional)' : 'Modelin çıkış yılı (isteğe bağlı)'}
-                </p>
                 <select
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">{locale === 'en' ? 'Select year' : 'Yıl seçin'}</option>
                   {yearOptions.map((y) => (
@@ -745,9 +727,12 @@ export default function NewListingPage() {
                 </select>
               </div>
             </div>
+            </div>
 
-            {/* Trade Toggle */}
-            <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
+            {/* Section: Options */}
+            <div className="bg-white rounded border border-gray-100 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Seçenekler</h2>
+            <div className={`flex items-center justify-between p-3 rounded border ${limits?.canTrade
               ? 'bg-green-50 border-green-200'
               : 'bg-gray-50 border-gray-200'
               }`}>
@@ -778,8 +763,7 @@ export default function NewListingPage() {
               )}
             </div>
 
-            {/* Ön Sipariş */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
               <div>
                 <label className="font-medium text-gray-900">{locale === 'en' ? 'Pre-Order' : 'Ön Sipariş'}</label>
                 <p className="text-sm text-gray-600">
@@ -795,8 +779,7 @@ export default function NewListingPage() {
               </button>
             </div>
 
-            {/* Set / Paket */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
               <div>
                 <label className="font-medium text-gray-900">{locale === 'en' ? 'Set / Bundle' : 'Set / Paket'}</label>
                 <p className="text-sm text-gray-600">
@@ -812,86 +795,90 @@ export default function NewListingPage() {
               </button>
             </div>
 
-            {/* Price & Quantity */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fiyat (₺) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                  placeholder="0.00"
-                  required
-                  min={1}
-                  max={9999999}
-                  step="0.01"
-                />
-              </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stok Miktarı
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  {locale === 'en'
-                    ? 'Leave empty for unlimited stock'
-                    : 'Boş bırakırsanız sınırsız stok olur'}
-                </p>
-                <input
-                  type="number"
-                  value={formData.quantity || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Save as string, empty string means unlimited stock
-                    setFormData({ ...formData, quantity: value === '' ? '' : value });
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
-                  placeholder={locale === 'en' ? 'Unlimited' : 'Sınırsız'}
-                  min={1}
-                />
+            {/* Section: Price & Quantity */}
+            <div className="bg-white rounded border border-gray-100 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Fiyatlandırma</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Fiyat (₺) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-400 bg-white"
+                    placeholder="0.00"
+                    required
+                    min={1}
+                    max={9999999}
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Stok Miktarı
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.quantity || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, quantity: value === '' ? '' : value });
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-400 bg-white"
+                    placeholder={locale === 'en' ? 'Unlimited' : 'Sınırsız'}
+                    min={1}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    {locale === 'en' ? 'Leave empty for unlimited stock' : 'Boş bırakırsanız sınırsız stok'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Images */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri
-              </label>
+            {/* Section: Images */}
+            <div className="bg-white rounded border border-gray-100 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Görseller</h2>
               <div className="space-y-3">
-                <div>
-                  {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) ? (
+                {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) ? (
+                  <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-200 rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                    <PhotoIcon className="w-8 h-8 text-gray-400" />
+                    <span className="text-sm text-gray-500 font-medium">
+                      {locale === 'en' ? 'Click to upload images' : 'Görsel yüklemek için tıklayın'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} {locale === 'en' ? 'uploaded' : 'yüklendi'}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
                       multiple
                       onChange={(e) => handleFileUpload(e.target.files)}
                       disabled={uploadingImages}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="hidden"
                     />
-                  ) : (
-                    <div className="w-full px-4 py-3 border border-green-300 bg-green-50 rounded-xl text-green-700 text-sm">
-                      ✓ Maksimum görsel sayısına ulaştınız
-                    </div>
-                  )}
-                  {uploadingImages && (
-                    <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
-                  )}
-                </div>
-
+                  </label>
+                ) : (
+                  <div className="py-4 border border-green-200 bg-green-50 rounded text-green-700 text-sm text-center">
+                    Maksimum görsel sayısına ulaştınız
+                  </div>
+                )}
+                {uploadingImages && (
+                  <p className="text-sm text-primary-600">Resimler yükleniyor...</p>
+                )}
                 {formData.imageUrls.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                     {formData.imageUrls.map((key, index) => {
-                      // Use preview URL if available, otherwise try to use key (fallback)
-                      const previewUrl = imagePreviewUrls[index] || key;
+                      const previewUrl = imagePreviewUrls?.[index] || key;
                       return (
-                        <div key={index} className="relative group">
+                        <div key={index} className="relative group aspect-square">
                           <img
                             src={previewUrl}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                            className="w-full h-full object-cover rounded border border-gray-200"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
                             }}
@@ -899,7 +886,7 @@ export default function NewListingPage() {
                           <button
                             type="button"
                             onClick={() => removeImageUrl(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             ×
                           </button>
@@ -909,31 +896,21 @@ export default function NewListingPage() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-sm text-gray-500">
-                  {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} görsel
-                </p>
-                {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) && (
-                  <p className="text-xs text-gray-400">
-                    {(limits?.maxImagesPerListing || 5) - formData.imageUrls.length} görsel daha ekleyebilirsiniz
-                  </p>
-                )}
-              </div>
             </div>
 
             {/* Submit */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-medium"
+                className="flex-1 px-6 py-2.5 border border-gray-200 rounded hover:bg-gray-50 text-gray-700 font-medium text-sm"
               >
                 İptal
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="flex-1 px-6 py-2.5 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
               >
                 {isLoading ? (locale === 'en' ? 'Creating...' : 'Oluşturuluyor...') : (locale === 'en' ? 'Create Listing' : 'İlanı Oluştur')}
               </button>

@@ -9,6 +9,7 @@ import { ProductModule } from './modules/product';
 import { CategoryModule } from './modules/category';
 import { BrandModule } from './modules/brand';
 import { CarModelModule } from './modules/car-model';
+import { ManufacturerModule } from './modules/manufacturer';
 import { OfferModule } from './modules/offer';
 import { OrderModule } from './modules/order';
 import { PaymentModule } from './modules/payment';
@@ -109,6 +110,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     CategoryModule,
     BrandModule,
     CarModelModule,
+    ManufacturerModule,
     OfferModule,
     OrderModule,
     PaymentModule,

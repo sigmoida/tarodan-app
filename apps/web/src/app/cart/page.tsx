@@ -20,7 +20,6 @@ export default function CartPage() {
     shippingCost: apiShippingCost,
     totalDiscount,
     appliedDiscounts,
-    appliedCouponCode
   } = useCartStore();
   const { t } = useTranslation();
 
@@ -145,12 +144,6 @@ export default function CartPage() {
                 </div>
                 {appliedDiscounts && appliedDiscounts.length > 0 && (
                   <>
-                    {appliedCouponCode && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Kupon ({appliedCouponCode})</span>
-                        <span className="font-medium">-</span>
-                      </div>
-                    )}
                     {appliedDiscounts.map((d) => (
                       <div key={d.discountId} className="flex justify-between text-green-600">
                         <span>{d.discountName}</span>

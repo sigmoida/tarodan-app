@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, ShieldCheckIcon, ArrowsRightLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -23,11 +23,8 @@ export default function LoginPage() {
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  // Redirect if already authenticated (prefer sessionStorage so redirect is not lost when URL is stripped)
   useEffect(() => {
     if (isAuthenticated && typeof window !== 'undefined') {
-      // Don't auto-redirect if we're in the middle of login process
-      // The login handler will handle redirect after business check
       return;
     }
   }, [isAuthenticated]);
@@ -44,12 +41,10 @@ export default function LoginPage() {
       await login(email, password);
       toast.success(t('auth.loginSuccess'));
       
-      // Check for business account warning BEFORE redirect
       try {
         const userResponse = await api.get('/users/me');
         const currentUser = userResponse.data?.user || userResponse.data;
         
-        // Extract membership tier (handle different formats)
         const membershipTier = currentUser?.membership?.tier?.type || 
                                currentUser?.membership?.tier?.name || 
                                currentUser?.membershipTier || 
@@ -57,23 +52,19 @@ export default function LoginPage() {
         const normalizedTier = String(membershipTier).toLowerCase();
         const isBusinessTier = normalizedTier.includes('business') || normalizedTier === 'business';
         
-        // Check if business account needs membership - FORCE redirect to membership page
         if (currentUser?.isEmailVerified && 
             currentUser?.companyName && 
             currentUser?.taxId &&
             !isBusinessTier) {
-          // Force redirect to membership page - don't allow navigation elsewhere
           router.push('/profile/membership?required=true');
-          return; // Don't continue with normal redirect
+          return;
         }
       } catch (error) {
-        // Ignore errors in business check, continue with redirect
         if (process.env.NODE_ENV === 'development') {
           console.error('Business account check failed:', error);
         }
       }
       
-      // Get redirect URL
       let redirect: string | null = null;
       try {
         redirect = sessionStorage.getItem('login_redirect');
@@ -82,7 +73,6 @@ export default function LoginPage() {
       if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
       const target = redirect && redirect.startsWith('/') ? redirect : '/';
       
-      // Small delay to ensure toast is shown before redirect
       setTimeout(() => {
         router.push(target);
       }, 1000);
@@ -92,7 +82,6 @@ export default function LoginPage() {
       }
       const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
       
-      // Check if error is about unverified email
       if (message.includes('doğrulayın') || message.includes('verify')) {
         setShowVerificationBanner(true);
       }
@@ -121,35 +110,33 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen flex">
       {/* Left - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 sm:p-12">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-white">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-[400px]"
         >
-          <div className="mb-10 flex flex-col items-center">
-            <Link href="/" className="inline-flex items-center justify-center mb-6">
-              <Image
-                src="/tarodan-logo.jpg"
-                alt="Tarodan"
-                width={128}
-                height={128}
-                className="rounded-xl object-contain"
-              />
+          <div className="mb-8">
+            <Link href="/" className="inline-block mb-7">
+              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={44} height={44} className="rounded-lg object-contain" />
             </Link>
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               {t('auth.welcomeBack')}
             </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {locale === 'en' ? 'Sign in to your account' : 'Hesabınıza giriş yapın'}
+            </p>
           </div>
 
-          {/* Email verification banner */}
           {showVerificationBanner && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex gap-3"
+              className="bg-amber-50 border border-amber-200 p-4 mb-6 flex gap-3"
+              style={{ borderRadius: '6px' }}
             >
               <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -172,7 +159,7 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-soft p-8">
+          <div className="border border-gray-200 bg-white p-7" style={{ borderRadius: '8px' }}>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -185,13 +172,14 @@ export default function LoginPage() {
                   {t('auth.email')}
                 </label>
                 <div className="relative">
-                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-                    className="input pl-12 border-2 border-gray-200 focus:border-primary-500 bg-white shadow-sm"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
+                    style={{ borderRadius: '6px' }}
                     autoComplete="email"
                   />
                 </div>
@@ -202,13 +190,14 @@ export default function LoginPage() {
                   {t('auth.password')}
                 </label>
                 <div className="relative">
-                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="input pl-12 pr-12 border-2 border-gray-200 focus:border-primary-500 bg-white shadow-sm"
+                    className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
+                    style={{ borderRadius: '6px' }}
                     autoComplete="current-password"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -220,12 +209,12 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5 text-gray-400" />
+                      <EyeSlashIcon className="w-[18px] h-[18px]" />
                     ) : (
-                      <EyeIcon className="w-5 h-5 text-gray-400" />
+                      <EyeIcon className="w-[18px] h-[18px]" />
                     )}
                   </button>
                 </div>
@@ -235,11 +224,12 @@ export default function LoginPage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                    className="w-4 h-4 border-gray-300 text-orange-500 focus:ring-orange-500"
+                    style={{ borderRadius: '3px' }}
                   />
-                  <span className="text-sm text-gray-600 font-medium">{t('auth.rememberMe')}</span>
+                  <span className="text-sm text-gray-600">{t('auth.rememberMe')}</span>
                 </label>
-                <Link href="/forgot-password" className="text-sm font-medium text-primary-500 hover:text-primary-600">
+                <Link href="/forgot-password" className="text-sm font-medium text-orange-600 hover:text-orange-700">
                   {t('auth.forgotPassword')}
                 </Link>
               </div>
@@ -247,7 +237,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="btn-primary w-full py-3 text-sm font-semibold tracking-tight"
+                className="w-full py-2.5 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 active:bg-orange-700 transition-colors disabled:opacity-60"
+                style={{ borderRadius: '6px' }}
               >
                 {isLoading 
                   ? (locale === 'en' ? 'Signing in...' : 'Giriş yapılıyor...') 
@@ -256,67 +247,55 @@ export default function LoginPage() {
             </form>
           </div>
 
-          <p className="text-center mt-8 text-sm text-gray-500">
+          <p className="text-center mt-6 text-sm text-gray-500">
             {t('auth.noAccount')}{' '}
-            <Link href="/register" className="font-medium text-primary-500 hover:text-primary-600">
+            <Link href="/register" className="font-semibold text-orange-600 hover:text-orange-700">
               {t('common.register')}
             </Link>
           </p>
         </motion.div>
       </div>
 
-      {/* Right - Brand panel */}
-      <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-16 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
-        <div className="absolute top-12 right-12 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute bottom-16 left-16 w-48 h-48 rounded-full bg-white/5 blur-2xl" />
-        <div className="max-w-sm text-white relative z-10">
+      {/* Right - Image panel */}
+      <div className="hidden lg:flex flex-1 relative overflow-hidden">
+        <Image
+          src="/photos/colorful-car-toys.jpg"
+          alt="Diecast model araba koleksiyonu"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/50 to-black/20" />
+        <div className="absolute inset-0 flex items-center justify-center p-10 z-10">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
-            className="space-y-8"
+            transition={{ delay: 0.2, duration: 0.4 }}
           >
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight text-white mb-3">
-                {locale === 'en' 
-                  ? 'The Meeting Point for Collectors'
-                  : 'Koleksiyonerlerin Buluşma Noktası'}
-              </h2>
-              <p className="text-sm text-white/60 leading-relaxed">
-                {locale === 'en'
-                  ? 'Find what you\'re looking for among thousands of diecast models. Buy, sell, or trade with confidence.'
-                  : 'Binlerce diecast model arasından aradığınızı bulun. Güvenle alın, satın veya takas yapın.'}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ShieldCheckIcon className="w-5 h-5 text-white/80" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{locale === 'en' ? 'Secure Shopping' : 'Güvenli Alışveriş'}</p>
-                  <p className="text-xs text-white/50">{locale === 'en' ? 'Protected payments and buyer guarantee' : 'Korumalı ödeme ve alıcı garantisi'}</p>
-                </div>
+            <h2 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">
+              {locale === 'en' 
+                ? 'The Meeting Point for Collectors'
+                : 'Koleksiyonerlerin Buluşma Noktası'}
+            </h2>
+            <p className="text-sm text-white/80 max-w-md drop-shadow">
+              {locale === 'en'
+                ? 'Find what you\'re looking for among thousands of diecast models.'
+                : 'Binlerce diecast model arasından aradığınızı bulun.'}
+            </p>
+            <div className="flex items-center gap-6 mt-5">
+              <div>
+                <p className="text-lg font-bold text-white drop-shadow">10K+</p>
+                <p className="text-xs text-white/60">{locale === 'en' ? 'Listings' : 'İlan'}</p>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ArrowsRightLeftIcon className="w-5 h-5 text-white/80" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{locale === 'en' ? 'Easy Trading' : 'Kolay Takas'}</p>
-                  <p className="text-xs text-white/50">{locale === 'en' ? 'Trade models with other collectors safely' : 'Diğer koleksiyonerlerle güvenle takas yapın'}</p>
-                </div>
+              <div className="w-px h-6 bg-white/30" />
+              <div>
+                <p className="text-lg font-bold text-white drop-shadow">5K+</p>
+                <p className="text-xs text-white/60">{locale === 'en' ? 'Members' : 'Üye'}</p>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <SparklesIcon className="w-5 h-5 text-white/80" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{locale === 'en' ? 'Premium Collections' : 'Premium Koleksiyonlar'}</p>
-                  <p className="text-xs text-white/50">{locale === 'en' ? 'Showcase and discover rare diecast models' : 'Nadir diecast modelleri sergileyin ve keşfedin'}</p>
-                </div>
+              <div className="w-px h-6 bg-white/30" />
+              <div>
+                <p className="text-lg font-bold text-white drop-shadow">2K+</p>
+                <p className="text-xs text-white/60">{locale === 'en' ? 'Trades' : 'Takas'}</p>
               </div>
             </div>
           </motion.div>

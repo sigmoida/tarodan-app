@@ -15,9 +15,11 @@ const HERO_SLIDES = {
       title: "Türkiye'nin En Büyük\nDiecast Pazaryeri",
       subtitle:
         'Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.',
-      cta1: { label: 'Koleksiyon Oluştur', href: '/collections/new' },
+      cta1: { label: 'Koleksiyonları Keşfet', href: '/collections' },
       cta2: { label: 'Pazaryerini İncele', href: '/listings' },
-      accent: 'from-primary-100/40 to-amber-100/30',
+      image: '/photos/colorful-car-toys.jpg',
+      imageRight: true,
+      requiresAuth: false,
     },
     {
       title: 'Premium Hot Wheels\nKoleksiyonları',
@@ -25,15 +27,19 @@ const HERO_SLIDES = {
         'Fast & Furious, Formula 1 ve daha fazlası. Nadir bulunan modelleri keşfedin.',
       cta1: { label: 'Hot Wheels Keşfet', href: '/listings?manufacturer=Hot Wheels' },
       cta2: { label: 'Tüm Markalar', href: '/listings' },
-      accent: 'from-red-100/30 to-primary-100/30',
+      image: '/photos/toy-cars-row-1.jpg',
+      imageRight: false,
+      requiresAuth: false,
     },
     {
       title: 'Güvenli Takas\nSistemi',
       subtitle:
         'Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Her iki taraf için korumalı sistem.',
       cta1: { label: 'Takasa Başla', href: '/trades' },
-      cta2: { label: 'Nasıl Çalışır?', href: '/help/trades' },
-      accent: 'from-blue-100/30 to-indigo-100/30',
+      cta2: { label: 'Nasıl Çalışır?', href: '/guvenli-takas' },
+      image: '/photos/colorful-car-toys.jpg',
+      imageRight: true,
+      requiresAuth: true,
     },
   ],
   en: [
@@ -41,9 +47,11 @@ const HERO_SLIDES = {
       title: "Turkey's Largest\nDiecast Marketplace",
       subtitle:
         'Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.',
-      cta1: { label: 'Create Collection', href: '/collections/new' },
+      cta1: { label: 'Explore Collections', href: '/collections' },
       cta2: { label: 'Browse Marketplace', href: '/listings' },
-      accent: 'from-primary-100/40 to-amber-100/30',
+      image: '/photos/colorful-car-toys.jpg',
+      imageRight: true,
+      requiresAuth: false,
     },
     {
       title: 'Premium Hot Wheels\nCollections',
@@ -51,15 +59,19 @@ const HERO_SLIDES = {
         'Fast & Furious, Formula 1 and more. Discover rare models.',
       cta1: { label: 'Explore Hot Wheels', href: '/listings?manufacturer=Hot Wheels' },
       cta2: { label: 'All Brands', href: '/listings' },
-      accent: 'from-red-100/30 to-primary-100/30',
+      image: '/photos/toy-cars-row-1.jpg',
+      imageRight: false,
+      requiresAuth: false,
     },
     {
       title: 'Secure Trading\nSystem',
       subtitle:
         'Trade your collections with other collectors safely. Protected system for both parties.',
       cta1: { label: 'Start Trading', href: '/trades' },
-      cta2: { label: 'How It Works?', href: '/help/trades' },
-      accent: 'from-blue-100/30 to-indigo-100/30',
+      cta2: { label: 'How It Works?', href: '/guvenli-takas' },
+      image: '/photos/colorful-car-toys.jpg',
+      imageRight: true,
+      requiresAuth: true,
     },
   ],
 };
@@ -73,7 +85,7 @@ export default function HeroSlider() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 6000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [slides.length]);
 
@@ -82,8 +94,53 @@ export default function HeroSlider() {
 
   const slide = slides[currentSlide];
 
+  const textContent = (
+    <motion.div
+      key={`text-${currentSlide}`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.15 }}
+    >
+      <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-heading font-display leading-[1.1] tracking-tight mb-5 whitespace-pre-line">
+        {slide.title}
+      </h1>
+      <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
+        {slide.subtitle}
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button variant="primary" size="md" href={slide.cta1.href}>
+          {slide.cta1.label}
+        </Button>
+        <Button variant="secondary" size="md" href={slide.cta2.href}>
+          {slide.cta2.label}
+        </Button>
+      </div>
+    </motion.div>
+  );
+
+  const imageContent = (
+    <motion.div
+      key={`img-${currentSlide}`}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.6, delay: 0.25 }}
+      className="relative hidden md:block aspect-[4/3] w-full max-w-2xl overflow-hidden border border-gray-200 bg-white" style={{borderRadius:'4px'}}
+    >
+      <Image
+        src={slide.image}
+        alt={locale === 'tr' ? 'Diecast model araç koleksiyonu' : 'Diecast model car collection'}
+        fill
+        sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
+        className="object-cover object-center"
+        priority
+        quality={90}
+        unoptimized={slide.image.startsWith('http')}
+      />
+    </motion.div>
+  );
+
   return (
-    <section className="relative overflow-hidden bg-surface">
+    <section className="relative overflow-hidden bg-white">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide}
@@ -92,47 +149,13 @@ export default function HeroSlider() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 lg:py-20 relative z-10">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              {/* Text Content */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.15 }}
-              >
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
-                  {slide.title}
-                </h1>
-                <p className="text-base md:text-lg text-muted mb-8 max-w-lg leading-relaxed">
-                  {slide.subtitle}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="primary" size="md" href={slide.cta1.href}>
-                    {slide.cta1.label}
-                  </Button>
-                  <Button variant="secondary" size="md" href={slide.cta2.href}>
-                    {slide.cta2.label}
-                  </Button>
-                </div>
-              </motion.div>
-
-              {/* Hero image: HD diecast collection */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.25 }}
-                className="relative hidden md:block aspect-[4/3] w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200/60 shadow-soft bg-white"
-              >
-                <Image
-                  src="/photos/colorful-car-toys.jpg"
-                  alt={locale === 'tr' ? 'Diecast model araç koleksiyonu' : 'Diecast model car collection'}
-                  fill
-                  sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
-                  className="object-cover object-center"
-                  priority
-                  quality={90}
-                />
-              </motion.div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20 lg:py-24 relative z-10">
+            <div className="grid md:grid-cols-2 gap-10 items-center">
+              {slide.imageRight ? (
+                <>{textContent}{imageContent}</>
+              ) : (
+                <>{imageContent}{textContent}</>
+              )}
             </div>
           </div>
         </motion.div>
@@ -141,17 +164,19 @@ export default function HeroSlider() {
       {/* Navigation Arrows */}
       <button
         onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-soft flex items-center justify-center transition-all duration-200 z-10"
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
+        style={{borderRadius:'4px'}}
         aria-label="Previous slide"
       >
-        <ChevronLeftIcon className="w-5 h-5 text-heading" />
+        <ChevronLeftIcon className="w-4 h-4 text-heading" />
       </button>
       <button
         onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-soft flex items-center justify-center transition-all duration-200 z-10"
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
+        style={{borderRadius:'4px'}}
         aria-label="Next slide"
       >
-        <ChevronRightIcon className="w-5 h-5 text-heading" />
+        <ChevronRightIcon className="w-4 h-4 text-heading" />
       </button>
 
       {/* Slide Indicators */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
@@ -67,32 +68,45 @@ const SCALES_MENU = {
 // Bar: Yeni Gelenler, Çok Satanlar, İndirimler, Ön Sipariş, Markalar, Üreticiler, Ölçek
 const CATEGORY_BAR_ITEMS = {
     tr: [
+        { label: 'Kategoriler', dropdown: 'categories' },
         { label: 'Yeni Gelenler', href: '/listings?sortBy=created_desc' },
         { label: 'Çok Satanlar', href: '/listings?sortBy=view_count_desc' },
         { label: 'İndirimler', href: '/listings?discountOnly=true' },
-        { label: 'Ön Sipariş', href: '/listings?preOrder=true' },
-        { label: 'Limited Edition', href: '/listings?limited=true' },
-        { label: 'Setler', href: '/listings?set=true' },
         { label: 'Koleksiyonlar', href: '/collections' },
         { label: 'Markalar', href: '/brands' },
-        { label: 'Üreticiler', dropdown: 'manufacturers' },
         { label: 'Ölçek', dropdown: 'scales' },
     ],
     en: [
+        { label: 'Categories', dropdown: 'categories' },
         { label: 'New Arrivals', href: '/listings?sortBy=created_desc' },
         { label: 'Best Sellers', href: '/listings?sortBy=view_count_desc' },
         { label: 'On Sale', href: '/listings?discountOnly=true' },
-        { label: 'Pre-Order', href: '/listings?preOrder=true' },
-        { label: 'Limited Edition', href: '/listings?limited=true' },
-        { label: 'Sets', href: '/listings?set=true' },
         { label: 'Collections', href: '/collections' },
         { label: 'Brands', href: '/brands' },
-        { label: 'Manufacturers', dropdown: 'manufacturers' },
         { label: 'Scale', dropdown: 'scales' },
     ],
 };
 
-type DropdownType = 'manufacturers' | 'scales' | null;
+const CATEGORIES_MENU = {
+    tr: {
+        title: 'KATEGORİLER',
+        vehicleTypes: [
+            'Sedan', 'SUV / Jeep', 'Spor / Süper', 'Pick-up / Kamyonet',
+            'Klasik / Vintage', 'Yarış Aracı', 'Kamyon / TIR', 'Otobüs / Minibüs',
+            'Motosiklet', 'İş Makinesi', 'Askeri Araç', 'Polis / İtfaiye',
+        ],
+    },
+    en: {
+        title: 'CATEGORIES',
+        vehicleTypes: [
+            'Sedan', 'SUV / Jeep', 'Sports / Super', 'Pick-up / Truck',
+            'Classic / Vintage', 'Race Car', 'Truck / Semi', 'Bus / Minibus',
+            'Motorcycle', 'Construction', 'Military', 'Police / Fire',
+        ],
+    },
+};
+
+type DropdownType = 'scales' | 'categories' | null;
 
 export default function CategoryNavBar() {
     const { locale } = useTranslation();
@@ -103,6 +117,7 @@ export default function CategoryNavBar() {
     const categoryItems = CATEGORY_BAR_ITEMS[locale as 'tr' | 'en'];
     const manufacturersMenu = MANUFACTURERS_MENU[locale as 'tr' | 'en'];
     const scalesMenu = SCALES_MENU[locale as 'tr' | 'en'];
+    const categoriesMenu = CATEGORIES_MENU[locale as 'tr' | 'en'];
 
     const handleMouseEnter = (dropdown: DropdownType) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -121,107 +136,131 @@ export default function CategoryNavBar() {
         };
     }, []);
 
-    return (
-        <nav ref={navRef} className="bg-surface-alt border-b border-gray-200 relative z-40">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
-                    {categoryItems.map((item, index) => (
-                        <div
-                            key={item.label}
-                            className="relative"
-                            onMouseEnter={() => item.dropdown ? handleMouseEnter(item.dropdown as DropdownType) : null}
-                            onMouseLeave={handleMouseLeave}
-                        >
-                            {item.href ? (
+    const dropdownPortal = typeof document !== 'undefined' ? createPortal(
+        <AnimatePresence>
+            {activeDropdown === 'scales' && (
+                <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed left-0 right-0 bg-white shadow-xl border-b border-gray-200"
+                    style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
+                    onMouseEnter={() => handleMouseEnter('scales')}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
+                        <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                            {scalesMenu.title}
+                        </h3>
+                        <div className="flex flex-wrap gap-2.5">
+                            {scalesMenu.items.map((scale) => (
                                 <Link
-                                    href={item.href}
-                                    className="nav-link-animated"
+                                    key={scale}
+                                    href={`/listings?scale=${encodeURIComponent(scale)}`}
+                                    className="px-4 py-2 bg-gray-50 border border-gray-200 hover:bg-orange-50 hover:border-orange-300 text-gray-700 hover:text-orange-600 text-sm font-medium transition-colors"
+                                    style={{ borderRadius: '4px' }}
                                 >
-                                    {item.label}
+                                    {scale}
                                 </Link>
-                            ) : (
-                                <button
-                                    className={`nav-link-animated flex items-center gap-1 ${activeDropdown === item.dropdown ? 'text-heading font-semibold' : ''}`}
-                                >
-                                    {item.label}
-                                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
-                                </button>
-                            )}
+                            ))}
                         </div>
-                    ))}
-                </div>
-            </div>
+                    </div>
+                </motion.div>
+            )}
 
-            {/* Dropdowns */}
-            <AnimatePresence>
-                {/* Manufacturers Dropdown */}
-                {activeDropdown === 'manufacturers' && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-[100]"
-                        onMouseEnter={() => handleMouseEnter('manufacturers')}
-                        onMouseLeave={handleMouseLeave}
-                    >
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                            <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
-                                {manufacturersMenu.title}
-                            </h3>
-                            <div className="grid grid-cols-4 gap-8">
-                                {manufacturersMenu.groups.map((group) => (
-                                    <div key={group.range}>
-                                        <h4 className="font-semibold text-gray-900 mb-3">{group.range}</h4>
-                                        <ul className="space-y-1">
-                                            {group.items.map((item) => (
-                                                <li key={item}>
-                                                    <Link
-                                                        href={`/listings?manufacturer=${encodeURIComponent(item)}`}
-                                                        className="text-sm text-gray-600 hover:text-orange-600 hover:underline"
-                                                    >
-                                                        {item}
-                                                    </Link>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                ))}
+            {activeDropdown === 'categories' && (
+                <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed left-0 right-0 bg-white shadow-xl border-b border-gray-200"
+                    style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
+                    onMouseEnter={() => handleMouseEnter('categories')}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
+                        <div className="grid grid-cols-2 gap-8">
+                            <div>
+                                <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                                    {locale === 'en' ? 'VEHICLE TYPES' : 'ARAÇ TÜRLERİ'}
+                                </h3>
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                                    {categoriesMenu.vehicleTypes.map((type) => (
+                                        <Link
+                                            key={type}
+                                            href={`/listings?category=${encodeURIComponent(type)}`}
+                                            className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
+                                        >
+                                            {type}
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    </motion.div>
-                )}
-
-                {/* Scales Dropdown */}
-                {activeDropdown === 'scales' && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-[100]"
-                        onMouseEnter={() => handleMouseEnter('scales')}
-                        onMouseLeave={handleMouseLeave}
-                    >
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                            <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
-                                {scalesMenu.title}
-                            </h3>
-                            <div className="flex flex-wrap gap-3">
-                                {scalesMenu.items.map((scale) => (
+                            <div>
+                                <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                                    {manufacturersMenu.title}
+                                </h3>
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                                    {manufacturersMenu.groups.flatMap(g => g.items).slice(0, 16).map((item) => (
+                                        <Link
+                                            key={item}
+                                            href={`/listings?manufacturer=${encodeURIComponent(item)}`}
+                                            className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
+                                        >
+                                            {item}
+                                        </Link>
+                                    ))}
                                     <Link
-                                        key={scale}
-                                        href={`/listings?scale=${encodeURIComponent(scale)}`}
-                                        className="px-4 py-2 bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 rounded-lg text-sm font-medium transition-colors"
+                                        href="/listings"
+                                        className="text-sm text-orange-500 font-semibold hover:text-orange-600 transition-colors py-1"
                                     >
-                                        {scale}
+                                        {locale === 'en' ? 'All Manufacturers →' : 'Tüm Üreticiler →'}
                                     </Link>
-                                ))}
+                                </div>
                             </div>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </nav>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>,
+        document.body
+    ) : null;
+
+    return (
+        <>
+            <nav ref={navRef} className="bg-orange-500 border-b border-orange-600 relative z-40">
+                <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
+                    <div className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
+                        {categoryItems.map((item) => (
+                            <div
+                                key={item.label}
+                                className="relative"
+                                onMouseEnter={() => item.dropdown ? handleMouseEnter(item.dropdown as DropdownType) : null}
+                                onMouseLeave={handleMouseLeave}
+                            >
+                                {item.href ? (
+                                    <Link
+                                        href={item.href}
+                                        className="whitespace-nowrap px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded"
+                                    >
+                                        {item.label}
+                                    </Link>
+                                ) : (
+                                    <button
+                                        className={`whitespace-nowrap px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded flex items-center gap-1 ${activeDropdown === item.dropdown ? 'text-white bg-white/10' : ''}`}
+                                    >
+                                        {item.label}
+                                        <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </nav>
+            {dropdownPortal}
+        </>
     );
 }

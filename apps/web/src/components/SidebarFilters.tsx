@@ -9,7 +9,7 @@ import {
     ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi } from '@/lib/api';
+import { categoriesApi, manufacturersApi } from '@/lib/api';
 
 interface Category {
     id: string;
@@ -25,6 +25,13 @@ interface FilterSection {
     items?: string[];
 }
 
+interface ManufacturerItem {
+    id: string;
+    name: string;
+    slug: string;
+    _count?: { products: number };
+}
+
 interface SidebarFiltersProps {
     filters: {
         brand: string;
@@ -36,6 +43,7 @@ interface SidebarFiltersProps {
         tradeOnly: boolean;
         category?: string;
         manufacturer?: string;
+        manufacturerId?: string;
         vehicleType?: string;
     };
     onFilterChange: (filters: any) => void;
@@ -72,8 +80,8 @@ const SCALES = [
     '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200',
 ];
 
-// Üreticiler
-const MANUFACTURERS = [
+// Üreticiler - API'den yüklenecek, bu liste sadece fallback
+const MANUFACTURERS_FALLBACK = [
     'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
     'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
     'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL',
@@ -103,11 +111,13 @@ export default function SidebarFilters({
         searchParams.get('categoryId')
     );
 
+    // Fetch manufacturers from API
+    const [manufacturerList, setManufacturerList] = useState<ManufacturerItem[]>([]);
+
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const response = await categoriesApi.findAll();
-                // Handle both array and { data: [...] } responses
                 const cats = Array.isArray(response.data) ? response.data : response.data.data || [];
                 setCategories(cats);
             } catch (error) {
@@ -115,6 +125,17 @@ export default function SidebarFilters({
             }
         };
         fetchCategories();
+
+        const fetchManufacturers = async () => {
+            try {
+                const response = await manufacturersApi.findAll();
+                const items = Array.isArray(response.data) ? response.data : response.data.data || [];
+                setManufacturerList(items);
+            } catch (error) {
+                console.error('Failed to fetch manufacturers:', error);
+            }
+        };
+        fetchManufacturers();
     }, []);
 
     // Sync selectedCategoryId with URL
@@ -181,11 +202,12 @@ export default function SidebarFilters({
         });
     };
 
-    const handleManufacturerChange = (manufacturer: string) => {
-        onFilterChange({
-            ...filters,
-            manufacturer: filters.manufacturer === manufacturer ? '' : manufacturer,
-        });
+    const handleManufacturerChange = (manufacturerId: string, manufacturerName: string) => {
+        if (filters.manufacturerId === manufacturerId) {
+            onFilterChange({ ...filters, manufacturerId: '', manufacturer: '' });
+        } else {
+            onFilterChange({ ...filters, manufacturerId, manufacturer: manufacturerName });
+        }
     };
 
     // Category change - update URL with categoryId
@@ -211,19 +233,21 @@ export default function SidebarFilters({
         brand.toLowerCase().includes(brandSearch.toLowerCase())
     );
 
-    const filteredManufacturers = MANUFACTURERS.filter(m =>
-        m.toLowerCase().includes(manufacturerSearch.toLowerCase())
-    );
+    const displayManufacturers = manufacturerList.length > 0
+        ? manufacturerList.filter(m => m.name.toLowerCase().includes(manufacturerSearch.toLowerCase()))
+        : MANUFACTURERS_FALLBACK
+            .filter(m => m.toLowerCase().includes(manufacturerSearch.toLowerCase()))
+            .map(name => ({ id: '', name, slug: name.toLowerCase().replace(/\s+/g, '-') }));
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+        <div className="bg-white rounded shadow-sm border border-gray-100 flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                     <FunnelIcon className="w-5 h-5 text-gray-600" />
                     <span className="font-semibold text-gray-900">{t('product.filters')}</span>
                     {activeFilterCount > 0 && (
-                        <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">
+                        <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-sm">
                             {activeFilterCount}
                         </span>
                     )}
@@ -266,7 +290,7 @@ export default function SidebarFilters({
                                         const newValue = filters.vehicleType === type.value ? '' : type.value;
                                         onFilterChange({ ...filters, vehicleType: newValue });
                                     }}
-                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors ${filters.vehicleType === type.value
+                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${filters.vehicleType === type.value
                                         ? 'bg-orange-100 text-orange-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
@@ -300,22 +324,23 @@ export default function SidebarFilters({
                                 placeholder={locale === 'en' ? 'Search brands...' : 'Marka ara...'}
                                 value={brandSearch}
                                 onChange={(e) => setBrandSearch(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 mb-2"
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
                             />
                             <div className="space-y-1">
                                 {filteredBrands.map((brand) => (
                                     <label
                                         key={brand}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${filters.brand === brand
+                                        className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.brand === brand
                                             ? 'bg-orange-100 text-orange-700'
                                             : 'text-gray-700 hover:bg-gray-50'
                                             }`}
                                     >
                                         <input
-                                            type="checkbox"
+                                            type="radio"
+                                            name="brand"
                                             checked={filters.brand === brand}
                                             onChange={() => handleBrandChange(brand)}
-                                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-400"
+                                            className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
                                         />
                                         <span className="text-sm">{brand}</span>
                                     </label>
@@ -346,7 +371,7 @@ export default function SidebarFilters({
                                 <button
                                     key={scale}
                                     onClick={() => handleScaleChange(scale)}
-                                    className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${filters.scale === scale
+                                    className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${filters.scale === scale
                                         ? 'bg-orange-500 text-white'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
@@ -379,7 +404,7 @@ export default function SidebarFilters({
                                 <button
                                     key={m.slug}
                                     onClick={() => handleMaterialChange(m.slug)}
-                                    className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded-lg transition-colors ${filters.material === m.slug
+                                    className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${filters.material === m.slug
                                         ? 'bg-orange-100 text-orange-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
@@ -413,26 +438,32 @@ export default function SidebarFilters({
                                 placeholder={locale === 'en' ? 'Search manufacturers...' : 'Üretici ara...'}
                                 value={manufacturerSearch}
                                 onChange={(e) => setManufacturerSearch(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 mb-2"
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
                             />
                             <div className="space-y-1">
-                                {filteredManufacturers.map((manufacturer) => (
-                                    <label
-                                        key={manufacturer}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${filters.manufacturer === manufacturer
-                                            ? 'bg-orange-100 text-orange-700'
-                                            : 'text-gray-700 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={filters.manufacturer === manufacturer}
-                                            onChange={() => handleManufacturerChange(manufacturer)}
-                                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-400"
-                                        />
-                                        <span className="text-sm">{manufacturer}</span>
-                                    </label>
-                                ))}
+                                {displayManufacturers.map((m) => {
+                                    const isSelected = m.id
+                                        ? filters.manufacturerId === m.id
+                                        : filters.manufacturer === m.name;
+                                    return (
+                                        <label
+                                            key={m.id || m.name}
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
+                                                ? 'bg-orange-100 text-orange-700'
+                                                : 'text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="manufacturer"
+                                                checked={isSelected}
+                                                onChange={() => handleManufacturerChange(m.id, m.name)}
+                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
+                                            />
+                                            <span className="text-sm">{m.name}</span>
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -458,7 +489,7 @@ export default function SidebarFilters({
                             {CONDITIONS.map((condition) => (
                                 <label
                                     key={condition.value}
-                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${filters.condition === condition.value
+                                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.condition === condition.value
                                         ? 'bg-orange-100 text-orange-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
@@ -500,7 +531,7 @@ export default function SidebarFilters({
                                     placeholder="Min ₺"
                                     value={filters.minPrice}
                                     onChange={(e) => onFilterChange({ ...filters, minPrice: e.target.value })}
-                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
+                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400"
                                 />
                                 <span className="text-gray-400 flex-shrink-0">-</span>
                                 <input
@@ -508,7 +539,7 @@ export default function SidebarFilters({
                                     placeholder="Max ₺"
                                     value={filters.maxPrice}
                                     onChange={(e) => onFilterChange({ ...filters, maxPrice: e.target.value })}
-                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
+                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400"
                                 />
                             </div>
                             {/* Quick price buttons */}
@@ -530,7 +561,7 @@ export default function SidebarFilters({
                                                     });
                                                 }
                                             }}
-                                            className={`px-2 py-1 text-xs rounded-md transition-colors ${isActive
+                                            className={`px-2 py-1 text-xs rounded transition-colors ${isActive
                                                 ? 'bg-orange-500 text-white'
                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                                 }`}
@@ -561,7 +592,7 @@ export default function SidebarFilters({
                     </button>
                     {!collapsedSections.options && (
                         <div className="mt-3">
-                            <label className="flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-gray-50">
                                 <input
                                     type="checkbox"
                                     checked={filters.tradeOnly}

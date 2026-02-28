@@ -134,14 +134,14 @@ model EmailVerificationToken {
 }
 
 model NewsletterSubscriber {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  newsletter     Boolean   @default(true) @map("newsletter")
-  promotions     Boolean   @default(true) @map("promotions")
-  unsubscribeToken String  @unique @map("unsubscribe_token")
-  unsubscribedAt DateTime? @map("unsubscribed_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  email            String    @unique
+  newsletter       Boolean   @default(true) @map("newsletter")
+  promotions       Boolean   @default(true) @map("promotions")
+  unsubscribeToken String    @unique @map("unsubscribe_token")
+  unsubscribedAt   DateTime? @map("unsubscribed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@index([email])
   @@index([unsubscribeToken])
@@ -342,6 +342,25 @@ model CarModel {
   @@map("car_models")
 }
 
+model Manufacturer {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  logo        String?
+  description String?
+  website     String?
+  country     String?
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  products    Product[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("manufacturers")
+}
+
 model Product {
   id                  String             @id @default(uuid())
   sellerId            String             @map("seller_id")
@@ -376,6 +395,7 @@ model Product {
   isSet               Boolean            @default(false) @map("is_set")
   releaseDate         DateTime?          @map("release_date")
   carModelId          String?            @map("car_model_id")
+  manufacturerId      String?            @map("manufacturer_id")
   cartItems           CartItem[]
   collectionItems     CollectionItem[]
   offers              Offer[]
@@ -388,6 +408,7 @@ model Product {
   brand               Brand?             @relation(fields: [brandId], references: [id])
   carModel            CarModel?          @relation(fields: [carModelId], references: [id])
   category            Category           @relation(fields: [categoryId], references: [id])
+  manufacturer        Manufacturer?      @relation(fields: [manufacturerId], references: [id])
   seller              User               @relation("SellerProducts", fields: [sellerId], references: [id])
   tradeItemsOffered   TradeItem[]        @relation("TradeItemProduct")
   wishlistItems       WishlistItem[]
@@ -395,6 +416,7 @@ model Product {
   @@index([sellerId])
   @@index([brandId])
   @@index([carModelId])
+  @@index([manufacturerId])
   @@index([status])
   @@index([isTradeEnabled])
   @@index([isPreorder])
@@ -468,15 +490,15 @@ model Trade {
 }
 
 model TradeItem {
-  id                   String   @id @default(uuid())
-  tradeId              String   @map("trade_id")
-  productId            String   @map("product_id")
-  side                 String
-  quantity             Int      @default(1)
-  valueAtTrade         Decimal  @map("value_at_trade") @db.Decimal(10, 2)
-  createdAt            DateTime @default(now()) @map("created_at")
-  trade                Trade   @relation("TradeItems", fields: [tradeId], references: [id], onDelete: Cascade, map: "trade_initiator_items_fk")
-  product              Product  @relation("TradeItemProduct", fields: [productId], references: [id])
+  id           String   @id @default(uuid())
+  tradeId      String   @map("trade_id")
+  productId    String   @map("product_id")
+  side         String
+  quantity     Int      @default(1)
+  valueAtTrade Decimal  @map("value_at_trade") @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+  trade        Trade    @relation("TradeItems", fields: [tradeId], references: [id], onDelete: Cascade, map: "trade_initiator_items_fk")
+  product      Product  @relation("TradeItemProduct", fields: [productId], references: [id])
 
   @@index([tradeId])
   @@index([productId])

@@ -67,14 +67,16 @@ const nextConfig = {
         hostname: 'autopartia.com',
       },
       {
-        // AWS S3 presigned URL'ler (amzn-tarodan bucket)
         protocol: 'https',
         hostname: 'amzn-tarodan.s3.eu-west-1.amazonaws.com',
       },
       {
-        // AWS S3 presigned URL'ler (alternatif format)
         protocol: 'https',
         hostname: 's3.eu-west-1.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
       },
     ],
     dangerouslyAllowSVG: true,

@@ -16,36 +16,50 @@ export class SearchController {
   constructor(
     private readonly searchService: SearchService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
-  /**
-   * Search products (public)
-   * GET /search/products
-   */
   @Public()
   @Get('products')
   async searchProducts(
     @Query('q') query: string,
     @Query('categoryId') categoryId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('manufacturerId') manufacturerId?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('condition') condition?: string,
     @Query('brand') brand?: string,
     @Query('scale') scale?: string,
+    @Query('material') material?: string,
     @Query('manufacturer') manufacturer?: string,
+    @Query('tradeOnly') tradeOnly?: string,
+    @Query('discountOnly') discountOnly?: string,
+    @Query('preOrder') preOrder?: string,
+    @Query('limited') limited?: string,
+    @Query('set') setFilter?: string,
+    @Query('vehicleType') vehicleType?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
-    @Query('sortBy') sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest',
+    @Query('sortBy') sortBy?: string,
   ): Promise<SearchResponse> {
     const options: SearchOptions = {
       query: query || '',
       categoryId,
+      brandId,
+      manufacturerId,
       minPrice: minPrice ? parseFloat(minPrice) : undefined,
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
       condition,
       brand,
       scale,
+      material,
       manufacturer,
+      tradeOnly: tradeOnly === 'true',
+      discountOnly: discountOnly === 'true',
+      preOrder: preOrder === 'true',
+      limited: limited === 'true',
+      set: setFilter === 'true',
+      vehicleType,
       page: page ? parseInt(page) : 1,
       pageSize: pageSize ? parseInt(pageSize) : 20,
       sortBy,
@@ -54,10 +68,6 @@ export class SearchController {
     return this.searchService.searchProducts(options);
   }
 
-  /**
-   * Autocomplete suggestions (public)
-   * GET /search/autocomplete
-   */
   @Public()
   @Get('autocomplete')
   async autocomplete(
@@ -71,10 +81,6 @@ export class SearchController {
     return { suggestions };
   }
 
-  /**
-   * Reindex all products (Admin)
-   * POST /search/admin/reindex
-   */
   @Post('admin/reindex')
   @Roles(AdminRole.admin, AdminRole.super_admin)
   async reindexAll(): Promise<{ indexed: number }> {
@@ -82,10 +88,6 @@ export class SearchController {
     return { indexed };
   }
 
-  /**
-   * Index a single product (Admin)
-   * POST /search/admin/index/:productId
-   */
   @Post('admin/index/:productId')
   @Roles(AdminRole.admin, AdminRole.super_admin)
   async indexProduct(
@@ -95,62 +97,23 @@ export class SearchController {
     return { success: true };
   }
 
-  /**
-   * Reindex all products (Development only)
-   * GET /search/dev/reindex
-   * Only works in development mode for easy testing
-   */
   @Public()
   @Get('dev/reindex')
   async devReindex(): Promise<{ indexed: number; message: string }> {
     const isDev = this.configService.get('NODE_ENV') === 'development';
-
     if (!isDev) {
       return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
     }
-
     const indexed = await this.searchService.reindexAll();
     return {
       indexed,
-      message: `${indexed} ürün Elasticsearch'e index'lendi. Artık "hotw" veya "hxt wheels" gibi aramalar çalışacak.`
+      message: `${indexed} ürün Elasticsearch'e index'lendi.`,
     };
   }
 
-  /**
-   * Get search index status
-   * GET /search/status
-   */
   @Public()
   @Get('status')
-  async getStatus(): Promise<{
-    elasticsearch: boolean;
-    indexExists: boolean;
-    documentCount: number;
-    message: string;
-  }> {
-    try {
-      // This will test if ES is reachable and index exists
-      const result = await this.searchService.searchProducts({
-        query: '',
-        page: 1,
-        pageSize: 1
-      });
-
-      return {
-        elasticsearch: true,
-        indexExists: true,
-        documentCount: result.total,
-        message: result.total > 0
-          ? `Elasticsearch çalışıyor, ${result.total} ürün index'li`
-          : 'Elasticsearch çalışıyor ama index boş. /search/dev/reindex çağırın.',
-      };
-    } catch (error) {
-      return {
-        elasticsearch: false,
-        indexExists: false,
-        documentCount: 0,
-        message: `Elasticsearch bağlantı hatası: ${error.message}`,
-      };
-    }
+  async getStatus() {
+    return this.searchService.getStatus();
   }
 }

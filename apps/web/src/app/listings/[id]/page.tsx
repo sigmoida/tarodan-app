@@ -47,7 +47,6 @@ const ReportModal = dynamic(
 );
 import { HeartIcon as HeartOutlineIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
-import TrustBadges from '@/components/home/TrustBadges';
 
 interface ProductImage {
   id?: string;
@@ -755,7 +754,7 @@ export default function ListingDetailPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="animate-pulse">
             <div className="grid lg:grid-cols-2 gap-8">
-              <div className="aspect-square bg-gray-200 rounded-2xl" />
+              <div className="aspect-square bg-gray-200 rounded" />
               <div className="space-y-4">
                 <div className="h-8 bg-gray-200 rounded w-3/4" />
                 <div className="h-6 bg-gray-200 rounded w-1/2" />
@@ -818,7 +817,7 @@ export default function ListingDetailPage() {
             {/* Küçük Resim + Büyüteç */}
             <div
               ref={setImageContainerRef}
-              className="relative aspect-square bg-white rounded-2xl overflow-visible shadow-sm cursor-zoom-in"
+              className="relative aspect-square bg-white rounded overflow-visible shadow-sm cursor-zoom-in"
               onClick={() => openLightbox(activeImageIndex)}
               onMouseMove={handleMagnifierMouseMove}
               onMouseLeave={handleMagnifierMouseLeave}
@@ -827,7 +826,7 @@ export default function ListingDetailPage() {
                 src={images[activeImageIndex]}
                 alt={listing.title}
                 fill
-                className="object-cover rounded-2xl"
+                className="object-cover rounded"
                 fallbackSrc="https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün"
                 logContext={{ listingId: listing.id, page: 'listing-detail-main' }}
                 priority
@@ -892,7 +891,7 @@ export default function ListingDetailPage() {
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="absolute left-full top-0 ml-4 w-full aspect-square bg-white rounded-2xl overflow-hidden shadow-2xl hidden md:block z-50"
+                className="absolute left-full top-0 ml-4 w-full aspect-square bg-white rounded overflow-hidden shadow-2xl hidden md:block z-50"
                 style={{ maxWidth: '600px' }}
               >
                 <div
@@ -916,7 +915,7 @@ export default function ListingDetailPage() {
                   e.stopPropagation();
                   open360View();
                 }}
-                className={`flex-shrink-0 w-20 h-20 rounded-lg flex flex-col items-center justify-center transition-all shadow-md ${images.length > 1
+                className={`flex-shrink-0 w-20 h-20 rounded flex flex-col items-center justify-center transition-all shadow-md ${images.length > 1
                   ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
@@ -934,7 +933,7 @@ export default function ListingDetailPage() {
                     setActiveImageIndex(index);
                     openLightbox(index);
                   }}
-                  className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
+                  className={`relative w-20 h-20 rounded overflow-hidden flex-shrink-0 border-2 transition-colors ${index === activeImageIndex ? 'border-orange-500' : 'border-transparent'
                     }`}
                 >
                   <OptimizedImage src={img} alt="" fill className="object-cover" logContext={{ page: 'listing-detail-thumb' }} />
@@ -1045,7 +1044,7 @@ export default function ListingDetailPage() {
                           setZoomLevel(1);
                           setPanPosition({ x: 0, y: 0 });
                         }}
-                        className={`relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${index === lightboxImageIndex
+                        className={`relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border-2 transition-colors ${index === lightboxImageIndex
                           ? 'border-orange-500'
                           : 'border-white/20 hover:border-white/40'
                           }`}
@@ -1064,7 +1063,7 @@ export default function ListingDetailPage() {
 
                 {/* Image Counter */}
                 {images.length > 1 && (
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded text-white text-sm">
                     {lightboxImageIndex + 1} / {images.length}
                   </div>
                 )}
@@ -1106,7 +1105,7 @@ export default function ListingDetailPage() {
                 </div>
 
                 {/* Main Image */}
-                <div className="relative aspect-square bg-gray-900 rounded-2xl overflow-hidden mb-4">
+                <div className="relative aspect-square bg-gray-900 rounded overflow-hidden mb-4">
                   <OptimizedImage
                     src={images[view360Index]}
                     alt={`${listing.title} - ${view360Index + 1}`}
@@ -1137,7 +1136,7 @@ export default function ListingDetailPage() {
                         <button
                           key={index}
                           onClick={() => setView360Index(index)}
-                          className={`h-1.5 flex-1 rounded-full transition-all ${index === view360Index ? 'bg-orange-500' : 'bg-white/30 hover:bg-white/50'
+                          className={`h-1.5 flex-1 rounded-sm transition-all ${index === view360Index ? 'bg-orange-500' : 'bg-white/30 hover:bg-white/50'
                             }`}
                         />
                       ))}
@@ -1149,7 +1148,7 @@ export default function ListingDetailPage() {
                 <div className="flex items-center justify-center gap-4">
                   <button
                     onClick={toggle360Play}
-                    className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-semibold transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded font-semibold transition-colors"
                   >
                     {is360Playing ? (
                       <>
@@ -1175,7 +1174,7 @@ export default function ListingDetailPage() {
           <div>
             {/* Sold/Out of Stock Banner */}
             {listing.status === 'sold' && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+              <div className="bg-red-50 border border-red-200 rounded p-4 mb-4 flex items-center gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                   <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1194,7 +1193,7 @@ export default function ListingDetailPage() {
                   {listing.title}
                 </h1>
                 {listing.status === 'sold' && (
-                  <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded-full">
+                  <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded">
                     {t('product.sold')}
                   </span>
                 )}
@@ -1202,7 +1201,7 @@ export default function ListingDetailPage() {
               <div className="flex gap-2">
                 <button
                   onClick={handleToggleFavorite}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  className="p-2 rounded hover:bg-gray-100 transition-colors"
                   title="Favorilere Ekle"
                 >
                   {isFavorite ? (
@@ -1214,7 +1213,7 @@ export default function ListingDetailPage() {
                 <div className="relative">
                   <button
                     onClick={handleShare}
-                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded hover:bg-gray-100 transition-colors"
                     title="Paylaş"
                   >
                     <ShareIcon className="w-6 h-6 text-gray-400" />
@@ -1222,7 +1221,7 @@ export default function ListingDetailPage() {
 
                   {/* Share Dropdown */}
                   {showShareMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded shadow-lg border border-gray-200 py-2 z-50">
                       <button
                         onClick={() => shareToSocial('whatsapp')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
@@ -1285,7 +1284,7 @@ export default function ListingDetailPage() {
                       setShowReportModal(true);
                     }
                   }}
-                  className="p-2 rounded-full hover:bg-red-50 transition-colors"
+                  className="p-2 rounded hover:bg-red-50 transition-colors"
                   title={t('product.reportListing')}
                 >
                   <FlagIcon className="w-6 h-6 text-gray-400 hover:text-red-500" />
@@ -1325,7 +1324,7 @@ export default function ListingDetailPage() {
             </div>
 
             {/* Quick Info - Özet özellikler, tekrarsız */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-5 bg-white rounded shadow-sm border border-gray-100 mb-6">
               {listing.brand && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.brand')}</p>
@@ -1371,9 +1370,9 @@ export default function ListingDetailPage() {
             </div>
 
             {/* Description & Details Tabbed Layout would be better, but listing details below description is fine */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+            <div className="bg-white rounded p-6 shadow-sm border border-gray-100 mb-6">
               <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <span className="w-1 h-5 bg-orange-500 rounded-full" aria-hidden />
+                <span className="w-1 h-5 bg-orange-500 rounded-sm" aria-hidden />
                 {t('product.description')}
               </h2>
               <div className="prose prose-sm max-w-none text-gray-600 whitespace-pre-line leading-relaxed">
@@ -1384,7 +1383,7 @@ export default function ListingDetailPage() {
               {(listing.attributes?.filter((a) => (a.group !== 'scale' && a.group !== 'material' && a.group !== 'Malzeme'))?.length ?? 0) > 0 || listing.carModel ? (
                 <div className="border-t pt-6 mt-6">
                   <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <span className="w-1 h-5 bg-blue-500 rounded-full" aria-hidden />
+                    <span className="w-1 h-5 bg-blue-500 rounded-sm" aria-hidden />
                     {locale === 'en' ? 'Technical details' : 'Teknik özellikler'}
                   </h3>
                   <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
@@ -1409,7 +1408,7 @@ export default function ListingDetailPage() {
 
             {/* Seller Info */}
             {listing.seller && (
-              <div className="bg-white rounded-xl p-4 mb-6">
+              <div className="bg-white rounded p-4 mb-6">
                 <div className="flex items-center gap-4">
                   {isAuthenticated ? (
                     <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
@@ -1509,7 +1508,7 @@ export default function ListingDetailPage() {
 
             {/* Product Status Banner */}
             {listing.status && listing.status !== 'active' && (
-              <div className={`rounded-xl p-4 mb-4 ${listing.status === 'reserved'
+              <div className={`rounded p-4 mb-4 ${listing.status === 'reserved'
                 ? 'bg-yellow-50 border border-yellow-200'
                 : listing.status === 'sold'
                   ? 'bg-red-50 border border-red-200'
@@ -1548,7 +1547,7 @@ export default function ListingDetailPage() {
             <div className="space-y-3">
               {/* Owner Notice */}
               {isOwner && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                <div className="bg-blue-50 border border-blue-200 rounded p-4 text-center">
                   <p className="text-blue-800 font-medium">
                     {locale === 'en' ? 'This is your listing' : 'Bu sizin ilanınız'}
                   </p>
@@ -1593,7 +1592,7 @@ export default function ListingDetailPage() {
                   disabled={listing.status !== 'active'}
                   className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${listing.status === 'active'
                     ? 'btn-primary'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-xl'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
                     }`}
                 >
                   <BoltIcon className="w-6 h-6" />
@@ -1627,7 +1626,7 @@ export default function ListingDetailPage() {
                         router.push(`/trades/new?listing=${listing.id}`);
                       }}
                       disabled={listing.status !== 'active'}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
                         }`}
                     >
                       <ArrowsRightLeftIcon className="w-5 h-5" />
@@ -1638,7 +1637,7 @@ export default function ListingDetailPage() {
                     onClick={handleMakeOffer}
                     disabled={listing.status !== 'active'}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status !== 'active'
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
                       : 'btn-secondary'
                       }`}
                   >
@@ -1649,7 +1648,7 @@ export default function ListingDetailPage() {
                     onClick={handleCartToggle}
                     disabled={isAddingToCart || listing.status !== 'active'}
                     className={`flex-1 flex items-center justify-center gap-2 ${listing.status !== 'active'
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-2'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded py-2'
                       : isInCart
                         ? 'btn-secondary bg-red-50 border-red-200 text-red-600'
                         : 'btn-secondary'
@@ -1684,14 +1683,9 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      {/* Trust Badges */}
-      <div className="mt-8 border-t border-gray-100 pt-8">
-        <TrustBadges />
-      </div>
-
       {/* Product Reviews Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
+        <div className="bg-white rounded shadow-sm p-6 md:p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
               {t('product.productReviews')}
@@ -1724,7 +1718,7 @@ export default function ListingDetailPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
             </div>
           ) : reviews.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-xl">
+            <div className="text-center py-12 bg-gray-50 rounded">
               <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-medium text-gray-900 mb-2">
                 {t('product.noReviews')}
@@ -1788,7 +1782,7 @@ export default function ListingDetailPage() {
       {/* Add to Collection Modal */}
       {showCollectionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
+          <div className="bg-white rounded p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
             <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addToCollection')}</h2>
 
             {loadingCollections ? (
@@ -1804,7 +1798,7 @@ export default function ListingDetailPage() {
                         key={collection.id}
                         onClick={() => handleAddToCollection(collection.id)}
                         disabled={addingToCollection}
-                        className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <h3 className="font-medium text-gray-900">{collection.name}</h3>
                         {collection.description && (
@@ -1825,7 +1819,7 @@ export default function ListingDetailPage() {
                       setShowCollectionModal(false);
                       router.push('/collections');
                     }}
-                    className="w-full p-4 bg-orange-50 hover:bg-orange-100 border-2 border-dashed border-orange-300 rounded-lg transition-colors text-orange-700 font-medium"
+                    className="w-full p-4 bg-orange-50 hover:bg-orange-100 border-2 border-dashed border-orange-300 rounded transition-colors text-orange-700 font-medium"
                   >
                     + {t('collection.createNewCollection')}
                   </button>
@@ -1836,7 +1830,7 @@ export default function ListingDetailPage() {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <button
                 onClick={() => setShowCollectionModal(false)}
-                className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
+                className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors font-medium"
               >
                 {t('common.cancel')}
               </button>
@@ -1869,7 +1863,7 @@ export default function ListingDetailPage() {
       {/* Offer Modal */}
       {showOfferModal && listing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">{t('product.makeOffer')}</h2>
               <button
@@ -1904,7 +1898,7 @@ export default function ListingDetailPage() {
                   placeholder={locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'}
                   min={Math.round(effectivePrice * 0.5)}
                   max={Math.max(0, Math.round(effectivePrice) - 1)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
@@ -1918,7 +1912,7 @@ export default function ListingDetailPage() {
                   placeholder={locale === 'en' ? 'Message you want to send to seller...' : 'Satıcıya iletmek istediğiniz mesaj...'}
                   rows={4}
                   maxLength={500}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   {offerMessage.length}/500 {locale === 'en' ? 'characters' : 'karakter'}
@@ -1928,14 +1922,14 @@ export default function ListingDetailPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowOfferModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleSubmitOffer}
                   disabled={isSubmittingOffer || !offerAmount}
-                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {isSubmittingOffer ? t('common.sending') : t('product.sendOffer')}
                 </button>
@@ -1951,7 +1945,7 @@ export default function ListingDetailPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl max-w-md w-full p-6 text-center"
+            className="bg-white rounded max-w-md w-full p-6 text-center"
           >
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <ArrowsRightLeftIcon className="w-8 h-8 text-amber-600" />
@@ -1965,13 +1959,13 @@ export default function ListingDetailPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowTradeModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors"
               >
                 {t('common.cancel')}
               </button>
               <Link
                 href="/membership"
-                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors text-center"
+                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded font-medium hover:bg-orange-600 transition-colors text-center"
               >
                 {t('membership.upgrade')}
               </Link>

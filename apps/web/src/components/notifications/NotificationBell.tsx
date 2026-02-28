@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BellIcon } from '@heroicons/react/24/outline';
+import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -76,6 +76,19 @@ export default function NotificationBell() {
       ]);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to mark as read:', error);
+    }
+  };
+
+  const dismissNotification = async (id: string) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+        queryClient.invalidateQueries({ queryKey: ['notifications-bell'] }),
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      ]);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to dismiss:', error);
     }
   };
 
@@ -163,47 +176,61 @@ export default function NotificationBell() {
               ) : (
                 <div className="divide-y divide-gray-50">
                   {notifications.map((notification) => (
-                    <Link
+                    <div
                       key={notification.id}
-                      href={notification.link || notification.data?.link || '/notifications'}
-                      onClick={() => {
-                        if (!notification.isRead) {
-                          markAsRead(notification.id);
-                        }
-                        setShowDropdown(false);
-                      }}
-                      className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${
+                      className={`relative group px-4 py-3 hover:bg-gray-50 transition-colors ${
                         !notification.isRead ? 'bg-orange-50/50' : ''
                       }`}
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="text-lg flex-shrink-0">
-                          {notification.icon || notification.data?.icon || '🔔'}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={`text-sm ${
-                                !notification.isRead
-                                  ? 'font-semibold text-gray-900'
-                                  : 'font-medium text-gray-700'
-                              }`}
-                            >
-                              {notification.title}
+                      <Link
+                        href={notification.link || notification.data?.link || '/notifications'}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            markAsRead(notification.id);
+                          }
+                          setShowDropdown(false);
+                        }}
+                        className="block"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg flex-shrink-0">
+                            {notification.icon || notification.data?.icon || '🔔'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p
+                                className={`text-sm ${
+                                  !notification.isRead
+                                    ? 'font-semibold text-gray-900'
+                                    : 'font-medium text-gray-700'
+                                }`}
+                              >
+                                {notification.title}
+                              </p>
+                              <span className="text-xs text-gray-400 flex-shrink-0">
+                                {getTimeAgo(notification.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                              {notification.message}
                             </p>
-                            <span className="text-xs text-gray-400 flex-shrink-0">
-                              {getTimeAgo(notification.createdAt)}
-                            </span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                            {notification.message}
-                          </p>
+                          {!notification.isRead && (
+                            <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0 mt-1.5"></span>
+                          )}
                         </div>
-                        {!notification.isRead && (
-                          <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0 mt-1.5"></span>
-                        )}
-                      </div>
-                    </Link>
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismissNotification(notification.id);
+                        }}
+                        className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={locale === 'en' ? 'Dismiss' : 'Kapat'}
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

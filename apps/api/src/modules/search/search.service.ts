@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
 import { ProductStatus } from '@prisma/client';
@@ -16,24 +17,39 @@ export interface ProductSearchResult {
   price: number;
   condition: string;
   status: string;
+  categoryId?: string;
   categoryName: string;
+  brandId?: string;
+  brandName?: string;
+  manufacturerId?: string;
+  manufacturerName?: string;
   sellerName: string;
   imageUrl?: string;
   score: number;
 }
 
 export interface SearchOptions {
-  query: string;
+  query?: string;
   categoryId?: string;
+  brandId?: string;
+  manufacturerId?: string;
   minPrice?: number;
   maxPrice?: number;
   condition?: string;
   brand?: string;
   scale?: string;
+  material?: string;
   manufacturer?: string;
+  tradeOnly?: boolean;
+  discountOnly?: boolean;
+  preOrder?: boolean;
+  limited?: boolean;
+  set?: boolean;
+  vehicleType?: string;
+  sellerId?: string;
   page?: number;
   pageSize?: number;
-  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest';
+  sortBy?: string;
 }
 
 export interface SearchResponse {
@@ -41,7 +57,7 @@ export interface SearchResponse {
   total: number;
   page: number;
   pageSize: number;
-  took: number; // milliseconds
+  took: number;
 }
 
 @Injectable()
@@ -49,14 +65,14 @@ export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
   private client: Client;
   private readonly PRODUCTS_INDEX = 'products';
+  private esAvailable = false;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
-    // Initialize Elasticsearch client
     const node = this.configService.get(
       'ELASTICSEARCH_NODE',
       'http://localhost:9200',
@@ -70,13 +86,13 @@ export class SearchService implements OnModuleInit {
       },
     });
 
-    // Initialize index
     await this.ensureIndexExists();
   }
 
-  /**
-   * Ensure products index exists with proper mapping
-   */
+  isAvailable(): boolean {
+    return this.esAvailable;
+  }
+
   private async ensureIndexExists(): Promise<void> {
     try {
       const indexExists = await this.client.indices.exists({
@@ -84,13 +100,11 @@ export class SearchService implements OnModuleInit {
       });
 
       if (!indexExists) {
-        // ES 8.x API: settings and mappings go directly (no body wrapper)
         await this.client.indices.create({
           index: this.PRODUCTS_INDEX,
           settings: {
             number_of_shards: 1,
             number_of_replicas: 0,
-            // Allow larger ngram difference for better partial matching
             max_ngram_diff: 13,
             analysis: {
               analyzer: {
@@ -99,19 +113,16 @@ export class SearchService implements OnModuleInit {
                   tokenizer: 'standard',
                   filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
                 },
-                // Edge ngram analyzer for autocomplete (matches from beginning of words)
                 turkish_edge_ngram: {
                   type: 'custom',
                   tokenizer: 'edge_ngram_tokenizer',
                   filter: ['lowercase', 'asciifolding'],
                 },
-                // Ngram analyzer for partial matching (matches anywhere in word)
                 turkish_ngram: {
                   type: 'custom',
                   tokenizer: 'ngram_tokenizer',
                   filter: ['lowercase', 'asciifolding'],
                 },
-                // Search analyzer (for query time)
                 turkish_search: {
                   type: 'custom',
                   tokenizer: 'standard',
@@ -133,18 +144,9 @@ export class SearchService implements OnModuleInit {
                 },
               },
               filter: {
-                turkish_stop: {
-                  type: 'stop',
-                  stopwords: '_turkish_',
-                },
-                turkish_stemmer: {
-                  type: 'stemmer',
-                  language: 'turkish',
-                },
-                asciifolding: {
-                  type: 'asciifolding',
-                  preserve_original: true,
-                },
+                turkish_stop: { type: 'stop', stopwords: '_turkish_' },
+                turkish_stemmer: { type: 'stemmer', language: 'turkish' },
+                asciifolding: { type: 'asciifolding', preserve_original: true },
               },
             },
           },
@@ -157,13 +159,11 @@ export class SearchService implements OnModuleInit {
                 search_analyzer: 'turkish_search',
                 fields: {
                   keyword: { type: 'keyword' },
-                  // Edge ngram field for autocomplete/prefix matching
                   edge_ngram: {
                     type: 'text',
                     analyzer: 'turkish_edge_ngram',
                     search_analyzer: 'turkish_search',
                   },
-                  // Ngram field for partial matching anywhere in word
                   ngram: {
                     type: 'text',
                     analyzer: 'turkish_ngram',
@@ -183,6 +183,7 @@ export class SearchService implements OnModuleInit {
                 },
               },
               price: { type: 'float' },
+              oldPrice: { type: 'float' },
               condition: { type: 'keyword' },
               status: { type: 'keyword' },
               categoryId: { type: 'keyword' },
@@ -198,19 +199,57 @@ export class SearchService implements OnModuleInit {
                   },
                 },
               },
+              brandId: { type: 'keyword' },
+              brandName: {
+                type: 'text',
+                analyzer: 'turkish',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              manufacturerId: { type: 'keyword' },
+              manufacturerName: {
+                type: 'text',
+                analyzer: 'turkish',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              carModelId: { type: 'keyword' },
+              carModelName: {
+                type: 'text',
+                fields: { keyword: { type: 'keyword' } },
+              },
               sellerId: { type: 'keyword' },
               sellerName: { type: 'keyword' },
               imageUrl: { type: 'keyword' },
+              scale: { type: 'keyword' },
+              material: { type: 'keyword' },
               isTradeEnabled: { type: 'boolean' },
+              isPreorder: { type: 'boolean' },
+              isLimited: { type: 'boolean' },
+              isSet: { type: 'boolean' },
+              quantity: { type: 'integer' },
               createdAt: { type: 'date' },
               updatedAt: { type: 'date' },
             },
           },
         });
-        this.logger.log('Created Elasticsearch index: products with ngram analyzers');
+        this.logger.log('Created Elasticsearch index with extended mappings');
       }
 
-      // Update index tracking in DB
+      this.esAvailable = true;
+
       await this.prisma.searchIndex.upsert({
         where: { indexName: this.PRODUCTS_INDEX },
         update: { status: 'active' },
@@ -221,24 +260,37 @@ export class SearchService implements OnModuleInit {
         },
       });
     } catch (error) {
-      this.logger.warn('Elasticsearch index creation failed');
-      // Don't throw - allow app to start without ES
+      this.esAvailable = false;
+      this.logger.warn('Elasticsearch index creation failed – app will use PostgreSQL fallback');
     }
   }
 
-  /**
-   * Search products
-   */
+  // ──────────────────────────── Search ────────────────────────────
+
   async searchProducts(options: SearchOptions): Promise<SearchResponse> {
+    if (!this.esAvailable) {
+      return this.fallbackSearch(options);
+    }
+
     const {
       query,
       categoryId,
+      brandId,
+      manufacturerId,
       minPrice,
       maxPrice,
       condition,
       brand,
       scale,
+      material,
       manufacturer,
+      tradeOnly,
+      discountOnly,
+      preOrder,
+      limited,
+      set: setFilter,
+      vehicleType,
+      sellerId,
       page = 1,
       pageSize = 20,
       sortBy = 'relevance',
@@ -247,91 +299,34 @@ export class SearchService implements OnModuleInit {
     const must: any[] = [];
     const filter: any[] = [];
 
-    // Text search with ngram support for partial matching
+    // Text search
     if (query) {
       must.push({
         bool: {
           should: [
-            // Exact match on title gets highest boost
-            {
-              match: {
-                title: {
-                  query,
-                  boost: 5,
-                },
-              },
-            },
-            // Edge ngram for prefix matching (e.g., "hot" -> "Hot Wheels")
-            {
-              match: {
-                'title.edge_ngram': {
-                  query,
-                  boost: 3,
-                },
-              },
-            },
-            // Ngram for partial matching (e.g., "wheel" in "Hotwheels")
-            {
-              match: {
-                'title.ngram': {
-                  query,
-                  boost: 2,
-                },
-              },
-            },
-            // Description matching
-            {
-              match: {
-                description: {
-                  query,
-                  boost: 1,
-                },
-              },
-            },
-            {
-              match: {
-                'description.edge_ngram': {
-                  query,
-                  boost: 0.5,
-                },
-              },
-            },
-            // Category name matching
-            {
-              match: {
-                categoryName: {
-                  query,
-                  boost: 2,
-                },
-              },
-            },
-            {
-              match: {
-                'categoryName.edge_ngram': {
-                  query,
-                  boost: 1,
-                },
-              },
-            },
-            // Fuzzy match for typos (e.g., "hxt wheels" → "hot wheels")
+            { match: { title: { query, boost: 5 } } },
+            { match: { 'title.edge_ngram': { query, boost: 3 } } },
+            { match: { 'title.ngram': { query, boost: 2 } } },
+            { match: { description: { query, boost: 1 } } },
+            { match: { 'description.edge_ngram': { query, boost: 0.5 } } },
+            { match: { categoryName: { query, boost: 2 } } },
+            { match: { 'categoryName.edge_ngram': { query, boost: 1 } } },
+            { match: { brandName: { query, boost: 2 } } },
+            { match: { 'brandName.edge_ngram': { query, boost: 1 } } },
+            { match: { manufacturerName: { query, boost: 2 } } },
+            { match: { 'manufacturerName.edge_ngram': { query, boost: 1 } } },
             {
               multi_match: {
                 query,
-                fields: ['title^3', 'description', 'categoryName^2'],
-                fuzziness: 2, // Allow up to 2 character edits
-                prefix_length: 1, // First character must match
+                fields: ['title^3', 'description', 'categoryName^2', 'brandName^2', 'manufacturerName^2'],
+                fuzziness: 2,
+                prefix_length: 1,
                 boost: 1.5,
               },
             },
-            // More aggressive fuzzy for very short queries
             {
               fuzzy: {
-                title: {
-                  value: query.toLowerCase(),
-                  fuzziness: 'AUTO',
-                  prefix_length: 1,
-                  boost: 1,
-                },
+                title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1 },
               },
             },
           ],
@@ -340,24 +335,24 @@ export class SearchService implements OnModuleInit {
       });
     }
 
-    // Status filter - only active products
+    // Always active only
     filter.push({ term: { status: ProductStatus.active } });
+    filter.push({ bool: { must_not: { prefix: { id: 'membership-' } } } });
 
-    // Exclude membership virtual products (used only for payment processing)
-    filter.push({
-      bool: {
-        must_not: {
-          prefix: { id: 'membership-' },
-        },
-      },
-    });
+    // ID-based filters (keyword exact match)
+    if (categoryId) filter.push({ term: { categoryId } });
+    if (brandId) filter.push({ term: { brandId } });
+    if (manufacturerId) filter.push({ term: { manufacturerId } });
+    if (sellerId) filter.push({ term: { sellerId } });
+    if (condition) filter.push({ term: { condition } });
 
-    // Category filter
-    if (categoryId) {
-      filter.push({ term: { categoryId } });
-    }
+    // Scale filter – exact keyword match (e.g. "1:18")
+    if (scale) filter.push({ term: { scale } });
 
-    // Price range filter
+    // Material filter – exact keyword match (e.g. "diecast")
+    if (material) filter.push({ term: { material } });
+
+    // Price range
     if (minPrice !== undefined || maxPrice !== undefined) {
       const range: any = {};
       if (minPrice !== undefined) range.gte = minPrice;
@@ -365,41 +360,40 @@ export class SearchService implements OnModuleInit {
       filter.push({ range: { price: range } });
     }
 
-    // Condition filter
-    if (condition) {
-      filter.push({ term: { condition } });
-    }
+    // Boolean filters
+    if (tradeOnly) filter.push({ term: { isTradeEnabled: true } });
+    if (preOrder) filter.push({ term: { isPreorder: true } });
+    if (limited) filter.push({ term: { isLimited: true } });
+    if (setFilter) filter.push({ term: { isSet: true } });
+    if (discountOnly) filter.push({ exists: { field: 'oldPrice' } });
 
-    // Brand filter
-    if (brand) {
+    // Text-based fallback filters (when ID is not available)
+    if (brand && !brandId) {
       must.push({
         multi_match: {
           query: brand,
-          fields: ['title', 'description', 'categoryName'],
-          type: 'phrase', // Use phrase match for exact brand names
+          fields: ['title', 'description', 'brandName'],
+          type: 'phrase',
           boost: 2,
         },
       });
     }
-
-    // Scale filter
-    if (scale) {
-      must.push({
-        multi_match: {
-          query: scale,
-          fields: ['title', 'description'],
-          type: 'phrase',
-        },
-      });
-    }
-
-    // Manufacturer filter (treat as brand or description)
-    if (manufacturer) {
+    if (manufacturer && !manufacturerId) {
       must.push({
         multi_match: {
           query: manufacturer,
-          fields: ['title', 'description'],
+          fields: ['title', 'description', 'manufacturerName'],
           type: 'phrase',
+          boost: 2,
+        },
+      });
+    }
+    if (vehicleType) {
+      must.push({
+        multi_match: {
+          query: vehicleType,
+          fields: ['title', 'description', 'categoryName'],
+          type: 'best_fields',
         },
       });
     }
@@ -407,21 +401,15 @@ export class SearchService implements OnModuleInit {
     // Sorting
     let sort: any[] = [];
     switch (sortBy) {
-      case 'price_asc':
-        sort = [{ price: 'asc' }];
-        break;
-      case 'price_desc':
-        sort = [{ price: 'desc' }];
-        break;
+      case 'price_asc': sort = [{ price: 'asc' }]; break;
+      case 'price_desc': sort = [{ price: 'desc' }]; break;
       case 'newest':
-        sort = [{ createdAt: 'desc' }];
-        break;
-      default:
-        sort = [{ _score: 'desc' }];
+      case 'created_desc': sort = [{ createdAt: 'desc' }]; break;
+      case 'created_asc': sort = [{ createdAt: 'asc' }]; break;
+      default: sort = query ? [{ _score: 'desc' }] : [{ createdAt: 'desc' }];
     }
 
     try {
-      // ES 8.x API: no body wrapper, response is direct
       const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
         query: {
@@ -441,9 +429,8 @@ export class SearchService implements OnModuleInit {
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
 
-      // If ES returns 0 results, fallback to database search
       if (hits.length === 0 && query) {
-        this.logger.debug('Elasticsearch returned 0 results, falling back to database search');
+        this.logger.debug('ES returned 0 results, falling back to database');
         return this.fallbackSearch(options);
       }
 
@@ -455,7 +442,12 @@ export class SearchService implements OnModuleInit {
           price: hit._source.price,
           condition: hit._source.condition,
           status: hit._source.status,
+          categoryId: hit._source.categoryId,
           categoryName: hit._source.categoryName,
+          brandId: hit._source.brandId,
+          brandName: hit._source.brandName,
+          manufacturerId: hit._source.manufacturerId,
+          manufacturerName: hit._source.manufacturerName,
           sellerName: hit._source.sellerName,
           imageUrl: hit._source.imageUrl,
           score: hit._score || 0,
@@ -472,53 +464,95 @@ export class SearchService implements OnModuleInit {
   }
 
   /**
-   * Index a product
+   * Search and return only product IDs (used by product.service for full-data hydration)
    */
+  async searchProductIds(options: SearchOptions): Promise<{ ids: string[]; total: number }> {
+    if (!this.esAvailable) {
+      return { ids: [], total: 0 };
+    }
+
+    const result = await this.searchProducts(options);
+    return {
+      ids: result.results.map((r) => r.id),
+      total: result.total,
+    };
+  }
+
+  // ──────────────────────────── Indexing ────────────────────────────
+
+  private buildProductDocument(product: any): Record<string, any> {
+    const scaleAttr = product.productAttributes?.find(
+      (pa: any) => pa.attribute?.group?.slug === 'scale',
+    );
+    const materialAttr = product.productAttributes?.find(
+      (pa: any) => pa.attribute?.group?.slug === 'material',
+    );
+
+    return {
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      price: parseFloat(product.price.toString()),
+      oldPrice: product.oldPrice != null ? parseFloat(product.oldPrice.toString()) : undefined,
+      condition: product.condition,
+      status: product.status,
+      categoryId: product.categoryId,
+      categoryName: product.category?.name,
+      brandId: product.brandId || undefined,
+      brandName: product.brand?.name || undefined,
+      manufacturerId: product.manufacturerId || undefined,
+      manufacturerName: product.manufacturer?.name || undefined,
+      carModelId: product.carModelId || undefined,
+      carModelName: product.carModel?.name || undefined,
+      sellerId: product.sellerId,
+      sellerName: product.seller?.displayName,
+      imageUrl: product.images?.[0]?.url,
+      scale: scaleAttr?.attribute?.slug || scaleAttr?.attribute?.value || undefined,
+      material: materialAttr?.attribute?.slug || undefined,
+      isTradeEnabled: product.isTradeEnabled,
+      isPreorder: product.isPreorder,
+      isLimited: product.isLimited,
+      isSet: product.isSet,
+      quantity: product.quantity,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  }
+
+  private readonly productInclude = {
+    category: { select: { id: true, name: true } },
+    brand: { select: { id: true, name: true } },
+    manufacturer: { select: { id: true, name: true } },
+    carModel: { select: { id: true, name: true } },
+    seller: { select: { id: true, displayName: true } },
+    images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { url: true } },
+    productAttributes: {
+      include: {
+        attribute: { include: { group: { select: { slug: true } } } },
+      },
+    },
+  };
+
   async indexProduct(productId: string): Promise<void> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
-      include: {
-        category: { select: { id: true, name: true } },
-        seller: { select: { id: true, displayName: true } },
-        images: { take: 1, select: { url: true } },
-      },
+      include: this.productInclude,
     });
 
     if (!product) return;
 
     try {
-      // ES 8.x API: document goes in `document` parameter
       await this.client.index({
         index: this.PRODUCTS_INDEX,
         id: product.id,
-        document: {
-          id: product.id,
-          title: product.title,
-          description: product.description,
-          price: parseFloat(product.price.toString()),
-          condition: product.condition,
-          status: product.status,
-          categoryId: product.categoryId,
-          categoryName: product.category.name,
-          sellerId: product.sellerId,
-          sellerName: product.seller.displayName,
-          imageUrl: product.images[0]?.url,
-          isTradeEnabled: product.isTradeEnabled,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt,
-        },
+        document: this.buildProductDocument(product),
       });
-
-      // Update document count
       await this.updateIndexStats();
     } catch (error) {
-      this.logger.warn('Elasticsearch indexing error');
+      this.logger.warn(`Elasticsearch indexing error for product ${productId}`);
     }
   }
 
-  /**
-   * Remove product from index
-   */
   async removeProduct(productId: string): Promise<void> {
     try {
       await this.client.delete({
@@ -527,14 +561,10 @@ export class SearchService implements OnModuleInit {
       });
       await this.updateIndexStats();
     } catch (error) {
-      this.logger.warn('Elasticsearch delete error');
+      this.logger.warn(`Elasticsearch delete error for product ${productId}`);
     }
   }
 
-  /**
-   * Force recreate index with updated settings
-   * Use this when analyzer settings change
-   */
   async forceRecreateIndex(): Promise<void> {
     this.logger.log('Force recreating Elasticsearch index');
     try {
@@ -551,11 +581,7 @@ export class SearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Reindex all products
-   */
   async reindexAll(): Promise<number> {
-    // Update index status
     await this.prisma.searchIndex.upsert({
       where: { indexName: this.PRODUCTS_INDEX },
       update: { status: 'rebuilding' },
@@ -563,49 +589,25 @@ export class SearchService implements OnModuleInit {
     });
 
     try {
-      // Get all active products (exclude membership virtual products)
       const products = await this.prisma.product.findMany({
         where: {
           status: ProductStatus.active,
           NOT: { id: { startsWith: 'membership-' } },
         },
-        include: {
-          category: { select: { id: true, name: true } },
-          seller: { select: { id: true, displayName: true } },
-          images: { take: 1, select: { url: true } },
-        },
+        include: this.productInclude,
       });
 
-      // Force recreate index with new settings
       await this.forceRecreateIndex();
 
-      // Bulk index
       if (products.length > 0) {
-        const body = products.flatMap((product) => [
+        const operations = products.flatMap((product) => [
           { index: { _index: this.PRODUCTS_INDEX, _id: product.id } },
-          {
-            id: product.id,
-            title: product.title,
-            description: product.description,
-            price: parseFloat(product.price.toString()),
-            condition: product.condition,
-            status: product.status,
-            categoryId: product.categoryId,
-            categoryName: product.category.name,
-            sellerId: product.sellerId,
-            sellerName: product.seller.displayName,
-            imageUrl: product.images[0]?.url,
-            isTradeEnabled: product.isTradeEnabled,
-            createdAt: product.createdAt,
-            updatedAt: product.updatedAt,
-          },
+          this.buildProductDocument(product),
         ]);
 
-        // ES 8.x API: use operations instead of body
-        await this.client.bulk({ refresh: true, operations: body });
+        await this.client.bulk({ refresh: true, operations });
       }
 
-      // Update index status
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: {
@@ -615,6 +617,7 @@ export class SearchService implements OnModuleInit {
         },
       });
 
+      this.logger.log(`Reindexed ${products.length} products`);
       return products.length;
     } catch (error) {
       this.logger.error('Elasticsearch reindex error');
@@ -626,60 +629,32 @@ export class SearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Get autocomplete suggestions with fuzzy matching
-   */
+  // ──────────────────────────── Autocomplete ────────────────────────────
+
   async autocomplete(query: string, limit = 10): Promise<string[]> {
+    if (!this.esAvailable) return this.fallbackAutocomplete(query, limit);
+
     try {
-      // ES 8.x API: no body wrapper
       const response = await this.client.search({
         index: this.PRODUCTS_INDEX,
         query: {
           bool: {
             should: [
-              // Edge ngram for partial matching (e.g., "hotw" → "hot wheels")
-              {
-                match: {
-                  'title.edge_ngram': {
-                    query,
-                    boost: 4,
-                  },
-                },
-              },
-              // Ngram for middle-of-word matching
-              {
-                match: {
-                  'title.ngram': {
-                    query,
-                    boost: 2,
-                  },
-                },
-              },
-              // Standard phrase prefix
+              { match: { 'title.edge_ngram': { query, boost: 4 } } },
+              { match: { 'title.ngram': { query, boost: 2 } } },
               {
                 multi_match: {
                   query,
                   type: 'phrase_prefix',
-                  fields: ['title^2', 'categoryName'],
+                  fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName'],
                   boost: 3,
                 },
               },
-              // Fuzzy match for typos (e.g., "hxt" → "hot")
-              {
-                fuzzy: {
-                  title: {
-                    value: query.toLowerCase(),
-                    fuzziness: 'AUTO',
-                    prefix_length: 1,
-                    boost: 1.5,
-                  },
-                },
-              },
-              // Multi-match fuzzy for complete phrases with typos
+              { fuzzy: { title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1.5 } } },
               {
                 multi_match: {
                   query,
-                  fields: ['title^2', 'categoryName'],
+                  fields: ['title^2', 'categoryName', 'manufacturerName'],
                   fuzziness: 2,
                   prefix_length: 1,
                   boost: 1,
@@ -689,22 +664,13 @@ export class SearchService implements OnModuleInit {
             minimum_should_match: 1,
             filter: [
               { term: { status: ProductStatus.active } },
-              {
-                bool: {
-                  must_not: {
-                    prefix: { id: 'membership-' },
-                  },
-                },
-              },
+              { bool: { must_not: { prefix: { id: 'membership-' } } } },
             ],
           },
         },
         _source: ['title'],
-        size: limit * 2, // Get more results then dedupe
-        // Remove duplicates
-        collapse: {
-          field: 'title.keyword',
-        },
+        size: limit * 2,
+        collapse: { field: 'title.keyword' },
       });
 
       return response.hits.hits
@@ -716,9 +682,6 @@ export class SearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Fallback autocomplete using database
-   */
   private async fallbackAutocomplete(query: string, limit: number): Promise<string[]> {
     const products = await this.prisma.product.findMany({
       where: {
@@ -730,22 +693,30 @@ export class SearchService implements OnModuleInit {
       take: limit,
       distinct: ['title'],
     });
-    return products.map(p => p.title);
+    return products.map((p) => p.title);
   }
 
-  /**
-   * Fallback to database search when Elasticsearch is unavailable
-   */
+  // ──────────────────────────── Fallback Search ────────────────────────────
+
   private async fallbackSearch(options: SearchOptions): Promise<SearchResponse> {
     const {
       query,
       categoryId,
+      brandId,
+      manufacturerId,
       minPrice,
       maxPrice,
       condition,
       brand,
       scale,
+      material,
       manufacturer,
+      tradeOnly,
+      discountOnly,
+      preOrder,
+      limited,
+      set: setFilter,
+      sellerId,
       page = 1,
       pageSize = 20,
       sortBy = 'relevance',
@@ -755,35 +726,68 @@ export class SearchService implements OnModuleInit {
       status: ProductStatus.active,
       NOT: { id: { startsWith: 'membership-' } },
     };
+    const andConditions: any[] = [];
 
     if (query) {
-      where.OR = [
-        { title: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (categoryId) where.categoryId = categoryId;
+    if (brandId) where.brandId = brandId;
+    if (manufacturerId) where.manufacturerId = manufacturerId;
+    if (sellerId) where.sellerId = sellerId;
     if (condition) where.condition = condition;
 
-    if (brand) {
-      where.title = { contains: brand, mode: 'insensitive' };
+    if (brand && !brandId) {
+      andConditions.push({
+        OR: [
+          { title: { contains: brand, mode: 'insensitive' } },
+          { brand: { name: { contains: brand, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (manufacturer && !manufacturerId) {
+      andConditions.push({
+        OR: [
+          { title: { contains: manufacturer, mode: 'insensitive' } },
+          { manufacturer: { name: { contains: manufacturer, mode: 'insensitive' } } },
+        ],
+      });
     }
 
     if (scale) {
-      where.OR = where.OR || [];
-      where.OR.push(
-        { title: { contains: scale, mode: 'insensitive' } },
-        { description: { contains: scale, mode: 'insensitive' } }
-      );
+      andConditions.push({
+        OR: [
+          { title: { contains: scale, mode: 'insensitive' } },
+          { description: { contains: scale, mode: 'insensitive' } },
+        ],
+      });
     }
 
-    if (manufacturer) {
-      where.OR = where.OR || [];
-      where.OR.push(
-        { title: { contains: manufacturer, mode: 'insensitive' } },
-        { description: { contains: manufacturer, mode: 'insensitive' } }
-      );
+    if (material) {
+      where.productAttributes = {
+        some: {
+          attribute: {
+            isActive: true,
+            group: { slug: 'material', isActive: true },
+            slug: material,
+          },
+        },
+      };
+    }
+
+    if (tradeOnly) where.isTradeEnabled = true;
+    if (preOrder) where.isPreorder = true;
+    if (limited) where.isLimited = true;
+    if (setFilter) where.isSet = true;
+    if (discountOnly) {
+      andConditions.push({ oldPrice: { not: null } });
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -792,19 +796,18 @@ export class SearchService implements OnModuleInit {
       if (maxPrice !== undefined) where.price.lte = maxPrice;
     }
 
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
     let orderBy: any;
     switch (sortBy) {
-      case 'price_asc':
-        orderBy = { price: 'asc' };
-        break;
-      case 'price_desc':
-        orderBy = { price: 'desc' };
-        break;
+      case 'price_asc': orderBy = { price: 'asc' }; break;
+      case 'price_desc': orderBy = { price: 'desc' }; break;
       case 'newest':
-        orderBy = { createdAt: 'desc' };
-        break;
-      default:
-        orderBy = { createdAt: 'desc' };
+      case 'created_desc': orderBy = { createdAt: 'desc' }; break;
+      case 'created_asc': orderBy = { createdAt: 'asc' }; break;
+      default: orderBy = { createdAt: 'desc' };
     }
 
     const [products, total] = await Promise.all([
@@ -812,6 +815,8 @@ export class SearchService implements OnModuleInit {
         where,
         include: {
           category: { select: { name: true } },
+          brand: { select: { name: true } },
+          manufacturer: { select: { name: true } },
           seller: { select: { displayName: true } },
           images: { take: 1, select: { url: true } },
         },
@@ -825,22 +830,19 @@ export class SearchService implements OnModuleInit {
     return {
       results: products.map((p) => {
         const priceA = parseFloat(p.price.toString());
-        const oldPriceDb = p.oldPrice != null ? parseFloat(p.oldPrice.toString()) : null;
-        const isOnSale = oldPriceDb != null && oldPriceDb > priceA;
-        const discountPercent = isOnSale && oldPriceDb ? Math.round(((oldPriceDb - priceA) / oldPriceDb) * 100) : null;
         return {
           id: p.id,
           title: p.title,
           description: p.description || undefined,
           price: priceA,
-          oldPrice: isOnSale ? oldPriceDb : null,
-          originalPrice: isOnSale ? oldPriceDb : null,
-          salePrice: isOnSale ? priceA : null,
-          isOnSale: isOnSale || undefined,
-          discountPercent: discountPercent ?? undefined,
           condition: p.condition,
           status: p.status,
+          categoryId: p.categoryId,
           categoryName: p.category.name,
+          brandId: p.brandId || undefined,
+          brandName: (p as any).brand?.name || undefined,
+          manufacturerId: p.manufacturerId || undefined,
+          manufacturerName: (p as any).manufacturer?.name || undefined,
           sellerName: p.seller.displayName,
           imageUrl: p.images[0]?.url,
           score: 0,
@@ -853,14 +855,91 @@ export class SearchService implements OnModuleInit {
     };
   }
 
-  /**
-   * Update index statistics
-   */
+  // ──────────────────────────── Periodic Sync ────────────────────────────
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handlePeriodicSync() {
+    if (!this.esAvailable) return;
+
+    try {
+      const dbCount = await this.prisma.product.count({
+        where: {
+          status: ProductStatus.active,
+          NOT: { id: { startsWith: 'membership-' } },
+        },
+      });
+
+      const esResponse = await this.client.count({ index: this.PRODUCTS_INDEX });
+      const esCount = esResponse.count;
+
+      if (Math.abs(dbCount - esCount) > 2) {
+        this.logger.warn(
+          `ES/DB count mismatch: DB=${dbCount}, ES=${esCount}. Running delta sync...`,
+        );
+        await this.deltaSync();
+      }
+    } catch (error) {
+      this.logger.warn('Periodic sync check failed');
+    }
+  }
+
+  private async deltaSync(): Promise<void> {
+    try {
+      const activeProducts = await this.prisma.product.findMany({
+        where: {
+          status: ProductStatus.active,
+          NOT: { id: { startsWith: 'membership-' } },
+        },
+        select: { id: true, updatedAt: true },
+      });
+
+      const dbIds = new Set(activeProducts.map((p) => p.id));
+
+      // Get all ES document IDs
+      const esIds = new Set<string>();
+      let searchAfter: any[] | undefined;
+      while (true) {
+        const params: any = {
+          index: this.PRODUCTS_INDEX,
+          size: 1000,
+          _source: false,
+          sort: [{ _doc: 'asc' }],
+        };
+        if (searchAfter) params.search_after = searchAfter;
+        const resp = await this.client.search(params);
+        const hits = resp.hits.hits;
+        if (hits.length === 0) break;
+        hits.forEach((h: any) => esIds.add(h._id));
+        searchAfter = hits[hits.length - 1].sort;
+      }
+
+      // Index missing products
+      const missingIds = [...dbIds].filter((id) => !esIds.has(id));
+      for (const id of missingIds) {
+        await this.indexProduct(id);
+      }
+
+      // Remove stale documents
+      const staleIds = [...esIds].filter((id) => !dbIds.has(id));
+      for (const id of staleIds) {
+        await this.removeProduct(id);
+      }
+
+      if (missingIds.length > 0 || staleIds.length > 0) {
+        this.logger.log(
+          `Delta sync: indexed ${missingIds.length}, removed ${staleIds.length}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Delta sync failed');
+    }
+  }
+
+  // ──────────────────────────── Stats ────────────────────────────
+
   private async updateIndexStats(): Promise<void> {
     try {
-      const response = await this.client.count({
-        index: this.PRODUCTS_INDEX
-      });
+      const response = await this.client.count({ index: this.PRODUCTS_INDEX });
       await this.prisma.searchIndex.update({
         where: { indexName: this.PRODUCTS_INDEX },
         data: {
@@ -870,6 +949,46 @@ export class SearchService implements OnModuleInit {
       });
     } catch (error) {
       this.logger.warn('Failed to update index stats');
+    }
+  }
+
+  async getStatus(): Promise<{
+    elasticsearch: boolean;
+    indexExists: boolean;
+    documentCount: number;
+    dbCount: number;
+    inSync: boolean;
+    message: string;
+  }> {
+    try {
+      const esResponse = await this.client.count({ index: this.PRODUCTS_INDEX });
+      const dbCount = await this.prisma.product.count({
+        where: {
+          status: ProductStatus.active,
+          NOT: { id: { startsWith: 'membership-' } },
+        },
+      });
+
+      const inSync = Math.abs(dbCount - esResponse.count) <= 2;
+      return {
+        elasticsearch: true,
+        indexExists: true,
+        documentCount: esResponse.count,
+        dbCount,
+        inSync,
+        message: esResponse.count > 0
+          ? `ES çalışıyor: ${esResponse.count} ES / ${dbCount} DB doküman${inSync ? ' (senkron)' : ' (SENKRON DEĞİL)'}`
+          : 'ES çalışıyor ama index boş. /search/dev/reindex çağırın.',
+      };
+    } catch {
+      return {
+        elasticsearch: false,
+        indexExists: false,
+        documentCount: 0,
+        dbCount: 0,
+        inSync: false,
+        message: 'Elasticsearch bağlantı hatası',
+      };
     }
   }
 }

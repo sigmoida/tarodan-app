@@ -376,9 +376,9 @@ export default function ProfileDiscountsPage() {
             </p>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Kupon Kodları</p>
+            <p className="text-sm text-gray-500">Toplam Kampanya</p>
             <p className="text-2xl font-bold text-blue-600">
-              {discounts.filter(d => d.code).length}
+              {discounts.length}
             </p>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -539,7 +539,7 @@ export default function ProfileDiscountsPage() {
                 {editingDiscount ? 'İndirimi Düzenle' : 'Yeni İndirim Oluştur'}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Ürünleriniz için indirim veya kupon kodu oluşturun
+                Ürünleriniz için indirim kampanyası oluşturun
               </p>
             </div>
 
@@ -558,19 +558,6 @@ export default function ProfileDiscountsPage() {
                     placeholder="Örn: Yaz İndirimi"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Kupon Kodu (Opsiyonel)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                    placeholder="Örn: YAZ2026"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono uppercase"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Boş bırakılırsa otomatik kampanya olur</p>
                 </div>
               </div>
 

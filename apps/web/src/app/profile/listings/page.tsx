@@ -143,7 +143,7 @@ export default function ProfileListingsPage() {
 
         {/* Pending Listings Alert */}
         {listings.some(l => l.status === 'pending') && activeFilter !== 'pending' && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
             <div className="flex items-center gap-3">
               <ClockIcon className="w-6 h-6 text-yellow-600" />
               <div>
@@ -164,7 +164,7 @@ export default function ProfileListingsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveFilter(tab.value)}
-              className={`px-4 py-2 rounded-full font-medium transition-colors whitespace-nowrap ${
+              className={`px-4 py-2 rounded-sm font-medium transition-colors whitespace-nowrap ${
                 activeFilter === tab.value
                   ? 'bg-primary-500 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -172,7 +172,7 @@ export default function ProfileListingsPage() {
             >
               {tab.label}
               {tab.value === 'pending' && listings.filter(l => l.status === 'pending').length > 0 && (
-                <span className="ml-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-sm">
                   {listings.filter(l => l.status === 'pending').length}
                 </span>
               )}
@@ -185,15 +185,15 @@ export default function ProfileListingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="card p-4 animate-pulse">
-                <div className="aspect-square bg-gray-200 rounded-lg mb-4" />
+                <div className="aspect-square bg-gray-200 rounded mb-4" />
                 <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
                 <div className="h-4 bg-gray-200 rounded w-1/2" />
               </div>
             ))}
           </div>
         ) : listings.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+          <div className="text-center py-16 bg-white rounded">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-sm mb-4">
               <ArchiveBoxIcon className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -232,7 +232,7 @@ export default function ProfileListingsPage() {
                       />
                     </div>
                     <div className="absolute top-2 left-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium ${statusConfig.color}`}>
                         <StatusIcon className="w-3 h-3" />
                         {statusConfig.label}
                       </span>
@@ -271,7 +271,7 @@ export default function ProfileListingsPage() {
                       {listing.status === 'active' && (
                         <Link
                           href={`/listings/${listing.id}`}
-                          className="flex-1 py-2 text-center bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                          className="flex-1 py-2 text-center bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
                         >
                           Görüntüle
                         </Link>
@@ -279,7 +279,7 @@ export default function ProfileListingsPage() {
                       {['active', 'pending', 'inactive'].includes(listing.status) && (
                         <Link
                           href={`/listings/${listing.id}/edit`}
-                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <PencilIcon className="w-4 h-4" />
                           Düzenle
@@ -289,7 +289,7 @@ export default function ProfileListingsPage() {
                         <button
                           onClick={() => handleDelete(listing.id)}
                           disabled={deletingId === listing.id}
-                          className="flex-1 py-2 text-center bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-2 text-center bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <TrashIcon className="w-4 h-4" />
                           {deletingId === listing.id ? 'Siliniyor...' : 'Sil'}

@@ -26,7 +26,6 @@ import {
   DocumentTextIcon,
   ShieldCheckIcon,
   CurrencyDollarIcon,
-  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
@@ -304,7 +303,6 @@ export default function ProfilePage() {
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
         { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', desc: 'Favori ürünleriniz' },
         { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz', badge: pendingCounts.trades },
-        { icon: ReceiptPercentIcon, label: 'İndirimlerim', href: '/profile/discounts', desc: 'İndirim ve kampanyalarınız', sellerOnly: true },
         { icon: SparklesIcon, label: t('membership.title'), href: '/profile/membership', desc: 'Üyelik planınızı yönetin' },
       ],
     },
@@ -366,7 +364,7 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
                   <h1 className="text-2xl md:text-3xl font-bold truncate">{profile.displayName}</h1>
                   {profile.isVerified && (
-                    <span className="px-2 py-1 bg-green-500/30 text-green-100 text-xs rounded-full font-medium whitespace-nowrap">
+                    <span className="px-2 py-1 bg-green-500/30 text-green-100 text-xs rounded-sm font-medium whitespace-nowrap">
                       ✓ {t('common.approved')}
                     </span>
                   )}
@@ -375,7 +373,7 @@ export default function ProfilePage() {
                 {/* Membership Badge - Ayrı satırda daha okunabilir */}
                 {profile.membership && (
                   <div className="mb-3">
-                    <span className={`inline-flex items-center px-4 py-1.5 text-sm rounded-full font-semibold ${
+                    <span className={`inline-flex items-center px-4 py-1.5 text-sm rounded-sm font-semibold ${
                       profile.membership.tier.type === 'business' 
                         ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-md' 
                         : profile.membership.tier.type === 'premium'
@@ -418,7 +416,7 @@ export default function ProfilePage() {
               {/* Edit Button */}
               <Link
                 href="/profile/edit"
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white transition-colors flex-shrink-0"
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded text-white transition-colors flex-shrink-0"
               >
                 <PencilSquareIcon className="w-5 h-5" />
                 <span>{t('profile.editProfile')}</span>
@@ -440,10 +438,10 @@ export default function ProfilePage() {
             <Link
               key={action.label}
               href={action.href}
-              className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 group"
+              className="bg-white rounded p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 group"
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-xl bg-gray-50 group-hover:bg-orange-50 transition-colors`}>
+                <div className={`p-2 rounded bg-gray-50 group-hover:bg-orange-50 transition-colors`}>
                   <action.icon className={`w-6 h-6 ${action.color}`} />
                 </div>
                 <div>
@@ -466,7 +464,7 @@ export default function ProfilePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className={`rounded-2xl p-6 shadow-sm border mb-6 ${
+            className={`rounded p-6 shadow-sm border mb-6 ${
               profile.membership.tier.type === 'business' 
                 ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200' 
                 : profile.membership.tier.type === 'premium'
@@ -476,7 +474,7 @@ export default function ProfilePage() {
           >
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-xl ${
+                <div className={`p-3 rounded ${
                   profile.membership.tier.type === 'business'
                     ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
                     : profile.membership.tier.type === 'premium'
@@ -498,7 +496,7 @@ export default function ProfilePage() {
               {profile.membership.tier.type === 'free' && (
                 <Link
                   href="/pricing"
-                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-xl transition-all shadow-sm hover:shadow-md"
+                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded transition-all shadow-sm hover:shadow-md"
                 >
                   🚀 Premium'a Yükselt
                 </Link>
@@ -507,7 +505,7 @@ export default function ProfilePage() {
             
             {/* Plan Özellikleri Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-              <div className={`text-center p-4 rounded-xl ${
+              <div className={`text-center p-4 rounded ${
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
@@ -518,7 +516,7 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.listingsLimit')}</p>
               </div>
-              <div className={`text-center p-4 rounded-xl ${
+              <div className={`text-center p-4 rounded ${
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
@@ -527,7 +525,7 @@ export default function ProfilePage() {
                 }`}>{profile.membership.tier.maxImagesPerListing}</p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">Fotoğraf / İlan</p>
               </div>
-              <div className={`text-center p-4 rounded-xl ${
+              <div className={`text-center p-4 rounded ${
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
@@ -536,7 +534,7 @@ export default function ProfilePage() {
                 }`}>{profile.membership.tier.featuredListingSlots}</p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.featuredListings')}</p>
               </div>
-              <div className={`text-center p-4 rounded-xl ${
+              <div className={`text-center p-4 rounded ${
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className="text-2xl font-bold text-green-500">
@@ -548,21 +546,21 @@ export default function ProfilePage() {
             
             {/* Özellik Badges */}
             <div className="flex flex-wrap gap-2">
-              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+              <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canTrade 
                   ? 'bg-green-100 text-green-700 border border-green-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
               }`}>
                 {profile.membership.tier.canTrade ? '✓' : '✗'} Takas
               </span>
-              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+              <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canCreateCollections 
                   ? 'bg-green-100 text-green-700 border border-green-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
               }`}>
                 {profile.membership.tier.canCreateCollections ? '✓' : '✗'} Koleksiyon
               </span>
-              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+              <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.isAdFree 
                   ? 'bg-green-100 text-green-700 border border-green-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
@@ -581,7 +579,7 @@ export default function ProfilePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + sectionIndex * 0.05 }}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+              className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden"
             >
               <div className="px-6 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">{section.title}</h2>
@@ -595,10 +593,10 @@ export default function ProfilePage() {
                     href={item.href}
                     className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
                   >
-                    <div className="relative p-2 rounded-xl bg-gray-100 group-hover:bg-orange-100 transition-colors">
+                    <div className="relative p-2 rounded bg-gray-100 group-hover:bg-orange-100 transition-colors">
                       <item.icon className="w-5 h-5 text-gray-600 group-hover:text-orange-600 transition-colors" />
                       {item.badge > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-sm flex items-center justify-center">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}
@@ -607,7 +605,7 @@ export default function ProfilePage() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900">{item.label}</p>
                         {item.badge > 0 && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-sm">
                             {item.badge} bekliyor
                           </span>
                         )}
@@ -627,7 +625,7 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             onClick={handleLogout}
-            className="w-full py-4 bg-white border border-red-200 text-red-600 font-medium rounded-2xl hover:bg-red-50 transition-colors shadow-sm"
+            className="w-full py-4 bg-white border border-red-200 text-red-600 font-medium rounded hover:bg-red-50 transition-colors shadow-sm"
           >
             {t('common.logout')}
           </motion.button>

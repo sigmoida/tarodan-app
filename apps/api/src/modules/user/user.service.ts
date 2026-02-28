@@ -1424,20 +1424,10 @@ export class UserService {
    * Algorithm: Score = (viewCount * 1) + (likeCount * 5) + (salesCount * 20)
    */
   async getTopCollections(limit: number = 20) {
-    // Get collections from premium/business users that are public
     const collections = await this.prisma.collection.findMany({
       where: {
         isPublic: true,
-        items: { some: {} }, // Has at least one item
-        user: {
-          membership: {
-            tier: {
-              type: {
-                in: ['premium', 'business'],
-              },
-            },
-          },
-        },
+        items: { some: {} },
       },
       include: {
         user: {
@@ -1654,8 +1644,7 @@ export class UserService {
       },
     });
 
-    // Filter to only users with companyName, isSeller, and active products
-    const businessUsers = businessMemberships
+    let businessUsers = businessMemberships
       .map((m) => m.user)
       .filter(
         (user) =>
@@ -1664,9 +1653,23 @@ export class UserService {
           user._count.products > 0
       );
 
-    // If no business users, return null (only business accounts should be featured)
     if (businessUsers.length === 0) {
-      return null;
+      const topSellers = await this.prisma.user.findMany({
+        where: {
+          isSeller: true,
+          products: { some: { status: 'active' } },
+        },
+        include: {
+          membership: { include: { tier: true } },
+          _count: { select: { products: { where: { status: 'active' } } } },
+        },
+        orderBy: { products: { _count: 'desc' } },
+        take: 10,
+      });
+      businessUsers = topSellers.filter((u) => u._count.products > 0);
+      if (businessUsers.length === 0) {
+        return null;
+      }
     }
 
     // Calculate engagement score for each business

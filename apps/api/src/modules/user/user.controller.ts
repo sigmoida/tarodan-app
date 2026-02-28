@@ -448,7 +448,12 @@ export class UserController {
     },
   })
   async getFeaturedCollector() {
-    return this.userService.getFeaturedCollector();
+    try {
+      return await this.userService.getFeaturedCollector();
+    } catch (err) {
+      this.logger.warn(`getFeaturedCollector failed: ${err?.message || err}`);
+      return null;
+    }
   }
 
   /**

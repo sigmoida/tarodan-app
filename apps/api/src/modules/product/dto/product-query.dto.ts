@@ -196,4 +196,20 @@ export class ProductQueryDto {
   @IsOptional()
   @IsUUID('4')
   carModelId?: string;
+
+  @ApiPropertyOptional({
+    example: 'uuid-manufacturer-id',
+    description: 'Filter by manufacturer ID',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  manufacturerId?: string;
+
+  @ApiPropertyOptional({
+    example: 'Hot Wheels',
+    description: 'Filter by manufacturer name (text search)',
+  })
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
 }

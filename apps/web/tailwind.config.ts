@@ -31,14 +31,17 @@ const config: Config = {
         subtle: '#999999',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       borderRadius: {
-        sm: '8px',
-        md: '12px',
-        lg: '16px',
-        xl: '24px',
+        none: '0px',
+        sm: '2px',
+        DEFAULT: '4px',
+        md: '4px',
+        lg: '6px',
+        xl: '8px',
+        '2xl': '10px',
       },
       boxShadow: {
         'soft': '0 2px 8px -2px rgba(0,0,0,0.08)',

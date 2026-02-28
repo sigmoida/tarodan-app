@@ -18,6 +18,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
+import { formatCondition } from '@/lib/format';
 import SidebarFilters from '@/components/SidebarFilters';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
 
@@ -57,10 +58,10 @@ interface Listing {
 export default function ListingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-4');
+  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
 
   const [filters, setFilters] = useState({
     brand: searchParams.get('brand') || '',
@@ -77,39 +78,30 @@ export default function ListingsPage() {
     sortBy: 'created_desc',
     category: searchParams.get('category') || '',
     manufacturer: searchParams.get('manufacturer') || '',
+    manufacturerId: searchParams.get('manufacturerId') || '',
     vehicleType: searchParams.get('vehicleType') || '',
   });
 
   useEffect(() => {
-    const urlTradeOnly = searchParams.get('tradeOnly');
-    const urlDiscountOnly = searchParams.get('discountOnly');
-    const urlPreOrder = searchParams.get('preOrder');
-    const urlLimited = searchParams.get('limited');
-    const urlSet = searchParams.get('set');
-    const urlBrand = searchParams.get('brand');
-    const urlScale = searchParams.get('scale');
-    const urlMaterial = searchParams.get('material');
-    const urlCondition = searchParams.get('condition');
-    const urlMinPrice = searchParams.get('minPrice');
-    const urlMaxPrice = searchParams.get('maxPrice');
-    const urlSortBy = searchParams.get('sortBy');
-
     setFilters(prev => ({
       ...prev,
-      tradeOnly: urlTradeOnly === 'true',
-      discountOnly: urlDiscountOnly === 'true',
-      preOrder: urlPreOrder === 'true',
-      limited: urlLimited === 'true',
-      set: urlSet === 'true',
-      brand: urlBrand || '',
-      scale: urlScale || '',
-      material: urlMaterial || '',
-      condition: urlCondition || '',
-      minPrice: urlMinPrice || '',
-      maxPrice: urlMaxPrice || '',
-      sortBy: urlSortBy || 'created_desc',
+      tradeOnly: searchParams.get('tradeOnly') === 'true',
+      discountOnly: searchParams.get('discountOnly') === 'true',
+      preOrder: searchParams.get('preOrder') === 'true',
+      limited: searchParams.get('limited') === 'true',
+      set: searchParams.get('set') === 'true',
+      brand: searchParams.get('brand') || prev.brand,
+      scale: searchParams.get('scale') || prev.scale,
+      material: searchParams.get('material') || prev.material,
+      condition: searchParams.get('condition') || prev.condition,
+      minPrice: searchParams.get('minPrice') || prev.minPrice,
+      maxPrice: searchParams.get('maxPrice') || prev.maxPrice,
+      sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
+      category: searchParams.get('category') || prev.category,
+      manufacturer: searchParams.get('manufacturer') || prev.manufacturer,
+      manufacturerId: searchParams.get('manufacturerId') || prev.manufacturerId,
+      vehicleType: searchParams.get('vehicleType') || prev.vehicleType,
     }));
-    if (searchParams.get('category')) setFilters(prev => ({ ...prev, category: searchParams.get('category') || '' }));
   }, [searchParams]);
 
   // Resolve category slug to id when ?category=slug is in URL
@@ -144,6 +136,8 @@ export default function ListingsPage() {
         if (filters.brand) p.brand = filters.brand;
         if (filters.scale) p.scale = filters.scale;
         if (filters.material) p.material = filters.material;
+        if (filters.manufacturerId) p.manufacturerId = filters.manufacturerId;
+        else if (filters.manufacturer) p.manufacturer = filters.manufacturer;
         if (filters.tradeOnly) p.tradeOnly = true;
         if (filters.discountOnly) p.discountOnly = true;
         if (filters.preOrder) p.preOrder = true;
@@ -164,17 +158,27 @@ export default function ListingsPage() {
   const clearFilters = () => {
     setFilters({
       brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
-      tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false, sortBy: 'created_desc', category: '', manufacturer: '', vehicleType: '',
+      tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
+      sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
   };
 
   const activeFilterCount = Object.entries(filters)
     .filter(([key, value]) => key !== 'sortBy' && value !== '' && value !== false).length;
 
-  const getImageUrl = (image: any): string => {
-    if (!image) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+  const LISTING_PLACEHOLDERS = [
+    'https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels',
+    'https://placehold.co/400x400/e3f2fd/1565c0?text=Diecast+Model',
+    'https://placehold.co/400x400/fce4ec/c62828?text=Koleksiyon',
+    'https://placehold.co/400x400/e8f5e9/2e7d32?text=Model+Araba',
+    'https://placehold.co/400x400/f3e5f5/6a1b9a?text=Premium',
+    'https://placehold.co/400x400/fff8e1/f57f17?text=Rare+Model',
+  ];
+  const getImageUrl = (image: any, index?: number): string => {
+    const placeholder = LISTING_PLACEHOLDERS[(index ?? 0) % LISTING_PLACEHOLDERS.length];
+    if (!image) return placeholder;
     if (typeof image === 'string') return image;
-    return image.url || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
+    return image.url || placeholder;
   };
 
   return (
@@ -184,11 +188,11 @@ export default function ListingsPage() {
           filters.brand ? `${filters.brand} Model Araç Koleksiyonu` : t('product.title')}
       </h1>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
+        <div className="flex gap-8">
           {/* Sidebar Filters (Desktop) */}
-          <div className="hidden lg:block w-72 flex-shrink-0">
-            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded-xl border border-gray-100 shadow-soft">
+          <div className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded border border-gray-100 shadow-soft">
               <SidebarFilters
                 filters={filters}
                 onFilterChange={setFilters}
@@ -205,7 +209,7 @@ export default function ListingsPage() {
               <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-xl flex flex-col overflow-y-auto">
                 <div className="flex-shrink-0 flex items-center justify-between p-4 bg-white border-b border-gray-100 z-10">
                   <span className="font-semibold text-gray-900">{t('product.filters')}</span>
-                  <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-gray-100 rounded">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
@@ -228,12 +232,12 @@ export default function ListingsPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowMobileSidebar(true)}
-                  className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50"
+                  className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded text-sm font-medium hover:bg-gray-50"
                 >
                   <FunnelIcon className="w-5 h-5" />
                   <span>{t('product.filters')}</span>
                   {activeFilterCount > 0 && (
-                    <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">{activeFilterCount}</span>
+                    <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-sm">{activeFilterCount}</span>
                   )}
                 </button>
                 <p className="text-base font-semibold text-gray-900">
@@ -250,7 +254,7 @@ export default function ListingsPage() {
                 <select
                   value={filters.sortBy}
                   onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                  className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-orange-400"
+                  className="px-3 py-2 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:border-orange-400"
                 >
                   <option value="created_desc">{t('product.sortNewest')}</option>
                   <option value="created_asc">{t('product.sortOldest')}</option>
@@ -271,37 +275,41 @@ export default function ListingsPage() {
                   { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
                   { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
-                  <span key={f.k} className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-full">
+                  <span key={f.k} className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded">
                     {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
-                    <button onClick={() => setFilters({ ...filters, [f.k]: '' })} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => {
+                      const updates: any = { ...filters, [f.k]: '' };
+                      if (f.k === 'manufacturer') updates.manufacturerId = '';
+                      setFilters(updates);
+                    }} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-full">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
                     <button onClick={() => setFilters({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 text-sm rounded-full">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 text-sm rounded">
                     {t('product.tradeAvailable')}
                     <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-violet-100 text-violet-700 text-sm rounded-full">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-violet-100 text-violet-700 text-sm rounded">
                     {t('product.preOrder')}
                     <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 )}
                 {filters.limited && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 text-sm rounded-full">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 text-sm rounded">
                     {t('product.limitedEdition')}
                     <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
                 )}
                 {filters.set && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-sky-100 text-sky-700 text-sm rounded-full">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-sky-100 text-sky-700 text-sm rounded">
                     {t('product.sets')}
                     <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900"><XMarkIcon className="w-4 h-4" /></button>
                   </span>
@@ -320,17 +328,17 @@ export default function ListingsPage() {
                     productLayout === 'grid-6' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-3'
               }>
                 {[...Array(12)].map((_, i) => (
-                  <div key={i} className={`card animate-pulse ${productLayout === 'list' ? 'flex gap-4' : 'aspect-square'} bg-gray-200 rounded-lg h-60`}></div>
+                  <div key={i} className={`card animate-pulse ${productLayout === 'list' ? 'flex gap-4' : 'aspect-square'} bg-gray-200 rounded h-60`}></div>
                 ))}
               </div>
             ) : listings.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-full mb-4">
+              <div className="text-center py-16 bg-white rounded border border-gray-100">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded mb-4">
                   <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
                 </div>
                 <p className="text-gray-500 text-lg mb-2">{t('product.noListings')}</p>
                 {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">{t('product.clearFilters')}</button>
+                  <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors">{t('product.clearFilters')}</button>
                 )}
               </div>
             ) : productLayout === 'list' ? (
@@ -338,14 +346,14 @@ export default function ListingsPage() {
                 {listings.map((listing, index) => (
                   <motion.div key={listing.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
                     <Link href={`/listings/${listing.id}`}>
-                      <div className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-md transition-all flex gap-4 p-4">
-                        <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                        <div className="bg-white rounded overflow-hidden border border-gray-200 hover:shadow-md transition-all flex gap-4 p-4">
+                        <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
                           <OptimizedImage
-                            src={getImageUrl(listing.images?.[0])}
+                            src={getImageUrl(listing.images?.[0], index)}
                             alt={listing.title}
                             fill
                             className="object-cover"
-                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                            fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index === 0}
                           />
@@ -357,14 +365,14 @@ export default function ListingsPage() {
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">{listing.title}</h3>
                             <p className="text-sm text-gray-500 mb-1">
-                              {typeof listing.brand === 'object' ? listing.brand.name : listing.brand} • {listing.scale}
+                              {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` • ${listing.scale}` : ''}{listing.year ? ` • ${listing.year}` : ''}
                             </p>
                             {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                               <div className="flex items-center gap-1"><StarIconSolid className="w-3.5 h-3.5 text-yellow-400" /><span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span><span className="text-xs text-gray-500">({listing.rating.count})</span></div>
                             )}
                           </div>
                           <div className="flex items-center gap-4 ml-4">
-                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{listing.condition}</span>
+                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{formatCondition(listing.condition, locale)}</span>
                             <div className="flex flex-col items-end">
                               {isProductOnSaleDisplay(listing) && (
                                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -390,22 +398,22 @@ export default function ListingsPage() {
                 {listings.map((listing, index) => (
                   <motion.div key={listing.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
                     <Link href={`/listings/${listing.id}`}>
-                      <div className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-lg hover:border-orange-200 transition-all group h-full flex flex-col">
+                      <div className="bg-white rounded overflow-hidden border border-gray-100 hover:shadow-lg hover:border-orange-200 transition-all group h-full flex flex-col">
                         <div className="relative aspect-square bg-gray-100">
                           <OptimizedImage
-                            src={getImageUrl(listing.images?.[0])}
+                            src={getImageUrl(listing.images?.[0], index)}
                             alt={listing.title}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                            fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index < 4}
                           />
                           {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><ArrowsRightLeftIcon className="w-3 h-3" /><span className="hidden sm:inline">{t('nav.trades')}</span></div>
+                            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"><ArrowsRightLeftIcon className="w-3 h-3" /><span className="hidden sm:inline">{t('nav.trades')}</span></div>
                           )}
                           {isProductOnSaleDisplay(listing) && (
-                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-sm">
+                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
                               %{listing.discountPercent ?? 0} {t('product.discount') || 'İndirim'}
                             </div>
                           )}
@@ -413,7 +421,7 @@ export default function ListingsPage() {
                         <div className="p-3 flex-1 flex flex-col">
                           <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm mb-1 group-hover:text-orange-600 transition-colors">{listing.title}</h3>
                           <p className="text-xs text-gray-500 mb-2">
-                            {typeof listing.brand === 'object' ? listing.brand.name : listing.brand} • {listing.scale}
+                            {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` • ${listing.scale}` : ''}{listing.year ? ` • ${listing.year}` : ''}
                           </p>
                           {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                             <div className="flex items-center gap-1 mb-2">
@@ -422,7 +430,7 @@ export default function ListingsPage() {
                             </div>
                           )}
                           <div className="mt-auto pt-2 border-t border-gray-100 space-y-1">
-                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block">{listing.condition}</span>
+                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block">{formatCondition(listing.condition, locale)}</span>
                             <div className="flex flex-col">
                               {isProductOnSaleDisplay(listing) && (
                                 <div className="flex items-center gap-1.5 mb-0.5">

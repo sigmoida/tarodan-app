@@ -5,25 +5,29 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { manufacturersApi } from '@/lib/api';
 
-// Diecast üreticileri - gerçek marka isimleri
-const MANUFACTURERS = [
-    { name: 'Hot Wheels', slug: 'hot-wheels' },
-    { name: 'Matchbox', slug: 'matchbox' },
-    { name: 'Tamiya', slug: 'tamiya' },
-    { name: 'AUTOart', slug: 'autoart' },
-    { name: 'Kyosho', slug: 'kyosho' },
-    { name: 'Maisto', slug: 'maisto' },
-    { name: 'BBR', slug: 'bbr' },
-    { name: 'GreenLight', slug: 'greenlight' },
-    { name: 'Bburago', slug: 'bburago' },
-    { name: 'Minichamps', slug: 'minichamps' },
-    { name: 'MINI GT', slug: 'mini-gt' },
-    { name: 'Tomica', slug: 'tomica' },
-    { name: 'Majorette', slug: 'majorette' },
-    { name: 'GT Spirit', slug: 'gt-spirit' },
-    { name: 'CMC', slug: 'cmc' },
-    { name: 'Almost Real', slug: 'almost-real' },
+interface ManufacturerItem {
+    id: string;
+    name: string;
+    slug: string;
+}
+
+const MANUFACTURERS_FALLBACK: ManufacturerItem[] = [
+    { id: '', name: 'Hot Wheels', slug: 'hot-wheels' },
+    { id: '', name: 'Matchbox', slug: 'matchbox' },
+    { id: '', name: 'Tamiya', slug: 'tamiya' },
+    { id: '', name: 'AUTOart', slug: 'autoart' },
+    { id: '', name: 'Kyosho', slug: 'kyosho' },
+    { id: '', name: 'Maisto', slug: 'maisto' },
+    { id: '', name: 'GreenLight', slug: 'greenlight' },
+    { id: '', name: 'Bburago', slug: 'bburago' },
+    { id: '', name: 'Minichamps', slug: 'minichamps' },
+    { id: '', name: 'Tomica', slug: 'tomica' },
+    { id: '', name: 'Majorette', slug: 'majorette' },
+    { id: '', name: 'GT Spirit', slug: 'gt-spirit' },
+    { id: '', name: 'CMC', slug: 'cmc' },
+    { id: '', name: 'Almost Real', slug: 'almost-real' },
 ];
 
 export default function ManufacturersSlider() {
@@ -31,6 +35,20 @@ export default function ManufacturersSlider() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
+    const [manufacturers, setManufacturers] = useState<ManufacturerItem[]>(MANUFACTURERS_FALLBACK);
+
+    useEffect(() => {
+        const fetchManufacturers = async () => {
+            try {
+                const response = await manufacturersApi.findAll();
+                const items = Array.isArray(response.data) ? response.data : response.data?.data || [];
+                if (items.length > 0) setManufacturers(items);
+            } catch {
+                // keep fallback
+            }
+        };
+        fetchManufacturers();
+    }, []);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -57,10 +75,14 @@ export default function ManufacturersSlider() {
         }
     };
 
+    const buildHref = (m: ManufacturerItem) => {
+        if (m.id) return `/listings?manufacturerId=${m.id}`;
+        return `/listings?manufacturer=${encodeURIComponent(m.name)}`;
+    };
+
     return (
         <section className="py-8 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <div className="w-1 h-8 bg-orange-500 rounded"></div>
@@ -77,9 +99,7 @@ export default function ManufacturersSlider() {
                     </Link>
                 </div>
 
-                {/* Slider Container */}
                 <div className="relative">
-                    {/* Left Arrow */}
                     {canScrollLeft && (
                         <button
                             onClick={() => scroll('left')}
@@ -90,14 +110,13 @@ export default function ManufacturersSlider() {
                         </button>
                     )}
 
-                    {/* Manufacturers Grid */}
                     <div
                         ref={scrollRef}
                         onScroll={checkScroll}
                         className="flex gap-4 overflow-x-auto scrollbar-hide px-1 py-2"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
-                        {MANUFACTURERS.map((manufacturer, index) => (
+                        {manufacturers.map((manufacturer, index) => (
                             <motion.div
                                 key={manufacturer.slug}
                                 initial={{ opacity: 0, y: 20 }}
@@ -105,7 +124,7 @@ export default function ManufacturersSlider() {
                                 transition={{ delay: index * 0.03 }}
                             >
                                 <Link
-                                    href={`/listings?manufacturer=${encodeURIComponent(manufacturer.name)}`}
+                                    href={buildHref(manufacturer)}
                                     className="flex-shrink-0 w-28 h-20 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-all group"
                                 >
                                     <span className="text-sm font-bold text-gray-700 group-hover:text-orange-600 text-center px-2">
@@ -116,7 +135,6 @@ export default function ManufacturersSlider() {
                         ))}
                     </div>
 
-                    {/* Right Arrow */}
                     {canScrollRight && (
                         <button
                             onClick={() => scroll('right')}

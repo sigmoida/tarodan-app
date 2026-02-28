@@ -68,6 +68,19 @@ export default function Navbar() {
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      setNavHidden(y > lastScrollY.current && y > 80);
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Defer auth-dependent UI until after hydration so server and first client render always match (avoids hydration error).
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -310,25 +323,15 @@ export default function Navbar() {
                 Sponsorlu
               </span>
             </div>
-          ) : (
-            <div
-              className="w-full flex items-center justify-center border-b border-gray-700 text-white text-xs font-medium flex-shrink-0 overflow-hidden"
-              style={{
-                height: isMobile ? 40 : 50,
-                backgroundColor: '#1f2937',
-              }}
-            >
-              <span className="truncate px-4">🎉 {t('nav.banner')}</span>
-            </div>
-          )}
+          ) : null}
         </>
       )}
 
-      <nav className="bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav className={`bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm transition-transform duration-300 ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
-            {/* Logo - navbarın en soluna dayalı */}
-            <Link href="/" className="flex-shrink-0 flex items-center hover:opacity-90 transition-opacity -ml-1 h-8">
+            {/* Logo */}
+            <Link href="/" className="flex-shrink-0 flex items-center hover:opacity-90 transition-opacity h-8">
               <Image
                 src="/tarodan-logo.jpg"
                 alt="Tarodan Logo"
@@ -341,9 +344,9 @@ export default function Navbar() {
 
             {/* Arama - ortada */}
             <div ref={searchContainerRef} className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4">
-              <div className="w-full max-w-md relative flex-shrink-0">
-              <form onSubmit={handleSearchSubmit} className="relative h-9 block">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
+              <div className="w-full max-w-xl relative flex-shrink-0">
+              <form onSubmit={handleSearchSubmit} className="relative h-10 block">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
                   <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
                 </span>
                 <input
@@ -352,7 +355,7 @@ export default function Navbar() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setShowSearchDropdown(true)}
                   placeholder={t('nav.searchPlaceholder')}
-                  className="w-full h-9 pl-9 pr-3 bg-white/95 rounded-md text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
+                  className="w-full h-10 pl-10 pr-4 bg-white/95 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
                   aria-label={t('nav.searchPlaceholder')}
                 />
               </form>
@@ -386,7 +389,7 @@ export default function Navbar() {
             </div>
 
             {/* Right - İlan Ver + Menü + Hesap dropdown */}
-            <div ref={accountDropdownRef} className="flex items-center gap-2 flex-shrink-0">
+            <div ref={accountDropdownRef} className="flex items-center gap-1 flex-shrink-0 ml-auto">
               {/* İlan Ver - her zaman görünür */}
               <Link
                 href="/listings/new"
@@ -586,28 +589,26 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Auth Required Modal for İlan Ver */}
-        <AuthRequiredModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          title={t('nav.loginToCreateListing')}
-          message={t('nav.loginToCreateListingMsg')}
-          icon={<PlusIcon className="w-10 h-10 text-primary-500" />}
-          redirectPath="/listings/new"
-        />
-
-        {/* Auth Required Modal for Takaslar */}
-        <AuthRequiredModal
-          isOpen={showTradesAuthModal}
-          onClose={() => setShowTradesAuthModal(false)}
-          title={t('nav.loginForTrades')}
-          message={t('trade.tradeRequiresLogin')}
-          icon={<ArrowsRightLeftIcon className="w-10 h-10 text-primary-500" />}
-          redirectPath="/trades"
-        />
       </nav>
 
-      {/* CategoryMegaMenu kaldırıldı */}
+      {/* Auth modals must be outside nav to escape its stacking context */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={t('nav.loginToCreateListing')}
+        message={t('nav.loginToCreateListingMsg')}
+        icon={<PlusIcon className="w-10 h-10 text-primary-500" />}
+        redirectPath="/listings/new"
+      />
+
+      <AuthRequiredModal
+        isOpen={showTradesAuthModal}
+        onClose={() => setShowTradesAuthModal(false)}
+        title={t('nav.loginForTrades')}
+        message={t('trade.tradeRequiresLogin')}
+        icon={<ArrowsRightLeftIcon className="w-10 h-10 text-primary-500" />}
+        redirectPath="/trades"
+      />
     </>
   );
 }
