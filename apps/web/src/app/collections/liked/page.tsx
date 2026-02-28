@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { BookOpenIcon, ArchiveBoxIcon, ArrowLeftIcon, EyeIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
@@ -194,13 +195,7 @@ export default function LikedCollectionsPage() {
                     )}
 
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <div className="w-4 h-4 bg-orange-100 rounded-full flex items-center justify-center text-[8px] text-orange-600 font-bold">
-                        {collection.user?.avatarUrl ? (
-                          <img src={collection.user.avatarUrl} alt={collection.user.displayName} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          collection.user?.displayName?.charAt(0) || '?'
-                        )}
-                      </div>
+                      <UserAvatar displayName={collection.user?.displayName} size="xs" className="!w-4 !h-4 !text-[8px]" />
                       <span className="text-[10px] text-gray-400">{collection.user?.displayName || t('collection.anonymous')}</span>
                     </div>
 

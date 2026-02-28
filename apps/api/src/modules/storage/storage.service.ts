@@ -75,14 +75,22 @@ export class StorageService implements OnModuleInit {
 
     this.hasCredentials = true;
 
-    // S3 Client oluştur
-    this.s3Client = new S3Client({
+    // S3 Client oluştur (MinIO veya AWS S3)
+    const s3Config: any = {
       region: this.configService.get('AWS_REGION', 'eu-west-1'),
       credentials: {
         accessKeyId,
         secretAccessKey,
       },
-    });
+    };
+
+    const s3Endpoint = this.configService.get<string>('S3_ENDPOINT');
+    if (s3Endpoint) {
+      s3Config.endpoint = s3Endpoint;
+      s3Config.forcePathStyle = true;
+    }
+
+    this.s3Client = new S3Client(s3Config);
 
     this.logger.log(`S3 Storage initialized: ${this.baseBucket} (${this.envPrefix})`);
   }

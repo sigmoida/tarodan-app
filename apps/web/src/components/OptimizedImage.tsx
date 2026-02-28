@@ -67,6 +67,12 @@ export default function OptimizedImage({
   // Validate src before passing to Next.js Image — bare S3 keys crash rendering
   const safeSrc = (typeof src === 'string' && !isValidImageSrc(src)) ? fallbackSrc : src;
 
+  // DiceBear and other SVG/external avatars: use unoptimized to avoid optimizer path and preserve aspect ratio
+  const isExternalAvatar =
+    typeof safeSrc === 'string' &&
+    (safeSrc.includes('dicebear.com') || safeSrc.includes('api.dicebear.com'));
+  const useUnoptimized = props.unoptimized ?? isExternalAvatar;
+
   const [imgSrc, setImgSrc] = useState(safeSrc);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -142,6 +148,7 @@ export default function OptimizedImage({
       sizes={effectiveSizes}
       onError={handleError}
       onLoad={handleLoad}
+      unoptimized={useUnoptimized}
     />
   );
 }

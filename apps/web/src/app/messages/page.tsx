@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
@@ -432,17 +433,7 @@ export default function MessagesPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
-                        <div className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm overflow-hidden">
-                          {thread.otherUser?.avatarUrl ? (
-                            <img
-                              src={thread.otherUser.avatarUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            (thread.otherUser?.displayName || '?').charAt(0).toUpperCase()
-                          )}
-                        </div>
+                        <UserAvatar displayName={thread.otherUser?.displayName} size="sm" className="!w-11 !h-11" />
                         {thread.unreadCount > 0 && (
                           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-500 rounded-full border-2 border-white" />
                         )}

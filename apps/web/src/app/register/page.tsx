@@ -261,7 +261,7 @@ export default function RegisterPage() {
       {/* Left - Image panel */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden">
         <Image
-          src="/photos/toy-cars-row-1.jpg"
+          src="/photos/hero/hero-hot-wheels.png"
           alt="Diecast model araba koleksiyonu"
           fill
           className="object-cover"

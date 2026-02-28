@@ -6,7 +6,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SearchService, SearchOptions, SearchResponse } from './search.service';
+import { SearchService, SearchOptions, SearchResponse, RichAutocompleteResult } from './search.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRole } from '@prisma/client';
@@ -79,6 +79,14 @@ export class SearchController {
       limit ? parseInt(limit) : 10,
     );
     return { suggestions };
+  }
+
+  @Public()
+  @Get('autocomplete-rich')
+  async autocompleteRich(
+    @Query('q') query: string,
+  ): Promise<RichAutocompleteResult> {
+    return this.searchService.autocompleteRich(query || '');
   }
 
   @Post('admin/reindex')

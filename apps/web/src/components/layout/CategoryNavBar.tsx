@@ -91,17 +91,35 @@ const CATEGORIES_MENU = {
     tr: {
         title: 'KATEGORİLER',
         vehicleTypes: [
-            'Sedan', 'SUV / Jeep', 'Spor / Süper', 'Pick-up / Kamyonet',
-            'Klasik / Vintage', 'Yarış Aracı', 'Kamyon / TIR', 'Otobüs / Minibüs',
-            'Motosiklet', 'İş Makinesi', 'Askeri Araç', 'Polis / İtfaiye',
+            { label: 'Arabalar', slug: 'araba' },
+            { label: 'Motosikletler', slug: 'motosiklet' },
+            { label: 'Motorsports / Yarış', slug: 'motorsports' },
+            { label: 'Ticari Araçlar', slug: 'ticari' },
+            { label: 'İnşaat Araçları', slug: 'insaat' },
+            { label: 'Tarım Araçları', slug: 'tarim' },
+            { label: 'Askeri Araçlar', slug: 'askeri' },
+            { label: 'Acil Durum Araçları', slug: 'acil-durum' },
+            { label: 'Gemiler', slug: 'gemi' },
+            { label: 'Trenler', slug: 'tren' },
+            { label: 'Uçaklar', slug: 'ucak' },
+            { label: 'Setler', slug: 'set' },
         ],
     },
     en: {
         title: 'CATEGORIES',
         vehicleTypes: [
-            'Sedan', 'SUV / Jeep', 'Sports / Super', 'Pick-up / Truck',
-            'Classic / Vintage', 'Race Car', 'Truck / Semi', 'Bus / Minibus',
-            'Motorcycle', 'Construction', 'Military', 'Police / Fire',
+            { label: 'Cars', slug: 'araba' },
+            { label: 'Motorcycles', slug: 'motosiklet' },
+            { label: 'Motorsports / Racing', slug: 'motorsports' },
+            { label: 'Commercial Vehicles', slug: 'ticari' },
+            { label: 'Construction', slug: 'insaat' },
+            { label: 'Agriculture', slug: 'tarim' },
+            { label: 'Military', slug: 'askeri' },
+            { label: 'Emergency Vehicles', slug: 'acil-durum' },
+            { label: 'Ships', slug: 'gemi' },
+            { label: 'Trains', slug: 'tren' },
+            { label: 'Aircrafts', slug: 'ucak' },
+            { label: 'Sets', slug: 'set' },
         ],
     },
 };
@@ -189,11 +207,11 @@ export default function CategoryNavBar() {
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                                     {categoriesMenu.vehicleTypes.map((type) => (
                                         <Link
-                                            key={type}
-                                            href={`/listings?category=${encodeURIComponent(type)}`}
+                                            key={type.slug}
+                                            href={`/listings?vehicleType=${encodeURIComponent(type.slug)}`}
                                             className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
                                         >
-                                            {type}
+                                            {type.label}
                                         </Link>
                                     ))}
                                 </div>

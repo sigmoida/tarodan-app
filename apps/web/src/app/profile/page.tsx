@@ -31,6 +31,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import UserAvatar from '@/components/UserAvatar';
 
 interface MembershipTier {
   type: string;
@@ -344,19 +345,9 @@ export default function ProfilePage() {
             </div>
           ) : profile && (
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              {/* Avatar */}
+              {/* Avatar: initials only (Trendyol-style) */}
               <div className="relative flex-shrink-0">
-                <div className="w-24 h-24 md:w-28 md:h-28 bg-white rounded-full flex items-center justify-center text-4xl font-bold text-orange-500 shadow-lg ring-4 ring-white/30">
-                  {profile.avatarUrl ? (
-                    <img
-                      src={profile.avatarUrl}
-                      alt={profile.displayName}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    profile.displayName.charAt(0).toUpperCase()
-                  )}
-                </div>
+                <UserAvatar displayName={profile.displayName} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
               </div>
               
               {/* User Info */}

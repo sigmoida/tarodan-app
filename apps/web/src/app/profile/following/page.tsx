@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import Image from 'next/image';
 import toast from 'react-hot-toast';
+import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { UserMinusIcon, ArrowLeftIcon, UserIcon } from '@heroicons/react/24/outline';
@@ -116,21 +116,7 @@ export default function FollowingPage() {
                   href={`/seller/${item.following.id}`}
                   className="flex items-center gap-4 flex-1 hover:opacity-80 transition-opacity"
                 >
-                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center overflow-hidden">
-                    {item.following.avatarUrl ? (
-                      <Image
-                        src={item.following.avatarUrl}
-                        alt={item.following.displayName}
-                        width={64}
-                        height={64}
-                        className="object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl font-bold text-primary-600">
-                        {item.following.displayName?.[0]?.toUpperCase() || '?'}
-                      </span>
-                    )}
-                  </div>
+                  <UserAvatar displayName={item.following.displayName} size="lg" className="!w-16 !h-16 !text-2xl" />
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900">
                       {item.following.displayName}

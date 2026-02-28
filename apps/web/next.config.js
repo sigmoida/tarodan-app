@@ -59,6 +59,10 @@ const nextConfig = {
         hostname: 'localhost',
       },
       {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+      },
+      {
         protocol: 'https',
         hostname: 'autopartia.com',
       },
@@ -77,6 +81,14 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ui-avatars.com',
       },
     ],
     dangerouslyAllowSVG: true,

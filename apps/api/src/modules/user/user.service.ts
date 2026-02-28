@@ -1841,14 +1841,14 @@ export class UserService {
         itemCount: c._count?.items || 0,
         previewItems: c.items || [],
       })),
-      products: products.map(p => ({
+      products: await Promise.all(products.map(async (p) => ({
         id: p.id,
         title: p.title,
         price: Number(p.price),
         viewCount: p.viewCount,
         likeCount: p.likeCount,
-        image: p.images[0]?.url,
-      })),
+        image: await this.resolveProductImageUrl(p.images[0]?.url),
+      }))),
     };
   }
 
