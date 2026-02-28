@@ -75,6 +75,22 @@ export class ProductController {
   }
 
   /**
+   * GET /products/popular
+   * Anasayfa Popüler İlanlar – sadece view count'a göre, indirim filtresi yok
+   */
+  @Get('popular')
+  @Public()
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
+  @ApiOperation({ summary: 'Popüler ilanlar (görüntülenme sayısına göre)' })
+  @ApiResponse({ status: 200, description: 'Popüler ürün listesi', type: PaginatedProductsDto })
+  async getPopular(
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+  ) {
+    return this.productService.findPopular(Number(limit) || 20, Number(page) || 1);
+  }
+
+  /**
    * GET /products/filters
    * Get dynamic filters (categories, brands, scales, manufacturers)
    */

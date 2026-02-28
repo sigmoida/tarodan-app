@@ -974,7 +974,8 @@ async function main() {
     if (status === ProductStatus.active) {
       catActiveAssigned[d.cat] = (catActiveAssigned[d.cat] || 0) + 1;
     }
-    const slug = d.img.replace('product-', '').replace('.png', '');
+    const slugBase = d.img.replace('product-', '').replace('.png', '');
+    const slug = `${slugBase}-${i}`;
 
     const product = await prisma.product.create({
       data: {

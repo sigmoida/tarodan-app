@@ -233,15 +233,16 @@ export default function Home() {
     isFetchingNextPage,
     isLoading: isLoadingBestSellers,
   } = useInfiniteQuery({
-    queryKey: ['home', 'bestSellers', { sortBy: 'view_count_desc', status: 'active' }],
+    queryKey: ['home', 'bestSellers', 'popular'],
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await listingsApi.getAll({ limit: 20, page: pageParam, sortBy: 'view_count_desc', status: 'active' });
+      const response = await listingsApi.getPopular({ limit: 20, page: pageParam });
       const raw = response?.data;
       const products = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
       return Array.isArray(products) ? products : [];
     },
     getNextPageParam: (_lastPage, allPages) => (_lastPage.length < 20 ? undefined : allPages.length + 1),
     initialPageParam: 1,
+    refetchOnMount: 'always',
     meta: { page: 'home', section: 'bestSellers' },
   });
   const bestSellers = bestSellersData?.pages.flatMap((p) => p) ?? [];
@@ -390,16 +391,35 @@ export default function Home() {
                     <Link key={product.id} href={`/listings/${product.id}`} className="block group">
                       <div className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all" style={{borderRadius:'4px'}}>
                         <div className="relative aspect-[4/3] bg-gray-100">
-                          <Image src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" unoptimized />
+                          <OptimizedImage src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3Ctext fill='%239ca3af' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14'%3E%C3%9Cr%C3%BCn%3C/text%3E%3C/svg%3E" logContext={{ productId: product.id, page: 'home-discounted' }} />
                           <div className="absolute top-1.5 left-1.5">
                             <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5" style={{borderRadius:'2px'}}>%{discountPct}</span>
                           </div>
                         </div>
                         <div className="p-1.5">
                           <h3 className="font-medium text-heading line-clamp-1 text-[10px] leading-tight mb-0.5">{product.title}</h3>
-                          <p className="text-xs font-bold text-primary-600">
-                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
-                          </p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isProductOnSaleDisplay(product) ? (
+                                <>
+                                  <span className="text-[10px] text-gray-500 line-through">
+                                    {getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+                                  </span>
+                                  <span className="text-xs font-bold text-primary-600">
+                                    {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-xs font-bold text-primary-600">
+                                  {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                              <span className="flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/></svg>{product.viewCount ?? 0}</span>
+                              <span className="flex items-center gap-0.5"><svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"/></svg>{product.likeCount ?? 0}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </Link>
@@ -437,7 +457,7 @@ export default function Home() {
                   <Link key={product.id} href={`/listings/${product.id}`} className="block group">
                     <div className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all" style={{borderRadius:'4px'}}>
                       <div className="relative aspect-[4/3] bg-gray-100">
-                        <Image src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" unoptimized />
+                        <OptimizedImage src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3Ctext fill='%239ca3af' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14'%3E%C3%9Cr%C3%BCn%3C/text%3E%3C/svg%3E" logContext={{ productId: product.id, page: 'home-bestSellers' }} />
                         {idx < 3 && (
                           <div className="absolute top-1.5 left-1.5">
                             <span className="text-[10px] font-bold bg-orange-500 text-white px-1.5 py-0.5" style={{borderRadius:'2px'}}>{locale === 'en' ? 'Popular' : 'Popüler'}</span>

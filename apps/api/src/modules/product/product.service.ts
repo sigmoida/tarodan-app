@@ -320,8 +320,13 @@ export class ProductService implements OnModuleInit {
       minPrice, maxPrice, sortBy, page, limit, carModelId,
     })}`;
 
+    const hasSearch = !!(search && String(search).trim());
+    const isListAllOrPopular = !hasSearch && !discountOnly;
+    if (isListAllOrPopular) {
+      return this.findAllViaPostgres(query);
+    }
+
     const runListQuery = async () => {
-      // ── Try Elasticsearch first ──
       if (this.searchService.isAvailable()) {
         try {
           const esResult = await this.findAllViaElasticsearch(query);
@@ -330,12 +335,44 @@ export class ProductService implements OnModuleInit {
           this.logger.warn('ES findAll failed, falling back to PostgreSQL');
         }
       }
-
-      // ── PostgreSQL fallback ──
       return this.findAllViaPostgres(query);
     };
-
     return this.cache.getOrSet(cacheKey, runListQuery, { ttl: 300 });
+  }
+
+  /**
+   * Popüler ilanlar – sadece view count'a göre, indirim filtresi yok (cache yok)
+   * GET /products/popular
+   */
+  async findPopular(limit: number, page: number) {
+    const where: Prisma.ProductWhereInput = {
+      status: ProductStatus.active,
+      NOT: { id: { startsWith: 'membership-' } },
+      AND: [{ OR: [{ quantity: { gt: 0 } }, { quantity: null }] }],
+    };
+    const total = await this.prisma.product.count({ where });
+    const products = await this.prisma.product.findMany({
+      where,
+      orderBy: { viewCount: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        brand: { select: { id: true, name: true, slug: true, logo: true } },
+        manufacturer: { select: { id: true, name: true, slug: true } },
+        carModel: { include: { brand: { select: { slug: true } } } },
+        productAttributes: { include: { attribute: { include: { group: true } } } },
+      },
+    });
+    const formattedProducts = await Promise.all(
+      products.map((p) => this.formatProductResponse(p)),
+    );
+    return {
+      data: formattedProducts,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
@@ -376,6 +413,9 @@ export class ProductService implements OnModuleInit {
     const esResult = await this.searchService.searchProductIds(esOptions);
     // ES index boş olabilir (örn. db reset sonrası); arama yoksa PostgreSQL fallback kullanılsın
     if (esResult.ids.length === 0) return null;
+    // İndeks eksik olabilir (sadece güncellenen ürün indexlendi): arama yok, sayfa 1 ve total < limit ise Postgres kullan
+    const hasSearch = !!(search && search.trim());
+    if (!hasSearch && page === 1 && esResult.total < limit) return null;
 
     const products = await this.prisma.product.findMany({
       where: { id: { in: esResult.ids } },
@@ -391,6 +431,9 @@ export class ProductService implements OnModuleInit {
         productAttributes: { include: { attribute: { include: { group: true } } } },
       },
     });
+
+    // ES index can be stale (e.g. after DB seed): ids exist in ES but not in DB → fallback to Postgres
+    if (products.length === 0) return null;
 
     // Preserve ES ordering
     const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));
@@ -1619,8 +1662,10 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
                 sortOrder: img.sortOrder,
               };
             } catch (error) {
-              // Presigned URL oluşturulamazsa, orijinal URL'yi döndür
+              // Presigned URL oluşturulamazsa (S3 yok/hatalı), orijinal HTTP(S) URL'yi döndür
               this.logger.warn(`Failed to generate presigned URL for ${s3Key}: ${error}`);
+              const fallback = img.url && (img.url.startsWith('http://') || img.url.startsWith('https://')) ? img.url : null;
+              return { id: img.id, url: fallback, sortOrder: img.sortOrder };
             }
           }
 

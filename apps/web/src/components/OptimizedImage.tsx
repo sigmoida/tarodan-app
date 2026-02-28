@@ -78,7 +78,11 @@ export default function OptimizedImage({
   const isExternalAvatar =
     typeof safeSrc === 'string' &&
     (safeSrc.includes('dicebear.com') || safeSrc.includes('api.dicebear.com'));
-  const useUnoptimized = props.unoptimized ?? isExternalAvatar;
+  // Placeholder services: load directly to avoid Next.js optimizer truncating long query strings or failing
+  const isPlaceholderService =
+    typeof safeSrc === 'string' &&
+    (safeSrc.includes('placehold.co') || safeSrc.includes('via.placeholder.com') || safeSrc.includes('picsum.photos'));
+  const useUnoptimized = props.unoptimized ?? (isExternalAvatar || isPlaceholderService);
 
   const [imgSrc, setImgSrc] = useState(safeSrc);
   const [hasError, setHasError] = useState(false);

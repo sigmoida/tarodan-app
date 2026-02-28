@@ -131,6 +131,8 @@ export const authApi = {
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
   getFilters: () => api.get('/products/filters'),
+  getPopular: (params?: { limit?: number; page?: number }) =>
+    api.get('/products/popular', { params: { limit: 20, page: 1, ...params }, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
