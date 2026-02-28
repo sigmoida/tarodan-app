@@ -78,6 +78,7 @@ export default function CheckoutPage() {
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestPhoneCountryCode, setGuestPhoneCountryCode] = useState('+90');
 
   // New address form
   const [newAddress, setNewAddress] = useState<Omit<Address, 'id'>>({
@@ -89,6 +90,7 @@ export default function CheckoutPage() {
     address: '',
     zipCode: '',
   });
+  const [newAddressPhoneCountryCode, setNewAddressPhoneCountryCode] = useState('+90');
 
   // Billing address: same as shipping (default) or different
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
@@ -102,6 +104,35 @@ export default function CheckoutPage() {
     address: '',
     zipCode: '',
   });
+  const [billingAddressPhoneCountryCode, setBillingAddressPhoneCountryCode] = useState('+90');
+
+  // Common country codes
+  const countryCodes = [
+    { code: '+90', country: 'TR', name: 'Türkiye' },
+    { code: '+1', country: 'US', name: 'ABD/Kanada' },
+    { code: '+44', country: 'GB', name: 'İngiltere' },
+    { code: '+49', country: 'DE', name: 'Almanya' },
+    { code: '+33', country: 'FR', name: 'Fransa' },
+    { code: '+39', country: 'IT', name: 'İtalya' },
+    { code: '+34', country: 'ES', name: 'İspanya' },
+    { code: '+31', country: 'NL', name: 'Hollanda' },
+    { code: '+32', country: 'BE', name: 'Belçika' },
+    { code: '+41', country: 'CH', name: 'İsviçre' },
+    { code: '+43', country: 'AT', name: 'Avusturya' },
+    { code: '+46', country: 'SE', name: 'İsveç' },
+    { code: '+47', country: 'NO', name: 'Norveç' },
+    { code: '+45', country: 'DK', name: 'Danimarka' },
+    { code: '+358', country: 'FI', name: 'Finlandiya' },
+    { code: '+7', country: 'RU', name: 'Rusya' },
+    { code: '+971', country: 'AE', name: 'BAE' },
+    { code: '+966', country: 'SA', name: 'Suudi Arabistan' },
+    { code: '+20', country: 'EG', name: 'Mısır' },
+    { code: '+81', country: 'JP', name: 'Japonya' },
+    { code: '+86', country: 'CN', name: 'Çin' },
+    { code: '+82', country: 'KR', name: 'Güney Kore' },
+    { code: '+61', country: 'AU', name: 'Avustralya' },
+    { code: '+64', country: 'NZ', name: 'Yeni Zelanda' },
+  ];
 
   // Shipping cost state
   const [shippingCost, setShippingCost] = useState<number>(0);
@@ -117,22 +148,36 @@ export default function CheckoutPage() {
 
   // Coupon removed
 
-  // Phone formatting helper
-  const formatPhoneNumber = (value: string): string => {
+  // Phone formatting helper - format based on country code
+  const formatPhoneNumber = (value: string, countryCode: string = '+90'): string => {
     // Remove all non-digits
     const digits = value.replace(/\D/g, '');
-    // Limit to 10 digits
-    const limited = digits.slice(0, 10);
-    // Format as XXX XXX XX XX
-    if (limited.length <= 3) return limited;
-    if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
-    if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
-    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
+    
+    // For Turkey (+90), format as XXX XXX XX XX (10 digits)
+    if (countryCode === '+90') {
+      const limited = digits.slice(0, 10);
+      if (limited.length <= 3) return limited;
+      if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
+      if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
+      return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
+    }
+    
+    // For other countries, just return digits (no formatting)
+    return digits;
   };
 
-  const handlePhoneChange = (value: string) => {
-    const formatted = formatPhoneNumber(value);
+  const handlePhoneChange = (value: string, countryCode: string = '+90') => {
+    const formatted = formatPhoneNumber(value, countryCode);
     return formatted;
+  };
+
+  // Get full phone number with country code
+  const getFullPhoneNumber = (phone: string, countryCode: string): string => {
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (cleanPhone.startsWith(countryCode)) {
+      return cleanPhone;
+    }
+    return countryCode + cleanPhone;
   };
 
   // Saved cards state
@@ -288,24 +333,44 @@ export default function CheckoutPage() {
     }
   };
 
-  const fetchAddresses = async () => {
+  const fetchAddresses = async (selectAddressId?: string) => {
     try {
       const response = await addressesApi.getAll();
       const addressList = response.data?.addresses || response.data?.data || response.data || [];
       const validAddresses = Array.isArray(addressList) ? addressList : [];
       setAddresses(validAddresses);
+      
+      // If a specific address ID is provided, select it
+      if (selectAddressId) {
+        const targetAddr = validAddresses.find((a: Address) => a.id === selectAddressId);
+        if (targetAddr) {
+          setSelectedAddressId(targetAddr.id);
+          return;
+        }
+      }
+      
       // Select default address
       const defaultAddr = validAddresses.find((a: Address) => a.isDefault);
       if (defaultAddr) {
         setSelectedAddressId(defaultAddr.id);
       } else if (validAddresses.length > 0) {
-        setSelectedAddressId(validAddresses[0].id);
+        // If no default, select the most recently created (last in array, assuming backend returns in creation order)
+        setSelectedAddressId(validAddresses[validAddresses.length - 1].id);
       } else {
         // No addresses - automatically show the address form
+        setSelectedAddressId(null);
         setShowAddressForm(true);
       }
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch addresses:', error);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to fetch addresses:', error);
+        console.error('Error response:', error.response?.data);
+        console.error('Error status:', error.response?.status);
+      }
+      // Only show error toast if it's not a 401 (unauthorized) - that's handled by interceptor
+      if (error.response?.status !== 401) {
+        // Don't show toast for address fetch errors - user can still add new address
+      }
       setAddresses([]);
       // On error, show address form so user can still checkout
       setShowAddressForm(true);
@@ -320,10 +385,13 @@ export default function CheckoutPage() {
     }
 
     try {
+      // Format phone number with country code
+      const formattedPhone = getFullPhoneNumber(newAddress.phone, newAddressPhoneCountryCode);
+      
       const response = await addressesApi.create({
         title,
         fullName: newAddress.fullName,
-        phone: newAddress.phone,
+        phone: formattedPhone,
         city: newAddress.city,
         district: newAddress.district,
         address: newAddress.address,
@@ -331,12 +399,39 @@ export default function CheckoutPage() {
         isDefault: addresses.length === 0, // Make first address default
       });
 
-      const createdAddress = response.data?.address || response.data;
-      if (createdAddress && createdAddress.id) {
-        setAddresses([...addresses, createdAddress]);
-        setSelectedAddressId(createdAddress.id);
+      // Handle different response structures
+      // Backend returns the address object directly in response.data
+      // Check if response.data itself is an address object (has id field)
+      // Only use response.data.address if it's an object with an id, not a string
+      let createdAddress: any = null;
+      
+      if (response.data) {
+        // First, check if response.data is the address object (has id field)
+        if (response.data.id && typeof response.data === 'object' && !Array.isArray(response.data)) {
+          createdAddress = response.data;
+        }
+        // Otherwise, check if response.data.address exists and is an object with id
+        else if (response.data.address && typeof response.data.address === 'object' && response.data.address.id) {
+          createdAddress = response.data.address;
+        }
+        // Fallback: use response.data if it looks like an address object
+        else if (typeof response.data === 'object' && !Array.isArray(response.data) && response.data.id) {
+          createdAddress = response.data;
+        }
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Address Creation] API Response:', response.data);
+        console.log('[Address Creation] Extracted address:', createdAddress);
+        console.log('[Address Creation] Has ID:', !!createdAddress?.id);
+      }
+
+      // Validate that we have a valid address with an ID
+      if (createdAddress && createdAddress.id && typeof createdAddress.id === 'string') {
+        // Close the form first
         setShowAddressForm(false);
-        // Reset but keep user's name and phone for next time
+        
+        // Reset form but keep user's name and phone for next time
         setNewAddress({
           title: '',
           fullName: user?.displayName || '',
@@ -346,13 +441,44 @@ export default function CheckoutPage() {
           address: '',
           zipCode: ''
         });
+
+        // Refresh the address list from server to ensure we have the latest data
+        // This will also automatically select the new address (or default if it's set as default)
+        await fetchAddresses(createdAddress.id);
+        
         toast.success(locale === 'en' ? 'Address added' : 'Adres eklendi');
       } else {
-        toast.error(locale === 'en' ? 'Failed to add address' : 'Adres eklenemedi');
+        // Response structure doesn't match expected format
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Address Creation] Invalid response structure:', {
+            responseData: response.data,
+            extractedAddress: createdAddress,
+            hasId: !!createdAddress?.id
+          });
+        }
+        // Even if response structure is unexpected, try to refresh addresses
+        // The address might have been created on the backend
+        await fetchAddresses();
+        toast.error(locale === 'en' ? 'Address may have been added, but could not verify. Please refresh the page.' : 'Adres eklenmiş olabilir ancak doğrulanamadı. Lütfen sayfayı yenileyin.');
       }
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to add address:', error);
-      toast.error(error.response?.data?.message || t('checkout.addressAddError'));
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Address Creation] Error:', error);
+        console.error('[Address Creation] Error response:', error.response?.data);
+        console.error('[Address Creation] Error status:', error.response?.status);
+      }
+      
+      // Check if it's a validation error (400) - address might still be created in some edge cases
+      // For other errors, show the error message
+      const errorMessage = error.response?.data?.message || error.message || t('checkout.addressAddError');
+      
+      // If it's a 400 error, the address creation likely failed due to validation
+      // But refresh addresses anyway in case it was a partial success
+      if (error.response?.status === 400) {
+        await fetchAddresses();
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -459,16 +585,22 @@ export default function CheckoutPage() {
           return;
         }
 
+        // Format phone numbers with country codes
+        const formattedAddressPhone = getFullPhoneNumber(addressPhone, newAddressPhoneCountryCode);
+        const formattedContactPhone = isAuthenticated 
+          ? (user?.phone || formattedAddressPhone)
+          : getFullPhoneNumber(phone || guestPhone, guestPhoneCountryCode);
+
         shippingAddress = {
           fullName: newAddress.fullName,
-          phone: addressPhone,
+          phone: formattedAddressPhone,
           city: newAddress.city,
           district: newAddress.district,
           address: newAddress.address,
           zipCode: newAddress.zipCode || undefined,
         };
         contactEmail = email;
-        contactPhone = phone;
+        contactPhone = formattedContactPhone;
         contactName = name || newAddress.fullName;
       } else {
         // No address available - provide specific error message
@@ -527,7 +659,10 @@ export default function CheckoutPage() {
             }
             if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
               const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
-              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              const hasBillingCountryCode = countryCodes.some(cc => cleanBillingPhone.startsWith(cc.code));
+              const formattedBillingPhone = hasBillingCountryCode 
+                ? cleanBillingPhone 
+                : getFullPhoneNumber(cleanBillingPhone, billingAddressPhoneCountryCode);
               payload.billingAddress = {
                 fullName: newBillingAddress.fullName.trim(),
                 phone: formattedBillingPhone,
@@ -557,8 +692,12 @@ export default function CheckoutPage() {
                 if (!addr.city?.trim()) throw new Error('Teslimat adresi için şehir gereklidir');
                 if (!addr.district?.trim()) throw new Error('Teslimat adresi için ilçe gereklidir');
                 if (!addr.address?.trim()) throw new Error('Teslimat adresi için açık adres gereklidir');
+                // Format phone - if it already has a country code, use it; otherwise add the selected country code
                 const cleanPhone = addr.phone.replace(/\s/g, '');
-                const formattedPhone = cleanPhone.startsWith('+90') ? cleanPhone : cleanPhone.startsWith('0') ? '+9' + cleanPhone : '+90' + cleanPhone;
+                const hasCountryCode = countryCodes.some(cc => cleanPhone.startsWith(cc.code));
+                const formattedPhone = hasCountryCode 
+                  ? cleanPhone 
+                  : getFullPhoneNumber(cleanPhone, newAddressPhoneCountryCode);
                 payload.shippingAddress = {
                   fullName: addr.fullName.trim(),
                   phone: formattedPhone,
@@ -580,14 +719,18 @@ export default function CheckoutPage() {
             orderResponse = await ordersApi.directBuy(payload);
           } else {
             // Guest user: use guest checkout endpoint
-            // Format phone numbers properly
+            // Format phone numbers properly with country codes
             const cleanContactPhone = contactPhone?.replace(/\s/g, '') || '';
-            const formattedContactPhone = cleanContactPhone.startsWith('+90') ? cleanContactPhone :
-              cleanContactPhone.startsWith('0') ? '+9' + cleanContactPhone : '+90' + cleanContactPhone;
+            const hasContactCountryCode = countryCodes.some(cc => cleanContactPhone.startsWith(cc.code));
+            const formattedContactPhone = hasContactCountryCode 
+              ? cleanContactPhone 
+              : getFullPhoneNumber(cleanContactPhone, guestPhoneCountryCode);
 
             const cleanAddrPhone = shippingAddress?.phone?.replace(/\s/g, '') || '';
-            const formattedAddrPhone = cleanAddrPhone.startsWith('+90') ? cleanAddrPhone :
-              cleanAddrPhone.startsWith('0') ? '+9' + cleanAddrPhone : '+90' + cleanAddrPhone;
+            const hasAddrCountryCode = countryCodes.some(cc => cleanAddrPhone.startsWith(cc.code));
+            const formattedAddrPhone = hasAddrCountryCode 
+              ? cleanAddrPhone 
+              : getFullPhoneNumber(cleanAddrPhone, newAddressPhoneCountryCode);
 
             const guestPayload: {
               productId: string;
@@ -608,7 +751,10 @@ export default function CheckoutPage() {
             };
             if (!billingSameAsShipping && newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address) {
               const cleanBillingPhone = newBillingAddress.phone?.replace(/\s/g, '') || '';
-              const formattedBillingPhone = cleanBillingPhone.startsWith('+90') ? cleanBillingPhone : cleanBillingPhone.startsWith('0') ? '+9' + cleanBillingPhone : '+90' + cleanBillingPhone;
+              const hasBillingCountryCode = countryCodes.some(cc => cleanBillingPhone.startsWith(cc.code));
+              const formattedBillingPhone = hasBillingCountryCode 
+                ? cleanBillingPhone 
+                : getFullPhoneNumber(cleanBillingPhone, billingAddressPhoneCountryCode);
               guestPayload.billingAddress = {
                 fullName: newBillingAddress.fullName.trim(),
                 phone: formattedBillingPhone,
@@ -995,15 +1141,23 @@ export default function CheckoutPage() {
                             className="input"
                           />
                           <div className="flex">
-                            <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l">
-                              +90
-                            </span>
+                            <select
+                              value={newAddressPhoneCountryCode}
+                              onChange={(e) => setNewAddressPhoneCountryCode(e.target.value)}
+                              className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                            >
+                              {countryCodes.map((cc) => (
+                                <option key={cc.code} value={cc.code}>
+                                  {cc.code} {cc.country}
+                                </option>
+                              ))}
+                            </select>
                             <input
                               type="tel"
-                              placeholder="5XX XXX XX XX"
+                              placeholder={newAddressPhoneCountryCode === '+90' ? '5XX XXX XX XX' : 'Telefon'}
                               value={newAddress.phone}
-                              onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value) })}
-                              maxLength={13}
+                              onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value, newAddressPhoneCountryCode) })}
+                              maxLength={newAddressPhoneCountryCode === '+90' ? 13 : 20}
                               className="input rounded-l-none"
                             />
                           </div>
@@ -1073,15 +1227,23 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div className="flex">
-                      <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l">
-                        +90
-                      </span>
+                      <select
+                        value={guestPhoneCountryCode}
+                        onChange={(e) => setGuestPhoneCountryCode(e.target.value)}
+                        className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                      >
+                        {countryCodes.map((cc) => (
+                          <option key={cc.code} value={cc.code}>
+                            {cc.code} {cc.country}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="tel"
-                        placeholder="5XX XXX XX XX *"
+                        placeholder={guestPhoneCountryCode === '+90' ? '5XX XXX XX XX *' : 'Telefon *'}
                         value={guestPhone}
-                        onChange={(e) => setGuestPhone(handlePhoneChange(e.target.value))}
-                        maxLength={13}
+                        onChange={(e) => setGuestPhone(handlePhoneChange(e.target.value, guestPhoneCountryCode))}
+                        maxLength={guestPhoneCountryCode === '+90' ? 13 : 20}
                         className="input rounded-l-none flex-1"
                         required
                       />
@@ -1106,15 +1268,23 @@ export default function CheckoutPage() {
                         className="input"
                       />
                       <div className="flex">
-                        <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm">
-                          +90
-                        </span>
+                        <select
+                          value={newAddressPhoneCountryCode}
+                          onChange={(e) => setNewAddressPhoneCountryCode(e.target.value)}
+                          className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                        >
+                          {countryCodes.map((cc) => (
+                            <option key={cc.code} value={cc.code}>
+                              {cc.code} {cc.country}
+                            </option>
+                          ))}
+                        </select>
                         <input
                           type="tel"
-                          placeholder="5XX XXX XX XX"
+                          placeholder={newAddressPhoneCountryCode === '+90' ? '5XX XXX XX XX' : 'Telefon'}
                           value={newAddress.phone}
-                          onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value) })}
-                          maxLength={13}
+                          onChange={(e) => setNewAddress({ ...newAddress, phone: handlePhoneChange(e.target.value, newAddressPhoneCountryCode) })}
+                          maxLength={newAddressPhoneCountryCode === '+90' ? 13 : 20}
                           className="input rounded-l-none flex-1"
                         />
                       </div>
@@ -1183,13 +1353,23 @@ export default function CheckoutPage() {
                           className="input"
                         />
                         <div className="flex">
-                          <span className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm">+90</span>
+                          <select
+                            value={billingAddressPhoneCountryCode}
+                            onChange={(e) => setBillingAddressPhoneCountryCode(e.target.value)}
+                            className="inline-flex items-center px-3 text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                          >
+                            {countryCodes.map((cc) => (
+                              <option key={cc.code} value={cc.code}>
+                                {cc.code} {cc.country}
+                              </option>
+                            ))}
+                          </select>
                           <input
                             type="tel"
-                            placeholder="5XX XXX XX XX"
+                            placeholder={billingAddressPhoneCountryCode === '+90' ? '5XX XXX XX XX' : 'Telefon'}
                             value={newBillingAddress.phone}
-                            onChange={(e) => setNewBillingAddress(prev => ({ ...prev, phone: handlePhoneChange(e.target.value) }))}
-                            maxLength={13}
+                            onChange={(e) => setNewBillingAddress(prev => ({ ...prev, phone: handlePhoneChange(e.target.value, billingAddressPhoneCountryCode) }))}
+                            maxLength={billingAddressPhoneCountryCode === '+90' ? 13 : 20}
                             className="input rounded-l-none flex-1"
                           />
                         </div>
