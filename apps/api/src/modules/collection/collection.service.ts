@@ -136,6 +136,7 @@ export class CollectionService {
                 id: true,
                 title: true,
                 price: true,
+                status: true,
               },
             },
           },
@@ -256,6 +257,7 @@ export class CollectionService {
                   id: true,
                   title: true,
                   price: true,
+                  status: true,
                 },
               },
             },
@@ -1323,6 +1325,7 @@ export class CollectionService {
                       select: {
                         id: true,
                         title: true,
+                        status: true,
                         images: {
                           take: 1,
                           select: { url: true },
@@ -1421,6 +1424,26 @@ export class CollectionService {
     // Resolve coverImageUrl (S3 key -> presigned URL)
     const resolvedCoverUrl = await this.resolveCoverImageUrl(collection.coverImageUrl);
 
+    // Filter out products that are not active or sold
+    const activeItems = (collection.items && Array.isArray(collection.items))
+      ? collection.items.filter((item: any) => {
+          if (!item.productId) return true;
+          const status = item.product?.status;
+          return status === 'active' || status === 'sold';
+        })
+      : [];
+
+    const mappedItems = (await Promise.all(
+      activeItems.map(async (item: any) => {
+        try {
+          return await this.mapItemToDto(item);
+        } catch (itemError) {
+          this.logger.warn('mapCollectionToDto: error mapping item');
+          return null;
+        }
+      })
+    )).filter((item: any) => item !== null);
+
     return {
       id: collection.id,
       userId: collection.userId,
@@ -1434,17 +1457,8 @@ export class CollectionService {
       isPublic: collection.isPublic,
       viewCount: collection.viewCount ?? 0,
       likeCount: collection.likeCount ?? 0,
-      itemCount: collection.items?.length ?? 0,
-      items: (collection.items && Array.isArray(collection.items)) 
-        ? (await Promise.all(collection.items.map(async (item: any) => {
-            try {
-              return await this.mapItemToDto(item);
-            } catch (itemError) {
-              this.logger.warn('mapCollectionToDto: error mapping item');
-              return null;
-            }
-          }))).filter((item: any) => item !== null)
-        : [],
+      itemCount: mappedItems.length,
+      items: mappedItems,
       isLiked: isLiked ?? false,
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
@@ -1507,6 +1521,7 @@ export class CollectionService {
         productTitle: product.title || 'İsimsiz Ürün',
         productImage: (await this.resolveProductImageUrl(firstImage?.url)) || undefined,
         productPrice: product.price ? parseFloat(String(product.price)) : 0,
+        productStatus: (product as any).status ?? 'active',
         sortOrder: item.sortOrder || 0,
         isFeatured: item.isFeatured || false,
         addedAt: item.addedAt || new Date(),

@@ -64,8 +64,15 @@ export default function OptimizedImage({
   // When using fill, Next.js requires "sizes" for optimal srcset. Apply default if missing.
   const effectiveSizes = props.fill && !sizes ? DEFAULT_FILL_SIZES : sizes;
 
+  // Picsum random photos are irrelevant for products; show placeholder with product title (alt) instead
+  const replacePicsumWithPlaceholder = (s: string): string => {
+    if (typeof s !== 'string' || !s.includes('picsum.photos')) return s;
+    const text = (alt && typeof alt === 'string') ? alt.substring(0, 25).trim() : 'Ürün';
+    return `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(text)}`;
+  };
+  const srcReplaced = typeof src === 'string' ? replacePicsumWithPlaceholder(src) : src;
   // Validate src before passing to Next.js Image — bare S3 keys crash rendering
-  const safeSrc = (typeof src === 'string' && !isValidImageSrc(src)) ? fallbackSrc : src;
+  const safeSrc = (typeof srcReplaced === 'string' && !isValidImageSrc(srcReplaced)) ? fallbackSrc : srcReplaced;
 
   // DiceBear and other SVG/external avatars: use unoptimized to avoid optimizer path and preserve aspect ratio
   const isExternalAvatar =
@@ -79,11 +86,12 @@ export default function OptimizedImage({
 
   // Sync state when src prop changes
   useEffect(() => {
-    const validated = (typeof src === 'string' && !isValidImageSrc(src)) ? fallbackSrc : src;
+    const replaced = typeof src === 'string' ? replacePicsumWithPlaceholder(src) : src;
+    const validated = (typeof replaced === 'string' && !isValidImageSrc(replaced)) ? fallbackSrc : replaced;
     setImgSrc(validated);
     setHasError(false);
     setRetryCount(0);
-  }, [src, fallbackSrc]);
+  }, [src, fallbackSrc, alt]);
 
   const handleError = useCallback(() => {
     const errorDetails = {
@@ -159,10 +167,14 @@ export default function OptimizedImage({
  */
 export function getOptimizedImageUrl(
   image: string | { url: string } | { id?: string; url: string; sortOrder?: number } | null | undefined,
-  placeholder: string = DEFAULT_PLACEHOLDER
+  placeholder: string = DEFAULT_PLACEHOLDER,
+  productTitle?: string
 ): string {
   if (!image) return placeholder;
-  const raw = typeof image === 'string' ? image : ('url' in image ? image.url : null);
+  let raw = typeof image === 'string' ? image : ('url' in image ? image.url : null);
+  if (raw && raw.includes('picsum.photos') && productTitle) {
+    raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+  }
   if (raw && isValidImageSrc(raw)) return raw;
   return placeholder;
 }

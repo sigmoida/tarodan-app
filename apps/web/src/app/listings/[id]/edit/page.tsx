@@ -56,7 +56,9 @@ export default function EditListingPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const currentYear = new Date().getFullYear();
@@ -231,20 +233,31 @@ export default function EditListingPage() {
   }, [id, isAuthenticated]);
 
   const fetchBrands = async () => {
+    setBrandsLoading(true);
     try {
       const response = await api.get('/brands');
-      setBrands(response.data);
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setBrands(data);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch brands:', error);
+      console.error('Failed to fetch brands:', error);
+      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
+    } finally {
+      setBrandsLoading(false);
     }
   };
 
   const fetchModels = async (brandSlug: string) => {
+    setModelsLoading(true);
+    setModels([]);
     try {
       const response = await api.get(`/car-models?brand=${brandSlug}`);
-      setModels(response.data);
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setModels(data);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch models:', error);
+      console.error('Failed to fetch models:', error);
+      toast.error(locale === 'en' ? 'Failed to load models' : 'Modeller yüklenemedi');
+    } finally {
+      setModelsLoading(false);
     }
   };
 
@@ -492,7 +505,7 @@ export default function EditListingPage() {
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const maxImages = limits?.maxImagesPerListing || 5;
+    const maxImages = limits?.maxImagesPerListing || 3;
     const currentCount = formData.imageUrls.length;
 
     if (currentCount + files.length > maxImages) {
@@ -535,6 +548,27 @@ export default function EditListingPage() {
       imageUrls: formData.imageUrls.filter((_, i) => i !== index),
     });
     setImagePreviewUrls(imagePreviewUrls.filter((_, i) => i !== index));
+  };
+
+  const [reactivateQuantity, setReactivateQuantity] = useState('1');
+  const [reactivating, setReactivating] = useState(false);
+
+  const handleReactivate = async () => {
+    const qty = Number(reactivateQuantity);
+    if (!qty || qty < 1) {
+      toast.error('Geçerli bir stok miktarı giriniz');
+      return;
+    }
+    setReactivating(true);
+    try {
+      await listingsApi.update(id, { status: 'active', quantity: qty } as any);
+      toast.success('Ürün yeniden satışa açıldı!');
+      router.push(`/listings/${id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Yeniden satışa açılamadı');
+    } finally {
+      setReactivating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -687,7 +721,47 @@ export default function EditListingPage() {
             İlan bilgilerinizi güncelleyin.
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {(formData.status === 'sold' || formData.status === 'inactive') && (
+            <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-amber-800 mb-2">
+                {formData.status === 'sold' ? 'Bu ürün satılmış' : 'Bu ürün stokta yok'}
+              </h2>
+              <p className="text-sm text-amber-700 mb-4">
+                Yeniden satışa açmak için stok miktarı belirleyip aşağıdaki butonu kullanın.
+              </p>
+              <div className="flex items-end gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">Stok Miktarı</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={reactivateQuantity}
+                    onChange={(e) => setReactivateQuantity(e.target.value)}
+                    className="w-28 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-gray-900"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleReactivate}
+                  disabled={reactivating}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {reactivating ? 'İşleniyor...' : 'Yeniden Satışa Aç'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {formData.status === 'reserved' && (
+            <div className="mb-6 p-5 bg-blue-50 border border-blue-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-blue-800 mb-2">Bu ürün rezerve edilmiş</h2>
+              <p className="text-sm text-blue-700">
+                Rezerve edilmiş ürünler düzenlenemez. Rezervasyon tamamlandıktan veya iptal edildikten sonra düzenleme yapabilirsiniz.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6" style={{ display: ['sold', 'reserved', 'inactive'].includes(formData.status) ? 'none' : undefined }}>
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -773,12 +847,13 @@ export default function EditListingPage() {
                     setFormData(prev => ({
                       ...prev,
                       brandId: newBrandId,
-                      carModelId: '' // Reset model when brand changes
+                      carModelId: ''
                     }));
                   }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  disabled={brandsLoading}
                 >
-                  <option value="">Marka Seçin</option>
+                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
                   {brands.map((brand) => (
                     <option key={brand.id} value={brand.id}>
                       {brand.name}
@@ -795,9 +870,17 @@ export default function EditListingPage() {
                   value={formData.carModelId}
                   onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || models.length === 0}
+                  disabled={!formData.brandId || modelsLoading}
                 >
-                  <option value="">Model Seçin</option>
+                  <option value="">
+                    {!formData.brandId
+                      ? 'Önce marka seçin'
+                      : modelsLoading
+                        ? 'Yükleniyor...'
+                        : models.length === 0
+                          ? 'Bu markaya ait model yok'
+                          : 'Model Seçin'}
+                  </option>
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.name}
@@ -1116,7 +1199,7 @@ export default function EditListingPage() {
             {/* Images */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 5})
+                Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 3})
               </label>
               <div className="space-y-3">
                 <div>
@@ -1125,7 +1208,7 @@ export default function EditListingPage() {
                     accept="image/*"
                     multiple
                     onChange={(e) => handleFileUpload(e.target.files)}
-                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 5)}
+                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 3)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   {uploadingImages && (
@@ -1162,7 +1245,7 @@ export default function EditListingPage() {
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} resim yüklendi
+                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 3} resim yüklendi
               </p>
             </div>
 

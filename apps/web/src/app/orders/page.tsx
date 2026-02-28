@@ -10,7 +10,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { api, ratingsApi } from '@/lib/api';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
-import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
+import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { formatOrderStatus } from '@/lib/format';
 
@@ -94,6 +94,12 @@ export default function OrdersPage() {
   const [sellerShipping, setSellerShipping] = useState(5);
   const [sellerPackaging, setSellerPackaging] = useState(5);
   const [sellerReviewText, setSellerReviewText] = useState('');
+
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [shippingCarrier, setShippingCarrier] = useState('');
+  const [submittingShipping, setSubmittingShipping] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -211,6 +217,34 @@ export default function OrdersPage() {
       }
     } finally {
       setDownloadingInvoiceOrderId(null);
+    }
+  };
+
+  const openShippingModal = (orderId: string) => {
+    setShippingOrderId(orderId);
+    setTrackingNumber('');
+    setShippingCarrier('');
+    setShowShippingModal(true);
+  };
+
+  const submitShipping = async () => {
+    if (!shippingOrderId || !trackingNumber.trim()) {
+      toast.error(locale === 'en' ? 'Please enter tracking number' : 'Lütfen takip numarasını girin');
+      return;
+    }
+    setSubmittingShipping(true);
+    try {
+      await api.post(`/orders/${shippingOrderId}/ship`, {
+        trackingNumber: trackingNumber.trim(),
+        carrier: shippingCarrier.trim() || undefined,
+      });
+      toast.success(locale === 'en' ? 'Shipping info saved!' : 'Kargo bilgileri kaydedildi!');
+      setShowShippingModal(false);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Could not save shipping info' : 'Kargo bilgileri kaydedilemedi'));
+    } finally {
+      setSubmittingShipping(false);
     }
   };
 
@@ -333,10 +367,10 @@ export default function OrdersPage() {
 
                   <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                     <div className="text-sm text-gray-500">
-                      {order.isBuyer !== false ? (
-                        <>{t('product.seller')}: {order.seller?.displayName || t('product.seller')}</>
+                      {order.isSeller ? (
+                        <>{locale === 'en' ? 'Buyer' : 'Alıcı'}: {order.buyer?.displayName || '-'}</>
                       ) : (
-                        <>{t('product.seller')}: {order.buyer?.displayName}</>
+                        <>{t('product.seller')}: {order.seller?.displayName || t('product.seller')}</>
                       )}
                     </div>
                     <div className="text-right">
@@ -389,6 +423,26 @@ export default function OrdersPage() {
                         className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm"
                       >
                         {t('order.reorder')}
+                      </button>
+                    )}
+                    {/* Seller shipping actions */}
+                    {order.isSeller && ['paid', 'preparing'].includes(order.status) && !order.shipment && (
+                      <button
+                        onClick={() => openShippingModal(order.id)}
+                        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm flex items-center gap-1"
+                      >
+                        <TruckIcon className="w-4 h-4" />
+                        {locale === 'en' ? 'Add Shipping Info' : 'Kargo Bilgisi Ekle'}
+                      </button>
+                    )}
+                    {order.isSeller && ['paid', 'preparing', 'shipped'].includes(order.status) && (
+                      <button
+                        onClick={() => handleDownloadInvoice(order.id)}
+                        disabled={downloadingInvoiceOrderId === order.id}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm flex items-center gap-1 disabled:opacity-50"
+                      >
+                        <DocumentTextIcon className="w-4 h-4" />
+                        {locale === 'en' ? 'Invoice' : 'Fatura'}
                       </button>
                     )}
                     {canReview(order) && (
@@ -602,6 +656,75 @@ export default function OrdersPage() {
                   className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
                   {submittingReview ? t('common.sending') : t('review.submit')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Shipping Modal */}
+        {showShippingModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <TruckIcon className="w-6 h-6 text-purple-500" />
+                {locale === 'en' ? 'Add Shipping Info' : 'Kargo Bilgisi Ekle'}
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {locale === 'en' ? 'Shipping Company' : 'Kargo Firması'}
+                  </label>
+                  <select
+                    value={shippingCarrier}
+                    onChange={(e) => setShippingCarrier(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">{locale === 'en' ? 'Select carrier' : 'Kargo firması seçin'}</option>
+                    <option value="Yurtiçi Kargo">Yurtiçi Kargo</option>
+                    <option value="Aras Kargo">Aras Kargo</option>
+                    <option value="MNG Kargo">MNG Kargo</option>
+                    <option value="PTT Kargo">PTT Kargo</option>
+                    <option value="Sürat Kargo">Sürat Kargo</option>
+                    <option value="UPS">UPS</option>
+                    <option value="DHL">DHL</option>
+                    <option value="FedEx">FedEx</option>
+                    <option value="Trendyol Express">Trendyol Express</option>
+                    <option value="Diğer">{locale === 'en' ? 'Other' : 'Diğer'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {locale === 'en' ? 'Tracking Number' : 'Takip Numarası'} *
+                  </label>
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder={locale === 'en' ? 'Enter tracking number' : 'Kargo takip numarasını girin'}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowShippingModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {locale === 'en' ? 'Cancel' : 'İptal'}
+                </button>
+                <button
+                  onClick={submitShipping}
+                  disabled={submittingShipping || !trackingNumber.trim()}
+                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <TruckIcon className="w-4 h-4" />
+                  {submittingShipping 
+                    ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...') 
+                    : (locale === 'en' ? 'Save & Ship' : 'Kaydet ve Gönder')}
                 </button>
               </div>
             </div>

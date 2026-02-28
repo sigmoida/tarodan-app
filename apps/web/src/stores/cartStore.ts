@@ -137,9 +137,8 @@ export const useCartStore = create<CartState>()(
       
       setAuthToken: (token) => {
         set({ authToken: token });
-        // Fetch cart when token is set
         if (token) {
-          get().fetchCart();
+          get().syncOfflineCart().then(() => get().fetchCart());
         }
       },
       
@@ -198,15 +197,37 @@ export const useCartStore = create<CartState>()(
       },
       
       addToCart: async (productId, quantity = 1) => {
-        // productId must be a string (backend expects it)
         const id = typeof productId === 'string' ? productId : (productId as any)?.productId;
         if (!id) {
           console.warn('addToCart: productId is required');
           return;
         }
         const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        
         if (!token) {
-          console.warn('Cannot add to cart without authentication');
+          set({ isLoading: true, error: null });
+          try {
+            const res = await fetch(`${API_URL}/api/products/${id}`);
+            if (!res.ok) throw new Error('Ürün bilgisi alınamadı');
+            const product = await res.json();
+            
+            get().addToOfflineCart({
+              productId: product.id,
+              title: product.title,
+              price: product.salePrice ?? product.price,
+              imageUrl: product.images?.[0]?.url || product.imageUrl || '',
+              seller: {
+                id: product.sellerId || product.seller?.id || '',
+                displayName: product.sellerName || product.seller?.displayName || product.seller?.name || 'Satıcı',
+              },
+            });
+            set({ isLoading: false });
+          } catch (error) {
+            set({
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Hata oluştu',
+            });
+          }
           return;
         }
         
@@ -254,10 +275,24 @@ export const useCartStore = create<CartState>()(
       
       removeFromCart: async (productId) => {
         const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
-        if (!token) return;
         
         const id = typeof productId === 'string' ? productId : (productId as any)?.productId;
         if (!id) return;
+        
+        if (!token) {
+          const offlineItems = get().offlineItems;
+          const newItems = offlineItems.filter(i => i.productId !== id);
+          const total = newItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+          const itemCount = newItems.reduce((sum, i) => sum + i.quantity, 0);
+          set({
+            offlineItems: newItems,
+            subtotal: total,
+            grandTotal: total + (total >= 500 ? 0 : 29.99),
+            itemCount,
+            shippingCost: total >= 500 ? 0 : 29.99,
+          });
+          return;
+        }
         
         set({ isLoading: true, error: null });
         

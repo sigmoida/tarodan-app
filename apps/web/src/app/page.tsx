@@ -236,7 +236,8 @@ export default function Home() {
     queryKey: ['home', 'bestSellers', { sortBy: 'view_count_desc', status: 'active' }],
     queryFn: async ({ pageParam = 1 }) => {
       const response = await listingsApi.getAll({ limit: 20, page: pageParam, sortBy: 'view_count_desc', status: 'active' });
-      const products = response.data.data || response.data.products || [];
+      const raw = response?.data;
+      const products = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
       return Array.isArray(products) ? products : [];
     },
     getNextPageParam: (_lastPage, allPages) => (_lastPage.length < 20 ? undefined : allPages.length + 1),
@@ -264,7 +265,8 @@ export default function Home() {
     setIsLoadingDiscounted(true);
     try {
       const response = await listingsApi.getAll({ limit: 12, page: 1, discountOnly: true, status: 'active' });
-      const products = response.data.data || response.data.products || [];
+      const raw = response?.data;
+      const products = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
       setDiscountedProducts(Array.isArray(products) ? products : []);
     } catch (error) {
       console.error('Failed to fetch discounted products:', error);
@@ -288,11 +290,14 @@ export default function Home() {
     if (topCollections.length > 0) setCurrentCollectionIndex((prev) => (prev - 1 + topCollections.length) % topCollections.length);
   };
 
-  const getImageUrl = (image: any, index?: number): string => {
+  const getImageUrl = (image: any, index?: number, productTitle?: string): string => {
     const demoIdx = (index ?? Math.floor(Math.random() * DEMO_PRODUCT_IMAGES.length)) % DEMO_PRODUCT_IMAGES.length;
     const placeholder = DEMO_PRODUCT_IMAGES[demoIdx];
     if (!image) return placeholder;
-    const raw = typeof image === 'string' ? image : image.url;
+    let raw = typeof image === 'string' ? image : image.url;
+    if (raw && raw.includes('picsum.photos') && productTitle) {
+      raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+    }
     if (raw && isValidImageSrc(raw)) return raw;
     return placeholder;
   };
@@ -385,7 +390,7 @@ export default function Home() {
                     <Link key={product.id} href={`/listings/${product.id}`} className="block group">
                       <div className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all" style={{borderRadius:'4px'}}>
                         <div className="relative aspect-[4/3] bg-gray-100">
-                          <Image src={getImageUrl(product.images?.[0], idx)} alt={product.title} fill className="object-cover" unoptimized />
+                          <Image src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" unoptimized />
                           <div className="absolute top-1.5 left-1.5">
                             <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5" style={{borderRadius:'2px'}}>%{discountPct}</span>
                           </div>
@@ -432,7 +437,7 @@ export default function Home() {
                   <Link key={product.id} href={`/listings/${product.id}`} className="block group">
                     <div className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all" style={{borderRadius:'4px'}}>
                       <div className="relative aspect-[4/3] bg-gray-100">
-                        <Image src={getImageUrl(product.images?.[0], idx)} alt={product.title} fill className="object-cover" unoptimized />
+                        <Image src={getImageUrl(product.images?.[0], idx, product.title)} alt={product.title} fill className="object-cover" unoptimized />
                         {idx < 3 && (
                           <div className="absolute top-1.5 left-1.5">
                             <span className="text-[10px] font-bold bg-orange-500 text-white px-1.5 py-0.5" style={{borderRadius:'2px'}}>{locale === 'en' ? 'Popular' : 'Popüler'}</span>

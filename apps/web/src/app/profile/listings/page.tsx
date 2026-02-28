@@ -15,6 +15,10 @@ import {
   EyeIcon,
   TrashIcon,
   ArchiveBoxIcon,
+  TruckIcon,
+  UserIcon,
+  CurrencyDollarIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -33,6 +37,10 @@ interface Listing {
   images?: Array<{ url: string } | string>;
   createdAt: string;
   viewCount?: number;
+  soldAt?: string;
+  soldPrice?: number;
+  buyer?: { id: string; displayName: string };
+  orderId?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -48,7 +56,9 @@ const FILTER_TABS = [
   { value: '', label: 'Tümü' },
   { value: 'pending', label: 'Onay Bekleyen' },
   { value: 'active', label: 'Aktif' },
+  { value: 'reserved', label: 'Rezerve' },
   { value: 'sold', label: 'Satılan' },
+  { value: 'inactive', label: 'Pasif' },
 ];
 
 export default function ProfileListingsPage() {
@@ -73,14 +83,12 @@ export default function ProfileListingsPage() {
   const listingsQuery = useQuery({
     queryKey: ['profile-listings', activeFilter],
     queryFn: async (): Promise<Listing[]> => {
-      const params: Record<string, any> = {};
+      const params: Record<string, any> = { limit: 100, page: 1 };
       if (activeFilter?.trim()) params.status = activeFilter;
       const response = await userApi.getMyProducts(params);
       let data = response.data?.data || response.data?.products || response.data || [];
       if (!activeFilter?.trim()) {
-        data = data.filter((listing: Listing) =>
-          listing.status !== 'deleted' && listing.status !== 'inactive' && listing.status !== 'draft'
-        );
+        data = data.filter((listing: Listing) => listing.status !== 'draft');
       }
       return Array.isArray(data) ? data : [];
     },
@@ -266,9 +274,32 @@ export default function ProfileListingsPage() {
                         </span>
                       )}
                     </div>
+
+                    {listing.status === 'sold' && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3 space-y-1.5 text-sm">
+                        {listing.soldAt && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <CalendarDaysIcon className="w-4 h-4 text-orange-500" />
+                            <span>Satış: {new Date(listing.soldAt).toLocaleDateString('tr-TR')}</span>
+                          </div>
+                        )}
+                        {listing.buyer && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <UserIcon className="w-4 h-4 text-orange-500" />
+                            <span>Alıcı: @{listing.buyer.displayName}</span>
+                          </div>
+                        )}
+                        {listing.soldPrice != null && (
+                          <div className="flex items-center gap-2 text-gray-700 font-medium">
+                            <CurrencyDollarIcon className="w-4 h-4 text-green-600" />
+                            <span>{listing.soldPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="flex gap-2">
-                      {listing.status === 'active' && (
+                      {['active', 'sold', 'reserved', 'inactive'].includes(listing.status) && (
                         <Link
                           href={`/listings/${listing.id}`}
                           className="flex-1 py-2 text-center bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
@@ -285,6 +316,23 @@ export default function ProfileListingsPage() {
                           Düzenle
                         </Link>
                       )}
+                      {listing.status === 'sold' && listing.orderId && (
+                        <Link
+                          href={`/orders?highlight=${listing.orderId}`}
+                          className="flex-1 py-2 text-center bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                          <TruckIcon className="w-4 h-4" />
+                          Sipariş Detayı
+                        </Link>
+                      )}
+                      {(listing.status === 'sold' && !listing.orderId) || listing.status === 'inactive' ? (
+                        <Link
+                          href={`/listings/${listing.id}/edit`}
+                          className="flex-1 py-2 text-center bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                          Yeniden Satışa Aç
+                        </Link>
+                      ) : null}
                       {listing.status === 'rejected' && (
                         <button
                           onClick={() => handleDelete(listing.id)}

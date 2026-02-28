@@ -233,11 +233,10 @@ export class UserController {
 
   /**
    * GET /users/:id/profile
-   * Get public user profile
+   * Get public user profile (no auth required)
    */
   @Get(':id/profile')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Public()
   @ApiOperation({ summary: 'Kullanıcı profili görüntüle' })
   @ApiResponse({ status: 200, description: 'Kullanıcı profili' })
   async getUserProfile(@Param('id') userId: string) {

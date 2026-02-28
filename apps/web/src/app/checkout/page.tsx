@@ -53,17 +53,17 @@ interface CheckoutItem {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { items: cartItems, subtotal: cartSubtotal, clearCart } = useCartStore();
+  const { items: cartItems, offlineItems, subtotal: cartSubtotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
 
-  // Hydration fix - wait for client mount
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Direct buy mode (from URL param)
+  // Guest checkout is allowed - no redirect to login
+
   const directProductId = searchParams.get('productId');
 
   const [step, setStep] = useState(1); // 1: Address, 2: Payment, 3: Confirm
@@ -147,18 +147,27 @@ export default function CheckoutPage() {
   const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
   const [useNewCard, setUseNewCard] = useState(true);
 
-  // Get checkout items (either from cart or direct buy). Cart API returns effectivePrice, originalPrice, productTitle; normalize to CheckoutItem.
+  // Get checkout items: direct buy > authenticated cart > offline/guest cart
   const checkoutItems: CheckoutItem[] = directProduct
     ? [directProduct]
-    : cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
-      id: item.id,
-      productId: item.productId,
-      title: item.productTitle,
-      price: item.effectivePrice,
-      originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
-      imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
-      seller: { id: item.sellerId, displayName: item.sellerName },
-    }));
+    : cartItems.length > 0
+      ? cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
+        id: item.id,
+        productId: item.productId,
+        title: item.productTitle,
+        price: item.effectivePrice,
+        originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
+        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: { id: item.sellerId, displayName: item.sellerName },
+      }))
+      : offlineItems.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        title: item.title,
+        price: item.price,
+        imageUrl: item.imageUrl || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: { id: item.seller.id, displayName: item.seller.displayName },
+      }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
   const grandTotal = Math.max(0, subtotal + shippingCost);
 
@@ -304,13 +313,15 @@ export default function CheckoutPage() {
   };
 
   const handleAddAddress = async () => {
-    if (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
-      toast.error(t('common.fillAllFields'));
+    const title = (newAddress.title ?? '').trim();
+    if (!title || !newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
+      toast.error(locale === 'en' ? 'Please fill all required fields including address title (e.g. Home, Work)' : 'Adres başlığı dahil tüm zorunlu alanları doldurun (örn: Ev, İş)');
       return;
     }
 
     try {
       const response = await addressesApi.create({
+        title,
         fullName: newAddress.fullName,
         phone: newAddress.phone,
         city: newAddress.city,
@@ -327,6 +338,7 @@ export default function CheckoutPage() {
         setShowAddressForm(false);
         // Reset but keep user's name and phone for next time
         setNewAddress({
+          title: '',
           fullName: user?.displayName || '',
           phone: user?.phone || '',
           city: '',

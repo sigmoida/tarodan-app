@@ -175,6 +175,25 @@ export class ProductController {
   }
 
   /**
+   * GET /products/my/:id
+   * Get seller's own product by ID (all statuses: active, inactive, sold, reserved, etc.)
+   */
+  @Get('my/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kendi ürünüm (düzenleme için)' })
+  @ApiParam({ name: 'id', description: 'Product UUID' })
+  @ApiResponse({ status: 200, description: 'Ürün detayı' })
+  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 403, description: 'Bu ürün size ait değil' })
+  async findMyProductById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.productService.findMyProductById(id, userId);
+  }
+
+  /**
    * GET /products/:id
    * Get single product (public, but only shows active products)
    */
