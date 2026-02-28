@@ -151,8 +151,8 @@ export default function CreateScreen() {
           } as any);
           
           const uploadResponse = await uploadApi.image(formData);
-          if (uploadResponse.url) {
-            uploadedImageUrls.push(uploadResponse.url);
+          if (uploadResponse.key || uploadResponse.url) {
+            uploadedImageUrls.push(uploadResponse.key || uploadResponse.url);
           }
         } catch (uploadError) {
           console.error('Image upload error:', uploadError);

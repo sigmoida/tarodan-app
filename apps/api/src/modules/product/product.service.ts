@@ -145,6 +145,27 @@ export class ProductService implements OnModuleInit {
       ? new Date(dto.year, 0, 1)
       : undefined;
 
+    // Process imageUrls: extract S3 keys from presigned URLs or use keys directly
+    const processedImageUrls = dto.imageUrls?.map((urlOrKey) => {
+      // If already a key format (starts with dev/ or prod/), use it directly
+      if (urlOrKey.includes('dev/') || urlOrKey.includes('prod/')) {
+        // Remove query string if present
+        try {
+          const urlObj = new URL(urlOrKey, 'http://dummy.com');
+          return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+        } catch {
+          return urlOrKey; // If URL parse fails, use as-is
+        }
+      }
+      // If presigned URL, extract key
+      const extractedKey = this.extractKeyFromUrl(urlOrKey);
+      if (extractedKey) {
+        return extractedKey;
+      }
+      // Fallback: use original (for backward compatibility with old data)
+      return urlOrKey;
+    });
+
     const product = await this.prisma.product.create({
       data: {
         sellerId,
@@ -161,10 +182,10 @@ export class ProductService implements OnModuleInit {
         brandId: dto.brandId,
         carModelId: dto.carModelId,
         releaseDate,
-        images: dto.imageUrls?.length
+        images: processedImageUrls?.length
           ? {
-            create: dto.imageUrls.map((url, index) => ({
-              url,
+            create: processedImageUrls.map((key, index) => ({
+              url: key, // Store S3 key instead of presigned URL
               sortOrder: index,
             })),
           }
@@ -885,10 +906,31 @@ export class ProductService implements OnModuleInit {
       });
 
       if (dto.imageUrls.length > 0) {
+        // Process imageUrls: extract S3 keys from presigned URLs or use keys directly
+        const processedImageUrls = dto.imageUrls.map((urlOrKey) => {
+          // If already a key format (starts with dev/ or prod/), use it directly
+          if (urlOrKey.includes('dev/') || urlOrKey.includes('prod/')) {
+            // Remove query string if present
+            try {
+              const urlObj = new URL(urlOrKey, 'http://dummy.com');
+              return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+            } catch {
+              return urlOrKey; // If URL parse fails, use as-is
+            }
+          }
+          // If presigned URL, extract key
+          const extractedKey = this.extractKeyFromUrl(urlOrKey);
+          if (extractedKey) {
+            return extractedKey;
+          }
+          // Fallback: use original (for backward compatibility with old data)
+          return urlOrKey;
+        });
+
         await this.prisma.productImage.createMany({
-          data: dto.imageUrls.map((url, index) => ({
+          data: processedImageUrls.map((key, index) => ({
             productId: id,
-            url,
+            url: key, // Store S3 key instead of presigned URL
             sortOrder: index,
           })),
         });

@@ -196,8 +196,8 @@ const CreateListingScreen = ({ navigation }: any) => {
         
         try {
           const uploadResponse = await endpoints.upload.image(formData);
-          if (uploadResponse.url) {
-            imageUrls.push(uploadResponse.url);
+          if (uploadResponse.key || uploadResponse.url) {
+            imageUrls.push(uploadResponse.key || uploadResponse.url);
           }
         } catch (uploadError) {
           console.error('Image upload error:', uploadError);

@@ -872,13 +872,16 @@ export class AdminService {
         const effectivePrice = campaignPrice ?? basePrice;
         const hasDiscount = effectivePrice < basePrice;
 
+        // Convert S3 key to presigned URL for image
+        const imageUrl = await this.resolveProductImageUrl(p.images[0]?.url);
+
         return {
           ...p,
           price: effectivePrice,
           originalPrice: hasDiscount ? basePrice : (p.originalPrice != null ? Number(p.originalPrice) : null),
           salePrice: p.salePrice != null ? Number(p.salePrice) : null,
           isOnSale: hasDiscount || (p.salePrice != null && Number(p.salePrice) < basePrice),
-          imageUrl: p.images[0]?.url,
+          imageUrl,
         };
       }),
     );
@@ -954,8 +957,18 @@ export class AdminService {
     if (!product) {
       throw new NotFoundException('Ürün bulunamadı');
     }
+
+    // Convert S3 keys to presigned URLs for all images
+    const imagesWithPresignedUrls = await Promise.all(
+      product.images.map(async (img) => ({
+        ...img,
+        url: await this.resolveProductImageUrl(img.url),
+      })),
+    );
+
     return {
       ...product,
+      images: imagesWithPresignedUrls,
       price: Number(product.price),
       originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
       salePrice: product.salePrice != null ? Number(product.salePrice) : null,

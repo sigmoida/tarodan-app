@@ -115,6 +115,8 @@ export default function NewListingPage() {
     imageUrls: [] as string[],
   });
   const [uploadingImages, setUploadingImages] = useState(false);
+  // Store preview URLs separately (presigned URLs for display)
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -132,6 +134,34 @@ export default function NewListingPage() {
               ? parsed.quantity.toString()
               : '',
           }));
+          
+          // Restore preview URLs if available, otherwise fetch presigned URLs for keys
+          if (parsed.imageUrls?.length > 0) {
+            const restorePreviewUrls = async () => {
+              const previewUrls: string[] = [];
+              for (const key of parsed.imageUrls) {
+                // If key is S3 key format (starts with dev/ or prod/), get presigned URL
+                if (key && (key.includes('dev/') || key.includes('prod/'))) {
+                  try {
+                    // Extract bucket and key from full path (e.g., "dev/products/product-images/file.jpg")
+                    const parts = key.split('/');
+                    const bucket = parts[1] || 'products'; // Default to products
+                    const keyPath = parts.slice(2).join('/');
+                    const response = await api.get(`/storage/presigned/${bucket}/${keyPath}`);
+                    previewUrls.push(response.data.url);
+                  } catch (error) {
+                    // If presigned URL fetch fails, use placeholder
+                    previewUrls.push('https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim');
+                  }
+                } else {
+                  // If it's already a URL, use it directly
+                  previewUrls.push(key);
+                }
+              }
+              setImagePreviewUrls(previewUrls);
+            };
+            restorePreviewUrls();
+          }
         }
       } catch (e) {
         if (process.env.NODE_ENV === 'development') console.error('Failed to parse saved form data:', e);
@@ -355,14 +385,22 @@ export default function NewListingPage() {
     try {
       const response = await mediaApi.uploadProductImages(filesToUpload);
 
-      const uploadedUrls = response.data
+      // Extract keys for storage (to be saved to database)
+      const uploadedKeys = response.data
+        .map((result: any) => result.key)
+        .filter(Boolean);
+      
+      // Extract presigned URLs for preview
+      const uploadedPreviewUrls = response.data
         .map((result: any) => result.url || result.key)
         .filter(Boolean);
+
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, ...uploadedUrls],
+        imageUrls: [...formData.imageUrls, ...uploadedKeys],
       });
-      toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
+      setImagePreviewUrls([...imagePreviewUrls, ...uploadedPreviewUrls]);
+      toast.success(`${uploadedKeys.length} resim başarıyla yüklendi`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
@@ -376,6 +414,7 @@ export default function NewListingPage() {
       ...formData,
       imageUrls: formData.imageUrls.filter((_, i) => i !== index),
     });
+    setImagePreviewUrls(imagePreviewUrls.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -844,25 +883,29 @@ export default function NewListingPage() {
 
                 {formData.imageUrls.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {formData.imageUrls.map((url, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImageUrl(index)}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                    {formData.imageUrls.map((key, index) => {
+                      // Use preview URL if available, otherwise try to use key (fallback)
+                      const previewUrl = imagePreviewUrls[index] || key;
+                      return (
+                        <div key={index} className="relative group">
+                          <img
+                            src={previewUrl}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImageUrl(index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

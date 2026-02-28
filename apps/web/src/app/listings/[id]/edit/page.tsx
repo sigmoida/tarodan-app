@@ -81,6 +81,8 @@ export default function EditListingPage() {
     status: 'active' as string,
   });
   const [uploadingImages, setUploadingImages] = useState(false);
+  // Store preview URLs separately (presigned URLs for display)
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [productDiscounts, setProductDiscounts] = useState<any[]>([]);
@@ -431,6 +433,12 @@ export default function EditListingPage() {
           status: savedData?.status || listing.status || prev.status || 'active',
         };
 
+        // Set preview URLs for existing images (they should already be presigned URLs from API)
+        const previewUrls = savedData?.imageUrls?.length > 0 
+          ? [] // Will be set separately if needed
+          : (listing.images?.map((img: any) => img.url || img) || []);
+        setImagePreviewUrls(previewUrls);
+
         if (process.env.NODE_ENV === 'development') {
           console.log('[EDIT] fetchListing - Setting formData with quantity:', newFormData.quantity);
           console.log('[EDIT] fetchListing - Full newFormData:', newFormData);
@@ -497,14 +505,22 @@ export default function EditListingPage() {
       const fileArray = Array.from(files);
       const response = await mediaApi.uploadProductImages(fileArray);
 
-      const uploadedUrls = response.data
+      // Extract keys for storage (to be saved to database)
+      const uploadedKeys = response.data
+        .map((result: any) => result.key)
+        .filter(Boolean);
+      
+      // Extract presigned URLs for preview
+      const uploadedPreviewUrls = response.data
         .map((result: any) => result.url || result.key)
         .filter(Boolean);
+
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, ...uploadedUrls],
+        imageUrls: [...formData.imageUrls, ...uploadedKeys],
       });
-      toast.success(`${uploadedUrls.length} resim başarıyla yüklendi`);
+      setImagePreviewUrls([...imagePreviewUrls, ...uploadedPreviewUrls]);
+      toast.success(`${uploadedKeys.length} resim başarıyla yüklendi`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
@@ -518,6 +534,7 @@ export default function EditListingPage() {
       ...formData,
       imageUrls: formData.imageUrls.filter((_, i) => i !== index),
     });
+    setImagePreviewUrls(imagePreviewUrls.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1118,25 +1135,29 @@ export default function EditListingPage() {
 
                 {formData.imageUrls.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {formData.imageUrls.map((url, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImageUrl(index)}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                    {formData.imageUrls.map((key, index) => {
+                      // Use preview URL if available, otherwise try to use key (fallback)
+                      const previewUrl = imagePreviewUrls[index] || key;
+                      return (
+                        <div key={index} className="relative group">
+                          <img
+                            src={previewUrl}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImageUrl(index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
