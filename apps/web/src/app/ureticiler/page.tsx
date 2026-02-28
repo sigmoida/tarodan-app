@@ -3,6 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useQuery } from '@tanstack/react-query';
+import { manufacturersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MagnifyingGlassIcon, ChevronRightIcon, GlobeAltIcon, CalendarIcon, SparklesIcon } from '@heroicons/react/24/outline';
@@ -280,6 +282,27 @@ export default function UreticilerPage() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
 
+  const { data: apiManufacturers } = useQuery({
+    queryKey: ['manufacturers-list'],
+    queryFn: async () => {
+      const res = await manufacturersApi.findAll();
+      return res.data as Array<{ id: string; name: string; slug: string; logo?: string; country?: string; _count?: { products: number } }>;
+    },
+    staleTime: 60_000,
+  });
+
+  const manufacturerCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (apiManufacturers) {
+      apiManufacturers.forEach((m) => {
+        map.set(m.slug, m._count?.products ?? 0);
+      });
+    }
+    return map;
+  }, [apiManufacturers]);
+
+  const getProductCount = (slug: string) => manufacturerCountMap.get(slug) ?? 0;
+
   const filteredBrands = useMemo(() => {
     let result = BRANDS_DATA.filter((b) => {
       const matchesSearch =
@@ -306,7 +329,7 @@ export default function UreticilerPage() {
     return Array.from(map.entries()).sort((a, b) => b[1].count - a[1].count);
   }, []);
 
-  const totalProducts = BRANDS_DATA.reduce((sum, b) => sum + b.productCount, 0);
+  const totalProducts = BRANDS_DATA.reduce((sum, b) => sum + getProductCount(b.slug), 0);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -584,7 +607,7 @@ export default function UreticilerPage() {
                             </div>
                             <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
                               <span className="font-bold text-gray-900">Aktif İlan:</span>
-                              <span className="text-orange-600 font-semibold">{brand.productCount}</span>
+                              <span className="text-orange-600 font-semibold">{getProductCount(brand.slug)}</span>
                             </div>
                           </div>
                         </div>

@@ -33,12 +33,16 @@ export class ManufacturerService {
         description: true,
         website: true,
         country: true,
+        _count: { select: { products: { where: { status: 'active' } } } },
       },
     });
     if (!manufacturer) {
       throw new NotFoundException(`Üretici bulunamadı: ${slug}`);
     }
-    return manufacturer;
+    return {
+      ...manufacturer,
+      productCount: manufacturer._count.products,
+    };
   }
 
   async findOne(id: string) {
@@ -52,11 +56,15 @@ export class ManufacturerService {
         description: true,
         website: true,
         country: true,
+        _count: { select: { products: { where: { status: 'active' } } } },
       },
     });
     if (!manufacturer) {
       throw new NotFoundException(`Üretici bulunamadı`);
     }
-    return manufacturer;
+    return {
+      ...manufacturer,
+      productCount: manufacturer._count.products,
+    };
   }
 }

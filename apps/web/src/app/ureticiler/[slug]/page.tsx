@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { api, listingsApi } from '@/lib/api';
+import { listingsApi, manufacturersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import OptimizedImage from '@/components/OptimizedImage';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
@@ -21,13 +21,6 @@ interface Brand {
     country?: string;
     foundedYear?: number;
     productCount: number;
-}
-
-interface CarModel {
-    id: string;
-    name: string;
-    slug: string;
-    brandId: string;
 }
 
 interface Product {
@@ -78,44 +71,30 @@ export default function UreticiDetailPage() {
     const params = useParams();
     const slug = params?.slug as string;
     const { t } = useTranslation();
-    const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-
     const brandQuery = useQuery({
-        queryKey: ['brand', slug],
+        queryKey: ['manufacturer', slug],
         queryFn: async () => {
-            const res = await api.get(`/brands/${slug}`);
+            const res = await manufacturersApi.findBySlug(slug);
             return res.data as Brand;
         },
         enabled: !!slug,
     });
 
-    const modelsQuery = useQuery({
-        queryKey: ['brand-models', slug],
-        queryFn: async () => {
-            const res = await api.get('/car-models', { params: { brand: slug } });
-            return res.data as CarModel[];
-        },
-        enabled: !!slug,
-    });
-
     const productsQuery = useQuery({
-        queryKey: ['brand-products', slug, selectedModelId],
+        queryKey: ['manufacturer-products', slug],
         queryFn: async () => {
             const params: any = {
-                brandId: brandQuery.data?.id,
+                manufacturerId: brandQuery.data?.id,
                 limit: 50
             };
-            if (selectedModelId) {
-                params.carModelId = selectedModelId;
-            }
             const res = await listingsApi.getAll(params);
-            return res.data?.data || res.data?.products || [];
+            const raw = res.data;
+            return Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
         },
-        enabled: !!brandQuery.data?.name,
+        enabled: !!brandQuery.data?.id,
     });
 
     const brand = brandQuery.data;
-    const models = modelsQuery.data ?? [];
     const products: Product[] = productsQuery.data ?? [];
 
     const getImageUrl = (img: any) => {
@@ -223,52 +202,11 @@ export default function UreticiDetailPage() {
                     </div>
                 </motion.div>
 
-                {/* Models Filter Section */}
-                {models.length > 0 && (
-                    <div className="mb-12">
-                        <div className="flex items-center justify-between mb-6 px-2">
-                            <h3 className="text-xl font-bold text-gray-900">Modeller</h3>
-                            {selectedModelId && (
-                                <button
-                                    onClick={() => setSelectedModelId(null)}
-                                    className="text-sm font-bold text-orange-600 hover:underline"
-                                >
-                                    Filtreyi Temizle
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                onClick={() => setSelectedModelId(null)}
-                                className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${selectedModelId === null
-                                    ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20'
-                                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'
-                                    }`}
-                            >
-                                Tümü
-                            </button>
-
-                            {models.map((model) => (
-                                <button
-                                    key={model.id}
-                                    onClick={() => setSelectedModelId(selectedModelId === model.id ? null : model.id)}
-                                    className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${selectedModelId === model.id
-                                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                                        : 'bg-white text-gray-600 hover:bg-orange-50 hover:text-orange-600 border border-gray-100'
-                                        }`}
-                                >
-                                    {model.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* Products Grid */}
                 <div>
                     <div className="flex items-end justify-between mb-8 px-2">
                         <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-                            {selectedModelId ? `${models.find(m => m.id === selectedModelId)?.name} İlanları` : 'Tüm İlanlar'}
+                            Tüm İlanlar
                         </h2>
                         <span className="text-gray-400 font-medium text-sm">
                             {products.length} sonuç gösteriliyor
@@ -292,9 +230,7 @@ export default function UreticiDetailPage() {
                             </div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-3">{t('brands.noProducts') || 'İlan Bulunamadı'}</h3>
                             <p className="text-gray-500 max-w-md mx-auto mb-8">
-                                {selectedModelId
-                                    ? 'Seçilen model için şu an aktif ilan bulunmuyor.'
-                                    : 'Bu markaya ait henüz bir ilan eklenmemiş.'}
+                                Bu üreticiye ait henüz bir ilan eklenmemiş.
                             </p>
                             <Link href="/listings/new" className="inline-block px-10 py-4 bg-gray-900 text-white rounded-full font-bold shadow-xl shadow-gray-900/10 hover:bg-orange-600 hover:shadow-orange-500/30 transition-all transform hover:-translate-y-1">
                                 İlan Veren İlk Kişi Ol
