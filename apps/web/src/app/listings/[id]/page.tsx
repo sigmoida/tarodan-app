@@ -777,8 +777,8 @@ export default function ListingDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
         {/* Breadcrumbs */}
         <nav aria-label="Breadcrumb" className="flex items-center flex-wrap gap-y-1 text-sm text-gray-500 mb-6 overflow-x-auto whitespace-nowrap pb-2">
           <Link href="/" className="hover:text-orange-500 transition-colors text-gray-600">
@@ -1303,7 +1303,7 @@ export default function ListingDetailPage() {
                   </span>
                 </div>
               )}
-              <p className="text-4xl font-bold text-orange-500">
+              <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-500">
                 {effectivePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
@@ -1324,7 +1324,7 @@ export default function ListingDetailPage() {
             </div>
 
             {/* Quick Info - Özet özellikler, tekrarsız */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-5 bg-white rounded shadow-sm border border-gray-100 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 sm:gap-4 sm:p-5 bg-white rounded shadow-sm border border-gray-100 mb-4 sm:mb-6">
               {listing.brand && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.brand')}</p>
@@ -1590,19 +1590,19 @@ export default function ListingDetailPage() {
                 <button
                   onClick={handleBuyNow}
                   disabled={listing.status !== 'active'}
-                  className={`w-full flex items-center justify-center gap-2 py-4 text-lg ${listing.status === 'active'
+                  className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active'
                     ? 'btn-primary'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
                     }`}
                 >
-                  <BoltIcon className="w-6 h-6" />
+                  <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                   {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
                 </button>
               )}
 
               {/* Secondary Actions - Hide most for owner */}
               {!isOwner && (
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {isTradeAvailable && (
                     <button
                       onClick={() => {
@@ -1626,53 +1626,53 @@ export default function ListingDetailPage() {
                         router.push(`/trades/new?listing=${listing.id}`);
                       }}
                       disabled={listing.status !== 'active'}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
+                      className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${listing.status === 'active' ? 'btn-trade' : 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
                         }`}
                     >
-                      <ArrowsRightLeftIcon className="w-5 h-5" />
-                      {t('product.trade')}
+                      <ArrowsRightLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="truncate">{t('product.trade')}</span>
                     </button>
                   )}
                   <button
                     onClick={handleMakeOffer}
                     disabled={listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 ${listing.status !== 'active'
+                    className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${listing.status !== 'active'
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
                       : 'btn-secondary'
                       }`}
                   >
-                    <BoltIcon className="w-5 h-5" />
-                    {t('product.makeOffer')}
+                    <BoltIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="truncate">{t('product.makeOffer')}</span>
                   </button>
                   <button
                     onClick={handleCartToggle}
                     disabled={isAddingToCart || listing.status !== 'active'}
-                    className={`flex-1 flex items-center justify-center gap-2 ${listing.status !== 'active'
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded py-2'
+                    className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${listing.status !== 'active'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed rounded'
                       : isInCart
                         ? 'btn-secondary bg-red-50 border-red-200 text-red-600'
                         : 'btn-secondary'
                       }`}
                   >
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    {isAddingToCart
+                    <ShoppingCartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="truncate">{isAddingToCart
                       ? (isInCart ? t('product.removing') : t('product.adding'))
                       : (isInCart ? t('product.removeFromCart') : t('product.addToCart'))
-                    }
+                    }</span>
                   </button>
                   <button
                     onClick={handleToggleFavorite}
-                    className={`btn-secondary flex-1 flex items-center justify-center gap-2 ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
+                    className={`btn-secondary flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${isFavorite ? 'bg-red-50 border-red-200 text-red-600' : ''}`}
                   >
                     {isFavorite ? (
                       <>
-                        <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                        {t('product.removeFromFavorites')}
+                        <HeartSolidIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+                        <span className="truncate">{t('product.removeFromFavorites')}</span>
                       </>
                     ) : (
                       <>
-                        <HeartIcon className="w-5 h-5" />
-                        {t('product.addToFavorites')}
+                        <HeartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="truncate">{t('product.addToFavorites')}</span>
                       </>
                     )}
                   </button>
@@ -1684,8 +1684,8 @@ export default function ListingDetailPage() {
       </div>
 
       {/* Product Reviews Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded shadow-sm p-6 md:p-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-12">
+        <div className="bg-white rounded shadow-sm p-4 sm:p-6 md:p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
               {t('product.productReviews')}

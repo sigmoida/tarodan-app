@@ -39,7 +39,7 @@ export default function AuthRequiredModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 py-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -47,7 +47,7 @@ export default function AuthRequiredModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-white shadow-2xl max-w-md w-full mx-auto my-auto overflow-hidden" style={{borderRadius:'6px'}}>
+      <div className="relative bg-white shadow-2xl max-w-sm sm:max-w-md w-full mx-auto overflow-hidden" style={{borderRadius:'6px'}}>
         {/* Close button */}
         <button
           onClick={onClose}
@@ -58,7 +58,7 @@ export default function AuthRequiredModal({
         </button>
 
         {/* Content */}
-        <div className="p-8 text-center">
+        <div className="p-6 sm:p-8 text-center">
           {/* Icon */}
           <div className="w-16 h-16 mx-auto mb-5 bg-orange-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
             {icon || (

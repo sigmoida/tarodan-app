@@ -146,9 +146,9 @@ export default function FavoritesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/3" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-64 bg-gray-200 rounded-lg" />
+                <div key={i} className="h-40 sm:h-64 bg-gray-200 rounded" />
               ))}
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function FavoritesPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">
               {isSharedView ? t('favorites.sharedList') : t('favorites.myFavorites')}
             </h1>
             <p className="text-gray-600">
@@ -199,7 +199,7 @@ export default function FavoritesPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {items.map((item, index) => {
               return (
                 <motion.div
@@ -225,47 +225,47 @@ export default function FavoritesPage() {
                             e.preventDefault();
                             handleRemove(item.productId);
                           }}
-                          className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
+                          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
                           title={t('favorites.removeFromFavorites')}
                         >
-                          <TrashIcon className="w-5 h-5 text-red-500" />
+                          <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                         </button>
                       )}
                     </div>
                   </Link>
-                  <div className="p-4">
+                  <div className="p-2.5 sm:p-4">
                     <Link href={`/listings/${item.productId}`}>
-                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 hover:text-primary-500">
+                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1.5 sm:mb-2 text-xs sm:text-sm hover:text-primary-500">
                         {item.productTitle || 'Product'}
                       </h3>
                     </Link>
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
                       <div className="flex flex-col">
                         {item.productOriginalPrice && item.productOriginalPrice > item.productPrice && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-400 line-through">
-                              {Number(item.productOriginalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <span className="text-[10px] sm:text-sm text-gray-400 line-through">
+                              {Number(item.productOriginalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TL
                             </span>
-                            <span className="text-xs font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] sm:text-xs font-semibold text-white bg-red-500 px-1 sm:px-1.5 py-0.5 rounded">
                               %{Math.round(((item.productOriginalPrice - item.productPrice) / item.productOriginalPrice) * 100)}
                             </span>
                           </div>
                         )}
-                        <p className="text-xl font-bold text-primary-500">
-                          {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                        <p className="text-base sm:text-xl font-bold text-primary-500">
+                          {Number(item.productPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TL
                         </p>
                       </div>
                       {item.productCondition && (
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden sm:inline">
                           {item.productCondition}
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => handleAddToCart(item)}
-                      className="w-full btn-primary text-sm py-2 flex items-center justify-center gap-2"
+                      className="w-full btn-primary text-xs sm:text-sm py-1.5 sm:py-2 flex items-center justify-center gap-1.5 sm:gap-2"
                     >
-                      <ShoppingCartIcon className="w-4 h-4" />
+                      <ShoppingCartIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       {t('product.addToCart')}
                     </button>
                   </div>
