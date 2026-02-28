@@ -26,6 +26,7 @@ import {
   DocumentTextIcon,
   ShieldCheckIcon,
   CurrencyDollarIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
@@ -319,7 +320,8 @@ export default function ProfilePage() {
       items: [
         { icon: UserCircleIcon, label: t('profile.editProfile'), href: '/profile/edit', desc: 'Profil bilgilerinizi düzenleyin' },
         { icon: MapPinIcon, label: t('address.myAddresses'), href: '/profile/addresses', desc: 'Teslimat adresleriniz' },
-        { icon: CreditCardIcon, label: t('payment.paymentMethods'), href: '/profile/payments', desc: 'Ödeme yöntemleriniz' },
+        { icon: CreditCardIcon, label: t('payment.paymentMethods'), href: '/payment-methods', desc: 'Kayıtlı kartlarınız' },
+        { icon: ClockIcon, label: t('payment.history'), href: '/profile/payments', desc: 'Ödeme geçmişiniz' },
         { icon: BellIcon, label: t('nav.notifications'), href: '/profile/notifications', desc: 'Bildirim ayarları' },
         { icon: ShieldCheckIcon, label: 'Güvenlik', href: '/profile/change-password', desc: 'Şifre ve güvenlik ayarları' },
       ],
@@ -503,7 +505,12 @@ export default function ProfilePage() {
                   profile.membership.tier.type === 'business' ? 'text-amber-600' :
                   profile.membership.tier.type === 'premium' ? 'text-purple-600' : 'text-orange-500'
                 }`}>
-                  {profile.membership.tier.maxTotalListings === -1 ? '∞' : profile.membership.tier.maxTotalListings}
+                  {(() => {
+                    const limit = profile.membership.tier.type === 'free'
+                      ? profile.membership.tier.maxFreeListings
+                      : profile.membership.tier.maxTotalListings;
+                    return limit === -1 ? '∞' : limit;
+                  })()}
                 </p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.listingsLimit')}</p>
               </div>

@@ -573,10 +573,7 @@ export class UserService {
       throw new BadRequestException('En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
     }
 
-    // Validate title
-    if (!data.title || data.title.trim() === '') {
-      throw new BadRequestException('Adres başlığı zorunludur (örn: Ev, İş)');
-    }
+    const title = (data.title?.trim() && data.title.trim()) || `Adres ${existingAddresses + 1}`;
 
     // If this is the default address, unset other defaults
     if (data.isDefault) {
@@ -591,7 +588,7 @@ export class UserService {
         userId,
         fullName: data.fullName,
         phone: data.phone,
-        title: data.title.trim(),
+        title,
         city: data.city,
         district: data.district,
         address: data.address,

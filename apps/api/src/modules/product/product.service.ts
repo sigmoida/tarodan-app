@@ -694,6 +694,73 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
+   * Get seller's own product by ID (all statuses) – for edit page
+   * GET /products/my/:id
+   */
+  async findMyProductById(id: string, userId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            sellerType: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logo: true,
+          },
+        },
+        manufacturer: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        productAttributes: {
+          include: {
+            attribute: {
+              include: {
+                group: true,
+              },
+            },
+          },
+        },
+        carModel: {
+          include: {
+            brand: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    if (product.sellerId !== userId) {
+      throw new ForbiddenException('Bu ürünü görüntüleme yetkiniz yok');
+    }
+
+    return await this.formatProductResponse(product);
+  }
+
+  /**
    * Update product
    * PATCH /products/:id
    */
@@ -722,9 +789,30 @@ export class ProductService implements OnModuleInit {
       throw new ForbiddenException('Hesabınız banlanmış. Ürün düzenleyemezsiniz.');
     }
 
-    // Cannot update sold or reserved products
-    if (product.status === ProductStatus.sold || product.status === ProductStatus.reserved) {
-      throw new BadRequestException('Satılmış veya rezerve edilmiş ürünler güncellenemez');
+    // Reserved products cannot be updated at all
+    if (product.status === ProductStatus.reserved) {
+      throw new BadRequestException('Rezerve edilmiş ürünler güncellenemez');
+    }
+
+    // Sold or inactive (stok biten): only allow reactivation (status → active + quantity update)
+    if (product.status === ProductStatus.sold || product.status === ProductStatus.inactive) {
+      if (dto.status === ProductStatus.active && dto.quantity != null && Number(dto.quantity) > 0) {
+        await this.prisma.product.update({
+          where: { id },
+          data: {
+            status: ProductStatus.active,
+            quantity: Number(dto.quantity),
+          },
+        });
+        await this.cache.del(`products:detail:${id}`);
+        await this.cache.delPattern('products:list:*');
+        const updated = await this.prisma.product.findUnique({
+          where: { id },
+          include: { images: true, category: true, brand: true, carModel: true },
+        });
+        return updated;
+      }
+      throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
     }
 
     // Verify category if being updated
@@ -1261,10 +1349,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ...(status && status.trim() !== ''
         ? { status: status as ProductStatus }
         : {
-          // Exclude inactive, draft, and deleted listings from default view
-          status: {
-            notIn: [ProductStatus.inactive, ProductStatus.draft]
-          }
+          // "Tümü": show all except draft (so sold, inactive, reserved, active, pending, rejected visible)
+          status: { notIn: [ProductStatus.draft] }
         }
       ),
     };
