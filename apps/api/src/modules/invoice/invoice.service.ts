@@ -4,7 +4,7 @@
  * 
  * Requirement: "After payment, invoices will be sent to users automatically" (requirements.txt)
  */
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
@@ -12,7 +12,7 @@ import { NotificationService } from '../notification/notification.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
 import { TaxService } from '../tax';
-import PDFDocument from 'pdfkit';
+import * as PDFDocument from 'pdfkit';
 
 // Invoice generation service using pdfkit for reliable PDF creation
 // Turkish character support via system font fallbacks or embedded fonts
@@ -128,6 +128,10 @@ export class InvoiceService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
+    if (!order.buyer || !order.seller) {
+      throw new BadRequestException('Sipariş alıcı veya satıcı bilgisi eksik');
+    }
+
     // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber();
 
@@ -176,7 +180,7 @@ export class InvoiceService {
       orderNumber: order.orderNumber,
 
       items: [{
-        description: order.product.title,
+        description: order.product?.title || 'Ürün',
         quantity: 1,
         unitPrice: subtotal,
         total: subtotal,
@@ -189,8 +193,8 @@ export class InvoiceService {
       commission: Number(order.commissionAmount || 0),
       total: Number(order.totalAmount),
 
-      paymentMethod: order.payment?.provider || 'iyzico',
-      paymentDate: order.payment?.createdAt,
+      paymentMethod: order.payment?.provider ?? 'iyzico',
+      paymentDate: order.payment?.paidAt ?? order.payment?.createdAt,
 
       currency: 'TRY',
     };
@@ -684,48 +688,52 @@ export class InvoiceService {
     });
 
     if (!invoice) {
-      // Lazy create: if order exists, user is buyer/seller, and order is not cancelled/pending → try to generate
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         select: { id: true, buyerId: true, sellerId: true, status: true, payment: { select: { id: true } } },
       });
-      const statusStr = order?.status ? String(order.status) : '';
-      const skipStatuses = ['cancelled', 'pending_payment'];
-      const canGenerateByStatus = order && !skipStatuses.includes(statusStr);
-      const isBuyer = userId && order?.buyerId === userId;
-      const isSeller = userId && order?.sellerId === userId;
-      const isPaymentVerified = paymentId && order?.payment?.id === paymentId;
-      const mayCreate = canGenerateByStatus && (isBuyer || isSeller || isPaymentVerified);
+
       if (!order) {
-        this.logger.debug(`Invoice getByOrderId: order ${orderId} not found`);
-      } else if (!mayCreate) {
-        this.logger.debug(
-          `Invoice getByOrderId: order ${orderId} status=${statusStr} isBuyer=${isBuyer} isSeller=${isSeller} buyerId=${order.buyerId} sellerId=${order.sellerId} userId=${userId}`,
+        throw new NotFoundException('Sipariş bulunamadı');
+      }
+
+      const statusStr = order.status ? String(order.status) : '';
+      const skipStatuses = ['cancelled', 'pending_payment'];
+      const isBuyer = userId && order.buyerId === userId;
+      const isSeller = userId && order.sellerId === userId;
+      const isPaymentVerified = paymentId && order.payment?.id === paymentId;
+
+      if (!isBuyer && !isSeller && !isPaymentVerified) {
+        throw new NotFoundException('Fatura bulunamadı');
+      }
+
+      if (skipStatuses.includes(statusStr)) {
+        throw new BadRequestException(
+          'Ödenmemiş veya iptal edilmiş siparişler için fatura oluşturulamaz.',
         );
       }
-      if (mayCreate) {
-        try {
-          await this.generateForOrder(orderId);
-          invoice = await this.prisma.invoice.findFirst({
-            where: { orderId },
-            include: {
-              order: {
-                include: {
-                  buyer: { select: { id: true, displayName: true, email: true } },
-                  seller: { select: { id: true, displayName: true, email: true } },
-                  product: { select: { id: true, title: true } },
-                  payment: { select: { id: true } },
-                },
+
+      try {
+        await this.generateForOrder(orderId);
+        invoice = await this.prisma.invoice.findFirst({
+          where: { orderId },
+          include: {
+            order: {
+              include: {
+                buyer: { select: { id: true, displayName: true, email: true } },
+                seller: { select: { id: true, displayName: true, email: true } },
+                product: { select: { id: true, title: true } },
+                payment: { select: { id: true } },
               },
             },
-          });
-        } catch (err) {
-          this.logger.warn(`Lazy invoice generation failed for order ${orderId}:`, err);
-          throw new NotFoundException(
-            'Fatura oluşturulamadı. Sipariş ödenmiş olsa bile fatura kaydı eksik olabilir.',
-          );
-        }
+          },
+        });
+      } catch (err) {
+        this.logger.warn(`Lazy invoice generation failed for order ${orderId}:`, err);
+        const message = err instanceof BadRequestException ? err.message : 'Fatura oluşturulamadı. Sipariş ödenmiş olsa bile fatura kaydı eksik olabilir.';
+        throw new NotFoundException(message);
       }
+
       if (!invoice) {
         throw new NotFoundException('Fatura bulunamadı');
       }

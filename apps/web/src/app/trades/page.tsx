@@ -119,18 +119,18 @@ export default function TradesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <ArrowsRightLeftIcon className="w-8 h-8 text-orange-500" />
+        <div className="flex items-center justify-between mb-4 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
+            <ArrowsRightLeftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
             {t('trade.myTrades')}
           </h1>
         </div>
 
         {/* Status Filters */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-6 flex-wrap">
           {[
             { value: null, label: t('common.all'), icon: null },
             { value: 'pending', label: t('trade.statusPending'), icon: ClockIcon },
@@ -144,12 +144,12 @@ export default function TradesPage() {
               <button
                 key={f.value || 'all'}
                 onClick={() => setStatusFilter(f.value)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded font-medium transition-colors ${statusFilter === f.value
+                className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition-colors ${statusFilter === f.value
                     ? 'bg-orange-500 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
               >
-                {Icon && <Icon className="w-4 h-4" />}
+                {Icon && <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 {f.label}
               </button>
             );

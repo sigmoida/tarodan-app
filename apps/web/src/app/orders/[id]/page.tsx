@@ -170,10 +170,13 @@ export default function OrderDetailPage() {
       window.URL.revokeObjectURL(url);
       toast.success(locale === 'en' ? 'Invoice downloaded' : 'Fatura indirildi');
     } catch (err: any) {
+      const msg = err.response?.data?.message;
       if (err.response?.status === 404) {
-        toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');
+        toast.error(msg || (locale === 'en' ? 'Invoice not found' : 'Fatura bulunamadı'));
+      } else if (err.response?.status === 400 && msg) {
+        toast.error(msg);
       } else {
-        toast.error(err.response?.data?.message || (locale === 'en' ? 'Download failed' : 'İndirme başarısız'));
+        toast.error(msg || (locale === 'en' ? 'Download failed' : 'İndirme başarısız'));
       }
     } finally {
       setDownloadingInvoice(false);

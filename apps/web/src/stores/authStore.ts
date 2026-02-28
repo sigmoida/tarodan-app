@@ -53,7 +53,7 @@ export interface MembershipLimits {
 const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   free: {
     maxListings: 10,
-    maxImagesPerListing: 5,
+    maxImagesPerListing: 3,
     canTrade: false,
     canCreateCollections: false,
   },

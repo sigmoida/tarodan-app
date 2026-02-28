@@ -63,11 +63,22 @@ export default function ListingsPage() {
   const searchParams = useSearchParams();
   const { t, locale } = useTranslation();
 
+  const KNOWN_BRANDS = [
+    'Porsche', 'Ferrari', 'BMW', 'Mercedes', 'Audi', 'Lamborghini',
+    'McLaren', 'Bugatti', 'Koenigsegg', 'Pagani',
+  ];
+
+  const urlSearch = searchParams.get('search') || '';
+  const autoDetectedBrand = urlSearch
+    ? KNOWN_BRANDS.find(b => b.toLowerCase() === urlSearch.toLowerCase()) || ''
+    : '';
+
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
 
   const [filters, setFilters] = useState({
-    brand: searchParams.get('brand') || '',
+    search: autoDetectedBrand ? '' : urlSearch,
+    brand: searchParams.get('brand') || autoDetectedBrand || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
     condition: '',
@@ -86,24 +97,30 @@ export default function ListingsPage() {
   });
 
   useEffect(() => {
+    const newSearch = searchParams.get('search') || '';
+    const detectedBrand = newSearch
+      ? KNOWN_BRANDS.find(b => b.toLowerCase() === newSearch.toLowerCase()) || ''
+      : '';
+
     setFilters(prev => ({
       ...prev,
+      search: detectedBrand ? '' : newSearch,
       tradeOnly: searchParams.get('tradeOnly') === 'true',
       discountOnly: searchParams.get('discountOnly') === 'true',
       preOrder: searchParams.get('preOrder') === 'true',
       limited: searchParams.get('limited') === 'true',
       set: searchParams.get('set') === 'true',
-      brand: searchParams.get('brand') || prev.brand,
-      scale: searchParams.get('scale') || prev.scale,
-      material: searchParams.get('material') || prev.material,
-      condition: searchParams.get('condition') || prev.condition,
-      minPrice: searchParams.get('minPrice') || prev.minPrice,
-      maxPrice: searchParams.get('maxPrice') || prev.maxPrice,
+      brand: searchParams.get('brand') || detectedBrand || '',
+      scale: searchParams.get('scale') || '',
+      material: searchParams.get('material') || '',
+      condition: searchParams.get('condition') || '',
+      minPrice: searchParams.get('minPrice') || '',
+      maxPrice: searchParams.get('maxPrice') || '',
       sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
-      category: searchParams.get('category') || prev.category,
-      manufacturer: searchParams.get('manufacturer') || prev.manufacturer,
-      manufacturerId: searchParams.get('manufacturerId') || prev.manufacturerId,
-      vehicleType: searchParams.get('vehicleType') || prev.vehicleType,
+      category: searchParams.get('category') || '',
+      manufacturer: searchParams.get('manufacturer') || '',
+      manufacturerId: searchParams.get('manufacturerId') || '',
+      vehicleType: searchParams.get('vehicleType') || '',
     }));
   }, [searchParams]);
 
@@ -130,6 +147,7 @@ export default function ListingsPage() {
 
       const buildListParams = (): Record<string, any> => {
         const p: Record<string, any> = { limit: 100, page: 1 };
+        if (filters.search) p.search = filters.search;
         if (urlCategoryId) p.categoryId = urlCategoryId;
         if (mappedCondition) p.condition = mappedCondition;
         if (filters.minPrice) p.minPrice = Number(filters.minPrice);
@@ -159,12 +177,16 @@ export default function ListingsPage() {
 
   const clearFilters = () => {
     setFilters({
-      brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
-    const params = new URLSearchParams();
-    router.push(`/listings?${params.toString()}`);
+    // Remove all filter params from URL
+    const currentParams = new URLSearchParams(searchParams.toString());
+    const hasAnyFilter = Array.from(currentParams.keys()).some(key => key !== 'sortBy');
+    if (hasAnyFilter) {
+      router.replace('/listings');
+    }
   };
 
   const activeFilterCount = Object.entries(filters)
@@ -190,9 +212,9 @@ export default function ListingsPage() {
 
   const getGridClass = () => {
     switch (productLayout) {
-      case 'grid-3': return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4';
-      case 'grid-4': return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
-      case 'grid-6': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3';
+      case 'grid-3': return 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4';
+      case 'grid-4': return 'grid grid-cols-4 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-4';
+      case 'grid-6': return 'grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-3';
       default: return 'space-y-2';
     }
   };
@@ -206,28 +228,30 @@ export default function ListingsPage() {
 
       {/* Page Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
-                {filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+        <div className="mx-auto px-3 sm:px-6 lg:px-12 xl:px-16 py-4 sm:py-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                  <div className="w-1 h-6 bg-orange-500 rounded-sm flex-shrink-0" />
+                  <span className="truncate">{filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                  {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
+                </p>
+              </div>
               <button
                 onClick={() => setShowMobileSidebar(true)}
-                className="lg:hidden flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors flex-shrink-0 ml-2"
               >
                 <FunnelIcon className="w-4 h-4" />
-                {t('product.filters')}
+                <span className="hidden sm:inline">{t('product.filters')}</span>
                 {activeFilterCount > 0 && (
                   <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-sm">{activeFilterCount}</span>
                 )}
               </button>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto">
               <ProductLayoutSelector
                 layout={productLayout}
                 onLayoutChange={setProductLayout}
@@ -236,7 +260,7 @@ export default function ListingsPage() {
               <select
                 value={filters.sortBy}
                 onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:border-orange-400 text-gray-700"
+                className="px-2.5 py-1.5 border border-gray-200 rounded bg-white text-xs sm:text-sm focus:outline-none focus:border-orange-400 text-gray-700 flex-shrink-0"
               >
                 <option value="created_desc">{t('product.sortNewest')}</option>
                 <option value="created_asc">{t('product.sortOldest')}</option>
@@ -251,7 +275,7 @@ export default function ListingsPage() {
         </div>
       </div>
 
-      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+      <div className="mx-auto px-3 sm:px-6 lg:px-12 xl:px-16 py-4 sm:py-5">
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">
@@ -297,45 +321,96 @@ export default function ListingsPage() {
                 {[
                   { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
                   { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
-                  { k: 'manufacturer', v: filters.manufacturer }
+                  { k: 'manufacturer', v: filters.manufacturer }, { k: 'vehicleType', v: filters.vehicleType }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
-                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
+                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : 
+                     f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
                       setFilters(updates);
+                      
+                      // Update URL
+                      const params = new URLSearchParams(searchParams.toString());
+                      if (f.k === 'category') {
+                        params.delete('category');
+                        params.delete('categoryId');
+                      } else if (f.k === 'manufacturer') {
+                        params.delete('manufacturer');
+                        params.delete('manufacturerId');
+                      } else {
+                        params.delete(f.k);
+                      }
+                      router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => setFilters({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, minPrice: '', maxPrice: '' });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('minPrice');
+                      params.delete('maxPrice');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, tradeOnly: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('tradeOnly');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
                     {t('product.preOrder')}
-                    <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, preOrder: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('preOrder');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.limited && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, limited: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('limited');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.set && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
                     {t('product.sets')}
-                    <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, set: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('set');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                  </span>
+                )}
+                {filters.discountOnly && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded border border-red-200">
+                    {locale === 'en' ? 'On Sale' : 'İndirimli'}
+                    <button onClick={() => {
+                      setFilters({ ...filters, discountOnly: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('discountOnly');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>

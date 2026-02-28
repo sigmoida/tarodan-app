@@ -93,7 +93,9 @@ export default function NewListingPage() {
   const [limitsLoading, setLimitsLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i); // 2025..1950
 
@@ -109,7 +111,6 @@ export default function NewListingPage() {
     material: '' as string,
     year: '' as string | number,
     isTradeEnabled: false,
-    isPreorder: false,
     isSet: false,
     quantity: '' as string | number,
     imageUrls: [] as string[],
@@ -298,20 +299,31 @@ export default function NewListingPage() {
   };
 
   const fetchBrands = async () => {
+    setBrandsLoading(true);
     try {
       const response = await api.get('/brands');
-      setBrands(response.data);
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setBrands(data);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch brands:', error);
+      console.error('Failed to fetch brands:', error);
+      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
+    } finally {
+      setBrandsLoading(false);
     }
   };
 
   const fetchModels = async (brandSlug: string) => {
+    setModelsLoading(true);
+    setModels([]);
     try {
       const response = await api.get(`/car-models?brand=${brandSlug}`);
-      setModels(response.data);
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setModels(data);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch models:', error);
+      console.error('Failed to fetch models:', error);
+      toast.error(locale === 'en' ? 'Failed to load models' : 'Modeller yüklenemedi');
+    } finally {
+      setModelsLoading(false);
     }
   };
 
@@ -369,7 +381,7 @@ export default function NewListingPage() {
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const maxImages = limits?.maxImagesPerListing || 5;
+    const maxImages = limits?.maxImagesPerListing || 3;
     const currentCount = formData.imageUrls.length;
     const remainingSlots = maxImages - currentCount;
 
@@ -450,7 +462,7 @@ export default function NewListingPage() {
         material: formData.material || undefined,
         year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
-        isPreorder: formData.isPreorder,
+        isPreorder: false,
         isSet: formData.isSet,
         quantity: formData.quantity ? Number(formData.quantity) : undefined, // undefined = unlimited stock
         imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
@@ -469,7 +481,9 @@ export default function NewListingPage() {
       router.push('/profile/listings?status=pending');
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to create listing:', error);
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to create listing' : 'İlan oluşturulamadı'));
+      const msg = error.response?.data?.message ?? error.response?.data?.error ?? error.message;
+      const fallback = locale === 'en' ? 'Failed to create listing' : 'İlan oluşturulamadı';
+      toast.error(typeof msg === 'string' ? msg : fallback);
     } finally {
       setIsLoading(false);
     }
@@ -493,7 +507,7 @@ export default function NewListingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-3xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Link
           href="/listings"
           className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors mb-6 text-sm"
@@ -507,7 +521,7 @@ export default function NewListingPage() {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Yeni İlan Oluştur</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Yeni İlan Oluştur</h1>
             <p className="text-gray-500 text-sm mt-1">
               Ürününüzü koleksiyoncularla buluşturun
             </p>
@@ -645,8 +659,9 @@ export default function NewListingPage() {
                     }));
                   }}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  disabled={brandsLoading}
                 >
-                  <option value="">Marka Seçin</option>
+                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
                   {brands.map((brand) => (
                     <option key={brand.id} value={brand.id}>
                       {brand.name}
@@ -663,9 +678,17 @@ export default function NewListingPage() {
                   value={formData.carModelId}
                   onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || models.length === 0}
+                  disabled={!formData.brandId || modelsLoading}
                 >
-                  <option value="">Model Seçin</option>
+                  <option value="">
+                    {!formData.brandId
+                      ? 'Önce marka seçin'
+                      : modelsLoading
+                        ? 'Yükleniyor...'
+                        : models.length === 0
+                          ? 'Bu markaya ait model yok'
+                          : 'Model Seçin'}
+                  </option>
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.name}
@@ -765,22 +788,6 @@ export default function NewListingPage() {
 
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
               <div>
-                <label className="font-medium text-gray-900">{locale === 'en' ? 'Pre-Order' : 'Ön Sipariş'}</label>
-                <p className="text-sm text-gray-600">
-                  {locale === 'en' ? 'Product not yet in stock; will ship when available' : 'Ürün henüz stokta değil; çıkınca gönderilecek'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-violet-500' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
-              <div>
                 <label className="font-medium text-gray-900">{locale === 'en' ? 'Set / Bundle' : 'Set / Paket'}</label>
                 <p className="text-sm text-gray-600">
                   {locale === 'en' ? 'Multiple models in one listing (e.g. 5-pack, garage set)' : 'Tek ilanda birden fazla model (örn. 5\'li paket, garaj seti)'}
@@ -843,14 +850,14 @@ export default function NewListingPage() {
             <div className="bg-white rounded border border-gray-100 p-5">
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Görseller</h2>
               <div className="space-y-3">
-                {formData.imageUrls.length < (limits?.maxImagesPerListing || 5) ? (
+                {formData.imageUrls.length < (limits?.maxImagesPerListing || 3) ? (
                   <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-200 rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
                     <PhotoIcon className="w-8 h-8 text-gray-400" />
                     <span className="text-sm text-gray-500 font-medium">
                       {locale === 'en' ? 'Click to upload images' : 'Görsel yüklemek için tıklayın'}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {formData.imageUrls.length} / {limits?.maxImagesPerListing || 5} {locale === 'en' ? 'uploaded' : 'yüklendi'}
+                      {formData.imageUrls.length} / {limits?.maxImagesPerListing || 3} {locale === 'en' ? 'uploaded' : 'yüklendi'}
                     </span>
                     <input
                       type="file"
@@ -870,7 +877,7 @@ export default function NewListingPage() {
                   <p className="text-sm text-primary-600">Resimler yükleniyor...</p>
                 )}
                 {formData.imageUrls.length > 0 && (
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                     {formData.imageUrls.map((key, index) => {
                       const previewUrl = imagePreviewUrls?.[index] || key;
                       return (

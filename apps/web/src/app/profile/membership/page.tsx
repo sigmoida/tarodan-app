@@ -21,7 +21,7 @@ export default function MembershipPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
@@ -301,7 +301,7 @@ export default function MembershipPage() {
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8"
           >
             <ArrowLeftIcon className="w-5 h-5" />
-            {t('profile.backToProfile')}
+            {locale === 'en' ? 'Back to Profile' : 'Profile Dön'}
           </Link>
         )}
 
@@ -335,8 +335,8 @@ export default function MembershipPage() {
         )}
 
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{t('membership.title')}</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">{t('membership.title')}</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto">
             {t('membership.subtitle')}
           </p>
           

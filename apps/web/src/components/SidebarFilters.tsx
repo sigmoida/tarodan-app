@@ -9,7 +9,7 @@ import {
     ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi, manufacturersApi } from '@/lib/api';
+import { categoriesApi, manufacturersApi, brandsApi } from '@/lib/api';
 
 interface Category {
     id: string;
@@ -53,13 +53,6 @@ interface SidebarFiltersProps {
 
 // Vehicle type categories are now loaded dynamically from API (see useEffect below)
 
-// Genişletilmiş markalar
-const BRANDS = [
-    'Audi', 'Alfa Romeo', 'BMW', 'Chevrolet', 'Dodge', 'Ferrari', 'Ford',
-    'Honda', 'Jaguar', 'Lamborghini', 'Land Rover', 'Maserati', 'McLaren',
-    'Mercedes-Benz', 'Nissan', 'Porsche', 'Subaru', 'Tesla', 'Toyota', 'Volkswagen',
-];
-
 // Genişletilmiş ölçekler
 const SCALES = [
     '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
@@ -99,6 +92,9 @@ export default function SidebarFilters({
 
     // Fetch manufacturers from API
     const [manufacturerList, setManufacturerList] = useState<ManufacturerItem[]>([]);
+    
+    // Fetch brands from API
+    const [brandList, setBrandList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -122,6 +118,17 @@ export default function SidebarFilters({
             }
         };
         fetchManufacturers();
+
+        const fetchBrands = async () => {
+            try {
+                const response = await brandsApi.findAll();
+                const brands = Array.isArray(response.data) ? response.data : response.data.data || [];
+                setBrandList(brands.map((b: any) => ({ id: b.id, name: b.name, slug: b.slug })));
+            } catch (error) {
+                console.error('Failed to fetch brands:', error);
+            }
+        };
+        fetchBrands();
     }, []);
 
     // Sync selectedCategoryId with URL
@@ -215,9 +222,9 @@ export default function SidebarFilters({
         router.push(`/listings?${params.toString()}`);
     };
 
-    const filteredBrands = BRANDS.filter(brand =>
-        brand.toLowerCase().includes(brandSearch.toLowerCase())
-    );
+    const filteredBrands = brandList.length > 0
+        ? brandList.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase()))
+        : [];
 
     const displayManufacturers = manufacturerList.length > 0
         ? manufacturerList.filter(m => m.name.toLowerCase().includes(manufacturerSearch.toLowerCase()))
@@ -238,15 +245,6 @@ export default function SidebarFilters({
                         </span>
                     )}
                 </div>
-                {activeFilterCount > 0 && (
-                    <button
-                        onClick={onClearFilters}
-                        className="text-sm text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
-                    >
-                        <XMarkIcon className="w-4 h-4" />
-                        {t('product.clearFilters')}
-                    </button>
-                )}
             </div>
 
             {/* Filter Sections */}
@@ -312,8 +310,8 @@ export default function SidebarFilters({
                             <div className="space-y-1">
                                 {filteredBrands.map((brand) => (
                                     <label
-                                        key={brand}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.brand === brand
+                                        key={brand.id}
+                                        className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.brand === brand.name
                                             ? 'bg-orange-100 text-orange-700'
                                             : 'text-gray-700 hover:bg-gray-50'
                                             }`}
@@ -321,11 +319,11 @@ export default function SidebarFilters({
                                         <input
                                             type="radio"
                                             name="brand"
-                                            checked={filters.brand === brand}
-                                            onChange={() => handleBrandChange(brand)}
+                                            checked={filters.brand === brand.name}
+                                            onChange={() => handleBrandChange(brand.name)}
                                             className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
                                         />
-                                        <span className="text-sm">{brand}</span>
+                                        <span className="text-sm">{brand.name}</span>
                                     </label>
                                 ))}
                             </div>

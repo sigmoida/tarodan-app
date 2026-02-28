@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -15,17 +15,18 @@ import {
   PlusIcon,
   ShoppingBagIcon,
   TagIcon,
-  MapPinIcon,
-  CogIcon,
   ArrowRightOnRectangleIcon,
   CurrencyDollarIcon,
-  SparklesIcon,
   ChevronDownIcon,
   BellIcon,
+  ClockIcon,
+  XMarkIcon,
+  FireIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
-import { messagesApi, api, wishlistApi } from '@/lib/api';
+import { messagesApi, api, wishlistApi, searchApi } from '@/lib/api';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 
@@ -36,6 +37,41 @@ const AuthRequiredModal = dynamic(
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
+import { isValidImageSrc } from '@/components/OptimizedImage';
+
+const POPULAR_SEARCHES = {
+  tr: ['Hot Wheels', 'Matchbox', 'Minichamps', '1:18 ölçek', 'Ferrari', 'Porsche'],
+  en: ['Hot Wheels', 'Matchbox', 'Minichamps', '1:18 scale', 'Ferrari', 'Porsche'],
+};
+
+// Known entities for smart navigation (popular search -> correct filter param)
+const KNOWN_BRANDS = [
+  'Audi', 'Alfa Romeo', 'BMW', 'Chevrolet', 'Dodge', 'Ferrari', 'Ford',
+  'Honda', 'Jaguar', 'Lamborghini', 'Land Rover', 'Maserati', 'McLaren',
+  'Mercedes-Benz', 'Nissan', 'Porsche', 'Subaru', 'Tesla', 'Toyota', 'Volkswagen',
+];
+const KNOWN_MANUFACTURERS = [
+  'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
+  'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
+  'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL',
+];
+const SCALE_REGEX = /^(1:\d+)/;
+
+/** Build the best listings URL for a given search term */
+function buildSmartSearchUrl(query: string): string {
+  const trimmed = query.trim();
+  // Check if it matches a known brand (case-insensitive)
+  const matchedBrand = KNOWN_BRANDS.find(b => b.toLowerCase() === trimmed.toLowerCase());
+  if (matchedBrand) return `/listings?brand=${encodeURIComponent(matchedBrand)}`;
+  // Check if it matches a known manufacturer (case-insensitive)
+  const matchedMfr = KNOWN_MANUFACTURERS.find(m => m.toLowerCase() === trimmed.toLowerCase());
+  if (matchedMfr) return `/listings?manufacturer=${encodeURIComponent(matchedMfr)}`;
+  // Check if it starts with a scale pattern like "1:18"
+  const scaleMatch = trimmed.match(SCALE_REGEX);
+  if (scaleMatch) return `/listings?scale=${encodeURIComponent(scaleMatch[1])}`;
+  // Default: free-text search
+  return `/listings?search=${encodeURIComponent(trimmed)}`;
+}
 
 export default function Navbar() {
   const router = useRouter();
@@ -53,7 +89,10 @@ export default function Navbar() {
   const accountDropdownRef = useRef<HTMLDivElement>(null);
   const accountDropdownLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const { addSearch, searches: recentSearches } = useRecentSearchesStore();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { addSearch, removeSearch, clearSearches, searches: recentSearches } = useRecentSearchesStore();
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [topAds, setTopAds] = useState<Array<{
     id: string;
     title: string;
@@ -135,8 +174,100 @@ export default function Navbar() {
       addSearch(trimmed);
       setSearchQuery('');
       setShowSearchDropdown(false);
-      router.push(`/listings?search=${encodeURIComponent(trimmed)}`);
+      router.push(buildSmartSearchUrl(trimmed));
     }
+  };
+
+  // Debounce search query for autocomplete
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setDebouncedQuery('');
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedQuery(trimmed), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset active index when query changes
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [debouncedQuery]);
+
+  // Rich autocomplete query
+  const richAutoQuery = useQuery({
+    queryKey: ['autocomplete-rich', debouncedQuery],
+    queryFn: async () => {
+      const res = await searchApi.autocompleteRich(debouncedQuery);
+      return res.data;
+    },
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 60_000,
+    meta: { page: 'navbar-autocomplete' },
+  });
+  const autoResults = richAutoQuery.data;
+
+  // Build flat list for keyboard navigation
+  const flatItems = (() => {
+    if (!autoResults || debouncedQuery.length < 2) return [];
+    const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'search'; id: string; label: string; href: string }> = [];
+    autoResults.products?.forEach((p) => items.push({ type: 'product', id: p.id, label: p.title, href: `/listings/${p.id}` }));
+    autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}` }));
+    autoResults.categories?.forEach((c) => items.push({ type: 'category', id: c.id, label: c.name, href: `/listings?categoryId=${c.id}` }));
+    autoResults.manufacturers?.forEach((m) => items.push({ type: 'manufacturer', id: m.id, label: m.name, href: `/listings?manufacturer=${encodeURIComponent(m.name)}&manufacturerId=${m.id}` }));
+    items.push({ type: 'search', id: '__search__', label: debouncedQuery, href: `/listings?search=${encodeURIComponent(debouncedQuery)}` });
+    return items;
+  })();
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setShowSearchDropdown(false);
+      searchInputRef.current?.blur();
+      return;
+    }
+    if (!showSearchDropdown) return;
+
+    if (debouncedQuery.length >= 2 && flatItems.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((prev) => (prev + 1) % flatItems.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((prev) => (prev <= 0 ? flatItems.length - 1 : prev - 1));
+      } else if (e.key === 'Enter' && activeIndex >= 0 && activeIndex < flatItems.length) {
+        e.preventDefault();
+        const item = flatItems[activeIndex];
+        if (item.type === 'search') {
+          addSearch(item.label);
+        }
+        setSearchQuery('');
+        setShowSearchDropdown(false);
+        router.push(item.href);
+      }
+    } else if (debouncedQuery.length < 2) {
+      // In empty/recent mode, Enter submits the form (default behavior)
+      if (e.key === 'ArrowDown' && recentSearches.length > 0) {
+        e.preventDefault();
+        setActiveIndex((prev) => Math.min(prev + 1, recentSearches.length - 1));
+      } else if (e.key === 'ArrowUp' && recentSearches.length > 0) {
+        e.preventDefault();
+        setActiveIndex((prev) => Math.max(prev - 1, -1));
+      } else if (e.key === 'Enter' && activeIndex >= 0 && activeIndex < recentSearches.length) {
+        e.preventDefault();
+        const q = recentSearches[activeIndex];
+        addSearch(q);
+        setSearchQuery('');
+        setShowSearchDropdown(false);
+        router.push(buildSmartSearchUrl(q));
+      }
+    }
+  }, [showSearchDropdown, debouncedQuery, flatItems, activeIndex, recentSearches, addSearch, router]);
+
+  const navigateSearch = (query: string) => {
+    addSearch(query);
+    setSearchQuery('');
+    setShowSearchDropdown(false);
+    router.push(buildSmartSearchUrl(query));
   };
 
   useEffect(() => {
@@ -345,46 +476,283 @@ export default function Navbar() {
             {/* Arama - ortada */}
             <div ref={searchContainerRef} className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4">
               <div className="w-full max-w-xl relative flex-shrink-0">
-              <form onSubmit={handleSearchSubmit} className="relative h-10 block">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
-                  <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
-                </span>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowSearchDropdown(true)}
-                  placeholder={t('nav.searchPlaceholder')}
-                  className="w-full h-10 pl-10 pr-4 bg-white/95 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
-                  aria-label={t('nav.searchPlaceholder')}
-                />
-              </form>
-              {showSearchDropdown && (
-                <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
-                  {recentSearches.length > 0 && (
-                    <div className="px-3 py-1">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{locale === 'en' ? 'Recent' : 'Son aramalar'}</p>
-                      {recentSearches.slice(0, 5).map((s) => (
+                <form onSubmit={handleSearchSubmit} className="relative h-10 block">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
+                    <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
+                  </span>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowSearchDropdown(true)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder={t('nav.searchPlaceholder')}
+                    className="w-full h-10 pl-10 pr-10 bg-white/95 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
+                    aria-label={t('nav.searchPlaceholder')}
+                    autoComplete="off"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(''); setDebouncedQuery(''); searchInputRef.current?.focus(); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </form>
+
+                {/* Search Dropdown */}
+                {showSearchDropdown && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-2xl border border-gray-200 z-[100] overflow-hidden">
+
+                    {/* === STATE 1: Empty / Focus — Recent searches + Popular === */}
+                    {debouncedQuery.length < 2 ? (
+                      <div className="max-h-[420px] overflow-y-auto">
+                        {/* Son Aramalar */}
+                        {recentSearches.length > 0 && (
+                          <div className="px-4 pt-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                                <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+                                {locale === 'en' ? 'Recent Searches' : 'Son Aramalar'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={clearSearches}
+                                className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                              >
+                                {locale === 'en' ? 'Clear' : 'Temizle'}
+                              </button>
+                            </div>
+                            <div className="space-y-0.5">
+                              {recentSearches.map((s, idx) => (
+                                <div key={s} className="flex items-center justify-between gap-1 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateSearch(s)}
+                                    className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'}`}
+                                  >
+                                    <ClockIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                    <span className="truncate">{s}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); removeSearch(s); }}
+                                    className="p-1.5 shrink-0 text-gray-400 hover:text-red-500 rounded transition-opacity opacity-0 group-hover:opacity-100"
+                                    aria-label={locale === 'en' ? 'Remove' : 'Kaldır'}
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Popüler Aramalar */}
+                        <div className={`px-4 pb-3 ${recentSearches.length > 0 ? 'pt-2 border-t border-gray-100' : 'pt-3'}`}>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                            <FireIcon className="w-3.5 h-3.5 shrink-0" />
+                            {locale === 'en' ? 'Popular Searches' : 'Popüler Aramalar'}
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {POPULAR_SEARCHES[locale as 'tr' | 'en']?.map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => navigateSearch(s)}
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 rounded-full transition-colors whitespace-nowrap"
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Tüm ilanları gör */}
                         <Link
-                          key={s}
-                          href={`/listings?search=${encodeURIComponent(s)}`}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                          href="/listings"
+                          className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-orange-50 hover:text-orange-600 border-t border-gray-100 transition-colors"
                           onClick={() => setShowSearchDropdown(false)}
                         >
-                          {s}
+                          <span>{locale === 'en' ? 'Browse all listings' : 'Tüm ilanları gör'}</span>
+                          <ArrowRightIcon className="w-4 h-4" />
                         </Link>
-                      ))}
-                    </div>
-                  )}
-                  <Link
-                    href="/listings"
-                    className={`block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 ${recentSearches.length > 0 ? 'border-t border-gray-100 mt-1' : ''}`}
-                    onClick={() => setShowSearchDropdown(false)}
-                  >
-                    {locale === 'en' ? 'Browse all listings' : 'Tüm ilanları gör'}
-                  </Link>
-                </div>
-              )}
+                      </div>
+                    ) : (
+                      /* === STATE 2: Typing — Categorized results === */
+                      <div className="max-h-[480px] overflow-y-auto">
+                        {richAutoQuery.isLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-orange-500 border-t-transparent" />
+                          </div>
+                        ) : (
+                          <>
+                            {/* İlgili Sonuçlar başlığı */}
+                            <div className="px-4 pt-3 pb-1">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                {locale === 'en' ? 'Related Results' : 'İlgili Sonuçlar'}
+                              </span>
+                            </div>
+
+                            {/* Ürünler */}
+                            {autoResults?.products && autoResults.products.length > 0 && (
+                              <div>
+                                {autoResults.products.map((product, idx) => {
+                                  const itemIdx = idx;
+                                  return (
+                                    <Link
+                                      key={product.id}
+                                      href={`/listings/${product.id}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      {product.imageUrl && isValidImageSrc(product.imageUrl) ? (
+                                        <img
+                                          src={product.imageUrl}
+                                          alt={product.title}
+                                          className="w-12 h-12 rounded-lg object-cover bg-gray-100 flex-shrink-0 border border-gray-200"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div className={`w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center border border-gray-200 ${product.imageUrl && isValidImageSrc(product.imageUrl) ? 'hidden' : ''}`}>
+                                        <ShoppingBagIcon className="w-5 h-5 text-gray-400" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-900 font-medium truncate">{product.title}</p>
+                                        <p className="text-xs text-orange-600 font-semibold">
+                                          {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                        </p>
+                                      </div>
+                                      <span className="text-[11px] text-gray-400 font-medium px-2 py-0.5 bg-gray-100 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Product' : 'Ürün'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Markalar (Car Brands) */}
+                            {autoResults?.brands && autoResults.brands.length > 0 && (
+                              <div className={autoResults?.products?.length ? 'border-t border-gray-100' : ''}>
+                                {autoResults.brands.map((brand) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + autoResults.brands.indexOf(brand);
+                                  return (
+                                    <Link
+                                      key={brand.id}
+                                      href={`/listings?brand=${encodeURIComponent(brand.name)}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      {brand.logo ? (
+                                        <img
+                                          src={brand.logo}
+                                          alt={brand.name}
+                                          className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-orange-100 flex-shrink-0 flex items-center justify-center text-orange-600 text-sm font-bold">
+                                          {brand.name.charAt(0)}
+                                        </div>
+                                      )}
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{brand.name}</span>
+                                      <span className="text-[11px] text-orange-600 font-medium px-2 py-0.5 bg-orange-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Brand' : 'Marka'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Kategoriler */}
+                            {autoResults?.categories && autoResults.categories.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.categories.map((cat) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + autoResults.categories.indexOf(cat);
+                                  return (
+                                    <Link
+                                      key={cat.id}
+                                      href={`/listings?categoryId=${cat.id}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      <div className="w-10 h-10 rounded-full bg-blue-50 flex-shrink-0 flex items-center justify-center text-blue-500 border border-blue-100">
+                                        <TagIcon className="w-5 h-5" />
+                                      </div>
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cat.name}</span>
+                                      <span className="text-[11px] text-blue-600 font-medium px-2 py-0.5 bg-blue-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Category' : 'Kategori'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Üreticiler (Manufacturers) */}
+                            {autoResults?.manufacturers && autoResults.manufacturers.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.manufacturers.map((mfr) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + autoResults.manufacturers.indexOf(mfr);
+                                  return (
+                                    <Link
+                                      key={mfr.id}
+                                      href={`/listings?manufacturer=${encodeURIComponent(mfr.name)}&manufacturerId=${mfr.id}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      {mfr.logo ? (
+                                        <img
+                                          src={mfr.logo}
+                                          alt={mfr.name}
+                                          className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-purple-50 flex-shrink-0 flex items-center justify-center text-purple-600 text-sm font-bold border border-purple-100">
+                                          {mfr.name.charAt(0)}
+                                        </div>
+                                      )}
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mfr.name}</span>
+                                      <span className="text-[11px] text-purple-600 font-medium px-2 py-0.5 bg-purple-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Manufacturer' : 'Üretici'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* No results */}
+                            {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && (
+                              <div className="px-4 py-6 text-center text-sm text-gray-500">
+                                {locale === 'en' ? 'No results found' : 'Sonuç bulunamadı'}
+                              </div>
+                            )}
+
+                            {/* "...ile ara" footer */}
+                            <button
+                              type="button"
+                              onClick={() => navigateSearch(debouncedQuery)}
+                              className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium border-t border-gray-100 transition-colors ${activeIndex === flatItems.length - 1 ? 'bg-orange-50 text-orange-600' : 'text-orange-600 hover:bg-orange-50'}`}
+                            >
+                              <span>
+                                &ldquo;{debouncedQuery}&rdquo; {locale === 'en' ? 'search for' : 'ile ara'}
+                              </span>
+                              <ArrowRightIcon className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

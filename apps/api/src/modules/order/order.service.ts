@@ -1563,17 +1563,10 @@ export class OrderService {
       });
 
       if (product && product.status !== ProductStatus.sold) {
-        // Update product status to SOLD
-        // If stock is 0, set product to inactive instead
-        const updateData: any = { 
-          status: product.quantity !== null && product.quantity === 0 
-            ? ProductStatus.inactive 
-            : ProductStatus.sold 
-        };
-
+        // Mark as SOLD so seller sees it in "Satılan" and can use "Yeniden Satışa Aç"
         await this.prisma.product.update({
           where: { id: order.productId },
-          data: updateData,
+          data: { status: ProductStatus.sold },
         });
 
         // Invalidate cache

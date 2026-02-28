@@ -449,6 +449,12 @@ export const manufacturersApi = {
   findBySlug: (slug: string) => api.get(`/manufacturers/slug/${slug}`),
 };
 
+// Brands
+export const brandsApi = {
+  findAll: () => api.get('/brands'),
+  findBySlug: (slug: string) => api.get(`/brands/${slug}`),
+};
+
 // Membership
 export const membershipApi = {
   getTiers: () => api.get('/membership/tiers'),
@@ -523,6 +529,14 @@ export const searchApi = {
     api.get('/search/products', { params: { q, ...params } }),
   autocomplete: (q: string) =>
     api.get('/search/autocomplete', { params: { q } }),
+  autocompleteRich: (q: string) =>
+    api.get<{
+      products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
+      brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      categories: Array<{ id: string; name: string; slug: string }>;
+      manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      suggestions: string[];
+    }>('/search/autocomplete-rich', { params: { q } }),
 };
 
 // Discounts

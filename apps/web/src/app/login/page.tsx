@@ -120,9 +120,6 @@ export default function LoginPage() {
           className="w-full max-w-[400px]"
         >
           <div className="mb-8">
-            <Link href="/" className="inline-block mb-7">
-              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={44} height={44} className="rounded-lg object-contain" />
-            </Link>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               {t('auth.welcomeBack')}
             </h1>

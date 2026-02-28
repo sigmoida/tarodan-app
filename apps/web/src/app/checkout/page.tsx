@@ -313,13 +313,15 @@ export default function CheckoutPage() {
   };
 
   const handleAddAddress = async () => {
-    if (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
-      toast.error(t('common.fillAllFields'));
+    const title = (newAddress.title ?? '').trim();
+    if (!title || !newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
+      toast.error(locale === 'en' ? 'Please fill all required fields including address title (e.g. Home, Work)' : 'Adres başlığı dahil tüm zorunlu alanları doldurun (örn: Ev, İş)');
       return;
     }
 
     try {
       const response = await addressesApi.create({
+        title,
         fullName: newAddress.fullName,
         phone: newAddress.phone,
         city: newAddress.city,
@@ -336,6 +338,7 @@ export default function CheckoutPage() {
         setShowAddressForm(false);
         // Reset but keep user's name and phone for next time
         setNewAddress({
+          title: '',
           fullName: user?.displayName || '',
           phone: user?.phone || '',
           city: '',
