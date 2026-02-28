@@ -387,11 +387,11 @@ export default function TaxSettingsPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Vergi Ayarları</h1>
-          <p className="text-gray-400 mt-1">Bölge bazlı vergi oranları, kurallar ve raporlama</p>
+          <h1 className="text-2xl font-bold text-gray-900">Vergi Ayarları</h1>
+          <p className="text-gray-500 mt-1">Bölge bazlı vergi oranları, kurallar ve raporlama</p>
         </div>
 
-        <div className="border-b border-dark-700">
+        <div className="border-b border-gray-200">
           <nav className="flex gap-6">
             {tabs.map(({ id, label, icon: Icon }) => (
               <button
@@ -399,8 +399,8 @@ export default function TaxSettingsPage() {
                 onClick={() => setActiveTab(id)}
                 className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === id
-                    ? 'border-primary-500 text-primary-500'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-600 hover:border-gray-600'
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -412,8 +412,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === 'regions' && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-dark-700">
-              <h2 className="text-lg font-semibold text-white">Vergi Bölgeleri</h2>
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Vergi Bölgeleri</h2>
               <button type="button" onClick={openCreateRegion} className="btn-primary flex items-center gap-2">
                 <PlusIcon className="h-5 w-5" />
                 Yeni Bölge
@@ -421,17 +421,17 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-dark-700">
+                <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Bölge</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ülke / Bölge Kodu</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Varsayılan</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Oran / Kural</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Durum</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">İşlem</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bölge</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ülke / Bölge Kodu</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Varsayılan</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oran / Kural</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dark-700">
+                <tbody className="divide-y divide-gray-200">
                   {regions.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
@@ -440,22 +440,22 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     regions.map((r) => (
-                      <tr key={r.id} className="hover:bg-dark-800/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{r.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.countryCode}{r.regionCode ? ` / ${r.regionCode}` : ''}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.isDefault ? 'Evet' : 'Hayır'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.ratesCount} oran, {r.rulesCount} kural</td>
+                      <tr key={r.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.countryCode}{r.regionCode ? ` / ${r.regionCode}` : ''}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.isDefault ? 'Evet' : 'Hayır'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.ratesCount} oran, {r.rulesCount} kural</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${r.isActive ? 'bg-green-900/30 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
+                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${r.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-700 text-gray-500'}`}>
                             {r.isActive ? 'Aktif' : 'Pasif'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <button onClick={() => openEditRegion(r)} className="text-primary-500 hover:text-primary-400 mr-3">Düzenle</button>
+                          <button onClick={() => openEditRegion(r)} className="text-primary-600 hover:text-primary-400 mr-3">Düzenle</button>
                           {r.ratesCount === 0 && (
                             <button
                               onClick={() => setDeleteConfirm({ type: 'region', id: r.id })}
-                              className="text-red-400 hover:text-red-300"
+                              className="text-red-600 hover:text-red-300"
                             >
                               Sil
                             </button>
@@ -472,8 +472,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === 'rates' && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-dark-700">
-              <h2 className="text-lg font-semibold text-white">Vergi Oranları</h2>
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Vergi Oranları</h2>
               <button type="button" onClick={openCreateRate} className="btn-primary flex items-center gap-2" disabled={regions.length === 0}>
                 <PlusIcon className="h-5 w-5" />
                 Yeni Oran
@@ -481,17 +481,17 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-dark-700">
+                <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Bölge</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Oran Adı</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Oran %</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Varsayılan</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Geçerlilik</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">İşlem</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bölge</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oran Adı</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oran %</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Varsayılan</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geçerlilik</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dark-700">
+                <tbody className="divide-y divide-gray-200">
                   {rates.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
@@ -500,19 +500,19 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     rates.map((r) => (
-                      <tr key={r.id} className="hover:bg-dark-800/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{r.taxRegionName} ({r.countryCode})</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{r.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">%{r.rate}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.isDefault ? 'Evet' : 'Hayır'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      <tr key={r.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.taxRegionName} ({r.countryCode})</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">%{r.rate}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.isDefault ? 'Evet' : 'Hayır'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {r.effectiveFrom || r.effectiveTo
                             ? `${r.effectiveFrom ? new Date(r.effectiveFrom).toLocaleDateString('tr-TR') : '–'} / ${r.effectiveTo ? new Date(r.effectiveTo).toLocaleDateString('tr-TR') : '–'}`
                             : '–'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <button onClick={() => openEditRate(r)} className="text-primary-500 hover:text-primary-400 mr-3">Düzenle</button>
-                          <button onClick={() => setDeleteConfirm({ type: 'rate', id: r.id })} className="text-red-400 hover:text-red-300">Sil</button>
+                          <button onClick={() => openEditRate(r)} className="text-primary-600 hover:text-primary-400 mr-3">Düzenle</button>
+                          <button onClick={() => setDeleteConfirm({ type: 'rate', id: r.id })} className="text-red-600 hover:text-red-300">Sil</button>
                         </td>
                       </tr>
                     ))
@@ -525,8 +525,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === 'rules' && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-dark-700">
-              <h2 className="text-lg font-semibold text-white">Vergi Kuralları</h2>
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Vergi Kuralları</h2>
               <button type="button" onClick={openCreateRule} className="btn-primary flex items-center gap-2" disabled={regions.length === 0 || rates.length === 0}>
                 <PlusIcon className="h-5 w-5" />
                 Yeni Kural
@@ -534,17 +534,17 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-dark-700">
+                <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Bölge</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Oran</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Kapsam</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Kategori</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Öncelik</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">İşlem</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bölge</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oran</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kapsam</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Öncelik</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dark-700">
+                <tbody className="divide-y divide-gray-200">
                   {rules.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
@@ -553,15 +553,15 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     rules.map((r) => (
-                      <tr key={r.id} className="hover:bg-dark-800/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{r.taxRegionName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.taxRateName} (%{r.taxRateValue})</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{SCOPE_LABELS[r.scope] || r.scope}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.categoryName || '–'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{r.priority}</td>
+                      <tr key={r.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.taxRegionName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.taxRateName} (%{r.taxRateValue})</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{SCOPE_LABELS[r.scope] || r.scope}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.categoryName || '–'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.priority}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <button onClick={() => openEditRule(r)} className="text-primary-500 hover:text-primary-400 mr-3">Düzenle</button>
-                          <button onClick={() => setDeleteConfirm({ type: 'rule', id: r.id })} className="text-red-400 hover:text-red-300">Sil</button>
+                          <button onClick={() => openEditRule(r)} className="text-primary-600 hover:text-primary-400 mr-3">Düzenle</button>
+                          <button onClick={() => setDeleteConfirm({ type: 'rule', id: r.id })} className="text-red-600 hover:text-red-300">Sil</button>
                         </td>
                       </tr>
                     ))
@@ -576,7 +576,7 @@ export default function TaxSettingsPage() {
           <div className="space-y-6">
             <div className="admin-card p-4 flex flex-wrap items-end gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Başlangıç</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Başlangıç</label>
                 <input
                   type="date"
                   value={reportFrom}
@@ -585,7 +585,7 @@ export default function TaxSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Bitiş</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Bitiş</label>
                 <input
                   type="date"
                   value={reportTo}
@@ -594,7 +594,7 @@ export default function TaxSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Grupla</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Grupla</label>
                 <select
                   value={reportGroupBy}
                   onChange={(e) => setReportGroupBy(e.target.value as 'day' | 'month' | 'year')}
@@ -614,44 +614,44 @@ export default function TaxSettingsPage() {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-400">Toplam Tahsil Edilen Vergi</p>
-                    <p className="text-2xl font-bold text-white mt-1">₺{report.summary.totalTaxCollected.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-sm text-gray-500">Toplam Tahsil Edilen Vergi</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">₺{report.summary.totalTaxCollected.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-400">Toplam Ciro</p>
-                    <p className="text-2xl font-bold text-white mt-1">₺{report.summary.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-sm text-gray-500">Toplam Ciro</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">₺{report.summary.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-400">Fatura Sayısı</p>
-                    <p className="text-2xl font-bold text-white mt-1">{report.summary.invoiceCount}</p>
+                    <p className="text-sm text-gray-500">Fatura Sayısı</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{report.summary.invoiceCount}</p>
                   </div>
                 </div>
                 <div className="admin-card overflow-hidden">
-                  <div className="p-4 border-b border-dark-700">
-                    <h2 className="text-lg font-semibold text-white">Dönem Bazlı Vergi</h2>
+                  <div className="p-4 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">Dönem Bazlı Vergi</h2>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-dark-700">
+                      <thead className="bg-gray-100">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Dönem</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Vergi (₺)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Ciro (₺)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Adet</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dönem</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Vergi (₺)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ciro (₺)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Adet</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-dark-700">
+                      <tbody className="divide-y divide-gray-200">
                         {report.breakdown.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Bu dönemde fatura yok.</td>
                           </tr>
                         ) : (
                           report.breakdown.map((row) => (
-                            <tr key={row.period} className="hover:bg-dark-800/50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{row.period}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-right">{row.taxCollected.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-right">{row.revenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-right">{row.count}</td>
+                            <tr key={row.period} className="hover:bg-gray-50/50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.period}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.taxCollected.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.revenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.count}</td>
                             </tr>
                           ))
                         )}
@@ -667,16 +667,16 @@ export default function TaxSettingsPage() {
         {/* Region modal */}
         {showRegionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowRegionModal(false)}>
-            <div className="bg-dark-800 rounded-xl shadow-xl border border-dark-600 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center p-4 border-b border-dark-700">
-                <h3 className="text-lg font-semibold text-white">{editingRegion ? 'Vergi Bölgesi Düzenle' : 'Yeni Vergi Bölgesi'}</h3>
-                <button type="button" onClick={() => setShowRegionModal(false)} className="text-gray-400 hover:text-white">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">{editingRegion ? 'Vergi Bölgesi Düzenle' : 'Yeni Vergi Bölgesi'}</h3>
+                <button type="button" onClick={() => setShowRegionModal(false)} className="text-gray-500 hover:text-gray-900">
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
               <form onSubmit={saveRegion} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Bölge Adı *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Bölge Adı *</label>
                   <input
                     type="text"
                     value={regionForm.name}
@@ -688,7 +688,7 @@ export default function TaxSettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Ülke Kodu *</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Ülke Kodu *</label>
                     <input
                       type="text"
                       value={regionForm.countryCode}
@@ -700,7 +700,7 @@ export default function TaxSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Bölge Kodu (opsiyonel)</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Bölge Kodu (opsiyonel)</label>
                     <input
                       type="text"
                       value={regionForm.regionCode}
@@ -716,9 +716,9 @@ export default function TaxSettingsPage() {
                     id="regionDefault"
                     checked={regionForm.isDefault}
                     onChange={(e) => setRegionForm((f) => ({ ...f, isDefault: e.target.checked }))}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="regionDefault" className="text-sm text-gray-400">Varsayılan bölge</label>
+                  <label htmlFor="regionDefault" className="text-sm text-gray-500">Varsayılan bölge</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -726,9 +726,9 @@ export default function TaxSettingsPage() {
                     id="regionActive"
                     checked={regionForm.isActive}
                     onChange={(e) => setRegionForm((f) => ({ ...f, isActive: e.target.checked }))}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="regionActive" className="text-sm text-gray-400">Aktif</label>
+                  <label htmlFor="regionActive" className="text-sm text-gray-500">Aktif</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setShowRegionModal(false)} className="btn-secondary">
@@ -744,17 +744,17 @@ export default function TaxSettingsPage() {
         {/* Rate modal */}
         {showRateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowRateModal(false)}>
-            <div className="bg-dark-800 rounded-xl shadow-xl border border-dark-600 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center p-4 border-b border-dark-700">
-                <h3 className="text-lg font-semibold text-white">{editingRate ? 'Vergi Oranı Düzenle' : 'Yeni Vergi Oranı'}</h3>
-                <button type="button" onClick={() => setShowRateModal(false)} className="text-gray-400 hover:text-white">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">{editingRate ? 'Vergi Oranı Düzenle' : 'Yeni Vergi Oranı'}</h3>
+                <button type="button" onClick={() => setShowRateModal(false)} className="text-gray-500 hover:text-gray-900">
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
               <form onSubmit={saveRate} className="p-4 space-y-4">
                 {!editingRate && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Vergi Bölgesi *</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Vergi Bölgesi *</label>
                     <select
                       value={rateForm.taxRegionId}
                       onChange={(e) => setRateForm((f) => ({ ...f, taxRegionId: e.target.value }))}
@@ -768,7 +768,7 @@ export default function TaxSettingsPage() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Oran Adı *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Oran Adı *</label>
                   <input
                     type="text"
                     value={rateForm.name}
@@ -779,7 +779,7 @@ export default function TaxSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Oran (%) *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Oran (%) *</label>
                   <input
                     type="number"
                     min={0}
@@ -793,7 +793,7 @@ export default function TaxSettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Geçerlilik Başlangıç</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Geçerlilik Başlangıç</label>
                     <input
                       type="date"
                       value={rateForm.effectiveFrom}
@@ -802,7 +802,7 @@ export default function TaxSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Geçerlilik Bitiş</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Geçerlilik Bitiş</label>
                     <input
                       type="date"
                       value={rateForm.effectiveTo}
@@ -817,9 +817,9 @@ export default function TaxSettingsPage() {
                     id="rateDefault"
                     checked={rateForm.isDefault}
                     onChange={(e) => setRateForm((f) => ({ ...f, isDefault: e.target.checked }))}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="rateDefault" className="text-sm text-gray-400">Varsayılan oran (bu bölge için)</label>
+                  <label htmlFor="rateDefault" className="text-sm text-gray-500">Varsayılan oran (bu bölge için)</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -827,9 +827,9 @@ export default function TaxSettingsPage() {
                     id="rateActive"
                     checked={rateForm.isActive}
                     onChange={(e) => setRateForm((f) => ({ ...f, isActive: e.target.checked }))}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="rateActive" className="text-sm text-gray-400">Aktif</label>
+                  <label htmlFor="rateActive" className="text-sm text-gray-500">Aktif</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setShowRateModal(false)} className="btn-secondary">İptal</button>
@@ -843,16 +843,16 @@ export default function TaxSettingsPage() {
         {/* Rule modal */}
         {showRuleModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowRuleModal(false)}>
-            <div className="bg-dark-800 rounded-xl shadow-xl border border-dark-600 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center p-4 border-b border-dark-700">
-                <h3 className="text-lg font-semibold text-white">{editingRule ? 'Vergi Kuralı Düzenle' : 'Yeni Vergi Kuralı'}</h3>
-                <button type="button" onClick={() => setShowRuleModal(false)} className="text-gray-400 hover:text-white">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">{editingRule ? 'Vergi Kuralı Düzenle' : 'Yeni Vergi Kuralı'}</h3>
+                <button type="button" onClick={() => setShowRuleModal(false)} className="text-gray-500 hover:text-gray-900">
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
               <form onSubmit={saveRule} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Vergi Bölgesi *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Vergi Bölgesi *</label>
                   <select
                     value={ruleForm.taxRegionId}
                     onChange={(e) => setRuleForm((f) => ({ ...f, taxRegionId: e.target.value }))}
@@ -865,7 +865,7 @@ export default function TaxSettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Vergi Oranı *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Vergi Oranı *</label>
                   <select
                     value={ruleForm.taxRateId}
                     onChange={(e) => setRuleForm((f) => ({ ...f, taxRateId: e.target.value }))}
@@ -878,7 +878,7 @@ export default function TaxSettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Kapsam *</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Kapsam *</label>
                   <select
                     value={ruleForm.scope}
                     onChange={(e) => setRuleForm((f) => ({ ...f, scope: e.target.value }))}
@@ -891,7 +891,7 @@ export default function TaxSettingsPage() {
                 </div>
                 {ruleForm.scope === 'category' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Kategori *</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Kategori *</label>
                     <select
                       value={ruleForm.categoryId}
                       onChange={(e) => setRuleForm((f) => ({ ...f, categoryId: e.target.value }))}
@@ -906,7 +906,7 @@ export default function TaxSettingsPage() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Öncelik</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Öncelik</label>
                   <input
                     type="number"
                     min={0}
@@ -921,9 +921,9 @@ export default function TaxSettingsPage() {
                     id="ruleActive"
                     checked={ruleForm.isActive}
                     onChange={(e) => setRuleForm((f) => ({ ...f, isActive: e.target.checked }))}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="ruleActive" className="text-sm text-gray-400">Aktif</label>
+                  <label htmlFor="ruleActive" className="text-sm text-gray-500">Aktif</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setShowRuleModal(false)} className="btn-secondary">İptal</button>
@@ -937,14 +937,14 @@ export default function TaxSettingsPage() {
         {/* Delete confirmation */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setDeleteConfirm(null)}>
-            <div className="bg-dark-800 rounded-xl shadow-xl border border-dark-600 p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-              <p className="text-white font-medium">Bu kaydı silmek istediğinize emin misiniz?</p>
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+              <p className="text-gray-900 font-medium">Bu kaydı silmek istediğinize emin misiniz?</p>
               <div className="flex justify-end gap-2 mt-4">
                 <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary">Vazgeç</button>
                 <button
                   type="button"
                   onClick={() => handleDelete(deleteConfirm.type, deleteConfirm.id)}
-                  className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg"
+                  className="bg-red-600 hover:bg-red-500 text-gray-900 px-4 py-2 rounded-lg"
                 >
                   Sil
                 </button>

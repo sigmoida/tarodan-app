@@ -148,13 +148,13 @@ export default function RolesPage() {
             <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Roller ve İzinler</h1>
-                        <p className="text-gray-400 mt-1">Sistem erişim seviyelerini ve kullanıcı rollerini yönetin</p>
+                        <h1 className="text-2xl font-bold text-gray-900">Roller ve İzinler</h1>
+                        <p className="text-gray-500 mt-1">Sistem erişim seviyelerini ve kullanıcı rollerini yönetin</p>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setActiveTab('roles')}
-                            className={`px-4 py-2 rounded-lg transition-colors flex items-center ${activeTab === 'roles' ? 'bg-primary-600 text-white' : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                            className={`px-4 py-2 rounded-lg transition-colors flex items-center ${activeTab === 'roles' ? 'bg-primary-600 text-gray-900' : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
                                 }`}
                         >
                             <ShieldCheckIcon className="w-5 h-5 mr-2" />
@@ -162,7 +162,7 @@ export default function RolesPage() {
                         </button>
                         <button
                             onClick={() => setActiveTab('users')}
-                            className={`px-4 py-2 rounded-lg transition-colors flex items-center ${activeTab === 'users' ? 'bg-primary-600 text-white' : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                            className={`px-4 py-2 rounded-lg transition-colors flex items-center ${activeTab === 'users' ? 'bg-primary-600 text-gray-900' : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
                                 }`}
                         >
                             <UserGroupIcon className="w-5 h-5 mr-2" />
@@ -186,38 +186,38 @@ export default function RolesPage() {
                                 <div key={role.id} className="admin-card relative group flex flex-col h-full">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <h3 className="text-lg font-semibold text-white">{role.name}</h3>
+                                            <h3 className="text-lg font-semibold text-gray-900">{role.name}</h3>
                                             <div className="flex items-center mt-1">
-                                                <span className="text-sm text-gray-400">{role.usersCount} Kullanıcı</span>
+                                                <span className="text-sm text-gray-500">{role.usersCount} Kullanıcı</span>
                                                 {role.isSystem && (
-                                                    <span className="ml-2 text-xs bg-dark-600 text-gray-400 px-2 py-0.5 rounded">Sistem</span>
+                                                    <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Sistem</span>
                                                 )}
                                             </div>
                                         </div>
                                         {!role.isSystem && (
                                             <div className="flex gap-2">
-                                                <button onClick={() => handleEditRole(role)} className="p-1.5 hover:bg-dark-600 rounded transition-colors" title="Düzenle">
-                                                    <PencilIcon className="w-4 h-4 text-blue-400" />
+                                                <button onClick={() => handleEditRole(role)} className="p-1.5 hover:bg-gray-100 rounded transition-colors" title="Düzenle">
+                                                    <PencilIcon className="w-4 h-4 text-blue-700" />
                                                 </button>
-                                                <button onClick={() => handleDeleteRole(role.id)} className="p-1.5 hover:bg-dark-600 rounded transition-colors" title="Sil">
-                                                    <TrashIcon className="w-4 h-4 text-red-400" />
+                                                <button onClick={() => handleDeleteRole(role.id)} className="p-1.5 hover:bg-gray-100 rounded transition-colors" title="Sil">
+                                                    <TrashIcon className="w-4 h-4 text-red-600" />
                                                 </button>
                                             </div>
                                         )}
                                     </div>
 
-                                    <p className="text-gray-300 text-sm mb-4 flex-grow">{role.description}</p>
+                                    <p className="text-gray-600 text-sm mb-4 flex-grow">{role.description}</p>
 
                                     <div className="mt-auto">
                                         <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">İzinler</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {role.permissions.slice(0, 3).map(p => (
-                                                <span key={p} className="text-xs px-2 py-1 rounded bg-dark-600 text-gray-300 border border-dark-500">
+                                                <span key={p} className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 border border-gray-300">
                                                     {AVAILABLE_PERMISSIONS.find(ap => ap.id === p)?.label || p}
                                                 </span>
                                             ))}
                                             {role.permissions.length > 3 && (
-                                                <span className="text-xs px-2 py-1 rounded bg-dark-600 text-gray-400 border border-dark-500">
+                                                <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 border border-gray-300">
                                                     +{role.permissions.length - 3} daha
                                                 </span>
                                             )}
@@ -230,8 +230,8 @@ export default function RolesPage() {
                 ) : (
                     /* User Assignments */
                     <div className="admin-card overflow-hidden">
-                        <div className="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-800/50">
-                            <h3 className="text-lg font-semibold text-white">Yönetici Kullanıcılar</h3>
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white/50">
+                            <h3 className="text-lg font-semibold text-gray-900">Yönetici Kullanıcılar</h3>
                             <button
                                 onClick={() => {
                                     setEditingUser(null);
@@ -258,9 +258,9 @@ export default function RolesPage() {
                                 </thead>
                                 <tbody>
                                     {adminUsers.map((user) => (
-                                        <tr key={user.id} className="border-b border-dark-700 hover:bg-dark-700/50">
-                                            <td className="p-4 font-medium text-white">{user.name}</td>
-                                            <td className="p-4 text-gray-400">{user.email}</td>
+                                        <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-100/50">
+                                            <td className="p-4 font-medium text-gray-900">{user.name}</td>
+                                            <td className="p-4 text-gray-500">{user.email}</td>
                                             <td className="p-4">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.role === 'super_admin' ? 'bg-red-500/10 text-red-500' :
                                                         user.role === 'admin' ? 'bg-orange-500/10 text-orange-500' :
@@ -275,7 +275,7 @@ export default function RolesPage() {
                                                     {user.status === 'active' ? 'Aktif' : 'Pasif'}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-gray-400">{user.lastLogin}</td>
+                                            <td className="p-4 text-gray-500">{user.lastLogin}</td>
                                             <td className="p-4 text-right">
                                                 <button
                                                     onClick={() => {
@@ -283,7 +283,7 @@ export default function RolesPage() {
                                                         setUserForm({ email: user.email, role: user.role });
                                                         setShowUserModal(true);
                                                     }}
-                                                    className="text-blue-400 hover:text-blue-300 font-medium text-sm"
+                                                    className="text-blue-700 hover:text-blue-300 font-medium text-sm"
                                                 >
                                                     Düzenle
                                                 </button>
@@ -299,13 +299,13 @@ export default function RolesPage() {
                 {/* Create/Edit Role Modal */}
                 {showRoleModal && (
                     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div className="bg-dark-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-dark-700 shadow-2xl">
+                        <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 shadow-2xl">
                             <div className="p-6">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-white">
+                                    <h3 className="text-xl font-bold text-gray-900">
                                         {editingRole ? 'Rolü Düzenle' : 'Yeni Rol Oluştur'}
                                     </h3>
-                                    <button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-white">
+                                    <button onClick={() => setShowRoleModal(false)} className="text-gray-500 hover:text-gray-900">
                                         <span className="sr-only">Kapat</span>
                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -315,7 +315,7 @@ export default function RolesPage() {
 
                                 <form onSubmit={handleSaveRole} className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">Rol Adı</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Rol Adı</label>
                                         <input
                                             type="text"
                                             required
@@ -326,7 +326,7 @@ export default function RolesPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">Açıklama</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Açıklama</label>
                                         <textarea
                                             required
                                             value={roleForm.description}
@@ -337,11 +337,11 @@ export default function RolesPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-3 block">İzinler</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-3 block">İzinler</label>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                             {Object.entries(groupedPermissions).map(([group, perms]) => (
-                                                <div key={group} className="bg-dark-700/50 p-4 rounded-lg border border-dark-600">
-                                                    <h4 className="font-medium text-white mb-3 text-sm">{group}</h4>
+                                                <div key={group} className="bg-gray-100/50 p-4 rounded-lg border border-gray-300">
+                                                    <h4 className="font-medium text-gray-900 mb-3 text-sm">{group}</h4>
                                                     <div className="space-y-2">
                                                         {perms.map(perm => {
                                                             const isChecked = roleForm.permissions.includes(perm.id);
@@ -349,9 +349,9 @@ export default function RolesPage() {
                                                                 <label key={perm.id} className="flex items-start gap-3 cursor-pointer group">
                                                                     <div className={`mt-0.5 w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${isChecked
                                                                             ? 'bg-primary-600 border-primary-600'
-                                                                            : 'border-gray-500 group-hover:border-gray-400 bg-dark-800'
+                                                                            : 'border-gray-500 group-hover:border-gray-400 bg-white'
                                                                         }`}>
-                                                                        {isChecked && <CheckIcon className="w-3.5 h-3.5 text-white stroke-2" />}
+                                                                        {isChecked && <CheckIcon className="w-3.5 h-3.5 text-gray-900 stroke-2" />}
                                                                     </div>
                                                                     <input
                                                                         type="checkbox"
@@ -359,7 +359,7 @@ export default function RolesPage() {
                                                                         checked={isChecked}
                                                                         onChange={() => togglePermission(perm.id)}
                                                                     />
-                                                                    <span className={`text-sm select-none ${isChecked ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
+                                                                    <span className={`text-sm select-none ${isChecked ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-600'}`}>
                                                                         {perm.label}
                                                                     </span>
                                                                 </label>
@@ -370,7 +370,7 @@ export default function RolesPage() {
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="flex gap-3 justify-end pt-4 border-t border-dark-700">
+                                    <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
                                         <button
                                             type="button"
                                             onClick={() => setShowRoleModal(false)}
@@ -391,13 +391,13 @@ export default function RolesPage() {
                 {/* Assign User Modal */}
                 {showUserModal && (
                     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div className="bg-dark-800 rounded-xl max-w-md w-full border border-dark-700 shadow-2xl">
+                        <div className="bg-white rounded-xl max-w-md w-full border border-gray-200 shadow-2xl">
                             <div className="p-6">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-white">
+                                    <h3 className="text-xl font-bold text-gray-900">
                                         {editingUser ? 'Rolü Güncelle' : 'Kullanıcıya Rol Ata'}
                                     </h3>
-                                    <button onClick={() => setShowUserModal(false)} className="text-gray-400 hover:text-white">
+                                    <button onClick={() => setShowUserModal(false)} className="text-gray-500 hover:text-gray-900">
                                         <span className="sr-only">Kapat</span>
                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -407,7 +407,7 @@ export default function RolesPage() {
 
                                 <form onSubmit={handleAssignUser} className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">Kullanıcı E-posta</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Kullanıcı E-posta</label>
                                         <input
                                             type="email"
                                             required
@@ -420,7 +420,7 @@ export default function RolesPage() {
                                         {editingUser && <p className="text-xs text-gray-500 mt-1">E-posta adresi değiştirilemez.</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">Atanacak Rol</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Atanacak Rol</label>
                                         <select
                                             value={userForm.role}
                                             onChange={e => setUserForm({ ...userForm, role: e.target.value })}
@@ -431,7 +431,7 @@ export default function RolesPage() {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="flex gap-3 justify-end pt-4 border-t border-dark-700">
+                                    <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
                                         <button
                                             type="button"
                                             onClick={() => setShowUserModal(false)}

@@ -291,9 +291,9 @@ export default function CategoryPage() {
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-16">
-                <h2 className="text-xl font-semibold text-white mb-2">Ürün bulunamadı</h2>
+                <h2 className="text-xl font-semibold text-white mb-2">Stokta kalmadı</h2>
                 <p className="text-gray-400">
-                  Bu kategoride henüz ürün bulunmamaktadır.
+                  Bu kategoride şu an stokta ürün bulunmamaktadır.
                 </p>
               </div>
             ) : viewMode === 'grid' ? (

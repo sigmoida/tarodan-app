@@ -503,7 +503,7 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              {/* Mesajlar + yazma kutusu (son mesajın hemen altında, tek kaydırma alanı) */}
+              {/* Mesajlar alanı (scroll) */}
               <div
                 ref={messagesScrollRef}
                 className="flex-1 min-h-0 overflow-y-auto"
@@ -558,7 +558,10 @@ export default function MessagesPage() {
                   })}
                 </div>
                 <div ref={messagesEndRef} />
-                <div className="p-4 pt-2 bg-white border-t border-gray-200">
+              </div>
+
+              {/* Yazma kutusu - altta sabit */}
+              <div className="flex-shrink-0 p-4 pt-2 bg-white border-t border-gray-200">
                   {contentWarning && (
                     <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
                       ⚠️ {contentWarning}
@@ -618,7 +621,6 @@ export default function MessagesPage() {
                     </button>
                   </div>
                   <p className="text-xs text-gray-300 mt-1.5">{newMessage.length}/{maxMessageLength}</p>
-                </div>
               </div>
             </>
           ) : (

@@ -412,7 +412,7 @@ export default function ProductDetailPage() {
                       <div>
                         <span className="text-gray-600 text-sm">Fiyat:</span>
                         {isProductOnSaleDisplay(product) && (
-                          <p className="text-gray-400 line-through text-base">
+                          <p className="text-gray-500 line-through text-base">
                             ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </p>
                         )}
@@ -481,7 +481,7 @@ export default function ProductDetailPage() {
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowEditModal(true)}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2 bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                     >
                       <PencilIcon className="w-5 h-5" />
                       Düzenle
@@ -489,7 +489,7 @@ export default function ProductDetailPage() {
                     {canApprove && (
                       <button
                         onClick={() => setShowApproveModal(true)}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <CheckCircleIcon className="w-5 h-5" />
                         Onayla
@@ -498,7 +498,7 @@ export default function ProductDetailPage() {
                     {canReject && (
                       <button
                         onClick={() => setShowRejectModal(true)}
-                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <XCircleIcon className="w-5 h-5" />
                         Reddet
@@ -507,7 +507,7 @@ export default function ProductDetailPage() {
                     {canDelete && (
                       <button
                         onClick={() => setShowDeleteModal(true)}
-                        className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 py-2 bg-gray-600 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
                       >
                         <TrashIcon className="w-5 h-5" />
                         Sil
@@ -671,7 +671,7 @@ export default function ProductDetailPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"
                   >
                     Yanıtla
                   </button>
@@ -711,7 +711,7 @@ export default function ProductDetailPage() {
                 </button>
                 <button
                   onClick={handleApprove}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Onayla'}
@@ -751,7 +751,7 @@ export default function ProductDetailPage() {
                 </button>
                 <button
                   onClick={handleReject}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Reddet'}
@@ -871,7 +871,7 @@ export default function ProductDetailPage() {
                   <button
                     type="submit"
                     disabled={processing}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                   >
                     {processing ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
                   </button>
@@ -899,7 +899,7 @@ export default function ProductDetailPage() {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Sil'}

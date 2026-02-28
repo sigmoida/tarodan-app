@@ -134,8 +134,8 @@ export default function PaymentSettingsPage() {
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Ödeme Ayarları</h1>
-                        <p className="text-gray-400 mt-1">Ödeme geçitlerini ve API anahtarlarını yapılandırın</p>
+                        <h1 className="text-2xl font-bold text-gray-900">Ödeme Ayarları</h1>
+                        <p className="text-gray-500 mt-1">Ödeme geçitlerini ve API anahtarlarını yapılandırın</p>
                     </div>
                     <button
                         onClick={handleSave}
@@ -158,17 +158,17 @@ export default function PaymentSettingsPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {gateways.map(gateway => (
-                        <div key={gateway.id} className={`admin-card border-2 transition-colors ${gateway.enabled ? 'border-primary-500/30' : 'border-dark-700'}`}>
+                        <div key={gateway.id} className={`admin-card border-2 transition-colors ${gateway.enabled ? 'border-primary-500/30' : 'border-gray-200'}`}>
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-3 rounded-lg ${gateway.enabled ? 'bg-primary-500/20 text-primary-400' : 'bg-dark-700 text-gray-400'}`}>
+                                    <div className={`p-3 rounded-lg ${gateway.enabled ? 'bg-primary-100 text-primary-400' : 'bg-gray-100 text-gray-500'}`}>
                                         <CreditCardIcon className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-white">{gateway.name}</h3>
+                                        <h3 className="text-lg font-bold text-gray-900">{gateway.name}</h3>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className={`w-2 h-2 rounded-full ${gateway.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
-                                            <span className="text-xs text-gray-400">{gateway.enabled ? 'Aktif' : 'Pasif'}</span>
+                                            <span className="text-xs text-gray-500">{gateway.enabled ? 'Aktif' : 'Pasif'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -188,18 +188,18 @@ export default function PaymentSettingsPage() {
 
                             <div className="space-y-4">
                                 {/* Mode Selection */}
-                                <div className="bg-dark-700/50 p-4 rounded-lg">
-                                    <label className="text-sm font-medium text-gray-400 block mb-2">Çalışma Modu</label>
-                                    <div className="flex bg-dark-800 rounded-lg p-1">
+                                <div className="bg-gray-100/50 p-4 rounded-lg">
+                                    <label className="text-sm font-medium text-gray-500 block mb-2">Çalışma Modu</label>
+                                    <div className="flex bg-white rounded-lg p-1">
                                         <button
                                             onClick={() => updateGateway(gateway.id, { mode: 'test' })}
-                                            className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === 'test' ? 'bg-dark-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}
+                                            className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === 'test' ? 'bg-gray-100 text-gray-900 shadow' : 'text-gray-500 hover:text-gray-600'}`}
                                         >
                                             Test (Sandbox)
                                         </button>
                                         <button
                                             onClick={() => updateGateway(gateway.id, { mode: 'live' })}
-                                            className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === 'live' ? 'bg-red-900/30 text-red-200 shadow' : 'text-gray-500 hover:text-gray-300'}`}
+                                            className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === 'live' ? 'bg-red-50 text-red-200 shadow' : 'text-gray-500 hover:text-gray-600'}`}
                                         >
                                             Canlı (Live)
                                         </button>
@@ -209,7 +209,7 @@ export default function PaymentSettingsPage() {
                                 {/* Config Fields */}
                                 {Object.keys(gateway.config).map(key => (
                                     <div key={key}>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1 capitalize">
+                                        <label className="block text-sm font-medium text-gray-500 mb-1 capitalize">
                                             {key.replace(/([A-Z])/g, ' $1').trim()}
                                         </label>
                                         <div className="relative">

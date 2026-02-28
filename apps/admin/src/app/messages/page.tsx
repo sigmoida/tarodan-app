@@ -134,8 +134,8 @@ export default function MessagesPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Mesaj Moderation</h1>
-          <p className="text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900">Mesaj Moderation</h1>
+          <p className="text-gray-500 mt-1">
             {filter === 'all' 
               ? `Toplam ${total} mesaj` 
               : filter === 'pending' 
@@ -153,8 +153,8 @@ export default function MessagesPage() {
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 filter === f
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-dark-700 text-gray-400 hover:text-white'
+                  ? 'bg-primary-500 text-gray-900'
+                  : 'bg-gray-100 text-gray-500 hover:text-gray-900'
               }`}
             >
               {f === 'all' ? 'Tümü' : f === 'pending' ? 'Bekleyenler' : f === 'approved' ? 'Onaylananlar' : 'Reddedilenler'}
@@ -185,7 +185,7 @@ export default function MessagesPage() {
                   </tr>
                 ) : messages.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-400">
+                    <td colSpan={7} className="text-center py-8 text-gray-500">
                       Mesaj bulunamadı
                     </td>
                   </tr>
@@ -194,18 +194,18 @@ export default function MessagesPage() {
                     <tr key={message.id}>
                       <td>
                         <div>
-                          <p className="font-medium text-white">{message.sender.displayName}</p>
-                          <p className="text-xs text-gray-400">{message.sender.email}</p>
+                          <p className="font-medium text-gray-900">{message.sender.displayName}</p>
+                          <p className="text-xs text-gray-500">{message.sender.email}</p>
                         </div>
                       </td>
                       <td>
                         <div>
-                          <p className="font-medium text-white">{message.receiver.displayName}</p>
-                          <p className="text-xs text-gray-400">{message.receiver.email}</p>
+                          <p className="font-medium text-gray-900">{message.receiver.displayName}</p>
+                          <p className="text-xs text-gray-500">{message.receiver.email}</p>
                         </div>
                       </td>
                       <td>
-                        <p className="text-sm text-gray-300 line-clamp-2 max-w-md">
+                        <p className="text-sm text-gray-600 line-clamp-2 max-w-md">
                           {message.originalContent || message.content}
                         </p>
                       </td>
@@ -219,7 +219,7 @@ export default function MessagesPage() {
                         )}
                       </td>
                       <td>{getStatusBadge(message.status, message.flaggedReason)}</td>
-                      <td className="text-sm text-gray-400">
+                      <td className="text-sm text-gray-500">
                         {new Date(message.createdAt).toLocaleDateString('tr-TR')}
                       </td>
                       <td>
@@ -228,14 +228,14 @@ export default function MessagesPage() {
                             <>
                               <button
                                 onClick={() => handleApprove(message.id)}
-                                className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg"
+                                className="p-2 text-green-700 hover:bg-green-500/10 rounded-lg"
                                 title="Onayla"
                               >
                                 <CheckIcon className="h-5 w-5" />
                               </button>
                               <button
                                 onClick={() => handleReject(message.id)}
-                                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                                className="p-2 text-red-600 hover:bg-red-500/10 rounded-lg"
                                 title="Reddet"
                               >
                                 <XMarkIcon className="h-5 w-5" />
@@ -243,7 +243,7 @@ export default function MessagesPage() {
                               {message.senderId && (
                                 <button
                                   onClick={() => handleBanSender(message)}
-                                  className="p-2 text-orange-400 hover:bg-orange-500/10 rounded-lg"
+                                  className="p-2 text-orange-700 hover:bg-orange-500/10 rounded-lg"
                                   title="Göndereni yasakla (hesap engeli)"
                                 >
                                   <NoSymbolIcon className="h-5 w-5" />
@@ -252,7 +252,7 @@ export default function MessagesPage() {
                             </>
                           )}
                           <button
-                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -268,7 +268,7 @@ export default function MessagesPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">Sayfa {page} / {Math.ceil(total / 20)}</p>
+          <p className="text-sm text-gray-500">Sayfa {page} / {Math.ceil(total / 20)}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

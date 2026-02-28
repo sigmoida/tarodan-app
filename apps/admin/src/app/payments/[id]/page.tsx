@@ -332,7 +332,7 @@ export default function AdminPaymentDetailPage() {
                       setRefundReason('');
                       setShowRefundModal(true);
                     }}
-                    className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-gray-900 rounded-lg flex items-center justify-center gap-2"
                   >
                     <ArrowUturnLeftIcon className="w-5 h-5" />
                     Manuel İade
@@ -344,7 +344,7 @@ export default function AdminPaymentDetailPage() {
                       setCancelReason('');
                       setShowCancelModal(true);
                     }}
-                    className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-gray-900 rounded-lg flex items-center justify-center gap-2"
                   >
                     <XCircleIcon className="w-5 h-5" />
                     Zorla İptal
@@ -415,7 +415,7 @@ export default function AdminPaymentDetailPage() {
                 <button
                   onClick={handleManualRefund}
                   disabled={processing}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processing ? 'İşleniyor...' : 'İade Et'}
                 </button>
@@ -462,7 +462,7 @@ export default function AdminPaymentDetailPage() {
                 <button
                   onClick={handleForceCancel}
                   disabled={processing || !cancelReason.trim()}
-                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processing ? 'İşleniyor...' : 'Zorla İptal Et'}
                 </button>

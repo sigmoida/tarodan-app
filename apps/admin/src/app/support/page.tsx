@@ -205,11 +205,11 @@ export default function SupportPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      open: 'bg-blue-900/50 text-blue-400 border-blue-700',
-      in_progress: 'bg-yellow-900/50 text-yellow-400 border-yellow-700',
-      waiting_customer: 'bg-purple-900/50 text-purple-400 border-purple-700',
-      resolved: 'bg-green-900/50 text-green-400 border-green-700',
-      closed: 'bg-gray-900/50 text-gray-400 border-gray-700',
+      open: 'bg-blue-50 text-blue-700 border-blue-700',
+      in_progress: 'bg-yellow-50 text-yellow-700 border-yellow-700',
+      waiting_customer: 'bg-purple-900/50 text-purple-700 border-purple-700',
+      resolved: 'bg-green-50 text-green-700 border-green-700',
+      closed: 'bg-gray-50/50 text-gray-500 border-gray-200',
     };
     const labels: Record<string, string> = {
       open: 'Açık',
@@ -227,10 +227,10 @@ export default function SupportPage() {
 
   const getPriorityBadge = (priority: string) => {
     const styles: Record<string, string> = {
-      low: 'bg-gray-900/50 text-gray-400',
-      medium: 'bg-blue-900/50 text-blue-400',
-      high: 'bg-orange-900/50 text-orange-400',
-      urgent: 'bg-red-900/50 text-red-400',
+      low: 'bg-gray-50/50 text-gray-500',
+      medium: 'bg-blue-50 text-blue-700',
+      high: 'bg-orange-900/50 text-orange-700',
+      urgent: 'bg-red-50 text-red-700',
     };
     const labels: Record<string, string> = {
       low: 'Düşük',
@@ -275,20 +275,20 @@ export default function SupportPage() {
     <AdminLayout>
       <div className="flex h-[calc(100vh-8rem)]">
         {/* Ticket List */}
-        <div className={`${selectedTicket ? 'w-1/3' : 'w-full'} border-r border-dark-700 flex flex-col`}>
+        <div className={`${selectedTicket ? 'w-1/3' : 'w-full'} border-r border-gray-200 flex flex-col`}>
           {/* Header */}
-          <div className="p-4 border-b border-dark-700">
-            <h1 className="text-xl font-bold text-white mb-4">Destek Talepleri</h1>
+          <div className="p-4 border-b border-gray-200">
+            <h1 className="text-xl font-bold text-gray-900 mb-4">Destek Talepleri</h1>
 
             {/* Search */}
             <div className="relative mb-4">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
               <input
                 type="text"
                 placeholder="Ara..."
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:border-primary-500"
+                className="w-full bg-gray-100 border border-gray-300 rounded-lg pl-10 pr-4 py-2 text-gray-900 focus:outline-none focus:border-primary-500"
               />
             </div>
 
@@ -297,7 +297,7 @@ export default function SupportPage() {
               <select
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-gray-300"
+                className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-600"
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -308,7 +308,7 @@ export default function SupportPage() {
               <select
                 value={filters.priority}
                 onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-gray-300"
+                className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-600"
               >
                 {PRIORITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -319,7 +319,7 @@ export default function SupportPage() {
               <select
                 value={filters.category}
                 onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-gray-300"
+                className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-600"
               >
                 {CATEGORY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -337,7 +337,7 @@ export default function SupportPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
               </div>
             ) : tickets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+              <div className="flex flex-col items-center justify-center h-32 text-gray-500">
                 <ChatBubbleLeftRightIcon className="h-8 w-8 mb-2" />
                 <p>Destek talebi bulunamadı</p>
               </div>
@@ -346,16 +346,16 @@ export default function SupportPage() {
                 <button
                   key={ticket.id}
                   onClick={() => loadTicketDetails(ticket.id)}
-                  className={`w-full p-4 border-b border-dark-700 text-left hover:bg-dark-700/50 transition-colors ${
-                    selectedTicket?.id === ticket.id ? 'bg-dark-700' : ''
+                  className={`w-full p-4 border-b border-gray-200 text-left hover:bg-gray-100/50 transition-colors ${
+                    selectedTicket?.id === ticket.id ? 'bg-gray-100' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="text-xs text-gray-500">{ticket.ticketNumber}</span>
                     {getStatusBadge(ticket.status)}
                   </div>
-                  <h3 className="text-white font-medium mb-1 line-clamp-1">{ticket.subject}</h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <h3 className="text-gray-900 font-medium mb-1 line-clamp-1">{ticket.subject}</h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
                     <UserCircleIcon className="h-4 w-4" />
                     <span>{ticket.creator.displayName}</span>
                     <span>•</span>
@@ -375,38 +375,38 @@ export default function SupportPage() {
         {selectedTicket && (
           <div className="flex-1 flex flex-col">
             {/* Detail Header */}
-            <div className="p-4 border-b border-dark-700 flex items-center justify-between">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <span className="text-gray-500">{selectedTicket.ticketNumber}</span>
                   {getStatusBadge(selectedTicket.status)}
                   {getPriorityBadge(selectedTicket.priority)}
                 </div>
-                <h2 className="text-lg font-semibold text-white">{selectedTicket.subject}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{selectedTicket.subject}</h2>
               </div>
               <button
                 onClick={() => setSelectedTicket(null)}
-                className="text-gray-400 hover:text-white p-2"
+                className="text-gray-500 hover:text-gray-900 p-2"
               >
                 <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
 
             {/* Ticket Info */}
-            <div className="p-4 border-b border-dark-700 bg-dark-800/50">
+            <div className="p-4 border-b border-gray-200 bg-white/50">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Oluşturan</span>
-                  <p className="text-white">{selectedTicket.creator.displayName}</p>
-                  <p className="text-gray-400 text-xs">{selectedTicket.creator.email}</p>
+                  <p className="text-gray-900">{selectedTicket.creator.displayName}</p>
+                  <p className="text-gray-500 text-xs">{selectedTicket.creator.email}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Kategori</span>
-                  <p className="text-white">{getCategoryLabel(selectedTicket.category)}</p>
+                  <p className="text-gray-900">{getCategoryLabel(selectedTicket.category)}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Oluşturulma</span>
-                  <p className="text-white">{new Date(selectedTicket.createdAt).toLocaleString('tr-TR')}</p>
+                  <p className="text-gray-900">{new Date(selectedTicket.createdAt).toLocaleString('tr-TR')}</p>
                 </div>
               </div>
 
@@ -416,7 +416,7 @@ export default function SupportPage() {
                 <select
                   value={selectedTicket.status}
                   onChange={(e) => handleStatusChange(selectedTicket.id, e.target.value)}
-                  className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-white"
+                  className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900"
                 >
                   {STATUS_OPTIONS.filter((opt) => opt.value).map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -435,37 +435,37 @@ export default function SupportPage() {
                   className={`rounded-lg p-4 ${
                     message.isInternal
                       ? 'bg-yellow-900/20 border border-yellow-700'
-                      : 'bg-dark-700'
+                      : 'bg-gray-100'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <UserCircleIcon className="h-5 w-5 text-gray-400" />
-                      <span className="text-white font-medium">{message.sender.displayName}</span>
+                      <UserCircleIcon className="h-5 w-5 text-gray-500" />
+                      <span className="text-gray-900 font-medium">{message.sender.displayName}</span>
                       {message.isInternal && (
-                        <span className="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded">
+                        <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded">
                           İç Not
                         </span>
                       )}
                     </div>
                     <span className="text-xs text-gray-500">{formatTime(message.createdAt)}</span>
                   </div>
-                  <p className="text-gray-300 whitespace-pre-wrap">{message.content}</p>
+                  <p className="text-gray-600 whitespace-pre-wrap">{message.content}</p>
                 </div>
               ))}
             </div>
 
             {/* Reply Box */}
-            <div className="p-4 border-t border-dark-700">
+            <div className="p-4 border-t border-gray-200">
               <div className="flex items-center gap-2 mb-2">
                 <input
                   type="checkbox"
                   id="internalNote"
                   checked={isInternalNote}
                   onChange={(e) => setIsInternalNote(e.target.checked)}
-                  className="rounded border-dark-600 text-yellow-500 focus:ring-yellow-500 bg-dark-700"
+                  className="rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 bg-gray-100"
                 />
-                <label htmlFor="internalNote" className="text-sm text-gray-400">
+                <label htmlFor="internalNote" className="text-sm text-gray-500">
                   İç not olarak ekle (kullanıcı göremez)
                 </label>
               </div>
@@ -475,7 +475,7 @@ export default function SupportPage() {
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Yanıtınızı yazın..."
                   rows={3}
-                  className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500 resize-none"
+                  className="flex-1 bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:border-primary-500 resize-none"
                 />
                 <button
                   onClick={handleReply}

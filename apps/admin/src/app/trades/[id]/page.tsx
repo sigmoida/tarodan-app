@@ -172,7 +172,7 @@ export default function TradeDetailPage() {
               {canResolve && (
                 <button
                   onClick={() => setShowResolveModal(true)}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   Çözümle
                 </button>
@@ -400,7 +400,7 @@ export default function TradeDetailPage() {
                 </button>
                 <button
                   onClick={handleResolve}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Çözümle'}

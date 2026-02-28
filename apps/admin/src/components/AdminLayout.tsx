@@ -83,11 +83,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -95,12 +95,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 transform transition-transform duration-300 lg:translate-x-0 flex flex-col',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 lg:translate-x-0 flex flex-col shadow-soft',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-dark-700">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
           <Link href="/dashboard" className="flex items-center">
             <Image
               src="/tarodan-logo.jpg"
@@ -110,10 +110,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               className="object-contain"
               priority
             />
-            <span className="ml-2 text-xs text-gray-400">Admin</span>
+            <span className="ml-2 text-xs text-gray-500 font-medium">Admin</span>
           </Link>
           <button
-            className="lg:hidden text-gray-400 hover:text-white"
+            className="lg:hidden text-gray-400 hover:text-gray-700"
             onClick={() => setSidebarOpen(false)}
           >
             <XMarkIcon className="h-6 w-6" />
@@ -131,8 +131,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 className={clsx(
                   'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-primary-500/10 text-primary-500'
-                    : 'text-gray-400 hover:bg-dark-700 hover:text-white'
+                    ? 'bg-primary-50 text-primary-600'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 )}
                 onClick={() => setSidebarOpen(false)}
               >
@@ -144,21 +144,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-dark-700">
+        <div className="p-4 border-t border-gray-200">
           <div className="flex items-center mb-3">
-            <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center">
-              <span className="text-primary-500 font-semibold">
+            <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
+              <span className="text-primary-600 font-semibold">
                 {user?.displayName?.charAt(0) || 'A'}
               </span>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-white">{user?.displayName}</p>
-              <p className="text-xs text-gray-400">{user?.role}</p>
+              <p className="text-sm font-medium text-gray-900">{user?.displayName}</p>
+              <p className="text-xs text-gray-500">{user?.role}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
             Çıkış Yap
@@ -169,10 +169,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-dark-900/95 backdrop-blur border-b border-dark-700 flex items-center justify-between px-4">
+        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
             <button
-              className="lg:hidden text-gray-400 hover:text-white mr-4"
+              className="lg:hidden text-gray-500 hover:text-gray-700 mr-4"
               onClick={() => setSidebarOpen(true)}
             >
               <Bars3Icon className="h-6 w-6" />
@@ -185,18 +185,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 height={32}
                 className="object-contain"
               />
-              <span className="ml-2 text-sm text-gray-400">Admin Panel</span>
+              <span className="ml-2 text-sm text-gray-500">Admin Panel</span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Admin email display */}
             <div className="hidden sm:flex items-center gap-2 text-sm">
-              <span className="text-gray-400">{user?.email}</span>
+              <span className="text-gray-500">{user?.email}</span>
             </div>
-            {/* Profile/Settings access */}
             <Link
               href="/settings"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-dark-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             >
               <UserCircleIcon className="h-5 w-5" />
               <span className="hidden sm:inline text-sm">Profil</span>

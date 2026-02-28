@@ -140,7 +140,11 @@ export default function ProductsPage() {
         condition: p.condition,
         seller: p.seller || { id: p.sellerId, displayName: 'Satıcı' },
         category: p.category || { name: 'Kategori' },
-        imageUrl: p.imageUrl || p.images?.[0]?.url || p.images?.[0] || 'https://placehold.co/100x100/1a1a2e/666?text=Ürün',
+        imageUrl: (() => {
+          let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || '';
+          if (url && !url.startsWith('/') && !url.startsWith('http')) url = '/' + url;
+          return url || 'https://placehold.co/100x100/f3f4f6/666?text=Ürün';
+        })(),
         createdAt: p.createdAt,
       }));
       setProducts(mappedProducts);
@@ -318,34 +322,34 @@ export default function ProductsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-white">Ürünler</h1>
-              <p className="text-gray-400 mt-1">
+              <h1 className="text-2xl font-bold text-gray-900">Ürünler</h1>
+              <p className="text-gray-500 mt-1">
                 {filter === 'pending'
                   ? `${products.filter((p) => p.status === 'pending').length} ürün onay bekliyor`
                   : `Toplam ${total} ürün`}
                 {selectedSellerId && (
                   <span className="ml-2">
                     — Satıcıya göre filtreleniyor
-                    <button onClick={clearSellerFilter} className="ml-2 text-primary-500 hover:underline">Filtreyi kaldır</button>
+                    <button onClick={clearSellerFilter} className="ml-2 text-primary-600 hover:underline">Filtreyi kaldır</button>
                   </span>
                 )}
               </p>
             </div>
             {pendingCount > 0 && (
-              <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium">
+              <span className="px-3 py-1 bg-yellow-500/20 text-yellow-700 rounded-full text-sm font-medium">
                 {pendingCount} Bekleyen
               </span>
             )}
           </div>
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-gray-500">
                 {selectedIds.size} ürün seçili
               </span>
               <button
                 onClick={handleBulkApprove}
                 disabled={bulkProcessing}
-                className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-gray-900 rounded-lg disabled:opacity-50 transition-colors"
               >
                 <CheckCircleIcon className="h-4 w-4" />
                 Seçilenleri Onayla
@@ -353,7 +357,7 @@ export default function ProductsPage() {
               <button
                 onClick={handleBulkReject}
                 disabled={bulkProcessing}
-                className="flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-gray-900 rounded-lg disabled:opacity-50 transition-colors"
               >
                 <XCircleIcon className="h-4 w-4" />
                 Seçilenleri Reddet
@@ -373,7 +377,7 @@ export default function ProductsPage() {
                 window.URL.revokeObjectURL(url);
               } catch (e) { console.error(e); }
             }}
-            className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg text-sm"
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-100 text-gray-900 rounded-lg text-sm"
           >
             CSV İndir
           </button>
@@ -383,7 +387,7 @@ export default function ProductsPage() {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 flex gap-2">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
             <input
               type="text"
               placeholder="Ürün ara..."
@@ -399,7 +403,7 @@ export default function ProductsPage() {
 
           {/* Seller Filter */}
           <div className="relative w-full sm:w-64">
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
             <input
               type="text"
               placeholder="Satıcı ara..."
@@ -414,29 +418,29 @@ export default function ProductsPage() {
             {selectedSellerId && (
               <button
                 onClick={clearSellerFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
               >
                 <XCircleIcon className="h-5 w-5" />
               </button>
             )}
 
             {showSellerDropdown && sellerSearch.length >= 2 && (
-              <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-gray-100 border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {loadingUsers ? (
-                  <div className="p-3 text-center text-gray-400">Aranıyor...</div>
+                  <div className="p-3 text-center text-gray-500">Aranıyor...</div>
                 ) : users.length > 0 ? (
                   users.map((user) => (
                     <button
                       key={user.id}
                       onClick={() => handleSelectSeller(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-dark-600 text-white"
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
                     >
                       <div className="font-medium">{user.displayName}</div>
-                      <div className="text-xs text-gray-400">{user.email}</div>
+                      <div className="text-xs text-gray-500">{user.email}</div>
                     </button>
                   ))
                 ) : (
-                  <div className="p-3 text-center text-gray-400">Satıcı bulunamadı</div>
+                  <div className="p-3 text-center text-gray-500">Satıcı bulunamadı</div>
                 )}
               </div>
             )}
@@ -467,7 +471,7 @@ export default function ProductsPage() {
                       type="checkbox"
                       checked={selectedIds.size > 0 && selectedIds.size === filteredProducts.filter(p => p.status === 'pending').length}
                       onChange={toggleSelectAll}
-                      className="rounded border-gray-600 bg-dark-700 text-primary-500 focus:ring-primary-500"
+                      className="rounded border-gray-600 bg-gray-100 text-primary-600 focus:ring-primary-500"
                       title="Tümünü seç (bekleyenler)"
                     />
                   </th>
@@ -490,7 +494,7 @@ export default function ProductsPage() {
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-gray-400">
+                    <td colSpan={9} className="text-center py-8 text-gray-500">
                       Ürün bulunamadı
                     </td>
                   </tr>
@@ -503,33 +507,33 @@ export default function ProductsPage() {
                             type="checkbox"
                             checked={selectedIds.has(product.id)}
                             onChange={() => toggleSelect(product.id)}
-                            className="rounded border-gray-600 bg-dark-700 text-primary-500 focus:ring-primary-500"
+                            className="rounded border-gray-600 bg-gray-100 text-primary-600 focus:ring-primary-500"
                           />
                         )}
                       </td>
                       <td>
                         <div className="flex items-center">
-                          <div className="w-12 h-12 bg-dark-700 rounded-lg overflow-hidden mr-3 flex-shrink-0">
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden mr-3 flex-shrink-0">
                             <Image
-                              src={product.imageUrl || 'https://placehold.co/100x100/1a1a2e/666?text=Ürün'}
+                              src={product.imageUrl || 'https://placehold.co/100x100/f3f4f6/666?text=Ürün'}
                               alt={product.title}
                               width={48}
                               height={48}
                               className="object-cover w-full h-full"
                               unoptimized
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/1a1a2e/666?text=Ürün';
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/f3f4f6/666?text=Ürün';
                               }}
                             />
                           </div>
-                          <span className="font-medium text-white line-clamp-2">
+                          <span className="font-medium text-gray-900 line-clamp-2">
                             {product.title}
                           </span>
                         </div>
                       </td>
                       <td className="font-medium text-primary-400">
                         {isProductOnSaleDisplay(product) && (
-                          <span className="text-gray-400 line-through text-sm block">
+                          <span className="text-gray-500 line-through text-sm block">
                             ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR')}
                           </span>
                         )}
@@ -537,27 +541,27 @@ export default function ProductsPage() {
                       </td>
                       <td>{getStatusBadge(product.status)}</td>
                       <td>
-                        <span className="text-gray-300">
+                        <span className="text-gray-600">
                           {getConditionLabel(product.condition)}
                         </span>
                       </td>
                       <td>
                         <Link
                           href={`/users/${product.seller.id}`}
-                          className="text-white hover:text-primary-500"
+                          className="text-gray-900 hover:text-primary-600"
                         >
                           {product.seller.displayName}
                         </Link>
                       </td>
                       <td>{product.category.name}</td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {new Date(product.createdAt).toLocaleDateString('tr-TR')}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <Link
                             href={`/products/${product.id}`}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -566,14 +570,14 @@ export default function ProductsPage() {
                             <>
                               <button
                                 onClick={() => handleApprove(product.id)}
-                                className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg"
+                                className="p-2 text-green-700 hover:bg-green-500/10 rounded-lg"
                                 title="Onayla"
                               >
                                 <CheckIcon className="h-5 w-5" />
                               </button>
                               <button
                                 onClick={() => handleReject(product.id)}
-                                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                                className="p-2 text-red-600 hover:bg-red-500/10 rounded-lg"
                                 title="Reddet"
                               >
                                 <XMarkIcon className="h-5 w-5" />
@@ -582,7 +586,7 @@ export default function ProductsPage() {
                           )}
                           <button
                             onClick={() => handleDelete(product.id)}
-                            className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                            className="p-2 text-red-600 hover:bg-red-500/10 rounded-lg"
                             title="Sil"
                           >
                             <TrashIcon className="h-5 w-5" />
@@ -599,7 +603,7 @@ export default function ProductsPage() {
 
         {/* Pagination */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-500">
             Sayfa {page} / {Math.ceil(total / 20)}
           </p>
           <div className="flex gap-2">

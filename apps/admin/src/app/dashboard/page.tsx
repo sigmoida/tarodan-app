@@ -95,16 +95,16 @@ function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
     <div className="admin-card">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-400">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
           {change !== undefined && (
             <div className="flex items-center mt-2">
               {change >= 0 ? (
-                <ArrowTrendingUpIcon className="h-4 w-4 text-green-400 mr-1" />
+                <ArrowTrendingUpIcon className="h-4 w-4 text-green-700 mr-1" />
               ) : (
-                <ArrowTrendingDownIcon className="h-4 w-4 text-red-400 mr-1" />
+                <ArrowTrendingDownIcon className="h-4 w-4 text-red-600 mr-1" />
               )}
-              <span className={change >= 0 ? 'text-green-400' : 'text-red-400'}>
+              <span className={change >= 0 ? 'text-green-700' : 'text-red-600'}>
                 {Math.abs(change)}%
               </span>
               <span className="text-gray-500 ml-1 text-sm">vs dün</span>
@@ -112,7 +112,7 @@ function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
           )}
         </div>
         <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
+          <Icon className="h-6 w-6 text-gray-900" />
         </div>
       </div>
     </div>
@@ -269,15 +269,15 @@ export default function DashboardPage() {
 
   const getStatusBadge = (status: string) => {
     const statusColors: Record<string, string> = {
-      pending_payment: 'bg-yellow-500/20 text-yellow-400',
-      paid: 'bg-blue-500/20 text-blue-400',
-      preparing: 'bg-purple-500/20 text-purple-400',
-      shipped: 'bg-indigo-500/20 text-indigo-400',
-      delivered: 'bg-green-500/20 text-green-400',
-      completed: 'bg-green-500/20 text-green-400',
-      cancelled: 'bg-red-500/20 text-red-400',
-      refund_requested: 'bg-orange-500/20 text-orange-400',
-      refunded: 'bg-gray-500/20 text-gray-400',
+      pending_payment: 'bg-yellow-500/20 text-yellow-700',
+      paid: 'bg-blue-500/20 text-blue-700',
+      preparing: 'bg-purple-500/20 text-purple-700',
+      shipped: 'bg-indigo-500/20 text-indigo-700',
+      delivered: 'bg-green-500/20 text-green-700',
+      completed: 'bg-green-500/20 text-green-700',
+      cancelled: 'bg-red-500/20 text-red-600',
+      refund_requested: 'bg-orange-500/20 text-orange-700',
+      refunded: 'bg-gray-500/20 text-gray-500',
     };
     const statusLabels: Record<string, string> = {
       pending_payment: 'Ödeme Bekliyor',
@@ -291,7 +291,7 @@ export default function DashboardPage() {
       refunded: 'İade Edildi',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-400'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-500'}`}>
         {statusLabels[status] || status}
       </span>
     );
@@ -299,13 +299,13 @@ export default function DashboardPage() {
 
   const getTradeStatusBadge = (status: string) => {
     const statusColors: Record<string, string> = {
-      pending: 'bg-yellow-500/20 text-yellow-400',
-      accepted: 'bg-blue-500/20 text-blue-400',
-      in_progress: 'bg-purple-500/20 text-purple-400',
-      completed: 'bg-green-500/20 text-green-400',
-      cancelled: 'bg-red-500/20 text-red-400',
-      rejected: 'bg-red-500/20 text-red-400',
-      disputed: 'bg-orange-500/20 text-orange-400',
+      pending: 'bg-yellow-500/20 text-yellow-700',
+      accepted: 'bg-blue-500/20 text-blue-700',
+      in_progress: 'bg-purple-500/20 text-purple-700',
+      completed: 'bg-green-500/20 text-green-700',
+      cancelled: 'bg-red-500/20 text-red-600',
+      rejected: 'bg-red-500/20 text-red-600',
+      disputed: 'bg-orange-500/20 text-orange-700',
     };
     const statusLabels: Record<string, string> = {
       pending: 'Bekliyor',
@@ -317,7 +317,7 @@ export default function DashboardPage() {
       disputed: 'İtirazlı',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-400'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-500'}`}>
         {statusLabels[status] || status}
       </span>
     );
@@ -405,8 +405,8 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-gray-400 mt-1">Hoş geldiniz! İşte bugünkü genel bakış.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-1">Hoş geldiniz! İşte bugünkü genel bakış.</p>
         </div>
 
         {/* Stats Grid */}
@@ -444,28 +444,28 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Link href="/products" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-primary-500/20 rounded-lg">
-              <ShoppingBagIcon className="h-6 w-6 text-primary-500" />
+            <div className="p-2 bg-primary-100 rounded-lg">
+              <ShoppingBagIcon className="h-6 w-6 text-primary-600" />
             </div>
-            <span className="font-medium text-white">Ürünler</span>
+            <span className="font-medium text-gray-900">Ürünler</span>
           </Link>
           <Link href="/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
               <ChartBarIcon className="h-6 w-6 text-blue-500" />
             </div>
-            <span className="font-medium text-white">Siparişler</span>
+            <span className="font-medium text-gray-900">Siparişler</span>
           </Link>
           <Link href="/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
               <UsersIcon className="h-6 w-6 text-purple-500" />
             </div>
-            <span className="font-medium text-white">Kullanıcılar</span>
+            <span className="font-medium text-gray-900">Kullanıcılar</span>
           </Link>
           <Link href="/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-green-500/20 rounded-lg">
               <ArrowsRightLeftIcon className="h-6 w-6 text-green-500" />
             </div>
-            <span className="font-medium text-white">Mesajlar</span>
+            <span className="font-medium text-gray-900">Mesajlar</span>
           </Link>
         </div>
 
@@ -475,10 +475,10 @@ export default function DashboardPage() {
             {pendingActions.pendingProducts > 0 && (
               <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 flex items-center">
                 <div className="p-2 bg-yellow-500/20 rounded-lg mr-4">
-                  <ShoppingBagIcon className="h-6 w-6 text-yellow-400" />
+                  <ShoppingBagIcon className="h-6 w-6 text-yellow-700" />
                 </div>
                 <div>
-                  <p className="text-yellow-400 font-medium">
+                  <p className="text-yellow-700 font-medium">
                     {pendingActions.pendingProducts} ürün onay bekliyor
                   </p>
                   <Link href="/products?status=pending" className="text-sm text-yellow-500 hover:underline">
@@ -490,10 +490,10 @@ export default function DashboardPage() {
             {pendingActions.refundRequests > 0 && (
               <div className="bg-orange-900/20 border border-orange-700 rounded-lg p-4 flex items-center">
                 <div className="p-2 bg-orange-500/20 rounded-lg mr-4">
-                  <CurrencyDollarIcon className="h-6 w-6 text-orange-400" />
+                  <CurrencyDollarIcon className="h-6 w-6 text-orange-700" />
                 </div>
                 <div>
-                  <p className="text-orange-400 font-medium">
+                  <p className="text-orange-700 font-medium">
                     {pendingActions.refundRequests} iade talebi
                   </p>
                   <Link href="/orders?status=refund_requested" className="text-sm text-orange-500 hover:underline">
@@ -505,10 +505,10 @@ export default function DashboardPage() {
             {(pendingActions.pendingMessages ?? 0) > 0 && (
               <div className="bg-indigo-900/20 border border-indigo-700 rounded-lg p-4 flex items-center">
                 <div className="p-2 bg-indigo-500/20 rounded-lg mr-4">
-                  <ArrowsRightLeftIcon className="h-6 w-6 text-indigo-400" />
+                  <ArrowsRightLeftIcon className="h-6 w-6 text-indigo-700" />
                 </div>
                 <div>
-                  <p className="text-indigo-400 font-medium">
+                  <p className="text-indigo-700 font-medium">
                     {pendingActions.pendingMessages} mesaj onay bekliyor
                   </p>
                   <Link href="/messages" className="text-sm text-indigo-500 hover:underline">
@@ -520,10 +520,10 @@ export default function DashboardPage() {
             {(pendingActions.identityVerificationRequests ?? 0) > 0 && (
               <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 flex items-center">
                 <div className="p-2 bg-blue-500/20 rounded-lg mr-4">
-                  <UsersIcon className="h-6 w-6 text-blue-400" />
+                  <UsersIcon className="h-6 w-6 text-blue-700" />
                 </div>
                 <div>
-                  <p className="text-blue-400 font-medium">
+                  <p className="text-blue-700 font-medium">
                     {pendingActions.identityVerificationRequests} kimlik doğrulama talebi
                   </p>
                   <Link href="/users?status=pending_verification" className="text-sm text-blue-500 hover:underline">
@@ -539,7 +539,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Sales Chart */}
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-white mb-4">Son 30 Gün Satış Performansı</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Son 30 Gün Satış Performansı</h3>
             <Line
               data={salesChartData}
               options={{
@@ -563,7 +563,7 @@ export default function DashboardPage() {
 
           {/* Orders Chart */}
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-white mb-4">Günlük Sipariş Sayısı</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Günlük Sipariş Sayısı</h3>
             <Bar
               data={ordersChartData}
               options={{
@@ -592,7 +592,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Category Distribution */}
           <div className="admin-card overflow-visible">
-            <h3 className="text-lg font-semibold text-white mb-4">Kategori Dağılımı</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Kategori Dağılımı</h3>
             <div className="min-h-[380px] pb-6">
               <Doughnut
                 data={categoryChartData}
@@ -628,32 +628,32 @@ export default function DashboardPage() {
           {/* Recent Orders Panel */}
           <div className="admin-card lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Son Siparişler</h3>
-              <Link href="/orders" className="text-sm text-primary-500 hover:underline">
+              <h3 className="text-lg font-semibold text-gray-900">Son Siparişler</h3>
+              <Link href="/orders" className="text-sm text-primary-600 hover:underline">
                 Tümünü Gör →
               </Link>
             </div>
             <div className="space-y-3">
               {recentOrders.length > 0 ? (
                 recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between py-3 border-b border-dark-700 last:border-0">
+                  <div key={order.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
                     <div className="flex items-center flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center mr-3 flex-shrink-0">
-                        <span className="text-primary-500 text-sm font-medium">
+                      <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3 flex-shrink-0">
+                        <span className="text-primary-600 text-sm font-medium">
                           {order.buyerName?.charAt(0) || '?'}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-white truncate">
+                        <p className="text-sm text-gray-900 truncate">
                           <span className="font-medium">{order.orderNumber}</span>
                         </p>
-                        <p className="text-xs text-gray-400 truncate">
+                        <p className="text-xs text-gray-500 truncate">
                           {order.buyerName} - {order.productTitle}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-3">
-                      <span className="text-sm font-semibold text-white whitespace-nowrap">
+                      <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                         ₺{order.amount.toLocaleString('tr-TR')}
                       </span>
                       {getStatusBadge(order.status)}
@@ -664,7 +664,7 @@ export default function DashboardPage() {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-400">
+                <div className="text-center py-8 text-gray-500">
                   Henüz sipariş bulunmuyor
                 </div>
               )}
@@ -677,29 +677,29 @@ export default function DashboardPage() {
           {/* Recent Trades Panel */}
           <div className="admin-card lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <ArrowsRightLeftIcon className="h-5 w-5 text-primary-500" />
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <ArrowsRightLeftIcon className="h-5 w-5 text-primary-600" />
                 Son Takaslar
               </h3>
-              <Link href="/trades" className="text-sm text-primary-500 hover:underline">
+              <Link href="/trades" className="text-sm text-primary-600 hover:underline">
                 Tümünü Gör →
               </Link>
             </div>
             <div className="space-y-3">
               {recentTrades.length > 0 ? (
                 recentTrades.map((trade) => (
-                  <div key={trade.id} className="flex items-center justify-between py-3 border-b border-dark-700 last:border-0">
+                  <div key={trade.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mr-3 flex-shrink-0">
-                        <ArrowsRightLeftIcon className="h-5 w-5 text-green-400" />
+                        <ArrowsRightLeftIcon className="h-5 w-5 text-green-700" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-white truncate">
+                        <p className="text-sm text-gray-900 truncate">
                           <span className="font-medium">{trade.offeredBy?.username || 'Kullanıcı'}</span>
                           <span className="text-gray-500 mx-2">↔</span>
                           <span className="font-medium">{trade.requestedBy?.username || 'Kullanıcı'}</span>
                         </p>
-                        <p className="text-xs text-gray-400 truncate">
+                        <p className="text-xs text-gray-500 truncate">
                           {trade.offeredProduct?.title || 'Ürün'} ↔ {trade.requestedProduct?.title || 'Ürün'}
                         </p>
                       </div>
@@ -713,7 +713,7 @@ export default function DashboardPage() {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-400">
+                <div className="text-center py-8 text-gray-500">
                   Henüz takas bulunmuyor
                 </div>
               )}

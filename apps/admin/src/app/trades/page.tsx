@@ -169,21 +169,21 @@ export default function TradesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-white">Takaslar</h1>
-            <p className="text-gray-400 mt-1">
+            <h1 className="text-2xl font-bold text-gray-900">Takaslar</h1>
+            <p className="text-gray-500 mt-1">
               Toplam {total} takas
               {selectedUserId && (
                 <span className="ml-2">
                   — Kullanıcıya göre filtreleniyor
-                  <button onClick={clearUserFilter} className="ml-2 text-primary-500 hover:underline">Filtreyi kaldır</button>
+                  <button onClick={clearUserFilter} className="ml-2 text-primary-600 hover:underline">Filtreyi kaldır</button>
                 </span>
               )}
             </p>
           </div>
           {disputedCount > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 bg-red-900/20 border border-red-700 rounded-lg">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
-              <span className="text-red-400">{disputedCount} itirazlı takas</span>
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+              <span className="text-red-600">{disputedCount} itirazlı takas</span>
             </div>
           )}
         </div>
@@ -191,7 +191,7 @@ export default function TradesPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           {/* User Filter */}
           <div className="relative w-full sm:w-64">
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
             <input
               type="text"
               placeholder="Kullanıcı ara..."
@@ -206,29 +206,29 @@ export default function TradesPage() {
             {selectedUserId && (
               <button
                 onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
               >
                 <XCircleIcon className="h-5 w-5" />
               </button>
             )}
             
             {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-gray-100 border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {loadingUsers ? (
-                  <div className="p-3 text-center text-gray-400">Aranıyor...</div>
+                  <div className="p-3 text-center text-gray-500">Aranıyor...</div>
                 ) : users.length > 0 ? (
                   users.map((user) => (
                     <button
                       key={user.id}
                       onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-dark-600 text-white"
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
                     >
                       <div className="font-medium">{user.displayName}</div>
-                      <div className="text-xs text-gray-400">{user.email}</div>
+                      <div className="text-xs text-gray-500">{user.email}</div>
                     </button>
                   ))
                 ) : (
-                  <div className="p-3 text-center text-gray-400">Kullanıcı bulunamadı</div>
+                  <div className="p-3 text-center text-gray-500">Kullanıcı bulunamadı</div>
                 )}
               </div>
             )}
@@ -271,7 +271,7 @@ export default function TradesPage() {
                   </tr>
                 ) : trades.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-400">
+                    <td colSpan={8} className="text-center py-8 text-gray-500">
                       Takas bulunamadı
                     </td>
                   </tr>
@@ -283,7 +283,7 @@ export default function TradesPage() {
                       <td>
                         <Link
                           href={`/users/${trade.initiator.id}`}
-                          className="text-white hover:text-primary-500"
+                          className="text-gray-900 hover:text-primary-600"
                         >
                           {trade.initiator.displayName}
                         </Link>
@@ -291,7 +291,7 @@ export default function TradesPage() {
                       <td>
                         <Link
                           href={`/users/${trade.receiver.id}`}
-                          className="text-white hover:text-primary-500"
+                          className="text-gray-900 hover:text-primary-600"
                         >
                           {trade.receiver.displayName}
                         </Link>
@@ -308,19 +308,19 @@ export default function TradesPage() {
                           <span className="text-gray-500">-</span>
                         )}
                       </td>
-                      <td>{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</td>
-                      <td>
+                      <td className="whitespace-nowrap">{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</td>
+                      <td className="whitespace-nowrap">
                         <div className="flex gap-1">
                           <Link
                             href={`/trades/${trade.id}`}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
                           </Link>
                           {trade.hasDispute && (
                             <button
-                              className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                              className="p-2 text-red-600 hover:bg-red-500/10 rounded-lg"
                               title="İtirazı Çöz"
                             >
                               <ExclamationTriangleIcon className="h-5 w-5" />
@@ -337,7 +337,7 @@ export default function TradesPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">Sayfa {page} / {Math.ceil(total / 20)}</p>
+          <p className="text-sm text-gray-500">Sayfa {page} / {Math.ceil(total / 20)}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

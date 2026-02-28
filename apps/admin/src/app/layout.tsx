@@ -18,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={inter.className}>
-        <Toaster position="top-right" />
+        <Toaster position="bottom-right" toastOptions={{ style: { maxWidth: '360px' } }} />
         {children}
       </body>
     </html>

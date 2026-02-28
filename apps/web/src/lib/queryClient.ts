@@ -33,8 +33,18 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000, // 1 minute
-        retry: 1,
         refetchOnWindowFocus: false,
+        // API henüz ayağa kalkmamışsa (ECONNREFUSED) birkaç kez gecikmeli tekrar dene
+        retry: (failureCount, error: unknown) => {
+          const err = error as { code?: string; message?: string };
+          const isNetworkError =
+            err?.code === 'ECONNREFUSED' ||
+            err?.code === 'ERR_NETWORK' ||
+            (typeof err?.message === 'string' && (err.message.includes('ECONNREFUSED') || err.message.includes('Network Error')));
+          if (isNetworkError) return failureCount < 5;
+          return failureCount < 1;
+        },
+        retryDelay: (attemptIndex) => Math.min(1500 * (attemptIndex + 1), 8000),
       },
       mutations: {
         onError: (error: unknown, _variables: unknown, context: unknown) => {

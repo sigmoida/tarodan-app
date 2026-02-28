@@ -230,19 +230,19 @@ export default function NotificationsPage() {
         <AdminLayout>
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Bildirim Yönetimi</h1>
-                    <p className="text-gray-400 mt-1">Push, email ve SMS bildirimleri gönderin ve yönetin</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Bildirim Yönetimi</h1>
+                    <p className="text-gray-500 mt-1">Push, email ve SMS bildirimleri gönderin ve yönetin</p>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex flex-wrap gap-2 border-b border-dark-700 pb-4">
+                <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
                     {tabs.map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key as TabType)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${activeTab === tab.key
-                                    ? 'bg-primary-500 text-white'
-                                    : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+                                    ? 'bg-primary-500 text-gray-900'
+                                    : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
                         >
                             <tab.icon className="h-5 w-5" />
@@ -256,7 +256,7 @@ export default function NotificationsPage() {
                     <div className="admin-card p-6 max-w-2xl">
                         <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Başlık *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Başlık *</label>
                                 <input
                                     type="text"
                                     value={sendForm.title}
@@ -267,7 +267,7 @@ export default function NotificationsPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">İçerik *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">İçerik *</label>
                                 <textarea
                                     value={sendForm.body}
                                     onChange={(e) => setSendForm({ ...sendForm, body: e.target.value })}
@@ -278,7 +278,7 @@ export default function NotificationsPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Kanallar</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Kanallar</label>
                                 <div className="flex gap-4">
                                     {['push', 'email', 'sms'].map(channel => (
                                         <label key={channel} className="flex items-center cursor-pointer">
@@ -286,16 +286,16 @@ export default function NotificationsPage() {
                                                 type="checkbox"
                                                 checked={sendForm.channels.includes(channel)}
                                                 onChange={() => toggleChannel(channel)}
-                                                className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500 mr-2"
+                                                className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600 mr-2"
                                             />
-                                            <span className="text-gray-300 capitalize">{channel}</span>
+                                            <span className="text-gray-600 capitalize">{channel}</span>
                                         </label>
                                     ))}
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Hedef</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Hedef</label>
                                 <select
                                     value={sendForm.targetType}
                                     onChange={(e) => setSendForm({ ...sendForm, targetType: e.target.value as any })}
@@ -309,7 +309,7 @@ export default function NotificationsPage() {
 
                             {sendForm.targetType === 'user_ids' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Kullanıcı ID'leri (virgülle ayırın)</label>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Kullanıcı ID'leri (virgülle ayırın)</label>
                                     <input
                                         type="text"
                                         value={sendForm.userIds}
@@ -321,9 +321,9 @@ export default function NotificationsPage() {
                             )}
 
                             {sendForm.targetType === 'segment' && (
-                                <div className="space-y-4 p-4 bg-dark-700 rounded-lg">
+                                <div className="space-y-4 p-4 bg-gray-100 rounded-lg">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-300 mb-2">Satıcı Durumu</label>
+                                        <label className="block text-sm font-medium text-gray-600 mb-2">Satıcı Durumu</label>
                                         <select
                                             value={sendForm.isSeller === undefined ? '' : sendForm.isSeller ? 'true' : 'false'}
                                             onChange={(e) => setSendForm({ ...sendForm, isSeller: e.target.value === '' ? undefined : e.target.value === 'true' })}
@@ -335,7 +335,7 @@ export default function NotificationsPage() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-300 mb-2">Üyelik Tipi</label>
+                                        <label className="block text-sm font-medium text-gray-600 mb-2">Üyelik Tipi</label>
                                         <select
                                             value={sendForm.membershipTier}
                                             onChange={(e) => setSendForm({ ...sendForm, membershipTier: e.target.value })}
@@ -395,14 +395,14 @@ export default function NotificationsPage() {
                                             </td>
                                         </tr>
                                     ) : scheduled.length === 0 ? (
-                                        <tr><td colSpan={6} className="text-center py-8 text-gray-400">Zamanlanmış bildirim yok</td></tr>
+                                        <tr><td colSpan={6} className="text-center py-8 text-gray-500">Zamanlanmış bildirim yok</td></tr>
                                     ) : (
                                         scheduled.map((item) => (
                                             <tr key={item.id}>
-                                                <td className="font-medium text-white">{item.title}</td>
-                                                <td className="text-gray-400">{item.channels?.join(', ')}</td>
-                                                <td className="text-gray-400">{item.targetType}</td>
-                                                <td className="text-gray-400">
+                                                <td className="font-medium text-gray-900">{item.title}</td>
+                                                <td className="text-gray-500">{item.channels?.join(', ')}</td>
+                                                <td className="text-gray-500">{item.targetType}</td>
+                                                <td className="text-gray-500">
                                                     {new Date(item.scheduledFor).toLocaleString('tr-TR')}
                                                 </td>
                                                 <td>
@@ -411,7 +411,7 @@ export default function NotificationsPage() {
                                                 <td>
                                                     <button
                                                         onClick={() => handleCancelScheduled(item.id)}
-                                                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                                                        className="p-2 text-red-600 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
                                                     >
                                                         <XCircleIcon className="h-5 w-5" />
                                                     </button>
@@ -472,13 +472,13 @@ export default function NotificationsPage() {
                                                 </td>
                                             </tr>
                                         ) : history.length === 0 ? (
-                                            <tr><td colSpan={5} className="text-center py-8 text-gray-400">Bildirim geçmişi boş</td></tr>
+                                            <tr><td colSpan={5} className="text-center py-8 text-gray-500">Bildirim geçmişi boş</td></tr>
                                         ) : (
                                             history.map((log) => (
                                                 <tr key={log.id}>
-                                                    <td className="text-white">{log.user?.displayName || log.userId}</td>
-                                                    <td className="text-gray-400 uppercase">{log.channel}</td>
-                                                    <td className="text-white">{log.title}</td>
+                                                    <td className="text-gray-900">{log.user?.displayName || log.userId}</td>
+                                                    <td className="text-gray-500 uppercase">{log.channel}</td>
+                                                    <td className="text-gray-900">{log.title}</td>
                                                     <td>
                                                         <span className={`badge ${log.status === 'sent' || log.status === 'delivered'
                                                                 ? 'badge-success'
@@ -489,7 +489,7 @@ export default function NotificationsPage() {
                                                             {log.status}
                                                         </span>
                                                     </td>
-                                                    <td className="text-gray-400">
+                                                    <td className="text-gray-500">
                                                         {new Date(log.createdAt).toLocaleString('tr-TR')}
                                                     </td>
                                                 </tr>
@@ -503,7 +503,7 @@ export default function NotificationsPage() {
                         {/* Pagination */}
                         {totalHistory > historyFilters.limit && (
                             <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-400">
+                                <p className="text-sm text-gray-500">
                                     Sayfa {historyFilters.page} / {Math.ceil(totalHistory / historyFilters.limit)}
                                 </p>
                                 <div className="flex gap-2">
@@ -531,11 +531,11 @@ export default function NotificationsPage() {
             {/* Schedule Modal */}
             {showScheduleModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-dark-800 rounded-xl border border-dark-700 w-full max-w-md p-6">
-                        <h2 className="text-xl font-bold text-white mb-4">Bildirimi Zamanla</h2>
+                    <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md p-6">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Bildirimi Zamanla</h2>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Gönderim Tarihi ve Saati</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Gönderim Tarihi ve Saati</label>
                                 <input
                                     type="datetime-local"
                                     value={scheduleDate}

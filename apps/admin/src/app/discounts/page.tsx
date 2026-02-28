@@ -394,19 +394,19 @@ export default function DiscountsPage() {
           </div>
           <div className="admin-card p-4">
             <p className="text-sm text-muted-foreground">Aktif</p>
-            <p className="text-2xl font-bold text-green-400">
+            <p className="text-2xl font-bold text-green-700">
               {discounts.filter(d => d.isCurrentlyValid).length}
             </p>
           </div>
           <div className="admin-card p-4">
             <p className="text-sm text-muted-foreground">Kupon Kodları</p>
-            <p className="text-2xl font-bold text-blue-400">
+            <p className="text-2xl font-bold text-blue-700">
               {discounts.filter(d => d.code).length}
             </p>
           </div>
           <div className="admin-card p-4">
             <p className="text-sm text-muted-foreground">Otomatik Kampanyalar</p>
-            <p className="text-2xl font-bold text-purple-400">
+            <p className="text-2xl font-bold text-purple-700">
               {discounts.filter(d => !d.code).length}
             </p>
           </div>
@@ -504,7 +504,7 @@ export default function DiscountsPage() {
                             onClick={() => toggleDiscountStatus(discount)}
                             className={`p-1.5 rounded-lg transition-colors ${discount.isActive
                               ? 'text-muted-foreground hover:bg-muted'
-                              : 'text-green-400 hover:bg-green-900/30'
+                              : 'text-green-700 hover:bg-green-50'
                               }`}
                             title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}
                           >
@@ -512,14 +512,14 @@ export default function DiscountsPage() {
                           </button>
                           <button
                             onClick={() => openEditModal(discount)}
-                            className="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded-lg transition-colors"
+                            className="p-1.5 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Düzenle"
                           >
                             <PencilIcon className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(discount.id)}
-                            className="p-1.5 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Sil"
                           >
                             <TrashIcon className="w-4 h-4" />
