@@ -54,8 +54,17 @@ const KNOWN_MANUFACTURERS = [
   'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
   'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
   'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL',
+  'GreenLight Collectibles', 'Abrex', 'Airfix', 'American Diorama', 'Atlantic',
+  'Atlas Editions', 'Brekina', 'Britains', 'Cada', 'Cararama', 'Corgi',
+  'CMJ - Jian Feng Juan Toys', 'Cobi', 'Cult', 'DeAgostini', 'Diecast Masters',
+  'Ebbro', 'i0lcek', 'IXO', 'Kess', 'KK Olcek', 'LCD', 'Looksmart', 'Matrix',
+  'MINI GT', 'Mitica', 'Model Car Group', 'Motormax', 'NewRay', 'OttOmobile',
+  'Oxford', 'Paragon', 'Pop Race', 'Olcekxtric', 'Siku', 'Solido', 'Sun Star',
+  'Tarmac Works', 'TopSpeed', 'Touring', 'Modelcars', 'Triple 9 Collection',
+  'Trumpeter', 'Unbranded', 'Welly', 'Werk83', 'WhiteBox',
 ];
-const SCALE_REGEX = /^(1:\d+)/;
+// Improved regex to handle Turkish scale text like "1:18 ölçek" or "1:18 scale"
+const SCALE_REGEX = /^(1:\d+)\s*(ölçek|scale)?/i;
 
 /** Build the best listings URL for a given search term */
 function buildSmartSearchUrl(query: string): string {
