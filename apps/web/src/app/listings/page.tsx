@@ -162,6 +162,8 @@ export default function ListingsPage() {
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
+    const params = new URLSearchParams();
+    router.push(`/listings?${params.toString()}`);
   };
 
   const activeFilterCount = Object.entries(filters)

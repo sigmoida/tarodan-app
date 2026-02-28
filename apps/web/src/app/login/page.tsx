@@ -259,7 +259,7 @@ export default function LoginPage() {
       {/* Right - Image panel */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden">
         <Image
-          src="/photos/colorful-car-toys.jpg"
+          src="/photos/hero/hero-marketplace.png"
           alt="Diecast model araba koleksiyonu"
           fill
           className="object-cover"

@@ -38,3 +38,8 @@ coverage/
 prisma/*.db
 prisma/*.db-journal
 node_modules
+
+# Local / one-off: image generation and MVP docs (not needed in repo)
+docs/IMAGE_GENERATION_PROMPTS.md
+docs/MVP_IMAGE_PLAN.md
+scripts/generate-images.mjs

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeftIcon, 
@@ -205,8 +206,8 @@ export default function EditProfilePage() {
                     logContext={{ page: 'profile-edit-avatar' }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <UserCircleIcon className="w-16 h-16 text-white/60" />
+                  <div className="w-full h-full flex items-center justify-center p-2">
+                    <UserAvatar displayName={user?.displayName} size="xl" className="!w-full !h-full !text-4xl text-white/90 bg-white/20" />
                   </div>
                 )}
               </div>

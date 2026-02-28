@@ -23,6 +23,7 @@ import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayout
 
 import HeroSlider from '@/components/home/HeroSlider';
 import TrustBadges from '@/components/home/TrustBadges';
+import UserAvatar from '@/components/UserAvatar';
 
 import { SectionHeader, SkeletonCard, EmptyState, ProductCard, Badge } from '@/components/ui';
 
@@ -340,7 +341,8 @@ export default function Home() {
                     alt={brand.name}
                     width={90}
                     height={50}
-                    className="w-full h-full object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                    className="object-contain opacity-70 group-hover:opacity-100 transition-opacity max-w-full max-h-full"
+                    style={{ width: 'auto', height: 'auto' }}
                     unoptimized
                   />
                 </div>
@@ -492,13 +494,7 @@ export default function Home() {
                         <div className="bg-surface-alt rounded p-5">
                           <div className="flex flex-col md:flex-row md:items-center gap-5">
                             <div className="flex items-center gap-4 md:w-1/3">
-                              {collection.user?.avatarUrl ? (
-                                <OptimizedImage src={collection.user.avatarUrl} alt={collection.user.displayName} width={48} height={48} className="rounded-full object-cover flex-shrink-0" logContext={{ userId: collection.user?.id, page: 'home-collection-avatar' }} />
-                              ) : (
-                                <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                  {collection.user?.displayName?.charAt(0).toUpperCase() || '?'}
-                                </div>
-                              )}
+                              <UserAvatar displayName={collection.user?.displayName} size="md" />
                               <div className="min-w-0">
                                 <h3 className="text-sm font-bold text-heading flex items-center gap-1.5">
                                   {collection.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
@@ -570,13 +566,7 @@ export default function Home() {
                     </h2>
                   </div>
                   <div className="flex items-start gap-4 mb-4">
-                    {featuredCollectorToShow.user?.avatarUrl ? (
-                      <OptimizedImage src={featuredCollectorToShow.user.avatarUrl} alt={featuredCollectorToShow.user.displayName} width={56} height={56} className="rounded-full object-cover flex-shrink-0" logContext={{ userId: featuredCollectorToShow.user.id, page: 'home-featured-collector-avatar' }} />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                        {featuredCollectorToShow.user?.displayName?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                    )}
+                    <UserAvatar displayName={featuredCollectorToShow.user?.displayName} size="lg" />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
                         {featuredCollectorToShow.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
@@ -636,13 +626,7 @@ export default function Home() {
                     </h2>
                   </div>
                   <div className="flex items-start gap-4 mb-4">
-                    {companyOfWeek.avatarUrl ? (
-                      <OptimizedImage src={companyOfWeek.avatarUrl} alt={companyOfWeek.companyName || companyOfWeek.displayName} width={56} height={56} className="rounded-full object-cover flex-shrink-0 border-2 border-gray-100" logContext={{ companyId: companyOfWeek.id, page: 'home-company-avatar' }} />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0 border-2 border-gray-100">
-                        {(companyOfWeek.companyName || companyOfWeek.displayName).charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <UserAvatar displayName={companyOfWeek.displayName} companyName={companyOfWeek.companyName} size="lg" className="border-2 border-gray-100" />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
                         {companyOfWeek.companyName || companyOfWeek.displayName}

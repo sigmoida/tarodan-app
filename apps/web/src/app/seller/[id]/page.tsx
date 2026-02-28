@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -317,19 +317,7 @@ export default function SellerProfilePage() {
               className="relative flex-shrink-0"
             >
               <div className="relative">
-                {seller.avatarUrl ? (
-                  <Image
-                    src={seller.avatarUrl}
-                    alt={seller.displayName}
-                    width={160}
-                    height={160}
-                    className="w-36 h-36 md:w-40 md:h-40 rounded-2xl object-cover shadow-2xl ring-4 ring-white/30"
-                  />
-                ) : (
-                  <div className="w-36 h-36 md:w-40 md:h-40 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-5xl font-bold shadow-2xl ring-4 ring-white/30">
-                    {seller.displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <UserAvatar displayName={seller.displayName} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-white/20 backdrop-blur-sm text-white shadow-2xl ring-4 ring-white/30" />
                 {seller.isVerified && (
                   <div className="absolute -bottom-3 -right-3 bg-white rounded-xl p-2 shadow-lg">
                     <CheckBadgeSolidIcon className="w-7 h-7 text-green-500" />
@@ -629,8 +617,6 @@ export default function SellerProfilePage() {
                   <div className="lg:col-span-2 space-y-4">
                     {reviews.map((review, index) => {
                       const reviewerName = review.giverName || review.giver?.displayName || '';
-                      const reviewerInitial = reviewerName?.charAt(0)?.toUpperCase() || '?';
-                      
                       return (
                         <motion.div
                           key={review.id}
@@ -642,19 +628,7 @@ export default function SellerProfilePage() {
                           <div className="flex items-start gap-4">
                             {/* Reviewer Avatar */}
                             <div className="flex-shrink-0">
-                              {review.giver?.avatarUrl ? (
-                                <Image
-                                  src={review.giver.avatarUrl}
-                                  alt={reviewerName}
-                                  width={48}
-                                  height={48}
-                                  className="w-11 h-11 rounded-xl object-cover"
-                                />
-                              ) : (
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold shadow-sm">
-                                  {reviewerInitial}
-                                </div>
-                              )}
+                              <UserAvatar displayName={reviewerName} size="sm" className="!w-11 !h-11 rounded-xl shadow-sm" />
                             </div>
                             
                             {/* Review Content */}

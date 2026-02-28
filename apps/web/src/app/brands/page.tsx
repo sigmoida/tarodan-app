@@ -488,7 +488,8 @@ export default function BrandsPage() {
                         alt={brand.name}
                         width={80}
                         height={60}
-                        className="w-full h-full object-contain"
+                        className="object-contain max-w-full max-h-full"
+                        style={{ width: 'auto', height: 'auto' }}
                         unoptimized
                       />
                     </div>

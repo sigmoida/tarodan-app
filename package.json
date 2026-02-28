@@ -49,5 +49,8 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "openai": "^6.25.0"
   }
 }

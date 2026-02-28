@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import UserAvatar from '@/components/UserAvatar';
 import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, RectangleStackIcon, ArchiveBoxIcon, BookOpenIcon } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
@@ -153,17 +154,7 @@ export default function BusinessDashboardPage() {
         {/* Header */}
         <div className="bg-gradient-to-br from-orange-900/40 to-amber-900/40 border border-orange-500/30 rounded-xl p-6 mb-8">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center text-3xl">
-              {stats?.company.avatarUrl ? (
-                <img
-                  src={stats.company.avatarUrl}
-                  alt={stats.company.name || stats.company.displayName}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                '🏢'
-              )}
-            </div>
+            <UserAvatar displayName={stats?.company.displayName} companyName={stats?.company.name} size="xl" className="!w-20 !h-20 !text-3xl" />
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
                 📊 İşletme Paneli

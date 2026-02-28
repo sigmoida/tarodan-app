@@ -62,189 +62,40 @@ const randomFutureDate = (daysAhead: number) => {
 // Photo Upload Helpers
 // ==========================================================================
 
-interface PhotoFile {
-  filename: string;
-  filepath: string;
-  mimeType: string;
-  buffer: Buffer;
-}
-
-// Initialize StorageService for seed script
-const initStorageService = (): StorageService | null => {
-  try {
-    // Create mock ConfigService
-    const configService = {
-      get: (key: string, defaultValue?: any) => {
-        return process.env[key] || defaultValue;
-      },
-    } as any;
-
-    // Create PrismaService instance
-    const prismaService = new PrismaService();
-
-    // Create StorageService instance
-    const storageService = new StorageService(configService, prismaService);
-    
-    return storageService;
-  } catch (error) {
-    console.error('⚠️ Failed to initialize StorageService:', error);
-    return null;
-  }
-};
-
-// Get MIME type from file extension
 const getMimeType = (filename: string): string => {
   const ext = filename.toLowerCase().split('.').pop() || '';
   const mimeTypes: Record<string, string> = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'webp': 'image/webp',
-    'gif': 'image/gif',
+    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp',
   };
   return mimeTypes[ext] || 'image/jpeg';
 };
 
-// Load photos from photos folder
-const loadPhotosFromFolder = (): PhotoFile[] => {
-  // Seed script runs from apps/api/ when using npx prisma db seed
-  // Photos folder is at project root: diecast/photos
-  const photosDir = path.join(process.cwd(), '..', '..', 'photos');
-  const photos: PhotoFile[] = [];
-
+const initStorageService = (): StorageService | null => {
   try {
-    if (!fs.existsSync(photosDir)) {
-      console.log(`⚠️ Photos directory not found: ${photosDir}`);
-      return photos;
-    }
-
-    const files = fs.readdirSync(photosDir);
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-
-    for (const file of files) {
-      const ext = path.extname(file).toLowerCase();
-      if (imageExtensions.includes(ext)) {
-        const filepath = path.join(photosDir, file);
-        try {
-          const buffer = fs.readFileSync(filepath);
-          photos.push({
-            filename: file,
-            filepath: filepath,
-            mimeType: getMimeType(file),
-            buffer: buffer,
-          });
-        } catch (error) {
-          console.error(`⚠️ Failed to read photo ${file}:`, error);
-        }
-      }
-    }
-
-    console.log(`📸 Loaded ${photos.length} photos from ${photosDir}`);
-  } catch (error) {
-    console.error('⚠️ Error loading photos:', error);
-  }
-
-  return photos;
+    const configService = { get: (key: string, dv?: any) => process.env[key] || dv } as any;
+    const prismaService = new PrismaService();
+    return new StorageService(configService, prismaService);
+  } catch { return null; }
 };
 
-// Upload photo to S3 using StorageService
-const uploadPhotoToS3 = async (
+const uploadPhoto = async (
   storageService: StorageService,
-  photo: PhotoFile,
-  bucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets' = 'products',
-  folder: string = 'product-images'
-): Promise<{ key: string } | null> => {
+  filepath: string,
+  bucket: 'products' | 'avatars' | 'collections' = 'products',
+  folder: string = 'product-images',
+): Promise<string | null> => {
   try {
-    // Generate unique filename
-    const uniqueId = randomUUID().substring(0, 8);
-    const ext = path.extname(photo.filename);
-    const filename = `${uniqueId}-${photo.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-
-    // Upload to S3 using StorageService
-    const result = await storageService.uploadFile(
-      photo.buffer,
-      {
-        bucket,
-        folder,
-        filename,
-        mimeType: photo.mimeType,
-      }
-    );
-
-    return { key: result.key };
-  } catch (error: any) {
-    console.error(`⚠️ Failed to upload photo ${photo.filename} to S3:`, error.message);
+    const buffer = fs.readFileSync(filepath);
+    const filename = `${randomUUID().substring(0, 8)}-${path.basename(filepath).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const result = await storageService.uploadFile(buffer, { bucket, folder, filename, mimeType: getMimeType(filepath) });
+    return result.key;
+  } catch (err: any) {
+    console.error(`⚠️ Upload failed ${path.basename(filepath)}: ${err.message}`);
     return null;
   }
 };
 
-// Match photo filename to product title
-const matchPhotoToProduct = (filename: string, productTitle: string): boolean => {
-  const normalizedFilename = filename.toLowerCase();
-  const normalizedTitle = productTitle.toLowerCase();
-
-  // Extract keywords from filename
-  const keywords: string[] = [];
-  
-  // Common patterns
-  if (normalizedFilename.includes('911')) {
-    keywords.push('porsche 911', '911');
-  }
-  if (normalizedFilename.includes('ferrari') && normalizedFilename.includes('f40')) {
-    keywords.push('ferrari f40', 'f40');
-  }
-  if (normalizedFilename.includes('bmw') && (normalizedFilename.includes('m3') || normalizedFilename.includes('e30'))) {
-    keywords.push('bmw m3', 'm3 e30', 'bmw');
-  }
-  if (normalizedFilename.includes('bmw')) {
-    keywords.push('bmw');
-  }
-  if (normalizedFilename.includes('honda') && normalizedFilename.includes('civic')) {
-    keywords.push('honda civic', 'civic');
-  }
-  if (normalizedFilename.includes('ford') && normalizedFilename.includes('raptor')) {
-    keywords.push('ford f-150 raptor', 'raptor', 'f-150');
-  }
-  if (normalizedFilename.includes('ford') && (normalizedFilename.includes('mustang') || normalizedFilename.includes('mach'))) {
-    keywords.push('ford mustang', 'mustang mach', 'mustang');
-  }
-  if (normalizedFilename.includes('toyota') || normalizedFilename.includes('supra')) {
-    keywords.push('toyota supra', 'supra');
-  }
-  if (normalizedFilename.includes('mazda') || normalizedFilename.includes('miata')) {
-    keywords.push('mazda mx-5', 'mazda miata', 'miata', 'mx-5');
-  }
-  if (normalizedFilename.includes('mitsubishi') || (normalizedFilename.includes('lancer') && normalizedFilename.includes('evo'))) {
-    keywords.push('mitsubishi lancer evo', 'lancer evo', 'evo');
-  }
-  if (normalizedFilename.includes('land rover') || normalizedFilename.includes('defender')) {
-    keywords.push('land rover defender', 'defender');
-  }
-  if (normalizedFilename.includes('mercedes') && (normalizedFilename.includes('amg') || normalizedFilename.includes('gt'))) {
-    keywords.push('mercedes amg gt', 'mercedes amg', 'amg gt');
-  }
-  if (normalizedFilename.includes('alfa') || normalizedFilename.includes('romeo')) {
-    keywords.push('alfa romeo');
-  }
-  if (normalizedFilename.includes('aston') || normalizedFilename.includes('martin')) {
-    keywords.push('aston martin');
-  }
-  if (normalizedFilename.includes('hot wheels') && normalizedFilename.includes('japan')) {
-    keywords.push('hot wheels', 'japan');
-  }
-  if (normalizedFilename.includes('majorette') && normalizedFilename.includes('racing')) {
-    keywords.push('majorette', 'racing');
-  }
-  if (normalizedFilename.includes('majorette')) {
-    keywords.push('majorette');
-  }
-  if (normalizedFilename.includes('hot wheels')) {
-    keywords.push('hot wheels');
-  }
-
-  // Check if any keyword matches product title
-  return keywords.some(keyword => normalizedTitle.includes(keyword));
-};
+const PHOTOS_ROOT = path.join(process.cwd(), '..', '..', 'photos');
 
 async function main() {
   console.log('🌱 Starting COMPREHENSIVE database seed...');
@@ -276,22 +127,7 @@ async function main() {
     )
   );
 
-  // Mevcut veriyi yeni kategorilere taşı, eski kategorileri kaldır
-  const arabaCategory = categories.find((c) => c.slug === 'araba')!;
-  await prisma.product.updateMany({ data: { categoryId: arabaCategory.id } });
-  await prisma.collection.updateMany({ data: { categoryId: null } });
-  await prisma.commissionRule.updateMany({
-    where: { categoryId: { not: null } },
-    data: { categoryId: arabaCategory.id },
-  });
-  await prisma.taxRule.updateMany({
-    where: { categoryId: { not: null } },
-    data: { categoryId: arabaCategory.id },
-  });
-  await prisma.discount.updateMany({
-    where: { categoryId: { not: null } },
-    data: { categoryId: arabaCategory.id },
-  });
+  // Clean up old categories that are no longer needed
   const newSlugs = categoryData.map((c) => c.slug);
   await prisma.category.deleteMany({ where: { slug: { notIn: newSlugs } } });
 
@@ -336,6 +172,163 @@ async function main() {
   );
 
   console.log(`✅ Created ${manufacturers.length} manufacturers`);
+
+  // ==========================================================================
+  // 1c. Create Brands (vehicle brands – NOT diecast manufacturers)
+  // ==========================================================================
+  console.log('Creating vehicle brands...');
+
+  const brandData = [
+    { name: 'Ferrari', slug: 'ferrari', country: 'İtalya', foundedYear: 1939 },
+    { name: 'Aston Martin', slug: 'aston-martin', country: 'İngiltere', foundedYear: 1913 },
+    { name: 'Mercedes-Benz', slug: 'mercedes-benz', country: 'Almanya', foundedYear: 1926 },
+    { name: 'Porsche', slug: 'porsche', country: 'Almanya', foundedYear: 1931 },
+    { name: 'Chevrolet', slug: 'chevrolet', country: 'ABD', foundedYear: 1911 },
+    { name: 'Alfa Romeo', slug: 'alfa-romeo', country: 'İtalya', foundedYear: 1910 },
+    { name: 'Ford', slug: 'ford', country: 'ABD', foundedYear: 1903 },
+    { name: 'Volkswagen', slug: 'volkswagen', country: 'Almanya', foundedYear: 1937 },
+    { name: 'Toyota', slug: 'toyota', country: 'Japonya', foundedYear: 1937 },
+    { name: 'Nissan', slug: 'nissan', country: 'Japonya', foundedYear: 1933 },
+    { name: 'Lamborghini', slug: 'lamborghini', country: 'İtalya', foundedYear: 1963 },
+    { name: 'McLaren', slug: 'mclaren', country: 'İngiltere', foundedYear: 1963 },
+    { name: 'Honda', slug: 'honda', country: 'Japonya', foundedYear: 1948 },
+    { name: 'BMW', slug: 'bmw', country: 'Almanya', foundedYear: 1916 },
+    { name: 'Dodge', slug: 'dodge', country: 'ABD', foundedYear: 1900 },
+    { name: 'Pontiac', slug: 'pontiac', country: 'ABD', foundedYear: 1926 },
+    { name: 'Plymouth', slug: 'plymouth', country: 'ABD', foundedYear: 1928 },
+    { name: 'Jeep', slug: 'jeep', country: 'ABD', foundedYear: 1941 },
+    { name: 'Land Rover', slug: 'land-rover', country: 'İngiltere', foundedYear: 1948 },
+    { name: 'Mazda', slug: 'mazda', country: 'Japonya', foundedYear: 1920 },
+    { name: 'Ducati', slug: 'ducati', country: 'İtalya', foundedYear: 1926 },
+    { name: 'Harley-Davidson', slug: 'harley-davidson', country: 'ABD', foundedYear: 1903 },
+    { name: 'Kawasaki', slug: 'kawasaki', country: 'Japonya', foundedYear: 1896 },
+  ];
+
+  const brands = await Promise.all(
+    brandData.map((b, i) =>
+      prisma.brand.upsert({
+        where: { slug: b.slug },
+        update: { name: b.name, country: b.country, foundedYear: b.foundedYear },
+        create: { ...b, sortOrder: i + 1, isActive: true },
+      })
+    )
+  );
+
+  console.log(`✅ Created ${brands.length} vehicle brands`);
+
+  // ==========================================================================
+  // 1d. Create Car Models (linked to brands)
+  // ==========================================================================
+  console.log('Creating car models...');
+
+  const carModelData = [
+    { brandSlug: 'ferrari', name: '275 GTB', slug: 'ferrari-275-gtb', yearStart: 1964, yearEnd: 1968 },
+    { brandSlug: 'ferrari', name: 'F8 Tributo', slug: 'ferrari-f8-tributo', yearStart: 2019, yearEnd: 2024 },
+    { brandSlug: 'aston-martin', name: 'DB5', slug: 'aston-martin-db5', yearStart: 1963, yearEnd: 1965 },
+    { brandSlug: 'mercedes-benz', name: '300SL Gullwing', slug: 'mercedes-300sl-gullwing', yearStart: 1954, yearEnd: 1957 },
+    { brandSlug: 'mercedes-benz', name: 'G-Class G63 AMG', slug: 'mercedes-g-class', yearStart: 2018, yearEnd: null },
+    { brandSlug: 'porsche', name: '356 Speedster', slug: 'porsche-356', yearStart: 1948, yearEnd: 1965 },
+    { brandSlug: 'porsche', name: '911 GT3 RS', slug: 'porsche-911-gt3-rs', yearStart: 2022, yearEnd: null },
+    { brandSlug: 'porsche', name: '911 Turbo', slug: 'porsche-911-turbo', yearStart: 1975, yearEnd: null },
+    { brandSlug: 'porsche', name: '917K', slug: 'porsche-917k', yearStart: 1969, yearEnd: 1971 },
+    { brandSlug: 'chevrolet', name: 'Corvette Stingray C2', slug: 'chevrolet-corvette-c2', yearStart: 1963, yearEnd: 1967 },
+    { brandSlug: 'chevrolet', name: 'Corvette C8', slug: 'chevrolet-corvette-c8', yearStart: 2020, yearEnd: null },
+    { brandSlug: 'chevrolet', name: 'Camaro SS', slug: 'chevrolet-camaro-ss', yearStart: 1967, yearEnd: 1969 },
+    { brandSlug: 'chevrolet', name: 'Chevelle SS', slug: 'chevrolet-chevelle-ss', yearStart: 1966, yearEnd: 1973 },
+    { brandSlug: 'chevrolet', name: 'Silverado', slug: 'chevrolet-silverado', yearStart: 1999, yearEnd: null },
+    { brandSlug: 'chevrolet', name: 'Impala', slug: 'chevrolet-impala', yearStart: 1958, yearEnd: 2020 },
+    { brandSlug: 'alfa-romeo', name: 'Giulia Sprint GTA', slug: 'alfa-romeo-giulia-gta', yearStart: 1965, yearEnd: 1969 },
+    { brandSlug: 'ford', name: 'Thunderbird', slug: 'ford-thunderbird', yearStart: 1955, yearEnd: 1997 },
+    { brandSlug: 'ford', name: 'Mustang Mach 1', slug: 'ford-mustang-mach-1', yearStart: 1969, yearEnd: 1978 },
+    { brandSlug: 'ford', name: 'Mustang Boss 429', slug: 'ford-mustang-boss-429', yearStart: 1969, yearEnd: 1970 },
+    { brandSlug: 'ford', name: 'Mustang Shelby GT500', slug: 'ford-mustang-gt500', yearStart: 1967, yearEnd: 1970 },
+    { brandSlug: 'ford', name: 'F-150 Raptor', slug: 'ford-f150-raptor', yearStart: 2010, yearEnd: null },
+    { brandSlug: 'volkswagen', name: 'Beetle', slug: 'volkswagen-beetle', yearStart: 1938, yearEnd: 2003 },
+    { brandSlug: 'toyota', name: '2000GT', slug: 'toyota-2000gt', yearStart: 1967, yearEnd: 1970 },
+    { brandSlug: 'toyota', name: 'Supra MK4', slug: 'toyota-supra-mk4', yearStart: 1993, yearEnd: 2002 },
+    { brandSlug: 'toyota', name: 'Land Cruiser J70', slug: 'toyota-land-cruiser-j70', yearStart: 1984, yearEnd: null },
+    { brandSlug: 'toyota', name: 'Hilux', slug: 'toyota-hilux', yearStart: 1968, yearEnd: null },
+    { brandSlug: 'toyota', name: 'AE86 Sprinter Trueno', slug: 'toyota-ae86', yearStart: 1983, yearEnd: 1987 },
+    { brandSlug: 'nissan', name: 'Skyline GT-R R34', slug: 'nissan-skyline-gtr-r34', yearStart: 1999, yearEnd: 2002 },
+    { brandSlug: 'nissan', name: 'GT-R R35', slug: 'nissan-gtr-r35', yearStart: 2007, yearEnd: null },
+    { brandSlug: 'lamborghini', name: 'Aventador', slug: 'lamborghini-aventador', yearStart: 2011, yearEnd: 2022 },
+    { brandSlug: 'lamborghini', name: 'Huracan', slug: 'lamborghini-huracan', yearStart: 2014, yearEnd: null },
+    { brandSlug: 'mclaren', name: 'P1', slug: 'mclaren-p1', yearStart: 2013, yearEnd: 2015 },
+    { brandSlug: 'honda', name: 'NSX Type-R', slug: 'honda-nsx-type-r', yearStart: 1992, yearEnd: 2005 },
+    { brandSlug: 'honda', name: 'CBR1000RR Fireblade', slug: 'honda-cbr1000rr', yearStart: 2004, yearEnd: null },
+    { brandSlug: 'honda', name: 'Civic', slug: 'honda-civic', yearStart: 1972, yearEnd: null },
+    { brandSlug: 'bmw', name: 'M4', slug: 'bmw-m4', yearStart: 2014, yearEnd: null },
+    { brandSlug: 'bmw', name: 'R1250GS Adventure', slug: 'bmw-r1250gs', yearStart: 2019, yearEnd: null },
+    { brandSlug: 'dodge', name: 'Challenger R/T', slug: 'dodge-challenger-rt', yearStart: 1970, yearEnd: 1974 },
+    { brandSlug: 'dodge', name: 'Charger', slug: 'dodge-charger', yearStart: 1966, yearEnd: null },
+    { brandSlug: 'pontiac', name: 'GTO Judge', slug: 'pontiac-gto-judge', yearStart: 1969, yearEnd: 1971 },
+    { brandSlug: 'plymouth', name: 'Barracuda', slug: 'plymouth-barracuda', yearStart: 1964, yearEnd: 1974 },
+    { brandSlug: 'jeep', name: 'Wrangler Rubicon', slug: 'jeep-wrangler-rubicon', yearStart: 2003, yearEnd: null },
+    { brandSlug: 'land-rover', name: 'Defender 90', slug: 'land-rover-defender', yearStart: 1983, yearEnd: null },
+    { brandSlug: 'mazda', name: 'RX-7 FD', slug: 'mazda-rx-7', yearStart: 1991, yearEnd: 2002 },
+    { brandSlug: 'ducati', name: 'Panigale V4', slug: 'ducati-panigale-v4', yearStart: 2018, yearEnd: null },
+    { brandSlug: 'harley-davidson', name: 'Fat Boy', slug: 'harley-fat-boy', yearStart: 1990, yearEnd: null },
+    { brandSlug: 'kawasaki', name: 'Ninja ZX-10R', slug: 'kawasaki-ninja-zx10r', yearStart: 2004, yearEnd: null },
+  ];
+
+  const carModels = await Promise.all(
+    carModelData.map((cm, i) => {
+      const brand = brands.find(b => b.slug === cm.brandSlug)!;
+      return prisma.carModel.upsert({
+        where: { slug: cm.slug },
+        update: { name: cm.name, yearStart: cm.yearStart, yearEnd: cm.yearEnd },
+        create: { brandId: brand.id, name: cm.name, slug: cm.slug, yearStart: cm.yearStart, yearEnd: cm.yearEnd, sortOrder: i + 1, isActive: true },
+      });
+    })
+  );
+
+  console.log(`✅ Created ${carModels.length} car models`);
+
+  // ==========================================================================
+  // 1e. Create Attribute Groups & Attributes (scale, material)
+  // ==========================================================================
+  console.log('Creating attribute groups...');
+
+  const scaleGroup = await prisma.attributeGroup.upsert({
+    where: { slug: 'scale' },
+    update: {},
+    create: { name: 'Ölçek', slug: 'scale', isRequired: false, sortOrder: 1 },
+  });
+
+  const materialGroup = await prisma.attributeGroup.upsert({
+    where: { slug: 'material' },
+    update: {},
+    create: { name: 'Malzeme', slug: 'material', isRequired: false, sortOrder: 2 },
+  });
+
+  const scaleValues = ['1:18', '1:24', '1:43', '1:64', '1:72', '1:160', '1:350', '1:400', '1:700'];
+  const materialValues = [
+    { value: 'diecast', display: 'Diecast Metal' },
+    { value: 'resin', display: 'Resin' },
+    { value: 'plastic', display: 'Plastik' },
+    { value: 'composite', display: 'Karışık (Metal+Plastik)' },
+  ];
+
+  const scaleAttrs: Record<string, any> = {};
+  for (const sv of scaleValues) {
+    const slug = sv.replace(':', '-');
+    scaleAttrs[sv] = await prisma.attribute.upsert({
+      where: { groupId_slug: { groupId: scaleGroup.id, slug } },
+      update: {},
+      create: { groupId: scaleGroup.id, value: sv, slug, displayValue: sv, sortOrder: scaleValues.indexOf(sv) },
+    });
+  }
+
+  const materialAttrs: Record<string, any> = {};
+  for (const mv of materialValues) {
+    materialAttrs[mv.value] = await prisma.attribute.upsert({
+      where: { groupId_slug: { groupId: materialGroup.id, slug: mv.value } },
+      update: {},
+      create: { groupId: materialGroup.id, value: mv.value, slug: mv.value, displayValue: mv.display, sortOrder: materialValues.indexOf(mv) },
+    });
+  }
+
+  console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials)`);
 
   // ==========================================================================
   // 2. Create Membership Tiers
@@ -713,6 +706,7 @@ async function main() {
     users.push(user);
   }
 
+  // No default avatar URLs (Trendyol-style: generic icon or initials on frontend only)
   console.log(`✅ Created ${users.length} users`);
 
   // ==========================================================================
@@ -822,353 +816,310 @@ async function main() {
   console.log(`✅ Created wishlists for all users`);
 
   // ==========================================================================
-  // 10. Create Products (100+ products)
+  // 10. Create Products (85 unique products – one per image)
   // ==========================================================================
   console.log('Creating products...');
 
-  const productTemplates = [
-    // Araba
-    { title: 'Hot Wheels Vintage 1960s Ferrari 275 GTB', cat: 'araba', price: [8000, 15000], cond: ProductCondition.good },
-    { title: 'Matchbox 1965 James Bond Aston Martin', cat: 'araba', price: [5000, 10000], cond: ProductCondition.fair },
-    { title: 'Tamiya Vintage Collection 1950s', cat: 'araba', price: [3000, 7000], cond: ProductCondition.good },
-    { title: 'AUTOart Classic Mercedes 300SL Gullwing', cat: 'araba', price: [10000, 18000], cond: ProductCondition.good },
-    { title: 'Kyosho Vintage Porsche 356', cat: 'araba', price: [4000, 8000], cond: ProductCondition.like_new },
-    { title: 'Maisto Classic Corvette 1963', cat: 'araba', price: [2000, 5000], cond: ProductCondition.good },
-    { title: 'Bburago Vintage Alfa Romeo', cat: 'araba', price: [3000, 6000], cond: ProductCondition.fair },
-    { title: 'Greenlight Vintage Collection', cat: 'araba', price: [2500, 5500], cond: ProductCondition.good },
-    { title: 'Majorette Vintage Set', cat: 'araba', price: [1500, 3500], cond: ProductCondition.good },
-    { title: 'Tomica Limited Vintage Collection', cat: 'araba', price: [6000, 12000], cond: ProductCondition.new },
-    { title: 'Minichamps Vintage Racing', cat: 'araba', price: [5000, 10000], cond: ProductCondition.like_new },
-    
-    // Spor Kategorisi - Anasayfadaki markalarla
-    { title: 'Hot Wheels Nissan Skyline GT-R R34', cat: 'araba', price: [150, 450], cond: ProductCondition.new },
-    { title: 'Hot Wheels Porsche 911 GT3 RS', cat: 'araba', price: [120, 350], cond: ProductCondition.new },
-    { title: 'Hot Wheels Lamborghini Aventador', cat: 'araba', price: [200, 500], cond: ProductCondition.new },
-    { title: 'Matchbox McLaren P1', cat: 'araba', price: [100, 300], cond: ProductCondition.new },
-    { title: 'Tamiya Toyota Supra MK4', cat: 'araba', price: [300, 600], cond: ProductCondition.new },
-    { title: 'AUTOart 1:18 Lamborghini Huracan', cat: 'araba', price: [4000, 6000], cond: ProductCondition.new },
-    { title: 'Kyosho 1:18 Nissan GT-R R35', cat: 'araba', price: [3500, 5500], cond: ProductCondition.new },
-    { title: 'Maisto 1:24 Ferrari F8 Tributo', cat: 'araba', price: [300, 600], cond: ProductCondition.new },
-    { title: 'Bburago 1:24 Lamborghini Aventador', cat: 'araba', price: [250, 500], cond: ProductCondition.new },
-    { title: 'Greenlight Sports Car Series', cat: 'araba', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Majorette Porsche 911 Turbo', cat: 'araba', price: [40, 100], cond: ProductCondition.new },
-    { title: 'Tomica Honda NSX Type-R', cat: 'araba', price: [120, 300], cond: ProductCondition.new },
-    { title: 'Minichamps 1:43 Sports Car Collection', cat: 'araba', price: [500, 900], cond: ProductCondition.new },
-    
-    // Muscle Kategorisi - Anasayfadaki markalarla
-    { title: 'Hot Wheels Dodge Challenger R/T 1970', cat: 'araba', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Hot Wheels Ford Mustang Mach 1 1971', cat: 'araba', price: [200, 450], cond: ProductCondition.new },
-    { title: 'Matchbox 1970 Ford Mustang Boss 429', cat: 'araba', price: [150, 400], cond: ProductCondition.good },
-    { title: 'Greenlight Muscle Car Garage', cat: 'araba', price: [120, 280], cond: ProductCondition.new },
-    { title: 'Greenlight Route 66 Muscle Collection', cat: 'araba', price: [200, 450], cond: ProductCondition.like_new },
-    { title: 'Maisto Chevrolet Camaro SS 1969', cat: 'araba', price: [180, 400], cond: ProductCondition.like_new },
-    { title: 'Bburago Dodge Charger 1970', cat: 'araba', price: [160, 380], cond: ProductCondition.new },
-    { title: 'AUTOart 1:18 Plymouth Barracuda', cat: 'araba', price: [3000, 5500], cond: ProductCondition.new },
-    { title: 'Kyosho 1:18 Ford Mustang GT500', cat: 'araba', price: [2500, 4500], cond: ProductCondition.new },
-    
-    // Kamyon Kategorisi - Anasayfadaki markalarla
-    { title: 'Hot Wheels Ford F-150 Raptor 2023', cat: 'kamyon', price: [150, 350], cond: ProductCondition.new },
-    { title: 'Matchbox Land Rover Defender', cat: 'kamyon', price: [80, 200], cond: ProductCondition.new },
-    { title: 'Tamiya Toyota Land Cruiser J70', cat: 'kamyon', price: [200, 450], cond: ProductCondition.like_new },
-    { title: 'Maisto Jeep Wrangler Rubicon', cat: 'kamyon', price: [120, 280], cond: ProductCondition.new },
-    { title: 'Bburago Mercedes G-Class', cat: 'kamyon', price: [180, 400], cond: ProductCondition.new },
-    { title: 'Greenlight Pickup Truck Series', cat: 'kamyon', price: [100, 250], cond: ProductCondition.new },
-    { title: 'Majorette SUV Collection', cat: 'kamyon', price: [50, 120], cond: ProductCondition.new },
-    { title: 'Tomica Toyota Hilux', cat: 'kamyon', price: [80, 180], cond: ProductCondition.new },
-    { title: 'AUTOart 1:18 Ford F-150 Raptor', cat: 'kamyon', price: [3500, 5500], cond: ProductCondition.new },
-    
-    // F1 Kategorisi - Anasayfadaki markalarla
-    { title: 'Hot Wheels Formula 1 Collection', cat: 'motorspor', price: [200, 500], cond: ProductCondition.new },
-    { title: 'Matchbox F1 Racing Set', cat: 'motorspor', price: [150, 400], cond: ProductCondition.new },
-    { title: 'Tamiya F1 Model Kit', cat: 'motorspor', price: [400, 800], cond: ProductCondition.new },
-    { title: 'AUTOart 1:18 F1 Championship Car', cat: 'motorspor', price: [5000, 9000], cond: ProductCondition.new },
-    { title: 'Kyosho 1:18 Formula 1', cat: 'motorspor', price: [4500, 8000], cond: ProductCondition.new },
-    { title: 'Maisto F1 Racing Collection', cat: 'motorspor', price: [300, 600], cond: ProductCondition.new },
-    { title: 'Bburago F1 Championship Series', cat: 'motorspor', price: [250, 500], cond: ProductCondition.new },
-    { title: 'Minichamps 1:43 F1 Racing', cat: 'motorspor', price: [600, 1200], cond: ProductCondition.new },
-    { title: 'Greenlight F1 Legends', cat: 'motorspor', price: [180, 400], cond: ProductCondition.new },
-    
-    // Custom Kategorisi - Anasayfadaki markalarla
-    { title: 'Hot Wheels Custom Modified Nissan Skyline', cat: 'araba', price: [300, 700], cond: ProductCondition.new },
-    { title: 'Hot Wheels Custom Paint Job Collection', cat: 'araba', price: [250, 600], cond: ProductCondition.new },
-    { title: 'Matchbox Custom Build Series', cat: 'araba', price: [150, 400], cond: ProductCondition.new },
-    { title: 'Tamiya Custom Drift Car', cat: 'araba', price: [500, 1000], cond: ProductCondition.new },
-    { title: 'Greenlight Custom Hot Rod', cat: 'araba', price: [200, 500], cond: ProductCondition.new },
-    { title: 'Maisto Custom Lowrider', cat: 'araba', price: [180, 450], cond: ProductCondition.new },
-    { title: 'Bburago Custom Tuning Series', cat: 'araba', price: [220, 550], cond: ProductCondition.new },
-    { title: 'Majorette Custom Racing', cat: 'araba', price: [100, 250], cond: ProductCondition.new },
-    { title: 'Tomica Custom Modified', cat: 'araba', price: [300, 650], cond: ProductCondition.new },
+  // Each entry maps 1:1 to a generated image file
+  const productData: Array<{
+    img: string; title: string; desc: string; cat: string;
+    brandSlug?: string; modelSlug?: string; mfgSlug?: string;
+    scale: string; material: string; year: number;
+    min: number; max: number; cond: ProductCondition;
+    isSet?: boolean; isLimited?: boolean; isPreorder?: boolean;
+  }> = [
+    // ── ARABA – Vintage (1-11) ──────────────────────────────────────────
+    { img: 'product-hot-wheels-ferrari-275-gtb.png', title: 'Hot Wheels Ferrari 275 GTB', desc: '1964 model Ferrari 275 GTB\'nin Hot Wheels üretimi 1:64 ölçekli diecast modeli. Klasik kırmızı renk, koleksiyonluk durumda.', cat: 'araba', brandSlug: 'ferrari', modelSlug: 'ferrari-275-gtb', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 1964, min: 850, max: 1500, cond: ProductCondition.good },
+    { img: 'product-matchbox-james-bond-aston-martin.png', title: 'Matchbox 007 Aston Martin DB5', desc: 'James Bond filmleriyle efsaneleşen Aston Martin DB5. Matchbox üretimi, gümüş renk, 1:64 ölçek.', cat: 'araba', brandSlug: 'aston-martin', modelSlug: 'aston-martin-db5', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 1965, min: 600, max: 1200, cond: ProductCondition.good },
+    { img: 'product-tamiya-vintage-1950s.png', title: 'Tamiya 1950s Vintage Classic', desc: '1950\'lerin zarif iki tonlu Amerikan klasiğinin Tamiya 1:24 ölçekli detaylı modeli.', cat: 'araba', mfgSlug: 'tamiya', scale: '1:24', material: 'composite', year: 1955, min: 350, max: 700, cond: ProductCondition.good },
+    { img: 'product-autoart-mercedes-300sl-gullwing.png', title: 'AUTOart Mercedes 300SL Gullwing 1:18', desc: 'Mercedes-Benz 300SL Gullwing\'in AUTOart premium 1:18 ölçekli modeli. Açılır martı kanatları, gümüş renk, vitrin kalitesi.', cat: 'araba', brandSlug: 'mercedes-benz', modelSlug: 'mercedes-300sl-gullwing', mfgSlug: 'autoart', scale: '1:18', material: 'diecast', year: 1955, min: 2800, max: 4500, cond: ProductCondition.like_new },
+    { img: 'product-kyosho-porsche-356.png', title: 'Kyosho Porsche 356 Speedster 1:18', desc: 'Porsche 356 Speedster\'ın Kyosho 1:18 ölçekli el yapımı kalitesinde modeli. Fildişi beyaz, klasik eğriler.', cat: 'araba', brandSlug: 'porsche', modelSlug: 'porsche-356', mfgSlug: 'kyosho', scale: '1:18', material: 'diecast', year: 1956, min: 1200, max: 2200, cond: ProductCondition.like_new },
+    { img: 'product-maisto-corvette-1963.png', title: 'Maisto 1963 Corvette Stingray 1:24', desc: '1963 Chevrolet Corvette Stingray split-window coupe. Maisto 1:24, parlak kırmızı.', cat: 'araba', brandSlug: 'chevrolet', modelSlug: 'chevrolet-corvette-c2', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 1963, min: 250, max: 500, cond: ProductCondition.good },
+    { img: 'product-bburago-alfa-romeo.png', title: 'Bburago Alfa Romeo Giulia GTA 1:24', desc: 'Alfa Romeo Giulia Sprint GTA\'nın Bburago üretimi 1:24 modeli. Koyu bordo, İtalyan yarış ruhu.', cat: 'araba', brandSlug: 'alfa-romeo', modelSlug: 'alfa-romeo-giulia-gta', mfgSlug: 'bburago', scale: '1:24', material: 'diecast', year: 1965, min: 300, max: 600, cond: ProductCondition.good },
+    { img: 'product-greenlight-vintage-collection.png', title: 'Greenlight 1960 Ford Thunderbird', desc: '1960 Ford Thunderbird\'ün Greenlight 1:64 ölçekli modeli. Pastel nane yeşili, krom detaylar.', cat: 'araba', brandSlug: 'ford', modelSlug: 'ford-thunderbird', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 1960, min: 180, max: 350, cond: ProductCondition.good },
+    { img: 'product-majorette-vintage-set.png', title: 'Majorette VW Beetle Classic', desc: 'Volkswagen Beetle\'ın Majorette 1:64 ölçekli sevimli modeli. Güneş sarısı, retro tarz.', cat: 'araba', brandSlug: 'volkswagen', modelSlug: 'volkswagen-beetle', mfgSlug: 'majorette', scale: '1:64', material: 'diecast', year: 1967, min: 120, max: 250, cond: ProductCondition.good },
+    { img: 'product-tomica-limited-vintage.png', title: 'Tomica Limited Vintage Toyota 2000GT', desc: 'Toyota 2000GT\'nin Tomica Limited Vintage serisi 1:64 modeli. İnci beyaz, kırmızı iç mekan, Japon zarafeti.', cat: 'araba', brandSlug: 'toyota', modelSlug: 'toyota-2000gt', mfgSlug: 'tomica', scale: '1:64', material: 'diecast', year: 1967, min: 450, max: 900, cond: ProductCondition.new, isLimited: true },
+    { img: 'product-minichamps-vintage-racing.png', title: 'Minichamps Porsche 917K Gulf 1:43', desc: 'Porsche 917K efsanevi Gulf renkleriyle Minichamps 1:43 ölçekli yarış modeli. Turuncu-mavi, Le Mans ruhu.', cat: 'araba', brandSlug: 'porsche', modelSlug: 'porsche-917k', mfgSlug: 'minichamps', scale: '1:43', material: 'resin', year: 1970, min: 800, max: 1500, cond: ProductCondition.like_new },
+
+    // ── ARABA – Sports (12-24) ──────────────────────────────────────────
+    { img: 'product-hot-wheels-nissan-skyline-gtr-r34.png', title: 'Hot Wheels Nissan Skyline GT-R R34', desc: 'JDM efsanesi R34 GT-R\'ın Hot Wheels 1:64 modeli. Gece moru, agresif duruş.', cat: 'araba', brandSlug: 'nissan', modelSlug: 'nissan-skyline-gtr-r34', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 1999, min: 150, max: 400, cond: ProductCondition.new },
+    { img: 'product-hot-wheels-porsche-911-gt3-rs.png', title: 'Hot Wheels Porsche 911 GT3 RS', desc: 'Porsche 911 GT3 RS\'in Hot Wheels 1:64 modeli. Asit yeşili, siyah aksan, agresif duruş.', cat: 'araba', brandSlug: 'porsche', modelSlug: 'porsche-911-gt3-rs', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2022, min: 120, max: 350, cond: ProductCondition.new },
+    { img: 'product-hot-wheels-lamborghini-aventador.png', title: 'Hot Wheels Lamborghini Aventador', desc: 'Lamborghini Aventador süper otomobilin Hot Wheels 1:64 modeli. Parlak turuncu, dramatik tasarım.', cat: 'araba', brandSlug: 'lamborghini', modelSlug: 'lamborghini-aventador', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2011, min: 100, max: 300, cond: ProductCondition.new },
+    { img: 'product-matchbox-mclaren-p1.png', title: 'Matchbox McLaren P1', desc: 'McLaren P1 hipercar Matchbox 1:64 modeli. Volkan sarısı, fütüristik tasarım.', cat: 'araba', brandSlug: 'mclaren', modelSlug: 'mclaren-p1', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 2013, min: 80, max: 250, cond: ProductCondition.new },
+    { img: 'product-tamiya-toyota-supra-mk4.png', title: 'Tamiya Toyota Supra MK4 1:24', desc: 'Efsanevi Toyota Supra A80\'in Tamiya 1:24 detaylı modeli. Beyaz, büyük arka kanat, tuner ikonu.', cat: 'araba', brandSlug: 'toyota', modelSlug: 'toyota-supra-mk4', mfgSlug: 'tamiya', scale: '1:24', material: 'composite', year: 1993, min: 400, max: 800, cond: ProductCondition.new },
+    { img: 'product-autoart-lamborghini-huracan-118.png', title: 'AUTOart Lamborghini Huracan 1:18', desc: 'Lamborghini Huracan\'ın AUTOart premium 1:18 modeli. Verde Mantis yeşil, açılır kapılar, olağanüstü detay.', cat: 'araba', brandSlug: 'lamborghini', modelSlug: 'lamborghini-huracan', mfgSlug: 'autoart', scale: '1:18', material: 'diecast', year: 2014, min: 3500, max: 5500, cond: ProductCondition.new },
+    { img: 'product-kyosho-nissan-gtr-r35-118.png', title: 'Kyosho Nissan GT-R R35 1:18', desc: 'Nissan GT-R R35\'in Kyosho 1:18 premium modeli. Metalik koyu mavi, kaslı çamurluklar.', cat: 'araba', brandSlug: 'nissan', modelSlug: 'nissan-gtr-r35', mfgSlug: 'kyosho', scale: '1:18', material: 'diecast', year: 2007, min: 2800, max: 4800, cond: ProductCondition.new },
+    { img: 'product-maisto-ferrari-f8-tributo-124.png', title: 'Maisto Ferrari F8 Tributo 1:24', desc: 'Ferrari F8 Tributo\'nun Maisto 1:24 modeli. Rosso corsa kırmızı, İtalyan mükemmelliği.', cat: 'araba', brandSlug: 'ferrari', modelSlug: 'ferrari-f8-tributo', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 2019, min: 250, max: 500, cond: ProductCondition.new },
+    { img: 'product-bburago-lamborghini-aventador-124.png', title: 'Bburago Lamborghini Aventador 1:24', desc: 'Lamborghini Aventador\'un Bburago 1:24 modeli. Mat siyah, gizli görünüm, stealth modu.', cat: 'araba', brandSlug: 'lamborghini', modelSlug: 'lamborghini-aventador', mfgSlug: 'bburago', scale: '1:24', material: 'diecast', year: 2011, min: 200, max: 450, cond: ProductCondition.new },
+    { img: 'product-greenlight-sports-car-series.png', title: 'Greenlight Chevrolet Corvette C8', desc: 'Yeni nesil Corvette C8\'in Greenlight 1:64 modeli. Rapid Blue, modern spor araba.', cat: 'araba', brandSlug: 'chevrolet', modelSlug: 'chevrolet-corvette-c8', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 2020, min: 120, max: 300, cond: ProductCondition.new },
+    { img: 'product-majorette-porsche-911-turbo.png', title: 'Majorette Porsche 911 Turbo', desc: 'Porsche 911 Turbo\'nun Majorette 1:64 küçük ama detaylı modeli. Guards kırmızı, ikonik balina kuyruğu spoiler.', cat: 'araba', brandSlug: 'porsche', modelSlug: 'porsche-911-turbo', mfgSlug: 'majorette', scale: '1:64', material: 'diecast', year: 2020, min: 50, max: 120, cond: ProductCondition.new },
+    { img: 'product-tomica-honda-nsx-type-r.png', title: 'Tomica Honda NSX Type-R', desc: 'Honda NSX Type-R\'ın Tomica 1:64 modeli. Championship beyaz, orta motorlu Japon süper araba.', cat: 'araba', brandSlug: 'honda', modelSlug: 'honda-nsx-type-r', mfgSlug: 'tomica', scale: '1:64', material: 'diecast', year: 2002, min: 180, max: 400, cond: ProductCondition.new },
+    { img: 'product-minichamps-sports-car-143.png', title: 'Minichamps BMW M4 1:43', desc: 'BMW M4\'ün Minichamps 1:43 ölçekli premium modeli. Isle of Man yeşil, kompakt kalite.', cat: 'araba', brandSlug: 'bmw', modelSlug: 'bmw-m4', mfgSlug: 'minichamps', scale: '1:43', material: 'resin', year: 2021, min: 500, max: 900, cond: ProductCondition.new },
+
+    // ── ARABA – Muscle (25-33) ──────────────────────────────────────────
+    { img: 'product-hot-wheels-dodge-challenger-1970.png', title: 'Hot Wheels 1970 Dodge Challenger R/T', desc: '1970 Dodge Challenger R/T\'nin Hot Wheels 1:64 modeli. Plum Crazy mor, kas araba ikonu.', cat: 'araba', brandSlug: 'dodge', modelSlug: 'dodge-challenger-rt', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 1970, min: 120, max: 300, cond: ProductCondition.new },
+    { img: 'product-hot-wheels-ford-mustang-mach1-1971.png', title: 'Hot Wheels 1971 Mustang Mach 1', desc: '1971 Ford Mustang Mach 1 Hot Wheels 1:64. Grabber mavisi, siyah çizgiler, Amerikan gücü.', cat: 'araba', brandSlug: 'ford', modelSlug: 'ford-mustang-mach-1', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 1971, min: 150, max: 350, cond: ProductCondition.new },
+    { img: 'product-matchbox-ford-mustang-boss-429.png', title: 'Matchbox Ford Mustang Boss 429', desc: '1970 Ford Mustang Boss 429 Matchbox 1:64. Calypso mercan turuncu, nadir boss.', cat: 'araba', brandSlug: 'ford', modelSlug: 'ford-mustang-boss-429', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 1970, min: 200, max: 450, cond: ProductCondition.good },
+    { img: 'product-greenlight-muscle-car-garage.png', title: 'Greenlight Pontiac GTO Judge', desc: 'Pontiac GTO Judge Greenlight 1:64. Orbit turuncu, klasik kas araba.', cat: 'araba', brandSlug: 'pontiac', modelSlug: 'pontiac-gto-judge', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 1969, min: 120, max: 280, cond: ProductCondition.new },
+    { img: 'product-greenlight-route66-muscle.png', title: 'Greenlight Chevrolet Chevelle SS', desc: 'Chevrolet Chevelle SS Greenlight 1:64. Kızılcık kırmızı, parlayan krom tamponlar.', cat: 'araba', brandSlug: 'chevrolet', modelSlug: 'chevrolet-chevelle-ss', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 1970, min: 150, max: 350, cond: ProductCondition.like_new },
+    { img: 'product-maisto-chevrolet-camaro-ss-1969.png', title: 'Maisto 1969 Camaro SS 1:24', desc: '1969 Chevrolet Camaro SS Maisto 1:24. Hugger turuncu, beyaz yarış çizgileri, drag racer görünüm.', cat: 'araba', brandSlug: 'chevrolet', modelSlug: 'chevrolet-camaro-ss', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 1969, min: 250, max: 500, cond: ProductCondition.like_new },
+    { img: 'product-bburago-dodge-charger-1970.png', title: 'Bburago 1970 Dodge Charger 1:24', desc: '1970 Dodge Charger Bburago 1:24. Parlak siyah, tehditkar ve güçlü.', cat: 'araba', brandSlug: 'dodge', modelSlug: 'dodge-charger', mfgSlug: 'bburago', scale: '1:24', material: 'diecast', year: 1970, min: 200, max: 450, cond: ProductCondition.new },
+    { img: 'product-autoart-plymouth-barracuda-118.png', title: 'AUTOart Plymouth Barracuda 1:18', desc: 'Plymouth Barracuda AUTOart premium 1:18. Lime yeşil, kaput girişi, olağanüstü detay.', cat: 'araba', brandSlug: 'plymouth', modelSlug: 'plymouth-barracuda', mfgSlug: 'autoart', scale: '1:18', material: 'diecast', year: 1970, min: 3000, max: 5500, cond: ProductCondition.new },
+    { img: 'product-kyosho-ford-mustang-gt500-118.png', title: 'Kyosho Ford Mustang Shelby GT500 1:18', desc: 'Ford Mustang Shelby GT500 Kyosho 1:18. Wimbledon beyaz, mavi yarış çizgileri.', cat: 'araba', brandSlug: 'ford', modelSlug: 'ford-mustang-gt500', mfgSlug: 'kyosho', scale: '1:18', material: 'diecast', year: 1967, min: 2500, max: 4500, cond: ProductCondition.new },
+
+    // ── KAMYON / SUV (34-42) ────────────────────────────────────────────
+    { img: 'product-hot-wheels-ford-f150-raptor-2023.png', title: 'Hot Wheels Ford F-150 Raptor 2023', desc: 'Ford F-150 Raptor Hot Wheels 1:64. Velocity mavisi, off-road kamyon.', cat: 'kamyon', brandSlug: 'ford', modelSlug: 'ford-f150-raptor', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2023, min: 80, max: 200, cond: ProductCondition.new },
+    { img: 'product-matchbox-land-rover-defender.png', title: 'Matchbox Land Rover Defender 90', desc: 'Land Rover Defender 90 Matchbox 1:64. Pangea yeşil, macera aracı.', cat: 'kamyon', brandSlug: 'land-rover', modelSlug: 'land-rover-defender', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 2020, min: 70, max: 180, cond: ProductCondition.new },
+    { img: 'product-tamiya-toyota-land-cruiser-j70.png', title: 'Tamiya Toyota Land Cruiser J70 1:24', desc: 'Toyota Land Cruiser J70 Tamiya 1:24. Kumlu bej, sert ekspedisyon görünümü.', cat: 'kamyon', brandSlug: 'toyota', modelSlug: 'toyota-land-cruiser-j70', mfgSlug: 'tamiya', scale: '1:24', material: 'composite', year: 1984, min: 350, max: 700, cond: ProductCondition.like_new },
+    { img: 'product-maisto-jeep-wrangler-rubicon.png', title: 'Maisto Jeep Wrangler Rubicon 1:24', desc: 'Jeep Wrangler Rubicon Maisto 1:24. Ateş kırmızı, siyah tavan, patika hazır.', cat: 'kamyon', brandSlug: 'jeep', modelSlug: 'jeep-wrangler-rubicon', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 2021, min: 200, max: 450, cond: ProductCondition.new },
+    { img: 'product-bburago-mercedes-g-class.png', title: 'Bburago Mercedes G63 AMG 1:24', desc: 'Mercedes G-Class G63 AMG Bburago 1:24. Obsidyen siyah, lüks SUV.', cat: 'kamyon', brandSlug: 'mercedes-benz', modelSlug: 'mercedes-g-class', mfgSlug: 'bburago', scale: '1:24', material: 'diecast', year: 2018, min: 250, max: 500, cond: ProductCondition.new },
+    { img: 'product-greenlight-pickup-truck-series.png', title: 'Greenlight Chevrolet Silverado', desc: 'Chevrolet Silverado Greenlight 1:64. Summit beyaz, iş kamyonu.', cat: 'kamyon', brandSlug: 'chevrolet', modelSlug: 'chevrolet-silverado', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 2022, min: 80, max: 200, cond: ProductCondition.new },
+    { img: 'product-majorette-suv-collection.png', title: 'Majorette Range Rover Sport', desc: 'Range Rover Sport Majorette 1:64. Firenze kırmızı metalik, İngiliz lüksü.', cat: 'kamyon', brandSlug: 'land-rover', mfgSlug: 'majorette', scale: '1:64', material: 'diecast', year: 2022, min: 50, max: 120, cond: ProductCondition.new },
+    { img: 'product-tomica-toyota-hilux.png', title: 'Tomica Toyota Hilux', desc: 'Toyota Hilux Tomica 1:64. Kırmızı, güvenilir iş atı.', cat: 'kamyon', brandSlug: 'toyota', modelSlug: 'toyota-hilux', mfgSlug: 'tomica', scale: '1:64', material: 'diecast', year: 2020, min: 70, max: 180, cond: ProductCondition.new },
+    { img: 'product-autoart-ford-f150-raptor-118.png', title: 'AUTOart Ford F-150 Raptor 1:18', desc: 'Ford F-150 Raptor AUTOart premium 1:18. Code turuncu, off-road detay.', cat: 'kamyon', brandSlug: 'ford', modelSlug: 'ford-f150-raptor', mfgSlug: 'autoart', scale: '1:18', material: 'diecast', year: 2021, min: 3000, max: 5000, cond: ProductCondition.new },
+
+    // ── MOTORSPOR / F1 (43-51) ──────────────────────────────────────────
+    { img: 'product-hot-wheels-formula-1-collection.png', title: 'Hot Wheels F1 Ferrari Livery', desc: 'F1 yarış arabası Hot Wheels 1:64. Kırmızı Ferrari renkleri, açık tekerlekli yarış.', cat: 'motorspor', brandSlug: 'ferrari', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2023, min: 150, max: 350, cond: ProductCondition.new },
+    { img: 'product-matchbox-f1-racing-set.png', title: 'Matchbox F1 McLaren Papaya', desc: 'F1 arabası Matchbox 1:64. Papaya turuncu McLaren renkleri, aerodinamik tasarım.', cat: 'motorspor', brandSlug: 'mclaren', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 2023, min: 120, max: 300, cond: ProductCondition.new },
+    { img: 'product-tamiya-f1-model-kit.png', title: 'Tamiya F1 Mercedes AMG 1:24', desc: 'F1 Mercedes AMG Tamiya 1:24. Gümüş renk, turkuaz aksan, detaylı model kit.', cat: 'motorspor', brandSlug: 'mercedes-benz', mfgSlug: 'tamiya', scale: '1:24', material: 'composite', year: 2023, min: 500, max: 1000, cond: ProductCondition.new },
+    { img: 'product-autoart-f1-championship-118.png', title: 'AUTOart F1 Red Bull Racing 1:18', desc: 'F1 Red Bull Racing AUTOart premium 1:18. Koyu mavi, sarı aksan, şampiyonluk detayı.', cat: 'motorspor', mfgSlug: 'autoart', scale: '1:18', material: 'diecast', year: 2023, min: 4000, max: 7000, cond: ProductCondition.new },
+    { img: 'product-kyosho-formula-1-118.png', title: 'Kyosho F1 Aston Martin 1:18', desc: 'F1 Aston Martin Kyosho 1:18. British racing yeşil, premium kalite.', cat: 'motorspor', brandSlug: 'aston-martin', mfgSlug: 'kyosho', scale: '1:18', material: 'diecast', year: 2023, min: 3500, max: 6000, cond: ProductCondition.new },
+    { img: 'product-maisto-f1-racing-collection.png', title: 'Maisto F1 Alpine Blue 1:24', desc: 'F1 Alpine Maisto 1:24. Mavi, Fransız bayrağı aksan.', cat: 'motorspor', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 2023, min: 300, max: 600, cond: ProductCondition.new },
+    { img: 'product-bburago-f1-championship-series.png', title: 'Bburago F1 Lotus JPS 1:43', desc: 'Klasik F1 Lotus JPS Bburago 1:43. Siyah-altın, efsanevi yarış renkleri.', cat: 'motorspor', mfgSlug: 'bburago', scale: '1:43', material: 'diecast', year: 1978, min: 250, max: 500, cond: ProductCondition.new },
+    { img: 'product-minichamps-f1-racing-143.png', title: 'Minichamps F1 Williams 1:43', desc: 'F1 Williams Minichamps 1:43. Beyaz-mavi, kompakt hassasiyet.', cat: 'motorspor', mfgSlug: 'minichamps', scale: '1:43', material: 'resin', year: 2023, min: 500, max: 900, cond: ProductCondition.new },
+    { img: 'product-greenlight-f1-legends.png', title: 'Greenlight Vintage F1 Gulf Livery', desc: 'Vintage F1 aracı Greenlight 1:64. Gulf açık mavi-turuncu, retro yarış.', cat: 'motorspor', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 1970, min: 150, max: 350, cond: ProductCondition.new },
+
+    // ── ARABA – Custom (52-60) ──────────────────────────────────────────
+    { img: 'product-hot-wheels-custom-nissan-skyline.png', title: 'Hot Wheels Custom Skyline GTR Widebody', desc: 'Custom Nissan Skyline GT-R widebody kit, metalik gece mavisi, neon yeşil aksan. Hot Wheels 1:64, tuner stil.', cat: 'araba', brandSlug: 'nissan', modelSlug: 'nissan-skyline-gtr-r34', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2020, min: 200, max: 500, cond: ProductCondition.new },
+    { img: 'product-hot-wheels-custom-paint-collection.png', title: 'Hot Wheels Chrome Colorshift Custom', desc: 'Rainbow krom renk değiştiren boya, dikkat çekici custom. Hot Wheels 1:64.', cat: 'araba', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2024, min: 150, max: 400, cond: ProductCondition.new },
+    { img: 'product-matchbox-custom-build-series.png', title: 'Matchbox Custom Rat Rod', desc: 'Custom rat rod, düz primer gri, açık motor. Matchbox 1:64, ham yapı stili.', cat: 'araba', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 1932, min: 120, max: 300, cond: ProductCondition.new },
+    { img: 'product-tamiya-custom-drift-car.png', title: 'Tamiya Custom Drift AE86 Panda', desc: 'Drift-spec Toyota AE86, siyah-beyaz panda boyası, açılı tekerlekler. Tamiya 1:24, drift kültürü.', cat: 'araba', brandSlug: 'toyota', modelSlug: 'toyota-ae86', mfgSlug: 'tamiya', scale: '1:24', material: 'composite', year: 1985, min: 500, max: 1000, cond: ProductCondition.new },
+    { img: 'product-greenlight-custom-hot-rod.png', title: 'Greenlight 1932 Ford Hot Rod', desc: 'Custom 1932 Ford hot rod, şeker elma kırmızı, alev desenleri. Greenlight 1:64, klasik hot rod.', cat: 'araba', brandSlug: 'ford', mfgSlug: 'greenlight', scale: '1:64', material: 'diecast', year: 1932, min: 180, max: 400, cond: ProductCondition.new },
+    { img: 'product-maisto-custom-lowrider.png', title: 'Maisto Custom Lowrider Impala', desc: 'Custom lowrider Chevrolet Impala, metalik mor, altın tel jantlar. Maisto 1:24, lowrider kültürü.', cat: 'araba', brandSlug: 'chevrolet', modelSlug: 'chevrolet-impala', mfgSlug: 'maisto', scale: '1:24', material: 'diecast', year: 1964, min: 250, max: 550, cond: ProductCondition.new },
+    { img: 'product-bburago-custom-tuning-series.png', title: 'Bburago Custom Tuned Honda Civic', desc: 'Custom tuned Honda Civic, elektrik mavisi, karbon fiber kaput. Bburago 1:24, tuning sahnesi.', cat: 'araba', brandSlug: 'honda', modelSlug: 'honda-civic', mfgSlug: 'bburago', scale: '1:24', material: 'diecast', year: 2000, min: 200, max: 450, cond: ProductCondition.new },
+    { img: 'product-majorette-custom-racing.png', title: 'Majorette Porsche Martini Racing', desc: 'Custom Porsche Martini yarış çizgileri, beyaz. Majorette 1:64, motorsport stili.', cat: 'araba', brandSlug: 'porsche', mfgSlug: 'majorette', scale: '1:64', material: 'diecast', year: 2020, min: 80, max: 200, cond: ProductCondition.new },
+    { img: 'product-tomica-custom-modified.png', title: 'Tomica Custom Mazda RX-7 FD', desc: 'Custom modified Mazda RX-7 FD, gün batımı turuncu, siyah spoiler. Tomica 1:64, Japon tuner.', cat: 'araba', brandSlug: 'mazda', modelSlug: 'mazda-rx-7', mfgSlug: 'tomica', scale: '1:64', material: 'diecast', year: 1992, min: 250, max: 500, cond: ProductCondition.new },
+
+    // ── MOTOSİKLET (61-65) ──────────────────────────────────────────────
+    { img: 'product-maisto-ducati-panigale-v4.png', title: 'Maisto Ducati Panigale V4 1:18', desc: 'Ducati Panigale V4 Maisto 1:18. Kırmızı-beyaz, İtalyan süper motosiklet.', cat: 'motosiklet', brandSlug: 'ducati', modelSlug: 'ducati-panigale-v4', mfgSlug: 'maisto', scale: '1:18', material: 'diecast', year: 2018, min: 400, max: 800, cond: ProductCondition.new },
+    { img: 'product-maisto-harley-davidson-fat-boy.png', title: 'Maisto Harley-Davidson Fat Boy 1:18', desc: 'Harley-Davidson Fat Boy Maisto 1:18. Vivid siyah, krom motor, Amerikan cruiser.', cat: 'motosiklet', brandSlug: 'harley-davidson', modelSlug: 'harley-fat-boy', mfgSlug: 'maisto', scale: '1:18', material: 'diecast', year: 2018, min: 350, max: 700, cond: ProductCondition.new },
+    { img: 'product-welly-bmw-r1250gs.png', title: 'Welly BMW R1250GS Adventure 1:18', desc: 'BMW R1250GS Adventure Welly 1:18. Rallye mavi-kırmızı-beyaz, macera touring motosiklet.', cat: 'motosiklet', brandSlug: 'bmw', modelSlug: 'bmw-r1250gs', mfgSlug: 'welly', scale: '1:18', material: 'diecast', year: 2019, min: 300, max: 600, cond: ProductCondition.new },
+    { img: 'product-maisto-kawasaki-ninja-zx10r.png', title: 'Maisto Kawasaki Ninja ZX-10R 1:18', desc: 'Kawasaki Ninja ZX-10R Maisto 1:18. KRT yeşil-siyah, spor motosiklet.', cat: 'motosiklet', brandSlug: 'kawasaki', modelSlug: 'kawasaki-ninja-zx10r', mfgSlug: 'maisto', scale: '1:18', material: 'diecast', year: 2021, min: 350, max: 700, cond: ProductCondition.new },
+    { img: 'product-welly-honda-cbr1000rr.png', title: 'Welly Honda CBR1000RR Repsol 1:18', desc: 'Honda CBR1000RR Fireblade Welly 1:18. Repsol turuncu-kırmızı-mavi, yarış efsanesi.', cat: 'motosiklet', brandSlug: 'honda', modelSlug: 'honda-cbr1000rr', mfgSlug: 'welly', scale: '1:18', material: 'diecast', year: 2020, min: 300, max: 650, cond: ProductCondition.new },
+
+    // ── UÇAK (66-70) ────────────────────────────────────────────────────
+    { img: 'product-diecast-p51-mustang.png', title: 'P-51 Mustang WWII Fighter 1:72', desc: 'P-51 Mustang WWII savaş uçağı 1:72 diecast model. Gümüş, kırmızı kuyruk, savaş kuşu klasiği.', cat: 'ucak', scale: '1:72', material: 'diecast', year: 1944, min: 300, max: 600, cond: ProductCondition.new },
+    { img: 'product-diecast-spitfire-mk5.png', title: 'Supermarine Spitfire Mk V 1:72', desc: 'Spitfire Mk V 1:72 diecast model. RAF kamuflaj yeşil-kahve, D-Day çizgileri.', cat: 'ucak', scale: '1:72', material: 'diecast', year: 1941, min: 350, max: 700, cond: ProductCondition.new },
+    { img: 'product-diecast-f14-tomcat.png', title: 'F-14 Tomcat Navy Fighter 1:72', desc: 'F-14 Tomcat 1:72 diecast model. US Navy gri, VF-84 Jolly Rogers.', cat: 'ucak', scale: '1:72', material: 'diecast', year: 1974, min: 400, max: 800, cond: ProductCondition.new },
+    { img: 'product-diecast-red-baron-triplane.png', title: 'Fokker Dr.I Red Baron Triplane 1:72', desc: 'Fokker Dr.I Red Baron triplane 1:72 diecast. Parlak kırmızı, WWI havacılık efsanesi.', cat: 'ucak', scale: '1:72', material: 'diecast', year: 1917, min: 250, max: 500, cond: ProductCondition.new },
+    { img: 'product-diecast-boeing-747-lufthansa.png', title: 'Boeing 747 Lufthansa 1:400', desc: 'Boeing 747 Lufthansa renkleri 1:400 diecast. Beyaz-mavi-sarı, göklerin kraliçesi.', cat: 'ucak', scale: '1:400', material: 'diecast', year: 1969, min: 200, max: 450, cond: ProductCondition.new },
+
+    // ── GEMİ (71-75) ────────────────────────────────────────────────────
+    { img: 'product-diecast-titanic.png', title: 'RMS Titanic Model Gemi 1:700', desc: 'RMS Titanic 1:700 diecast model. Siyah gövde, beyaz üst güverte, dört baca, denizcilik efsanesi.', cat: 'gemi', scale: '1:700', material: 'diecast', year: 1912, min: 350, max: 700, cond: ProductCondition.new },
+    { img: 'product-diecast-uss-enterprise-cv6.png', title: 'USS Enterprise CV-6 1:700', desc: 'WWII uçak gemisi USS Enterprise CV-6 1:700 diecast. Donanma grisi, savaş gemisi detayı.', cat: 'gemi', scale: '1:700', material: 'diecast', year: 1936, min: 400, max: 800, cond: ProductCondition.new },
+    { img: 'product-diecast-bismarck-battleship.png', title: 'Bismarck Zırhlısı 1:700', desc: 'Alman zırhlısı Bismarck 1:700 diecast. Koyu gri Baltık kamuflaj, WWII deniz savaşı.', cat: 'gemi', scale: '1:700', material: 'diecast', year: 1939, min: 450, max: 900, cond: ProductCondition.new },
+    { img: 'product-diecast-sailboat-clipper.png', title: 'Cutty Sark Yelkenli Gemi 1:350', desc: 'Cutty Sark clipper 1:350 model. Beyaz yelkenler, altın çağ yelkenciliği.', cat: 'gemi', scale: '1:350', material: 'composite', year: 1869, min: 300, max: 600, cond: ProductCondition.new },
+    { img: 'product-diecast-submarine-u-boat.png', title: 'Type VII U-Boot Denizaltı 1:350', desc: 'Alman Type VII U-Boot 1:350 diecast denizaltı. Koyu gri, WWII detay.', cat: 'gemi', scale: '1:350', material: 'diecast', year: 1940, min: 350, max: 700, cond: ProductCondition.new },
+
+    // ── TREN (76-80) ────────────────────────────────────────────────────
+    { img: 'product-diecast-orient-express-locomotive.png', title: 'Orient Express Buharlı Lokomotif 1:160', desc: 'Orient Express buharlı lokomotif 1:160 diecast. Koyu mavi-altın, lüks demiryolu.', cat: 'tren', scale: '1:160', material: 'diecast', year: 1883, min: 500, max: 1000, cond: ProductCondition.new },
+    { img: 'product-diecast-shinkansen-n700.png', title: 'Shinkansen N700 Hızlı Tren 1:160', desc: 'Japon Shinkansen N700 1:160 diecast. Beyaz, mavi şerit, yüksek hızlı tren.', cat: 'tren', scale: '1:160', material: 'diecast', year: 2007, min: 400, max: 800, cond: ProductCondition.new },
+    { img: 'product-diecast-union-pacific-big-boy.png', title: 'Union Pacific Big Boy 4014 1:160', desc: 'Union Pacific Big Boy 4014 buharlı lokomotif 1:160. Siyah, gri duman kutusu, Amerikan demiryolu ikonu.', cat: 'tren', scale: '1:160', material: 'diecast', year: 1941, min: 600, max: 1200, cond: ProductCondition.new },
+    { img: 'product-diecast-eurostar-e300.png', title: 'Eurostar e300 Yüksek Hızlı Tren 1:160', desc: 'Eurostar e300 1:160 diecast. Beyaz-sarı-mavi, Manş Tüneli.', cat: 'tren', scale: '1:160', material: 'diecast', year: 2015, min: 350, max: 700, cond: ProductCondition.new },
+    { img: 'product-diecast-hogwarts-express.png', title: 'Klasik İngiliz Buharlı Lokomotif 1:160', desc: 'Klasik İngiliz GWR tarzı buharlı lokomotif 1:160. Kırmızı, altın detay, nostaljik demiryolu.', cat: 'tren', scale: '1:160', material: 'diecast', year: 1930, min: 450, max: 900, cond: ProductCondition.new },
+
+    // ── SET & DİĞER (81-85) ─────────────────────────────────────────────
+    { img: 'product-hot-wheels-5-pack-exotics.png', title: 'Hot Wheels 5\'li Egzotik Spor Araba Seti', desc: 'Hot Wheels 5\'li egzotik araba paketi. Kırmızı, sarı, mavi, yeşil, turuncu; blister ambalaj, hediye seti.', cat: 'set-diger', mfgSlug: 'hot-wheels', scale: '1:64', material: 'diecast', year: 2024, min: 250, max: 500, cond: ProductCondition.new, isSet: true },
+    { img: 'product-matchbox-construction-set.png', title: 'Matchbox İnşaat Araçları Seti', desc: 'Matchbox inşaat seti: ekskavatör, damperli kamyon, buldozer. Sarı CAT renkleri, şantiye koleksiyonu.', cat: 'set-diger', mfgSlug: 'matchbox', scale: '1:64', material: 'diecast', year: 2024, min: 200, max: 400, cond: ProductCondition.new, isSet: true },
+    { img: 'product-vintage-classics-gift-set.png', title: 'Klasik Otomobil Koleksiyon Seti', desc: '5 adet vintage diecast model: Ford Mustang, Chevrolet Bel Air, Porsche 356, VW Beetle, Mercedes 300SL. Hediye kutusu, koleksiyoner seti.', cat: 'set-diger', scale: '1:64', material: 'diecast', year: 2024, min: 350, max: 700, cond: ProductCondition.new, isSet: true },
+    { img: 'product-siku-emergency-vehicles-set.png', title: 'Acil Durum Araçları Seti', desc: 'İtfaiye, ambulans ve polis arabası seti. Klasik acil durum renkleri, kurtarma seti.', cat: 'set-diger', scale: '1:64', material: 'diecast', year: 2024, min: 300, max: 600, cond: ProductCondition.new, isSet: true },
+    { img: 'product-racing-legends-gift-set.png', title: 'Motorsport Efsaneleri Seti', desc: 'F1 ve Le Mans efsaneleri: McLaren, Ferrari, Porsche, Ford GT40, Aston Martin. 5 diecast model, yarış koleksiyonu.', cat: 'set-diger', scale: '1:64', material: 'diecast', year: 2024, min: 400, max: 800, cond: ProductCondition.new, isSet: true },
   ];
 
   const products: any[] = [];
   const sellers = users.filter(u => u.isSeller);
-  // More pending products for admin testing (40% pending, 40% active, 10% reserved, 5% sold, 5% inactive)
-  const statuses = [
-    ProductStatus.pending, ProductStatus.pending, ProductStatus.pending, ProductStatus.pending, // 40% pending
-    ProductStatus.active, ProductStatus.active, ProductStatus.active, ProductStatus.active, // 40% active
-    ProductStatus.reserved, ProductStatus.reserved, // 10% reserved
-    ProductStatus.sold, // 5% sold
-    ProductStatus.inactive, // 5% inactive
+  // Count products per category to guarantee minimum 5 active per category
+  const catProductCounts: Record<string, number> = {};
+  const catActiveAssigned: Record<string, number> = {};
+  for (const d of productData) {
+    catProductCounts[d.cat] = (catProductCounts[d.cat] || 0) + 1;
+    catActiveAssigned[d.cat] = 0;
+  }
+
+  // 70% active, 15% pending, 5% reserved, 5% sold, 5% draft (for categories with >5 products)
+  const statusPool = [
+    ...Array(14).fill(ProductStatus.active),
+    ...Array(3).fill(ProductStatus.pending),
+    ProductStatus.reserved,
+    ProductStatus.sold,
+    ProductStatus.draft,
   ];
 
-  const resolveManufacturer = (title: string) => {
-    const lowerTitle = title.toLowerCase();
-    const mapping: Record<string, string> = {
-      'hot wheels': 'hot-wheels', 'matchbox': 'matchbox', 'majorette': 'majorette',
-      'tomica': 'tomica', 'bburago': 'bburago', 'maisto': 'maisto',
-      'autoart': 'autoart', 'minichamps': 'minichamps', 'kyosho': 'kyosho',
-      'cmc': 'cmc', 'gt spirit': 'gt-spirit', 'almost real': 'almost-real',
-      'spark': 'spark', 'schuco': 'schuco', 'norev': 'norev',
-      'oxford diecast': 'oxford-diecast', 'greenlight': 'greenlight',
-      'ertl': 'ertl', 'tamiya': 'tamiya', 'welly': 'welly',
-    };
-    for (const [keyword, slug] of Object.entries(mapping)) {
-      if (lowerTitle.includes(keyword)) {
-        return manufacturers.find((m) => m.slug === slug)?.id ?? null;
-      }
-    }
-    return null;
-  };
-
-  // Create 100+ products
-  for (let i = 0; i < 120; i++) {
-    const template = productTemplates[i % productTemplates.length];
+  for (let i = 0; i < productData.length; i++) {
+    const d = productData[i];
     const seller = sellers[i % sellers.length];
-    const category = categories.find((c) => c.slug === template.cat) || categories[0];
-    const price = randomPrice(template.price[0], template.price[1]);
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    const manufacturerId = resolveManufacturer(template.title);
-    
+    const category = categories.find(c => c.slug === d.cat) || categories[0];
+    const brand = d.brandSlug ? brands.find(b => b.slug === d.brandSlug) : null;
+    const model = d.modelSlug ? carModels.find(cm => cm.slug === d.modelSlug) : null;
+    const mfg = d.mfgSlug ? manufacturers.find(m => m.slug === d.mfgSlug) : null;
+    const price = randomPrice(d.min, d.max);
+
+    // Ensure minimum 5 active per category; remaining use status pool
+    const catTotal = catProductCounts[d.cat] || 0;
+    const catActive = catActiveAssigned[d.cat] || 0;
+    let status: ProductStatus;
+    if (catActive < 5 || catTotal <= 5) {
+      status = ProductStatus.active;
+    } else {
+      status = statusPool[i % statusPool.length];
+    }
+    if (status === ProductStatus.active) {
+      catActiveAssigned[d.cat] = (catActiveAssigned[d.cat] || 0) + 1;
+    }
+    const slug = d.img.replace('product-', '').replace('.png', '');
+
     const product = await prisma.product.create({
       data: {
         sellerId: seller.id,
         categoryId: category.id,
-        title: `${template.title} #${i + 1}`,
-        description: `Kaliteli ${template.title} modeli. Koleksiyonunuz için mükemmel bir parça. Detaylı fotoğraflar için mesaj atabilirsiniz. ${i % 3 === 0 ? 'Takas yapılabilir.' : ''}`,
-        price: price,
-        condition: template.cond,
-        status: status,
-        isTradeEnabled: i % 2 === 0 || seller.displayName.includes('Premium') || seller.displayName.includes('Business'),
-        viewCount: Math.floor(Math.random() * 500),
+        brandId: brand?.id ?? null,
+        carModelId: model?.id ?? null,
+        manufacturerId: mfg?.id ?? null,
+        title: d.title,
+        slug,
+        description: d.desc,
+        price,
+        condition: d.cond,
+        status,
+        isTradeEnabled: i % 3 !== 2,
+        isSet: d.isSet ?? false,
+        isLimited: d.isLimited ?? false,
+        isPreorder: d.isPreorder ?? false,
+        releaseDate: new Date(d.year, 0, 1),
+        viewCount: Math.floor(Math.random() * 500) + 10,
+        quantity: 1,
         createdAt: randomPastDate(60),
-        manufacturerId: manufacturerId,
       },
     });
+
+    // Assign scale + material attributes
+    const sAttr = scaleAttrs[d.scale];
+    const mAttr = materialAttrs[d.material];
+    if (sAttr) {
+      try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: sAttr.id } }); } catch {}
+    }
+    if (mAttr) {
+      try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: mAttr.id } }); } catch {}
+    }
+
     products.push(product);
   }
 
-  console.log(`✅ Created ${products.length} products`);
+  console.log(`✅ Created ${products.length} products (with brands, models, attributes)`);
 
   // ==========================================================================
-  // 11. Create Product Images
+  // 11. Create Product Images (upload to S3 or use placeholder)
   // ==========================================================================
   console.log('Creating product images...');
 
-  // Try to load photos from photos folder and upload to S3
   const storageService = initStorageService();
-  const photos = loadPhotosFromFolder();
-  const uploadedPhotos: Array<{ key: string; filename: string; photo: PhotoFile }> = [];
-  let useRealPhotos = false;
+  let useS3 = false;
 
-  if (storageService && photos.length > 0) {
-    // Initialize storage service
+  if (storageService) {
     await storageService.onModuleInit();
-    
-    if (storageService.isStorageAvailable()) {
-      console.log(`📤 Uploading ${photos.length} photos to S3...`);
-      
-      for (const photo of photos) {
-        const result = await uploadPhotoToS3(storageService, photo);
-        if (result) {
-          uploadedPhotos.push({
-            key: result.key,
-            filename: photo.filename,
-            photo: photo,
-          });
-        }
-      }
-
-      if (uploadedPhotos.length > 0) {
-        useRealPhotos = true;
-        console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos to S3`);
-      } else {
-        console.log('⚠️ No photos were uploaded, falling back to placeholder images');
-      }
-    } else {
-      console.log('⚠️ S3 storage not available, using placeholder images');
-    }
-  } else {
-    if (!storageService) {
-      console.log('⚠️ StorageService not available, using placeholder images');
-    }
-    if (photos.length === 0) {
-      console.log('⚠️ No photos found, using placeholder images');
-    }
+    useS3 = storageService.isStorageAvailable();
   }
 
-  // Delete existing placeholder images if we have real photos
-  // But keep real images (S3 keys)
-  if (useRealPhotos && uploadedPhotos.length > 0) {
-    await prisma.productImage.deleteMany({
-      where: {
-        productId: {
-          in: products.map(p => p.id),
-        },
-        OR: [
-          { url: { contains: 'via.placeholder.com' } },
-          { url: { contains: 'placeholder' } },
-        ],
+  let uploadedCount = 0;
+  for (let i = 0; i < products.length; i++) {
+    const imgFile = productData[i].img;
+    const imgPath = path.join(PHOTOS_ROOT, 'products', imgFile);
+    let imageUrl: string | null = null;
+
+    if (useS3 && fs.existsSync(imgPath)) {
+      imageUrl = await uploadPhoto(storageService!, imgPath, 'products', 'product-images');
+      if (imageUrl) uploadedCount++;
+    }
+
+    await prisma.productImage.create({
+      data: {
+        productId: products[i].id,
+        url: imageUrl || `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title)}`,
+        sortOrder: 0,
       },
     });
   }
 
-  // Track which photos have been used for matching
-  const usedPhotoIndices = new Set<number>();
-  const availablePhotoIndices = uploadedPhotos.map((_, index) => index);
-  let roundRobinIndex = 0;
-
-  // Check existing images for each product
-  const productsWithImages = await prisma.product.findMany({
-    where: {
-      id: { in: products.map(p => p.id) },
-    },
-    include: {
-      images: {
-        where: {
-          OR: [
-            { url: { not: { contains: 'via.placeholder.com' } } },
-            { url: { not: { contains: 'placeholder' } } },
-          ],
-        },
-      },
-    },
-  });
-
-  const productsWithoutRealImages = products.filter(p => {
-    const productWithImages = productsWithImages.find(pwi => pwi.id === p.id);
-    return !productWithImages || productWithImages.images.length === 0;
-  });
-
-  console.log(`📊 ${productsWithoutRealImages.length} products need images (${products.length - productsWithoutRealImages.length} already have real images)`);
-
-  // Assign photos to products that need them
-  for (const product of productsWithoutRealImages) {
-    let selectedPhoto: typeof uploadedPhotos[0] | null = null;
-
-    if (useRealPhotos && uploadedPhotos.length > 0) {
-      // Try to find matching photo (only from unused photos)
-      let matchedPhotoIndex = -1;
-      for (let i = 0; i < uploadedPhotos.length; i++) {
-        if (!usedPhotoIndices.has(i) && matchPhotoToProduct(uploadedPhotos[i].filename, product.title)) {
-          matchedPhotoIndex = i;
-          break;
-        }
-      }
-
-      if (matchedPhotoIndex >= 0) {
-        // Use matched photo
-        selectedPhoto = uploadedPhotos[matchedPhotoIndex];
-        usedPhotoIndices.add(matchedPhotoIndex);
-        // Remove from available list
-        const idx = availablePhotoIndices.indexOf(matchedPhotoIndex);
-        if (idx > -1) {
-          availablePhotoIndices.splice(idx, 1);
-        }
-      } else {
-        // Use random photo from available ones
-        if (availablePhotoIndices.length > 0) {
-          const randomIdx = Math.floor(Math.random() * availablePhotoIndices.length);
-          const selectedIndex = availablePhotoIndices[randomIdx];
-          selectedPhoto = uploadedPhotos[selectedIndex];
-          usedPhotoIndices.add(selectedIndex);
-          availablePhotoIndices.splice(randomIdx, 1);
-        } else {
-          // All photos used, use round-robin
-          selectedPhoto = uploadedPhotos[roundRobinIndex % uploadedPhotos.length];
-          roundRobinIndex++;
-        }
-      }
-    }
-
-    // Create product image
-    if (selectedPhoto && storageService) {
-      // Store S3 key directly (presigned URL will be generated on-demand in API)
-      await prisma.productImage.create({
-        data: {
-          productId: product.id,
-          url: selectedPhoto.key, // S3 key kaydet: "dev/products/product-images/abc123.jpg"
-          sortOrder: 0,
-        },
-      });
-    } else {
-      // Fallback to placeholder
-      await prisma.productImage.create({
-        data: {
-          productId: product.id,
-          url: `https://via.placeholder.com/800x600?text=${encodeURIComponent(product.title)}`,
-          sortOrder: 0,
-        },
-      });
-    }
-  }
-
-  const imageType = useRealPhotos ? 'real photos' : 'placeholder images';
-  console.log(`✅ Created product images (${imageType})`);
+  console.log(`✅ Created product images (${uploadedCount} uploaded to S3, ${products.length - uploadedCount} placeholder)`);
 
   // ==========================================================================
-  // 12. Create Collections
+  // 12. Create Collections (one per category + thematic)
   // ==========================================================================
   console.log('Creating collections...');
 
-  const collectionData = [
-    { user: users[3], name: 'En İyi JDM Modelleri', slug: 'best-jdm', desc: 'Japon spor arabalarından oluşan özel koleksiyonum' },
-    { user: users[5], name: 'Vintage Hazinelerim', slug: 'vintage-treasures', desc: 'Antika ve nadir diecast modeller' },
-    { user: users[7], name: 'Premium 1:18 Vitrinim', slug: 'premium-118', desc: 'En değerli 1:18 ölçekli modellerim' },
-    { user: users[4], name: 'Muscle Car Cenneti', slug: 'muscle-heaven', desc: 'Amerikan kas arabaları koleksiyonu' },
-    { user: users[6], name: 'Hot Wheels Treasure Hunt', slug: 'hw-treasure-hunt', desc: 'Super ve Regular Treasure Hunt modelleri' },
-    { user: users[9], name: 'Takas Listesi', slug: 'trade-list', desc: 'Takas için açık modellerim' },
+  const collectionDefs = [
+    { slug: 'best-jdm', name: 'En İyi JDM Modelleri', desc: 'Japon spor arabalarından oluşan özel koleksiyonum', catSlug: 'araba', coverFile: 'collection-best-jdm.png', user: users[3], featured: true },
+    { slug: 'vintage-treasures', name: 'Vintage Hazinelerim', desc: 'Antika ve nadir diecast modeller', catSlug: 'araba', coverFile: 'collection-vintage-treasures.png', user: users[5], featured: true },
+    { slug: 'premium-118', name: 'Premium 1:18 Vitrinim', desc: 'En değerli 1:18 ölçekli modellerim', catSlug: 'araba', coverFile: 'collection-premium-118.png', user: users[7], featured: true },
+    { slug: 'muscle-heaven', name: 'Muscle Car Cenneti', desc: 'Amerikan kas arabaları koleksiyonu', catSlug: 'araba', coverFile: 'collection-muscle-heaven.png', user: users[4], featured: false },
+    { slug: 'hw-treasure-hunt', name: 'Hot Wheels Treasure Hunt', desc: 'Super ve Regular Treasure Hunt modelleri', catSlug: 'araba', coverFile: 'collection-hw-treasure-hunt.png', user: users[6], featured: false },
+    { slug: 'trade-list', name: 'Takas Listesi', desc: 'Takas için açık modellerim', catSlug: null, coverFile: 'collection-trade-list.png', user: users[9], featured: false },
+    { slug: 'offroad-beasts', name: 'Arazi Canavarları', desc: 'SUV ve kamyon modelleri koleksiyonu', catSlug: 'kamyon', coverFile: 'collection-offroad-beasts.png', user: users[3], featured: false },
+    { slug: 'f1-grid', name: 'F1 Grid Koleksiyonu', desc: 'Farklı takımlardan Formula 1 modelleri', catSlug: 'motorspor', coverFile: 'collection-f1-grid.png', user: users[4], featured: true },
+    { slug: 'two-wheels', name: 'İki Teker Tutkusu', desc: 'Motosiklet modelleri koleksiyonu', catSlug: 'motosiklet', coverFile: 'collection-two-wheels.png', user: users[5], featured: false },
+    { slug: 'wings-of-war', name: 'Savaş Kuşları', desc: 'WWII ve modern savaş uçağı modelleri', catSlug: 'ucak', coverFile: 'collection-wings-of-war.png', user: users[6], featured: false },
+    { slug: 'naval-fleet', name: 'Donanma Filosu', desc: 'Savaş gemisi ve denizaltı modelleri', catSlug: 'gemi', coverFile: 'collection-naval-fleet.png', user: users[7], featured: false },
+    { slug: 'rail-legends', name: 'Rayların Efsaneleri', desc: 'Tren ve lokomotif modelleri', catSlug: 'tren', coverFile: 'collection-rail-legends.png', user: users[8], featured: false },
+    { slug: 'starter-bundle', name: 'Başlangıç Paketi', desc: 'Yeni koleksiyoncular için ideal set ve paketler', catSlug: 'set-diger', coverFile: 'collection-starter-bundle.png', user: users[9], featured: false },
   ];
 
   const collections: any[] = [];
-  for (const cd of collectionData) {
+  for (const cd of collectionDefs) {
+    const catId = cd.catSlug ? categories.find(c => c.slug === cd.catSlug)?.id ?? null : null;
+
+    let coverUrl: string | null = null;
+    const coverPath = path.join(PHOTOS_ROOT, 'collections', cd.coverFile);
+    if (useS3 && fs.existsSync(coverPath)) {
+      coverUrl = await uploadPhoto(storageService!, coverPath, 'collections', 'collection-covers');
+    }
+
     const collection = await prisma.collection.upsert({
       where: { id: `collection-${cd.slug}` },
-      update: {},
+      update: { coverImageUrl: coverUrl, categoryId: catId },
       create: {
         id: `collection-${cd.slug}`,
         userId: cd.user.id,
+        categoryId: catId,
         name: cd.name,
         slug: cd.slug,
         description: cd.desc,
+        coverImageUrl: coverUrl,
         isPublic: true,
-        viewCount: Math.floor(Math.random() * 200),
-        likeCount: Math.floor(Math.random() * 50),
+        isFeatured: cd.featured,
+        viewCount: Math.floor(Math.random() * 200) + 20,
+        likeCount: Math.floor(Math.random() * 50) + 5,
       },
     });
     collections.push(collection);
   }
 
-  // Add products to collections
-  for (const collection of collections) {
-    const itemCount = Math.floor(Math.random() * 8) + 3; // 3-10 items
-    const shuffled = products.sort(() => 0.5 - Math.random());
-    for (let i = 0; i < itemCount; i++) {
+  // Assign products to matching collections
+  for (const coll of collections) {
+    const collDef = collectionDefs.find(d => `collection-${d.slug}` === coll.id)!;
+    const matchingProducts = collDef.catSlug
+      ? products.filter((_, idx) => productData[idx].cat === collDef.catSlug)
+      : products.filter(() => Math.random() > 0.7);
+    const chosen = matchingProducts.sort(() => 0.5 - Math.random()).slice(0, Math.min(8, matchingProducts.length));
+    for (let i = 0; i < chosen.length; i++) {
       try {
         await prisma.collectionItem.create({
-          data: {
-            collectionId: collection.id,
-            productId: shuffled[i].id,
-            sortOrder: i,
-            isFeatured: i === 0,
-          },
+          data: { collectionId: coll.id, productId: chosen[i].id, sortOrder: i, isFeatured: i === 0 },
         });
-      } catch (e) {
-        // Ignore duplicate errors
-      }
+      } catch {}
     }
   }
 
-  console.log(`✅ Created ${collections.length} collections`);
+  console.log(`✅ Created ${collections.length} collections (with covers and category links)`);
 
   // ==========================================================================
   // 13. Create Wishlist Items
@@ -1664,13 +1615,16 @@ async function main() {
   console.log('\n🎉 COMPREHENSIVE Database seed completed successfully!');
   console.log('\n📋 Summary:');
   console.log(`   - Categories: ${categories.length}`);
+  console.log(`   - Vehicle Brands: ${brands.length}`);
+  console.log(`   - Car Models: ${carModels.length}`);
+  console.log(`   - Manufacturers: ${manufacturers.length}`);
   console.log(`   - Membership Tiers: ${membershipTiers.length}`);
   console.log(`   - Commission Rules: ${commissionRules.length}`);
   console.log(`   - Content Filters: ${contentFilters.length}`);
   console.log(`   - Platform Settings: ${settings.length}`);
-  console.log(`   - Users: ${users.length}`);
-  console.log(`   - Products: ${products.length}`);
-  console.log(`   - Collections: ${collections.length}`);
+  console.log(`   - Users: ${users.length} (with avatars)`);
+  console.log(`   - Products: ${products.length} (unique, with full data)`);
+  console.log(`   - Collections: ${collections.length} (with covers)`);
   console.log(`   - Offers: ${offers.length}`);
   console.log(`   - Orders: ${orders.length}`);
   console.log(`   - Trades: ${trades.length}`);
