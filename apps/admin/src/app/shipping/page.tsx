@@ -309,7 +309,7 @@ export default function ShippingPage() {
                 return (
                     <>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Ad *</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Ad *</label>
                             <input
                                 type="text"
                                 value={formData.name || ''}
@@ -319,7 +319,7 @@ export default function ShippingPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Kod *</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Kod *</label>
                             <input
                                 type="text"
                                 value={formData.code || ''}
@@ -329,7 +329,7 @@ export default function ShippingPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Açıklama</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Açıklama</label>
                             <textarea
                                 value={formData.description || ''}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -342,9 +342,9 @@ export default function ShippingPage() {
                                 type="checkbox"
                                 checked={formData.isActive}
                                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                             />
-                            <label className="text-sm text-gray-300">Aktif</label>
+                            <label className="text-sm text-gray-600">Aktif</label>
                         </div>
                     </>
                 );
@@ -354,7 +354,7 @@ export default function ShippingPage() {
                     <>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Ad *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Ad *</label>
                                 <input
                                     type="text"
                                     value={formData.name || ''}
@@ -364,7 +364,7 @@ export default function ShippingPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Kod *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Kod *</label>
                                 <input
                                     type="text"
                                     value={formData.code || ''}
@@ -375,7 +375,7 @@ export default function ShippingPage() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Logo URL</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Logo URL</label>
                             <input
                                 type="text"
                                 value={formData.logo || ''}
@@ -384,7 +384,7 @@ export default function ShippingPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Takip URL</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Takip URL</label>
                             <input
                                 type="text"
                                 value={formData.trackingUrl || ''}
@@ -395,7 +395,7 @@ export default function ShippingPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">API Key</label>
                                 <input
                                     type="password"
                                     value={formData.apiKey || ''}
@@ -404,7 +404,7 @@ export default function ShippingPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">API Secret</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">API Secret</label>
                                 <input
                                     type="password"
                                     value={formData.apiSecret || ''}
@@ -418,9 +418,9 @@ export default function ShippingPage() {
                                 type="checkbox"
                                 checked={formData.isActive}
                                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                             />
-                            <label className="text-sm text-gray-300">Aktif</label>
+                            <label className="text-sm text-gray-600">Aktif</label>
                         </div>
                     </>
                 );
@@ -429,7 +429,7 @@ export default function ShippingPage() {
                 return (
                     <>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Bölge Adı *</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Bölge Adı *</label>
                             <input
                                 type="text"
                                 value={formData.name || ''}
@@ -439,7 +439,7 @@ export default function ShippingPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Ülkeler (virgülle ayırın)</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Ülkeler (virgülle ayırın)</label>
                             <input
                                 type="text"
                                 value={Array.isArray(formData.countries) ? formData.countries.join(', ') : ''}
@@ -453,9 +453,9 @@ export default function ShippingPage() {
                                 type="checkbox"
                                 checked={formData.isActive}
                                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                             />
-                            <label className="text-sm text-gray-300">Aktif</label>
+                            <label className="text-sm text-gray-600">Aktif</label>
                         </div>
                     </>
                 );
@@ -465,7 +465,7 @@ export default function ShippingPage() {
                     <>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Bölge *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Bölge *</label>
                                 <select
                                     value={formData.zoneId || ''}
                                     onChange={(e) => setFormData({ ...formData, zoneId: e.target.value })}
@@ -479,7 +479,7 @@ export default function ShippingPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Yöntem *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Yöntem *</label>
                                 <select
                                     value={formData.methodId || ''}
                                     onChange={(e) => setFormData({ ...formData, methodId: e.target.value })}
@@ -493,7 +493,7 @@ export default function ShippingPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Firma *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Firma *</label>
                                 <select
                                     value={formData.carrierId || ''}
                                     onChange={(e) => setFormData({ ...formData, carrierId: e.target.value })}
@@ -509,7 +509,7 @@ export default function ShippingPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Baz Fiyat (₺) *</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Baz Fiyat (₺) *</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -520,7 +520,7 @@ export default function ShippingPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">KG Başı (₺)</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">KG Başı (₺)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -531,7 +531,7 @@ export default function ShippingPage() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Ücretsiz Kargo Limiti (₺)</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">Ücretsiz Kargo Limiti (₺)</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -543,7 +543,7 @@ export default function ShippingPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Min. Teslimat (Gün)</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Min. Teslimat (Gün)</label>
                                 <input
                                     type="number"
                                     value={formData.minDeliveryDays || 1}
@@ -552,7 +552,7 @@ export default function ShippingPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Max. Teslimat (Gün)</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-2">Max. Teslimat (Gün)</label>
                                 <input
                                     type="number"
                                     value={formData.maxDeliveryDays || 3}
@@ -566,9 +566,9 @@ export default function ShippingPage() {
                                 type="checkbox"
                                 checked={formData.isActive}
                                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                             />
-                            <label className="text-sm text-gray-300">Aktif</label>
+                            <label className="text-sm text-gray-600">Aktif</label>
                         </div>
                     </>
                 );
@@ -603,13 +603,13 @@ export default function ShippingPage() {
                         </thead>
                         <tbody>
                             {methods.length === 0 ? (
-                                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Kayıt bulunamadı</td></tr>
+                                <tr><td colSpan={5} className="text-center py-8 text-gray-500">Kayıt bulunamadı</td></tr>
                             ) : (
                                 methods.map((item) => (
                                     <tr key={item.id}>
-                                        <td className="font-medium text-white">{item.name}</td>
+                                        <td className="font-medium text-gray-900">{item.name}</td>
                                         <td><code className="text-primary-400">{item.code}</code></td>
-                                        <td className="text-gray-400 max-w-xs truncate">{item.description || '-'}</td>
+                                        <td className="text-gray-500 max-w-xs truncate">{item.description || '-'}</td>
                                         <td>
                                             {item.isActive ? (
                                                 <span className="badge badge-success">Aktif</span>
@@ -619,10 +619,10 @@ export default function ShippingPage() {
                                         </td>
                                         <td>
                                             <div className="flex gap-2">
-                                                <button onClick={() => openModal(item)} className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg">
+                                                <button onClick={() => openModal(item)} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                                                     <PencilIcon className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                                                     <TrashIcon className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -648,18 +648,18 @@ export default function ShippingPage() {
                         </thead>
                         <tbody>
                             {carriers.length === 0 ? (
-                                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Kayıt bulunamadı</td></tr>
+                                <tr><td colSpan={5} className="text-center py-8 text-gray-500">Kayıt bulunamadı</td></tr>
                             ) : (
                                 carriers.map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="flex items-center gap-3">
                                                 {item.logo && <img src={item.logo} alt="" className="h-8 w-8 object-contain rounded" />}
-                                                <span className="font-medium text-white">{item.name}</span>
+                                                <span className="font-medium text-gray-900">{item.name}</span>
                                             </div>
                                         </td>
                                         <td><code className="text-primary-400">{item.code}</code></td>
-                                        <td className="text-gray-400 max-w-xs truncate">{item.trackingUrl || '-'}</td>
+                                        <td className="text-gray-500 max-w-xs truncate">{item.trackingUrl || '-'}</td>
                                         <td>
                                             {item.isActive ? (
                                                 <span className="badge badge-success">Aktif</span>
@@ -669,10 +669,10 @@ export default function ShippingPage() {
                                         </td>
                                         <td>
                                             <div className="flex gap-2">
-                                                <button onClick={() => openModal(item)} className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg">
+                                                <button onClick={() => openModal(item)} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                                                     <PencilIcon className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                                                     <TrashIcon className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -697,12 +697,12 @@ export default function ShippingPage() {
                         </thead>
                         <tbody>
                             {zones.length === 0 ? (
-                                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Kayıt bulunamadı</td></tr>
+                                <tr><td colSpan={4} className="text-center py-8 text-gray-500">Kayıt bulunamadı</td></tr>
                             ) : (
                                 zones.map((item) => (
                                     <tr key={item.id}>
-                                        <td className="font-medium text-white">{item.name}</td>
-                                        <td className="text-gray-400">{item.countries?.join(', ') || '-'}</td>
+                                        <td className="font-medium text-gray-900">{item.name}</td>
+                                        <td className="text-gray-500">{item.countries?.join(', ') || '-'}</td>
                                         <td>
                                             {item.isActive ? (
                                                 <span className="badge badge-success">Aktif</span>
@@ -712,10 +712,10 @@ export default function ShippingPage() {
                                         </td>
                                         <td>
                                             <div className="flex gap-2">
-                                                <button onClick={() => openModal(item)} className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg">
+                                                <button onClick={() => openModal(item)} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                                                     <PencilIcon className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                                                     <TrashIcon className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -742,24 +742,24 @@ export default function ShippingPage() {
                         </thead>
                         <tbody>
                             {rates.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Kayıt bulunamadı</td></tr>
+                                <tr><td colSpan={6} className="text-center py-8 text-gray-500">Kayıt bulunamadı</td></tr>
                             ) : (
                                 rates.map((item) => (
                                     <tr key={item.id}>
-                                        <td className="font-medium text-white">{item.zone?.name || '-'}</td>
-                                        <td className="text-gray-400">{item.method?.name || '-'}</td>
-                                        <td className="text-gray-400">{item.carrier?.name || '-'}</td>
+                                        <td className="font-medium text-gray-900">{item.zone?.name || '-'}</td>
+                                        <td className="text-gray-500">{item.method?.name || '-'}</td>
+                                        <td className="text-gray-500">{item.carrier?.name || '-'}</td>
                                         <td>
                                             <span className="text-primary-400 font-semibold">₺{item.basePrice?.toLocaleString()}</span>
                                             {item.pricePerKg > 0 && <span className="text-xs text-gray-500 ml-1">(+₺{item.pricePerKg}/kg)</span>}
                                         </td>
-                                        <td className="text-gray-400">{item.minDeliveryDays}-{item.maxDeliveryDays} gün</td>
+                                        <td className="text-gray-500">{item.minDeliveryDays}-{item.maxDeliveryDays} gün</td>
                                         <td>
                                             <div className="flex gap-2">
-                                                <button onClick={() => openModal(item)} className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg">
+                                                <button onClick={() => openModal(item)} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                                                     <PencilIcon className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                                                     <TrashIcon className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -775,8 +775,8 @@ export default function ShippingPage() {
                 return (
                     <>
                         {selectedIds.length > 0 && (
-                            <div className="mb-4 flex items-center gap-4 p-4 bg-dark-700 rounded-lg">
-                                <span className="text-gray-300">{selectedIds.length} gönderi seçildi</span>
+                            <div className="mb-4 flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
+                                <span className="text-gray-600">{selectedIds.length} gönderi seçildi</span>
                                 <button onClick={handleBulkGenerateLabels} className="btn-primary">
                                     <PrinterIcon className="h-4 w-4 mr-2" />
                                     Toplu Etiket Oluştur
@@ -797,7 +797,7 @@ export default function ShippingPage() {
                                                     setSelectedIds(shipments.map(s => s.id));
                                                 }
                                             }}
-                                            className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                            className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                                         />
                                     </th>
                                     <th>Sipariş</th>
@@ -810,7 +810,7 @@ export default function ShippingPage() {
                             </thead>
                             <tbody>
                                 {shipments.length === 0 ? (
-                                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">Gönderi bulunamadı</td></tr>
+                                    <tr><td colSpan={7} className="text-center py-8 text-gray-500">Gönderi bulunamadı</td></tr>
                                 ) : (
                                     shipments.map((item) => (
                                         <tr key={item.id}>
@@ -825,21 +825,21 @@ export default function ShippingPage() {
                                                             setSelectedIds([...selectedIds, item.id]);
                                                         }
                                                     }}
-                                                    className="h-4 w-4 rounded border-dark-600 bg-dark-700 text-primary-500"
+                                                    className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-primary-600"
                                                 />
                                             </td>
                                             <td className="font-medium text-primary-400">#{item.order?.orderNumber || '-'}</td>
-                                            <td className="text-white">{item.order?.buyer?.displayName || '-'}</td>
-                                            <td className="text-gray-400">{item.carrier?.name || '-'}</td>
-                                            <td><code className="text-xs text-gray-400">{item.trackingNumber || '-'}</code></td>
+                                            <td className="text-gray-900">{item.order?.buyer?.displayName || '-'}</td>
+                                            <td className="text-gray-500">{item.carrier?.name || '-'}</td>
+                                            <td><code className="text-xs text-gray-500">{item.trackingNumber || '-'}</code></td>
                                             <td>{getStatusBadge(item.status)}</td>
                                             <td>
                                                 {item.labelUrl ? (
-                                                    <a href={item.labelUrl} target="_blank" rel="noreferrer" className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg inline-flex">
+                                                    <a href={item.labelUrl} target="_blank" rel="noreferrer" className="p-2 text-blue-700 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg inline-flex">
                                                         <PrinterIcon className="h-4 w-4" />
                                                     </a>
                                                 ) : (
-                                                    <button onClick={() => handleGenerateLabel(item.id)} className="p-2 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10 rounded-lg">
+                                                    <button onClick={() => handleGenerateLabel(item.id)} className="p-2 text-primary-400 hover:text-primary-300 hover:bg-primary-50 rounded-lg">
                                                         <TagIcon className="h-4 w-4" />
                                                     </button>
                                                 )}
@@ -863,8 +863,8 @@ export default function ShippingPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Kargo Yönetimi</h1>
-                        <p className="text-gray-400 mt-1">Kargo yöntemleri, firmaları, bölgeleri ve ücretleri yönetin</p>
+                        <h1 className="text-2xl font-bold text-gray-900">Kargo Yönetimi</h1>
+                        <p className="text-gray-500 mt-1">Kargo yöntemleri, firmaları, bölgeleri ve ücretleri yönetin</p>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={loadData} className="btn-secondary">
@@ -880,14 +880,14 @@ export default function ShippingPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex flex-wrap gap-2 border-b border-dark-700 pb-4">
+                <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key as TabType)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${activeTab === tab.key
-                                    ? 'bg-primary-500 text-white'
-                                    : 'bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600'
+                                    ? 'bg-primary-500 text-gray-900'
+                                    : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
                         >
                             <tab.icon className="h-5 w-5" />
@@ -907,18 +907,18 @@ export default function ShippingPage() {
             {/* Modal */}
             {showModal && activeTab !== 'labels' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-dark-800 rounded-xl border border-dark-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between p-4 border-b border-dark-700">
-                            <h2 className="text-lg font-semibold text-white">
+                    <div className="bg-white rounded-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h2 className="text-lg font-semibold text-gray-900">
                                 {editing ? 'Düzenle' : 'Yeni Ekle'}
                             </h2>
-                            <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white">
+                            <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-900">
                                 <XCircleIcon className="h-6 w-6" />
                             </button>
                         </div>
                         <form onSubmit={handleSave} className="p-4 space-y-4">
                             {renderFormFields()}
-                            <div className="flex justify-end gap-3 pt-4 border-t border-dark-700">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">
                                     İptal
                                 </button>

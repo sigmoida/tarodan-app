@@ -95,6 +95,28 @@ export class SearchService implements OnModuleInit {
     });
 
     await this.ensureIndexExists();
+
+    // db:reset sonrası ES index boş kalabilir; DB'de ürün varsa arka planda doldur
+    setImmediate(() => this.syncIndexIfEmpty());
+  }
+
+  /** ES bağlı ama index boş, DB'de ürün varsa reindex çalıştır (db:reset senaryosu) */
+  private async syncIndexIfEmpty(): Promise<void> {
+    if (!this.esAvailable) return;
+    try {
+      const [esRes, dbCount] = await Promise.all([
+        this.client.count({ index: this.PRODUCTS_INDEX }).catch(() => ({ count: 0 })),
+        this.prisma.product.count({ where: { status: ProductStatus.active } }),
+      ]);
+      const esCount = esRes?.count ?? 0;
+      if (esCount === 0 && dbCount > 0) {
+        this.logger.log(`Elasticsearch index boş, DB'de ${dbCount} aktif ürün var – reindex başlatılıyor...`);
+        const indexed = await this.reindexAll();
+        this.logger.log(`Elasticsearch reindex tamamlandı: ${indexed} ürün index'lendi.`);
+      }
+    } catch (err) {
+      this.logger.warn('syncIndexIfEmpty failed', err instanceof Error ? err.message : String(err));
+    }
   }
 
   isAvailable(): boolean {

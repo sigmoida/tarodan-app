@@ -53,17 +53,17 @@ interface CheckoutItem {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { items: cartItems, subtotal: cartSubtotal, clearCart } = useCartStore();
+  const { items: cartItems, offlineItems, subtotal: cartSubtotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
 
-  // Hydration fix - wait for client mount
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Direct buy mode (from URL param)
+  // Guest checkout is allowed - no redirect to login
+
   const directProductId = searchParams.get('productId');
 
   const [step, setStep] = useState(1); // 1: Address, 2: Payment, 3: Confirm
@@ -147,18 +147,27 @@ export default function CheckoutPage() {
   const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
   const [useNewCard, setUseNewCard] = useState(true);
 
-  // Get checkout items (either from cart or direct buy). Cart API returns effectivePrice, originalPrice, productTitle; normalize to CheckoutItem.
+  // Get checkout items: direct buy > authenticated cart > offline/guest cart
   const checkoutItems: CheckoutItem[] = directProduct
     ? [directProduct]
-    : cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
-      id: item.id,
-      productId: item.productId,
-      title: item.productTitle,
-      price: item.effectivePrice,
-      originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
-      imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
-      seller: { id: item.sellerId, displayName: item.sellerName },
-    }));
+    : cartItems.length > 0
+      ? cartItems.map((item: { id: string; productId: string; productTitle: string; effectivePrice: number; originalPrice?: number; productImage: string | null; sellerId: string; sellerName: string }) => ({
+        id: item.id,
+        productId: item.productId,
+        title: item.productTitle,
+        price: item.effectivePrice,
+        originalPrice: item.originalPrice != null && item.originalPrice > item.effectivePrice ? item.originalPrice : undefined,
+        imageUrl: item.productImage || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: { id: item.sellerId, displayName: item.sellerName },
+      }))
+      : offlineItems.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        title: item.title,
+        price: item.price,
+        imageUrl: item.imageUrl || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        seller: { id: item.seller.id, displayName: item.seller.displayName },
+      }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
   const grandTotal = Math.max(0, subtotal + shippingCost);
 

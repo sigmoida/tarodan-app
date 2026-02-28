@@ -116,15 +116,15 @@ export default function AuditLogsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
-          <p className="text-gray-400 mt-1">Sistem işlem geçmişi</p>
+          <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
+          <p className="text-gray-500 mt-1">Sistem işlem geçmişi</p>
         </div>
 
         {/* Filters */}
         <div className="admin-card">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
               <input
                 type="text"
                 placeholder="Ara..."
@@ -158,7 +158,7 @@ export default function AuditLogsPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Başlangıç Tarihi</label>
+              <label className="block text-sm text-gray-500 mb-1">Başlangıç Tarihi</label>
               <input
                 type="date"
                 value={filters.fromDate}
@@ -167,7 +167,7 @@ export default function AuditLogsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Bitiş Tarihi</label>
+              <label className="block text-sm text-gray-500 mb-1">Bitiş Tarihi</label>
               <input
                 type="date"
                 value={filters.toDate}
@@ -201,7 +201,7 @@ export default function AuditLogsPage() {
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                    <td colSpan={6} className="text-center py-8 text-gray-500">
                       Log bulunamadı
                     </td>
                   </tr>
@@ -210,7 +210,7 @@ export default function AuditLogsPage() {
                     <tr key={log.id}>
                       <td>
                         <div className="flex items-center gap-2">
-                          <CalendarIcon className="w-4 h-4 text-gray-400" />
+                          <CalendarIcon className="w-4 h-4 text-gray-500" />
                           <span className="text-sm">
                             {new Date(log.createdAt).toLocaleString('tr-TR')}
                           </span>
@@ -218,7 +218,7 @@ export default function AuditLogsPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
-                          <UserIcon className="w-4 h-4 text-gray-400" />
+                          <UserIcon className="w-4 h-4 text-gray-500" />
                           <span className="text-sm">{log.adminName || log.adminId.substring(0, 8)}</span>
                         </div>
                       </td>
@@ -226,17 +226,17 @@ export default function AuditLogsPage() {
                         <span className="badge badge-info">{getActionLabel(log.action)}</span>
                       </td>
                       <td>
-                        <span className="text-sm text-gray-400">{getEntityTypeLabel(log.entityType)}</span>
+                        <span className="text-sm text-gray-500">{getEntityTypeLabel(log.entityType)}</span>
                       </td>
                       <td>
-                        <span className="font-mono text-xs text-gray-400">
+                        <span className="font-mono text-xs text-gray-500">
                           {log.entityId.substring(0, 8)}...
                         </span>
                       </td>
                       <td>
                         <button
                           onClick={() => setSelectedLog(log)}
-                          className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                           title="Detay"
                         >
                           <EyeIcon className="h-5 w-5" />
@@ -251,25 +251,25 @@ export default function AuditLogsPage() {
 
           {/* Pagination */}
           {total > 20 && (
-            <div className="flex items-center justify-between p-4 border-t border-dark-700">
-              <span className="text-sm text-gray-400">
+            <div className="flex items-center justify-between p-4 border-t border-gray-200">
+              <span className="text-sm text-gray-500">
                 Toplam {total} log
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-dark-600 text-gray-300 rounded hover:bg-dark-700 disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50"
                 >
                   Önceki
                 </button>
-                <span className="px-3 py-1 text-gray-300">
+                <span className="px-3 py-1 text-gray-600">
                   Sayfa {page} / {Math.ceil(total / 20)}
                 </span>
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={page >= Math.ceil(total / 20)}
-                  className="px-3 py-1 border border-dark-600 text-gray-300 rounded hover:bg-dark-700 disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50"
                 >
                   Sonraki
                 </button>
@@ -282,59 +282,59 @@ export default function AuditLogsPage() {
       {/* Detail Modal */}
       {selectedLog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-dark-800 rounded-xl p-6 max-w-2xl w-full mx-4 border border-dark-700 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Audit Log Detayı</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Audit Log Detayı</h2>
               <button
                 onClick={() => setSelectedLog(null)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-500 hover:text-gray-900"
               >
                 <DocumentTextIcon className="w-6 h-6" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <span className="text-sm text-gray-400">İşlem:</span>
-                <p className="text-white font-medium">{getActionLabel(selectedLog.action)}</p>
+                <span className="text-sm text-gray-500">İşlem:</span>
+                <p className="text-gray-900 font-medium">{getActionLabel(selectedLog.action)}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-400">Tip:</span>
-                <p className="text-white">{getEntityTypeLabel(selectedLog.entityType)}</p>
+                <span className="text-sm text-gray-500">Tip:</span>
+                <p className="text-gray-900">{getEntityTypeLabel(selectedLog.entityType)}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-400">Entity ID:</span>
-                <p className="text-white font-mono text-sm">{selectedLog.entityId}</p>
+                <span className="text-sm text-gray-500">Entity ID:</span>
+                <p className="text-gray-900 font-mono text-sm">{selectedLog.entityId}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-400">Admin:</span>
-                <p className="text-white">{selectedLog.adminName || selectedLog.adminId}</p>
+                <span className="text-sm text-gray-500">Admin:</span>
+                <p className="text-gray-900">{selectedLog.adminName || selectedLog.adminId}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-400">Tarih:</span>
-                <p className="text-white">
+                <span className="text-sm text-gray-500">Tarih:</span>
+                <p className="text-gray-900">
                   {new Date(selectedLog.createdAt).toLocaleString('tr-TR')}
                 </p>
               </div>
               {selectedLog.oldValues && (
                 <div>
-                  <span className="text-sm text-gray-400">Eski Değerler:</span>
-                  <pre className="mt-2 p-3 bg-dark-700 rounded text-xs text-gray-300 overflow-x-auto">
+                  <span className="text-sm text-gray-500">Eski Değerler:</span>
+                  <pre className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 overflow-x-auto">
                     {JSON.stringify(selectedLog.oldValues, null, 2)}
                   </pre>
                 </div>
               )}
               {selectedLog.newValues && (
                 <div>
-                  <span className="text-sm text-gray-400">Yeni Değerler:</span>
-                  <pre className="mt-2 p-3 bg-dark-700 rounded text-xs text-gray-300 overflow-x-auto">
+                  <span className="text-sm text-gray-500">Yeni Değerler:</span>
+                  <pre className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 overflow-x-auto">
                     {JSON.stringify(selectedLog.newValues, null, 2)}
                   </pre>
                 </div>
               )}
               {selectedLog.metadata && (
                 <div>
-                  <span className="text-sm text-gray-400">Metadata:</span>
-                  <pre className="mt-2 p-3 bg-dark-700 rounded text-xs text-gray-300 overflow-x-auto">
+                  <span className="text-sm text-gray-500">Metadata:</span>
+                  <pre className="mt-2 p-3 bg-gray-100 rounded text-xs text-gray-600 overflow-x-auto">
                     {JSON.stringify(selectedLog.metadata, null, 2)}
                   </pre>
                 </div>
@@ -343,7 +343,7 @@ export default function AuditLogsPage() {
             <div className="mt-6">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
               >
                 Kapat
               </button>

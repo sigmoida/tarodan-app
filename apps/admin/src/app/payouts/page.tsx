@@ -194,12 +194,12 @@ export default function PayoutsPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-white">Satıcı Ödemeleri</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Satıcı Ödemeleri</h1>
           <button
             type="button"
             onClick={handleExport}
             disabled={loadingExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 text-white hover:bg-dark-600 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50"
           >
             <ArrowDownTrayIcon className="h-5 w-5" />
             {loadingExport ? 'Hazırlanıyor...' : 'Dışa Aktar (CSV)'}
@@ -208,26 +208,26 @@ export default function PayoutsPage() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-dark-800 rounded-xl p-4 border border-dark-700">
-            <p className="text-sm text-gray-400">Bekleyen Toplam</p>
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <p className="text-sm text-gray-500">Bekleyen Toplam</p>
             <p className="text-2xl font-semibold text-amber-500">
               {summary != null ? formatCurrency(summary.totalPending) : '—'}
             </p>
             <p className="text-xs text-gray-500 mt-1">{summary?.countHeld ?? 0} işlem</p>
           </div>
-          <div className="bg-dark-800 rounded-xl p-4 border border-dark-700">
-            <p className="text-sm text-gray-400">Ödenen Toplam</p>
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <p className="text-sm text-gray-500">Ödenen Toplam</p>
             <p className="text-2xl font-semibold text-green-500">
               {summary != null ? formatCurrency(summary.totalReleased) : '—'}
             </p>
             <p className="text-xs text-gray-500 mt-1">{summary?.countReleased ?? 0} işlem</p>
           </div>
-          <div className="bg-dark-800 rounded-xl p-4 border border-dark-700 md:col-span-2">
-            <p className="text-sm text-gray-400">Yaklaşan Serbest Bırakmalar</p>
+          <div className="bg-white rounded-xl p-4 border border-gray-200 md:col-span-2">
+            <p className="text-sm text-gray-500">Yaklaşan Serbest Bırakmalar</p>
             <ul className="mt-2 space-y-1">
               {summary?.nextReleases?.length
                 ? summary.nextReleases.slice(0, 3).map((r) => (
-                    <li key={r.id} className="text-sm text-gray-300 flex justify-between">
+                    <li key={r.id} className="text-sm text-gray-600 flex justify-between">
                       <span>Sipariş #{r.orderId.slice(0, 8)}...</span>
                       <span>{formatCurrency(r.amount)} — {formatDate(r.releaseAt)}</span>
                     </li>
@@ -238,15 +238,15 @@ export default function PayoutsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-dark-700">
+        <div className="border-b border-gray-200">
           <nav className="flex gap-4">
             <button
               type="button"
               onClick={() => setActiveTab('transactions')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'transactions'
-                  ? 'border-primary-500 text-primary-500'
-                  : 'border-transparent text-gray-400 hover:text-white'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
               <span className="flex items-center gap-2">
@@ -259,8 +259,8 @@ export default function PayoutsPage() {
               onClick={() => setActiveTab('schedule')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'schedule'
-                  ? 'border-primary-500 text-primary-500'
-                  : 'border-transparent text-gray-400 hover:text-white'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
               <span className="flex items-center gap-2">
@@ -299,32 +299,32 @@ export default function PayoutsPage() {
               <button
                 type="button"
                 onClick={() => loadTransactions()}
-                className="p-2 rounded-lg bg-dark-700 text-gray-400 hover:text-white"
+                className="p-2 rounded-lg bg-gray-100 text-gray-500 hover:text-gray-900"
               >
                 <ArrowPathIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {loading ? (
-                <div className="p-8 text-center text-gray-400">Yükleniyor...</div>
+                <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
               ) : transactions.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">Kayıt yok</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-dark-700">
+                  <table className="min-w-full divide-y divide-gray-200">
                     <thead>
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Sipariş</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Satıcı</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Tutar</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Durum</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Serbest Bırakma</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">İşlem</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sipariş</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satıcı</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serbest Bırakma</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-dark-700">
+                    <tbody className="divide-y divide-gray-200">
                       {transactions.map((t) => (
-                        <tr key={t.id} className="text-gray-300">
+                        <tr key={t.id} className="text-gray-600">
                           <td className="px-4 py-3 text-sm">{t.orderNumber}</td>
                           <td className="px-4 py-3 text-sm">
                             <div>{t.sellerName}</div>
@@ -332,20 +332,20 @@ export default function PayoutsPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(t.amount)}</td>
                           <td className="px-4 py-3">
-                            <span className={STATUS_LABELS[t.status]?.color ?? 'text-gray-400'}>
+                            <span className={STATUS_LABELS[t.status]?.color ?? 'text-gray-500'}>
                               {STATUS_LABELS[t.status]?.label ?? t.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm">
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">
                             {t.releasedAt ? formatDate(t.releasedAt) : (t.releaseAt ? formatDate(t.releaseAt) : '-')}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             {t.status === 'held' && (
                               <button
                                 type="button"
                                 onClick={() => handleRelease(t.orderId)}
                                 disabled={releasingOrderId === t.orderId}
-                                className="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-400 disabled:opacity-50"
+                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50"
                               >
                                 <CheckCircleIcon className="h-4 w-4" />
                                 {releasingOrderId === t.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
@@ -359,7 +359,7 @@ export default function PayoutsPage() {
                 </div>
               )}
               {pagination.totalPages > 1 && (
-                <div className="px-4 py-3 flex items-center justify-between border-t border-dark-700">
+                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200">
                   <p className="text-sm text-gray-500">
                     Toplam {pagination.total} kayıt
                   </p>
@@ -368,7 +368,7 @@ export default function PayoutsPage() {
                       type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
                       disabled={pagination.page <= 1}
-                      className="px-3 py-1 rounded bg-dark-700 text-sm disabled:opacity-50"
+                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
                     >
                       Önceki
                     </button>
@@ -376,7 +376,7 @@ export default function PayoutsPage() {
                       type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-3 py-1 rounded bg-dark-700 text-sm disabled:opacity-50"
+                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
                     >
                       Sonraki
                     </button>
@@ -388,29 +388,29 @@ export default function PayoutsPage() {
         )}
 
         {activeTab === 'schedule' && (
-          <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {loading ? (
-              <div className="p-8 text-center text-gray-400">Yükleniyor...</div>
+              <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
             ) : schedule.length === 0 ? (
               <div className="p-8 text-center text-gray-500">Yaklaşan ödeme yok</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-dark-700">
+                <table className="min-w-full divide-y divide-gray-200">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Sipariş</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Satıcı</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Tutar</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Serbest Bırakma Tarihi</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sipariş</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satıcı</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serbest Bırakma Tarihi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-dark-700">
+                  <tbody className="divide-y divide-gray-200">
                     {schedule.map((s) => (
-                      <tr key={s.id} className="text-gray-300">
+                      <tr key={s.id} className="text-gray-600">
                         <td className="px-4 py-3 text-sm">{s.orderNumber}</td>
                         <td className="px-4 py-3 text-sm">{s.sellerName}</td>
                         <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(s.amount)}</td>
-                        <td className="px-4 py-3 text-sm">{formatDate(s.releaseAt)}</td>
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">{formatDate(s.releaseAt)}</td>
                       </tr>
                     ))}
                   </tbody>

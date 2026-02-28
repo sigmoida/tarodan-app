@@ -153,7 +153,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
-    { href: '/brands', label: t('nav.brands') || 'Markalar' },
+    { href: '/ureticiler', label: t('nav.brands') || 'Üreticiler' },
     { href: '/trades', label: t('nav.trades') },
     { href: '/collections', label: t('nav.collections') },
     { href: '/pricing', label: t('nav.pricing') },
@@ -826,7 +826,7 @@ export default function Navbar() {
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
-                        {NAV_LINKS.filter((l) => !['/listings', '/brands', '/collections'].includes(l.href)).map((link) => {
+                        {NAV_LINKS.filter((l) => !['/listings', '/ureticiler', '/collections'].includes(l.href)).map((link) => {
                           const isGuestTrades = link.href === '/trades' && !showAuthUI;
                           const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
                           return (
@@ -905,7 +905,7 @@ export default function Navbar() {
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
-                        {NAV_LINKS.filter((l) => !['/listings', '/brands', '/collections'].includes(l.href)).map((link) => {
+                        {NAV_LINKS.filter((l) => !['/listings', '/ureticiler', '/collections'].includes(l.href)).map((link) => {
                           const isGuestTrades = link.href === '/trades' && !showAuthUI;
                           return (
                             <Link

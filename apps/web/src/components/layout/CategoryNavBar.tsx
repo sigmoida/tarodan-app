@@ -40,7 +40,7 @@ const CATEGORY_BAR_ITEMS = {
         { label: 'Çok Satanlar', href: '/listings?sortBy=view_count_desc' },
         { label: 'İndirimler', href: '/listings?discountOnly=true' },
         { label: 'Koleksiyonlar', href: '/collections' },
-        { label: 'Markalar', href: '/brands' },
+        { label: 'Üreticiler', href: '/ureticiler' },
         { label: 'Ölçek', dropdown: 'scales' },
     ],
     en: [
@@ -49,7 +49,7 @@ const CATEGORY_BAR_ITEMS = {
         { label: 'Best Sellers', href: '/listings?sortBy=view_count_desc' },
         { label: 'On Sale', href: '/listings?discountOnly=true' },
         { label: 'Collections', href: '/collections' },
-        { label: 'Brands', href: '/brands' },
+        { label: 'Manufacturers', href: '/ureticiler' },
         { label: 'Scale', dropdown: 'scales' },
     ],
 };

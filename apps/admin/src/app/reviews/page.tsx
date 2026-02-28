@@ -153,8 +153,8 @@ export default function ReviewsPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Ürün Yorumları</h1>
-                        <p className="text-gray-400 mt-1">Kullanıcı geri bildirimlerini yönetin</p>
+                        <h1 className="text-2xl font-bold text-gray-900">Ürün Yorumları</h1>
+                        <p className="text-gray-500 mt-1">Kullanıcı geri bildirimlerini yönetin</p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export default function ReviewsPage() {
                                 setStatusFilter(e.target.value);
                                 setPage(1);
                             }}
-                            className="bg-dark-800 border border-dark-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                            className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
                         >
                             <option value="">Tüm Durumlar</option>
                             <option value="pending">Bekleyenler</option>
@@ -180,10 +180,10 @@ export default function ReviewsPage() {
                     {loading ? (
                         <div className="text-center py-12">
                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
-                            <p className="text-gray-400 mt-4">Yükleniyor...</p>
+                            <p className="text-gray-500 mt-4">Yükleniyor...</p>
                         </div>
                     ) : reviews.length === 0 ? (
-                        <div className="text-center py-12 text-gray-400">
+                        <div className="text-center py-12 text-gray-500">
                             Yorum bulunamadı
                         </div>
                     ) : (
@@ -214,10 +214,10 @@ export default function ReviewsPage() {
                                                             />
                                                         </div>
                                                     ) : (
-                                                        <div className="w-10 h-10 bg-dark-700 rounded flex-shrink-0" />
+                                                        <div className="w-10 h-10 bg-gray-100 rounded flex-shrink-0" />
                                                     )}
                                                     <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-white truncate max-w-[200px]" title={review.product.title}>
+                                                        <p className="text-sm font-medium text-gray-900 truncate max-w-[200px]" title={review.product.title}>
                                                             {review.product.title}
                                                         </p>
                                                     </div>
@@ -225,13 +225,13 @@ export default function ReviewsPage() {
                                             </td>
                                             <td>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center flex-shrink-0 text-primary-500 font-bold text-xs">
+                                                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 text-primary-600 font-bold text-xs">
                                                         {review.user.displayName.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm text-white">{review.user.displayName}</p>
+                                                        <p className="text-sm text-gray-900">{review.user.displayName}</p>
                                                         {review.isVerifiedPurchase && (
-                                                            <span className="text-[10px] text-green-400 flex items-center gap-1">
+                                                            <span className="text-[10px] text-green-700 flex items-center gap-1">
                                                                 <CheckCircleIcon className="w-3 h-3" />
                                                                 Onaylı Alıcı
                                                             </span>
@@ -242,19 +242,19 @@ export default function ReviewsPage() {
                                             <td className="max-w-md">
                                                 <div className="space-y-1">
                                                     {renderStars(review.score)}
-                                                    {review.title && <p className="font-medium text-white text-sm">{review.title}</p>}
-                                                    {review.review && <p className="text-gray-400 text-sm line-clamp-3">{review.review}</p>}
+                                                    {review.title && <p className="font-medium text-gray-900 text-sm">{review.title}</p>}
+                                                    {review.review && <p className="text-gray-500 text-sm line-clamp-3">{review.review}</p>}
                                                     {review.adminReply && (
                                                         <div className="mt-2 pl-3 border-l-2 border-primary-500">
                                                             <p className="text-xs text-primary-400 font-medium">Satıcı Yanıtı:</p>
-                                                            <p className="text-xs text-gray-400">{review.adminReply}</p>
+                                                            <p className="text-xs text-gray-500">{review.adminReply}</p>
                                                         </div>
                                                     )}
                                                 </div>
                                             </td>
                                             <td>{getStatusBadge(review.status)}</td>
                                             <td>
-                                                <span className="text-sm text-gray-400">
+                                                <span className="text-sm text-gray-500">
                                                     {format(new Date(review.createdAt), 'dd MMM yyyy', { locale: tr })}
                                                 </span>
                                             </td>
@@ -264,14 +264,14 @@ export default function ReviewsPage() {
                                                         <>
                                                             <button
                                                                 onClick={() => handleStatusUpdate(review.id, 'approved')}
-                                                                className="p-1.5 text-green-400 hover:bg-green-400/10 rounded-lg"
+                                                                className="p-1.5 text-green-700 hover:bg-green-400/10 rounded-lg"
                                                                 title="Onayla"
                                                             >
                                                                 <CheckCircleIcon className="w-5 h-5" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleStatusUpdate(review.id, 'rejected')}
-                                                                className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg"
+                                                                className="p-1.5 text-red-600 hover:bg-red-400/10 rounded-lg"
                                                                 title="Reddet"
                                                             >
                                                                 <XCircleIcon className="w-5 h-5" />
@@ -280,7 +280,7 @@ export default function ReviewsPage() {
                                                     )}
                                                     <button
                                                         onClick={() => openReplyModal(review)}
-                                                        className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded-lg"
+                                                        className="p-1.5 text-blue-700 hover:bg-blue-400/10 rounded-lg"
                                                         title={review.adminReply ? "Yanıtı Düzenle" : "Yanıtla"}
                                                     >
                                                         <ChatBubbleLeftRightIcon className="w-5 h-5" />
@@ -288,7 +288,7 @@ export default function ReviewsPage() {
                                                     {(review.status === 'approved' || review.status === 'pending') && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(review.id, 'spam')}
-                                                            className="p-1.5 text-yellow-400 hover:bg-yellow-400/10 rounded-lg"
+                                                            className="p-1.5 text-yellow-700 hover:bg-yellow-400/10 rounded-lg"
                                                             title="Spam Olarak İşaretle"
                                                         >
                                                             <ExclamationTriangleIcon className="w-5 h-5" />
@@ -296,7 +296,7 @@ export default function ReviewsPage() {
                                                     )}
                                                     <button
                                                         onClick={() => setDeleteConfirm(review.id)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg"
+                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-400/10 rounded-lg"
                                                         title="Sil"
                                                     >
                                                         <TrashIcon className="w-5 h-5" />
@@ -316,17 +316,17 @@ export default function ReviewsPage() {
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-dark-700 text-white rounded disabled:opacity-50"
+                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50"
                             >
                                 Önceki
                             </button>
-                            <span className="px-3 py-1 text-gray-400">
+                            <span className="px-3 py-1 text-gray-500">
                                 Sayfa {page} / {totalPages}
                             </span>
                             <button
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-dark-700 text-white rounded disabled:opacity-50"
+                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50"
                             >
                                 Sonraki
                             </button>
@@ -338,13 +338,13 @@ export default function ReviewsPage() {
             {/* Reply Modal */}
             {replyModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-dark-800 rounded-xl p-6 max-w-lg w-full mx-4 border border-dark-700">
-                        <h3 className="text-lg font-semibold text-white mb-4">
+                    <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
                             Yorumu Yanıtla
                         </h3>
                         {selectedReview && (
-                            <div className="mb-4 p-3 bg-dark-700/50 rounded-lg">
-                                <p className="text-sm text-gray-300 italic">"{selectedReview.review}"</p>
+                            <div className="mb-4 p-3 bg-gray-100/50 rounded-lg">
+                                <p className="text-sm text-gray-600 italic">"{selectedReview.review}"</p>
                             </div>
                         )}
                         <form onSubmit={handleReplySubmit}>
@@ -359,13 +359,13 @@ export default function ReviewsPage() {
                                 <button
                                     type="button"
                                     onClick={() => setReplyModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-dark-600 text-gray-300 rounded-lg hover:bg-dark-700"
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
                                 >
                                     İptal
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                                    className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"
                                 >
                                     Yanıtla
                                 </button>
@@ -378,21 +378,21 @@ export default function ReviewsPage() {
             {/* Delete Confirmation */}
             {deleteConfirm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-dark-800 rounded-xl p-6 max-w-md w-full mx-4 border border-dark-700">
-                        <h3 className="text-lg font-semibold text-white mb-4">Yorumu Sil</h3>
-                        <p className="text-gray-400 mb-6">
+                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Yorumu Sil</h3>
+                        <p className="text-gray-500 mb-6">
                             Bu yorumu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setDeleteConfirm(null)}
-                                className="flex-1 px-4 py-2 border border-dark-600 text-gray-300 rounded-lg hover:bg-dark-700"
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
                             >
                                 İptal
                             </button>
                             <button
                                 onClick={() => handleDelete(deleteConfirm)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700"
                             >
                                 Sil
                             </button>

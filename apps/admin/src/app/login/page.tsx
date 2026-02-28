@@ -49,22 +49,18 @@ export default function LoginPage() {
         return;
       }
 
-      // API returns { user, tokens: { accessToken, refreshToken } }
       if (response.data.tokens?.accessToken) {
         const accessToken = response.data.tokens.accessToken;
         setToken(accessToken);
         setUser(response.data.user);
-        // Store token in localStorage for API interceptor
         if (typeof window !== 'undefined') {
           localStorage.setItem('admin_token', accessToken);
           localStorage.setItem('admin_user', JSON.stringify(response.data.user));
-          // Middleware checks cookie; set it so redirect to /dashboard succeeds
-          const maxAge = 24 * 60 * 60; // 24 hours
+          const maxAge = 24 * 60 * 60;
           document.cookie = `admin_token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
           toast.success('Giriş başarılı!');
 
-          // Redirect to dashboard using href for full page reload to ensure middleware sees the cookie
           window.location.href = '/dashboard';
         }
       } else {
@@ -79,7 +75,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -91,17 +87,17 @@ export default function LoginPage() {
             className="mx-auto object-contain"
             priority
           />
-          <p className="text-gray-400 mt-2">Admin Panel</p>
+          <p className="text-gray-500 mt-2">Admin Panel</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-dark-800 rounded-xl shadow-2xl p-8 border border-dark-700">
-          <h2 className="text-2xl font-semibold text-white mb-6">Giriş Yap</h2>
+        <div className="bg-white rounded-xl shadow-elevated p-8 border border-gray-200">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Giriş Yap</h2>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 E-posta
               </label>
               <input
@@ -117,13 +113,13 @@ export default function LoginPage() {
                 placeholder="admin@tarodan.com"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Şifre
               </label>
               <input
@@ -139,14 +135,14 @@ export default function LoginPage() {
                 placeholder="••••••••"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
               )}
             </div>
 
             {/* 2FA Code */}
             {requires2FA && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Doğrulama Kodu
                 </label>
                 <input
@@ -163,7 +159,7 @@ export default function LoginPage() {
                   maxLength={6}
                 />
                 {errors.twoFactorCode && (
-                  <p className="mt-1 text-sm text-red-400">
+                  <p className="mt-1 text-sm text-red-600">
                     {errors.twoFactorCode.message}
                   </p>
                 )}
@@ -209,7 +205,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm mt-6">
-          © 2024 Tarodan Marketplace. Tüm hakları saklıdır.
+          © 2026 Tarodan Marketplace. Tüm hakları saklıdır.
         </p>
       </div>
     </div>

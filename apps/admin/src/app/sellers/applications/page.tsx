@@ -84,15 +84,15 @@ export default function SellerApplicationsPage() {
         <AdminLayout>
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Satıcı Başvuruları</h1>
-                    <p className="text-gray-400 mt-1">Bekleyen satıcı doğrulama ve onay taleplerini yönetin</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Satıcı Başvuruları</h1>
+                    <p className="text-gray-500 mt-1">Bekleyen satıcı doğrulama ve onay taleplerini yönetin</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Applications List */}
                     <div className="lg:col-span-1 space-y-4">
                         {applications.length === 0 ? (
-                            <div className="admin-card text-center py-8 text-gray-400">
+                            <div className="admin-card text-center py-8 text-gray-500">
                                 Bekleyen başvuru yok
                             </div>
                         ) : (
@@ -100,13 +100,13 @@ export default function SellerApplicationsPage() {
                                 <div
                                     key={app.id}
                                     onClick={() => setSelectedApplication(app)}
-                                    className={`admin-card cursor-pointer transition-all hover:bg-dark-700 ${selectedApplication?.id === app.id ? 'border-primary-500 ring-1 ring-primary-500' : ''
+                                    className={`admin-card cursor-pointer transition-all hover:bg-gray-100 ${selectedApplication?.id === app.id ? 'border-primary-500 ring-1 ring-primary-500' : ''
                                         }`}
                                 >
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${app.type === 'business' ? 'bg-purple-500/10 text-purple-400' :
-                                                app.type === 'verified' ? 'bg-blue-500/10 text-blue-400' :
-                                                    'bg-green-500/10 text-green-400'
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${app.type === 'business' ? 'bg-purple-500/10 text-purple-700' :
+                                                app.type === 'verified' ? 'bg-blue-500/10 text-blue-700' :
+                                                    'bg-green-500/10 text-green-700'
                                             }`}>
                                             {app.type === 'business' ? 'Kurumsal' : app.type === 'verified' ? 'Onaylı Satıcı' : 'Bireysel'}
                                         </span>
@@ -114,8 +114,8 @@ export default function SellerApplicationsPage() {
                                             {new Date(app.appliedAt).toLocaleDateString('tr-TR')}
                                         </span>
                                     </div>
-                                    <h3 className="font-semibold text-white">{app.displayName}</h3>
-                                    <p className="text-sm text-gray-400">{app.email}</p>
+                                    <h3 className="font-semibold text-gray-900">{app.displayName}</h3>
+                                    <p className="text-sm text-gray-500">{app.email}</p>
                                 </div>
                             ))
                         )}
@@ -125,10 +125,10 @@ export default function SellerApplicationsPage() {
                     <div className="lg:col-span-2">
                         {selectedApplication ? (
                             <div className="admin-card h-full">
-                                <div className="flex justify-between items-start mb-6 border-b border-dark-700 pb-4">
+                                <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
                                     <div>
-                                        <h2 className="text-xl font-bold text-white">{selectedApplication.displayName}</h2>
-                                        <p className="text-gray-400">{selectedApplication.email}</p>
+                                        <h2 className="text-xl font-bold text-gray-900">{selectedApplication.displayName}</h2>
+                                        <p className="text-gray-500">{selectedApplication.email}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
@@ -140,7 +140,7 @@ export default function SellerApplicationsPage() {
                                         </button>
                                         <button
                                             onClick={() => handleApprove(selectedApplication.id)}
-                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center"
+                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-gray-900 rounded-lg transition-colors flex items-center"
                                         >
                                             <CheckCircleIcon className="w-5 h-5 mr-2" />
                                             Onayla
@@ -154,11 +154,11 @@ export default function SellerApplicationsPage() {
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="text-xs text-gray-500 block">Başvuru Tipi</label>
-                                                <p className="text-white font-medium capitalize">{selectedApplication.type}</p>
+                                                <p className="text-gray-900 font-medium capitalize">{selectedApplication.type}</p>
                                             </div>
                                             <div>
                                                 <label className="text-xs text-gray-500 block">Başvuru Tarihi</label>
-                                                <p className="text-white font-medium">
+                                                <p className="text-gray-900 font-medium">
                                                     {new Date(selectedApplication.appliedAt).toLocaleString('tr-TR')}
                                                 </p>
                                             </div>
@@ -173,15 +173,15 @@ export default function SellerApplicationsPage() {
                                                     <label className="text-xs text-gray-500 block flex items-center gap-1">
                                                         <BuildingOfficeIcon className="w-4 h-4" /> Firma Adı
                                                     </label>
-                                                    <p className="text-white font-medium">{selectedApplication.companyName}</p>
+                                                    <p className="text-gray-900 font-medium">{selectedApplication.companyName}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-xs text-gray-500 block">Vergi Numarası</label>
-                                                    <p className="text-white font-medium">{selectedApplication.taxId}</p>
+                                                    <p className="text-gray-900 font-medium">{selectedApplication.taxId}</p>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <p className="text-gray-400 italic">Bireysel satıcı başvurusu - firma bilgisi yok.</p>
+                                            <p className="text-gray-500 italic">Bireysel satıcı başvurusu - firma bilgisi yok.</p>
                                         )}
                                     </div>
                                 </div>
@@ -194,25 +194,25 @@ export default function SellerApplicationsPage() {
                                                 <a
                                                     key={idx}
                                                     href={doc.url}
-                                                    className="flex items-center p-3 bg-dark-700/50 hover:bg-dark-700 border border-dark-600 rounded-lg transition-colors group"
+                                                    className="flex items-center p-3 bg-gray-100/50 hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors group"
                                                 >
-                                                    <DocumentTextIcon className="w-8 h-8 text-primary-500 mr-3 group-hover:text-primary-400" />
+                                                    <DocumentTextIcon className="w-8 h-8 text-primary-600 mr-3 group-hover:text-primary-400" />
                                                     <div>
-                                                        <p className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors">{doc.name}</p>
+                                                        <p className="text-sm font-medium text-gray-900 group-hover:text-primary-400 transition-colors">{doc.name}</p>
                                                         <p className="text-xs text-gray-500">Görüntülemek için tıklayın</p>
                                                     </div>
                                                 </a>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-gray-400 italic">Bu başvuru için yüklenen belge bulunmamaktadır.</p>
+                                        <p className="text-gray-500 italic">Bu başvuru için yüklenen belge bulunmamaktadır.</p>
                                     )}
                                 </div>
                             </div>
                         ) : (
                             <div className="admin-card h-full flex flex-col items-center justify-center text-center p-12 opacity-50">
                                 <UserIcon className="w-16 h-16 text-gray-600 mb-4" />
-                                <h3 className="text-xl font-medium text-gray-300">Başvuru Seçin</h3>
+                                <h3 className="text-xl font-medium text-gray-600">Başvuru Seçin</h3>
                                 <p className="text-gray-500">Detayları görüntülemek için soldaki listeden bir başvuru seçin.</p>
                             </div>
                         )}
@@ -222,12 +222,12 @@ export default function SellerApplicationsPage() {
                 {/* Reject Modal */}
                 {isRejectModalOpen && (
                     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div className="bg-dark-800 rounded-xl max-w-md w-full border border-dark-700 shadow-2xl">
+                        <div className="bg-white rounded-xl max-w-md w-full border border-gray-200 shadow-2xl">
                             <div className="p-6">
-                                <h3 className="text-xl font-bold text-white mb-4">Başvuruyu Reddet</h3>
+                                <h3 className="text-xl font-bold text-gray-900 mb-4">Başvuruyu Reddet</h3>
                                 <form onSubmit={handleReject}>
                                     <div className="mb-6">
-                                        <label className="block text-sm font-medium text-gray-400 mb-2">Red Nedeni</label>
+                                        <label className="block text-sm font-medium text-gray-500 mb-2">Red Nedeni</label>
                                         <textarea
                                             required
                                             value={rejectReason}
@@ -245,7 +245,7 @@ export default function SellerApplicationsPage() {
                                         >
                                             İptal
                                         </button>
-                                        <button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                                        <button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-gray-900 rounded-lg transition-colors">
                                             Reddet
                                         </button>
                                     </div>

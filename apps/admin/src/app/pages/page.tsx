@@ -126,39 +126,39 @@ export default function AdminPagesPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-white">Sayfa Yönetimi</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Sayfa Yönetimi</h1>
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600"
           >
             <PlusIcon className="h-5 w-5" />
             Yeni Sayfa
           </button>
         </div>
 
-        <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-400">Yükleniyor...</div>
+            <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
           ) : pages.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               Henüz sayfa yok. &quot;Yeni Sayfa&quot; ile About, FAQ vb. ekleyebilirsiniz.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-dark-700">
+              <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Slug</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Başlık</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">SEO Başlık</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Durum</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">İşlem</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Başlık</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SEO Başlık</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dark-700">
+                <tbody className="divide-y divide-gray-200">
                   {pages.map((p) => (
-                    <tr key={p.id} className="text-gray-300">
+                    <tr key={p.id} className="text-gray-600">
                       <td className="px-4 py-3 text-sm font-mono">{p.slug}</td>
                       <td className="px-4 py-3 text-sm">{p.title}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{p.metaTitle || '-'}</td>
@@ -171,14 +171,14 @@ export default function AdminPagesPage() {
                         <button
                           type="button"
                           onClick={() => openEdit(p)}
-                          className="text-primary-500 hover:text-primary-400 p-1"
+                          className="text-primary-600 hover:text-primary-400 p-1"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeleteConfirm(p.id)}
-                          className="text-red-500 hover:text-red-400 p-1 ml-2"
+                          className="text-red-500 hover:text-red-600 p-1 ml-2"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>
@@ -194,7 +194,7 @@ export default function AdminPagesPage() {
                             <button
                               type="button"
                               onClick={() => setDeleteConfirm(null)}
-                              className="text-xs text-gray-400 ml-2"
+                              className="text-xs text-gray-500 ml-2"
                             >
                               İptal
                             </button>
@@ -211,22 +211,22 @@ export default function AdminPagesPage() {
 
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-            <div className="bg-dark-800 rounded-xl border border-dark-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-dark-700">
-                <h2 className="text-lg font-semibold text-white">
+            <div className="bg-white rounded-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
                   {editing ? 'Sayfayı Düzenle' : 'Yeni Sayfa'}
                 </h2>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-500 hover:text-gray-900"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Slug *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Slug *</label>
                   <input
                     type="text"
                     required
@@ -239,7 +239,7 @@ export default function AdminPagesPage() {
                   <p className="text-xs text-gray-500 mt-1">URL: /sayfa/[slug]. Sadece yeni sayfada düzenlenebilir.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Başlık *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Başlık *</label>
                   <input
                     type="text"
                     required
@@ -249,7 +249,7 @@ export default function AdminPagesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">İçerik (WYSIWYG) *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">İçerik (WYSIWYG) *</label>
                   <RichTextEditor
                     value={form.content}
                     onChange={(v) => setForm({ ...form, content: v })}
@@ -258,7 +258,7 @@ export default function AdminPagesPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">SEO Başlık</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">SEO Başlık</label>
                     <input
                       type="text"
                       value={form.metaTitle}
@@ -267,7 +267,7 @@ export default function AdminPagesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Sıra</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Sıra</label>
                     <input
                       type="number"
                       min={0}
@@ -278,7 +278,7 @@ export default function AdminPagesPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">SEO Açıklama</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">SEO Açıklama</label>
                   <textarea
                     value={form.metaDescription}
                     onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
@@ -287,7 +287,7 @@ export default function AdminPagesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">SEO Anahtar Kelimeler</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">SEO Anahtar Kelimeler</label>
                   <input
                     type="text"
                     value={form.metaKeywords}
@@ -302,21 +302,21 @@ export default function AdminPagesPage() {
                     id="isPublished"
                     checked={form.isPublished}
                     onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
-                    className="rounded border-dark-600"
+                    className="rounded border-gray-300"
                   />
-                  <label htmlFor="isPublished" className="text-sm text-gray-300">Yayında</label>
+                  <label htmlFor="isPublished" className="text-sm text-gray-600">Yayında</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 rounded-lg bg-dark-700 text-white"
+                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-900"
                   >
                     İptal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600"
                   >
                     {editing ? 'Güncelle' : 'Oluştur'}
                   </button>

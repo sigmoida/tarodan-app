@@ -71,20 +71,20 @@ const tabs = [
 ];
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-500/10 text-red-400 border-red-500/20',
-    high: 'bg-red-500/10 text-red-400 border-red-500/20',
-    error: 'bg-red-500/10 text-red-400 border-red-500/20',
-    medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    warning: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    low: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    critical: 'bg-red-500/10 text-red-600 border-red-500/20',
+    high: 'bg-red-500/10 text-red-600 border-red-500/20',
+    error: 'bg-red-500/10 text-red-600 border-red-500/20',
+    medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
+    warning: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
+    low: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
 };
 
 const statusColors: Record<string, string> = {
-    sent: 'bg-green-500/10 text-green-400',
-    delivered: 'bg-green-500/10 text-green-400',
-    queued: 'bg-yellow-500/10 text-yellow-400',
-    bounced: 'bg-red-500/10 text-red-400',
-    failed: 'bg-red-500/10 text-red-400',
+    sent: 'bg-green-500/10 text-green-700',
+    delivered: 'bg-green-500/10 text-green-700',
+    queued: 'bg-yellow-500/10 text-yellow-700',
+    bounced: 'bg-red-500/10 text-red-600',
+    failed: 'bg-red-500/10 text-red-600',
 };
 
 const eventTypeLabels: Record<string, string> = {
@@ -174,12 +174,12 @@ export default function LogsPage() {
             <div className="p-6">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-white">Sistem Logları</h1>
-                    <p className="text-gray-400 mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Sistem Logları</h1>
+                    <p className="text-gray-500 mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex space-x-1 mb-6 bg-dark-800 p-1 rounded-lg w-fit">
+                <div className="flex space-x-1 mb-6 bg-white p-1 rounded-lg w-fit">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
@@ -187,8 +187,8 @@ export default function LogsPage() {
                             className={clsx(
                                 'flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors',
                                 activeTab === tab.id
-                                    ? 'bg-primary-500 text-white'
-                                    : 'text-gray-400 hover:text-white hover:bg-dark-700'
+                                    ? 'bg-primary-500 text-gray-900'
+                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                             )}
                         >
                             <tab.icon className="h-4 w-4 mr-2" />
@@ -254,19 +254,19 @@ export default function LogsPage() {
                 {/* Search and Filters */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="relative flex-1 max-w-md">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                         <input
                             type="text"
                             placeholder="Ara..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && loadLogs()}
-                            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                         />
                     </div>
                     <button
                         onClick={() => loadLogs()}
-                        className="p-2 bg-dark-800 border border-dark-700 rounded-lg text-gray-400 hover:text-white"
+                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900"
                     >
                         <ArrowPathIcon className={clsx('h-5 w-5', loading && 'animate-spin')} />
                     </button>
@@ -275,37 +275,37 @@ export default function LogsPage() {
                 {/* Content */}
                 {loading && logs.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
-                        <ArrowPathIcon className="h-8 w-8 text-primary-500 animate-spin" />
+                        <ArrowPathIcon className="h-8 w-8 text-primary-600 animate-spin" />
                     </div>
                 ) : (
                     <>
                         {/* Error Logs Table */}
                         {activeTab === 'errors' && (
-                            <div className="bg-dark-800 rounded-lg border border-dark-700 overflow-hidden">
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-dark-700">
+                                        <thead className="bg-gray-100">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Mesaj</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kaynak</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seviye</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mesaj</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kaynak</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-dark-700">
+                                        <tbody className="divide-y divide-gray-200">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={4} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: ErrorLog) => (
-                                                    <tr key={log.id} className="hover:bg-dark-700/50">
+                                                    <tr key={log.id} className="hover:bg-gray-100/50">
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
                                                                 {log.severity.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-white max-w-md truncate">{log.message}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">{log.source}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900 max-w-md truncate">{log.message}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500">{log.source}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -317,26 +317,26 @@ export default function LogsPage() {
 
                         {/* Security Logs Table */}
                         {activeTab === 'security' && (
-                            <div className="bg-dark-800 rounded-lg border border-dark-700 overflow-hidden">
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-dark-700">
+                                        <thead className="bg-gray-100">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Olay</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">IP / E-posta</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Tarih</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">İşlem</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Olay</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seviye</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP / E-posta</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-dark-700">
+                                        <tbody className="divide-y divide-gray-200">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={6} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: SecurityLog) => (
-                                                    <tr key={log.id} className="hover:bg-dark-700/50">
-                                                        <td className="px-4 py-3 text-sm text-white">
+                                                    <tr key={log.id} className="hover:bg-gray-100/50">
+                                                        <td className="px-4 py-3 text-sm text-gray-900">
                                                             {eventTypeLabels[log.eventType] || log.eventType}
                                                         </td>
                                                         <td className="px-4 py-3">
@@ -344,26 +344,26 @@ export default function LogsPage() {
                                                                 {log.severity.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">
+                                                        <td className="px-4 py-3 text-sm text-gray-500">
                                                             {log.ipAddress || log.email || '-'}
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             {log.resolved ? (
-                                                                <span className="flex items-center text-green-400 text-sm">
+                                                                <span className="flex items-center text-green-700 text-sm">
                                                                     <CheckCircleIcon className="h-4 w-4 mr-1" /> Çözüldü
                                                                 </span>
                                                             ) : (
-                                                                <span className="flex items-center text-yellow-400 text-sm">
+                                                                <span className="flex items-center text-yellow-700 text-sm">
                                                                     <ClockIcon className="h-4 w-4 mr-1" /> Bekliyor
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                         <td className="px-4 py-3">
                                                             {!log.resolved && (
                                                                 <button
                                                                     onClick={() => handleResolve(log.id)}
-                                                                    className="text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded hover:bg-green-500/20"
+                                                                    className="text-xs px-2 py-1 bg-green-500/10 text-green-700 rounded hover:bg-green-500/20"
                                                                 >
                                                                     Çöz
                                                                 </button>
@@ -380,33 +380,33 @@ export default function LogsPage() {
 
                         {/* Email Logs Table */}
                         {activeTab === 'emails' && (
-                            <div className="bg-dark-800 rounded-lg border border-dark-700 overflow-hidden">
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-dark-700">
+                                        <thead className="bg-gray-100">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Alıcı</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Konu</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Şablon</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alıcı</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konu</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Şablon</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-dark-700">
+                                        <tbody className="divide-y divide-gray-200">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={5} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: EmailLog) => (
-                                                    <tr key={log.id} className="hover:bg-dark-700/50">
-                                                        <td className="px-4 py-3 text-sm text-white">{log.to}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400 max-w-xs truncate">{log.subject}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">{log.template || '-'}</td>
+                                                    <tr key={log.id} className="hover:bg-gray-100/50">
+                                                        <td className="px-4 py-3 text-sm text-gray-900">{log.to}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{log.subject}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500">{log.template || '-'}</td>
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full', statusColors[log.status])}>
                                                                 {log.status.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-400">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -419,7 +419,7 @@ export default function LogsPage() {
                         {/* Pagination */}
                         {meta && meta.totalPages > 1 && (
                             <div className="flex items-center justify-between mt-4">
-                                <p className="text-sm text-gray-400">
+                                <p className="text-sm text-gray-500">
                                     Sayfa {page} / {meta.totalPages}
                                     ({meta.total} kayıt)
                                 </p>
@@ -427,14 +427,14 @@ export default function LogsPage() {
                                     <button
                                         onClick={() => setPage(p => Math.max(1, p - 1))}
                                         disabled={page === 1}
-                                        className="px-3 py-1 bg-dark-800 border border-dark-700 rounded text-sm text-gray-400 hover:text-white disabled:opacity-50"
+                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
                                     >
                                         Önceki
                                     </button>
                                     <button
                                         onClick={() => setPage(p => p + 1)}
                                         disabled={page >= meta.totalPages}
-                                        className="px-3 py-1 bg-dark-800 border border-dark-700 rounded text-sm text-gray-400 hover:text-white disabled:opacity-50"
+                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
                                     >
                                         Sonraki
                                     </button>
@@ -450,11 +450,11 @@ export default function LogsPage() {
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
     const colorClasses: Record<string, string> = {
-        red: 'bg-red-500/10 border-red-500/20 text-red-400',
-        yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
-        green: 'bg-green-500/10 border-green-500/20 text-green-400',
-        blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-        gray: 'bg-dark-700 border-dark-600 text-gray-400',
+        red: 'bg-red-500/10 border-red-500/20 text-red-600',
+        yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700',
+        green: 'bg-green-500/10 border-green-500/20 text-green-700',
+        blue: 'bg-blue-500/10 border-blue-500/20 text-blue-700',
+        gray: 'bg-gray-100 border-gray-300 text-gray-500',
     };
 
     return (

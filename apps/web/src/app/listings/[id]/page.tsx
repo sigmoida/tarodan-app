@@ -119,7 +119,7 @@ export default function ListingDetailPage() {
   const id = params.id as string;
   const { t, locale } = useTranslation();
 
-  const { addToCart, items: cartItems, removeFromCart } = useCartStore();
+  const { addToCart, addToOfflineCart, items: cartItems, offlineItems, removeFromCart } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
 
   // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
@@ -231,7 +231,8 @@ export default function ListingDetailPage() {
 
   // Check if product is in cart
   const cartItem = listing ? cartItems.find(item => item.productId === listing.id) : null;
-  const isInCart = !!cartItem;
+  const offlineCartItem = listing ? offlineItems.find(item => item.productId === listing.id) : null;
+  const isInCart = !!cartItem || !!offlineCartItem;
 
   // Helper function to get image URL
   const getImageUrl = (image: ProductImage | string): string => {
@@ -291,7 +292,6 @@ export default function ListingDetailPage() {
   const handleAddToCart = async () => {
     if (!listing) return;
 
-    // Check if product is available
     if (listing.status && listing.status !== 'active') {
       toast.error(t('product.productNotForSale'));
       return;
@@ -301,8 +301,20 @@ export default function ListingDetailPage() {
     try {
       await addToCart(listing.id);
       toast.success(t('product.addedToCart'));
-    } catch (error) {
-      toast.error(t('common.operationFailed'));
+    } catch (error: any) {
+      if (error?.message === 'AUTH_REQUIRED') {
+        const imgUrl = typeof listing.images?.[0] === 'string' ? listing.images[0] : (listing.images?.[0] as any)?.url || '';
+        addToOfflineCart({
+          productId: listing.id,
+          title: listing.title,
+          price: listing.price,
+          imageUrl: imgUrl,
+          seller: { id: listing.seller?.id || '', displayName: listing.seller?.displayName || '' },
+        });
+        toast.success(t('product.addedToCart'));
+      } else {
+        toast.error(t('common.operationFailed'));
+      }
     } finally {
       setIsAddingToCart(false);
     }

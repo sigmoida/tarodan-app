@@ -47,13 +47,13 @@ export default function RefundsPage() {
         <AdminLayout>
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <div><h1 className="text-2xl font-bold text-white">İade Geçmişi</h1><p className="text-gray-400">Tamamlanmış iadeler</p></div>
-                    <button onClick={loadRefunds} className="p-2 text-gray-400 hover:text-white"><ArrowPathIcon className="h-5 w-5" /></button>
+                    <div><h1 className="text-2xl font-bold text-gray-900">İade Geçmişi</h1><p className="text-gray-500">Tamamlanmış iadeler</p></div>
+                    <button onClick={loadRefunds} className="p-2 text-gray-500 hover:text-gray-900"><ArrowPathIcon className="h-5 w-5" /></button>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
                     <div className="relative flex-1">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                         <input type="text" placeholder="Alıcı veya satıcı ara..." value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} className="admin-input pl-10 w-full" />
                     </div>
                     <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="admin-input" />
@@ -69,26 +69,26 @@ export default function RefundsPage() {
                                 {loading ? (
                                     <tr><td colSpan={7} className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary-500 mx-auto"></div></td></tr>
                                 ) : refunds.length === 0 ? (
-                                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">İade bulunamadı</td></tr>
+                                    <tr><td colSpan={7} className="text-center py-8 text-gray-500">İade bulunamadı</td></tr>
                                 ) : refunds.map((r) => (
                                     <tr key={r.id}>
                                         <td className="font-mono text-sm">{r.id.slice(0, 8)}...</td>
-                                        <td className="font-medium text-red-400">₺{r.amount.toLocaleString('tr-TR')}</td>
+                                        <td className="font-medium text-red-600">₺{r.amount.toLocaleString('tr-TR')}</td>
                                         <td>
                                             {r.order?.buyer ? (
-                                                <Link href={`/users/${r.order.buyer.id}`} className="text-white hover:text-primary-400">{r.order.buyer.displayName}</Link>
+                                                <Link href={`/users/${r.order.buyer.id}`} className="text-gray-900 hover:text-primary-400">{r.order.buyer.displayName}</Link>
                                             ) : <span className="text-gray-500">-</span>}
                                         </td>
                                         <td>
                                             {r.order?.seller ? (
-                                                <Link href={`/users/${r.order.seller.id}`} className="text-white hover:text-primary-400">{r.order.seller.displayName}</Link>
+                                                <Link href={`/users/${r.order.seller.id}`} className="text-gray-900 hover:text-primary-400">{r.order.seller.displayName}</Link>
                                             ) : <span className="text-gray-500">-</span>}
                                         </td>
                                         <td className="max-w-[200px] truncate">{r.order?.product?.title || '-'}</td>
                                         <td>{new Date(r.refundedAt).toLocaleDateString('tr-TR')}</td>
                                         <td>
                                             {r.order && (
-                                                <Link href={`/orders/${r.order.id}`} className="p-2 text-gray-400 hover:text-white inline-block"><EyeIcon className="h-5 w-5" /></Link>
+                                                <Link href={`/orders/${r.order.id}`} className="p-2 text-gray-500 hover:text-gray-900 inline-block"><EyeIcon className="h-5 w-5" /></Link>
                                             )}
                                         </td>
                                     </tr>
@@ -99,7 +99,7 @@ export default function RefundsPage() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-400">Toplam {total} iade</p>
+                    <p className="text-sm text-gray-500">Toplam {total} iade</p>
                     <div className="flex gap-2">
                         <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary disabled:opacity-50">Önceki</button>
                         <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / 20)} className="btn-secondary disabled:opacity-50">Sonraki</button>

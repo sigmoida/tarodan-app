@@ -339,20 +339,20 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Analizler</h1>
-            <p className="text-gray-400 mt-1">Detaylı satış, kullanıcı ve ürün analizleri</p>
+            <h1 className="text-2xl font-bold text-gray-900">Analizler</h1>
+            <p className="text-gray-500 mt-1">Detaylı satış, kullanıcı ve ürün analizleri</p>
           </div>
 
           {/* Date Range Selector */}
-          <div className="flex items-center gap-2 bg-dark-800 rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-white rounded-lg p-1">
             {(['7d', '30d', '90d', '1y'] as DateRange[]).map((range) => (
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   dateRange === range
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-primary-500 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 {range === '7d' ? '7 Gün' : range === '30d' ? '30 Gün' : range === '90d' ? '90 Gün' : '1 Yıl'}
@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-dark-700">
+        <div className="border-b border-gray-200">
           <nav className="flex gap-4">
             {[
               { key: 'sales', label: 'Satış Analitiği', icon: CurrencyDollarIcon },
@@ -375,8 +375,8 @@ export default function AnalyticsPage() {
                 onClick={() => setActiveTab(tab.key as any)}
                 className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                   activeTab === tab.key
-                    ? 'border-primary-500 text-primary-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
                 }`}
               >
                 <tab.icon className="h-5 w-5" />
@@ -420,13 +420,13 @@ export default function AnalyticsPage() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="admin-card">
-                <h3 className="text-lg font-semibold text-white mb-4">Gelir Grafiği</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Gelir Grafiği</h3>
                 <div className="h-80">
                   <Line data={salesChartData} options={chartOptions} />
                 </div>
               </div>
               <div className="admin-card">
-                <h3 className="text-lg font-semibold text-white mb-4">Sipariş Sayısı</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Sayısı</h3>
                 <div className="h-80">
                   <Bar data={ordersChartData} options={chartOptions} />
                 </div>
@@ -435,12 +435,12 @@ export default function AnalyticsPage() {
 
             {/* Order Status Distribution */}
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-white mb-4">Sipariş Durumu Dağılımı</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Durumu Dağılımı</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {Object.entries(data?.salesReport.ordersByStatus || {}).map(([status, count]) => (
-                  <div key={status} className="bg-dark-700 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-white">{String(count)}</p>
-                    <p className="text-sm text-gray-400">{ORDER_STATUS_LABELS[status] ?? status}</p>
+                  <div key={status} className="bg-gray-100 rounded-lg p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{String(count)}</p>
+                    <p className="text-sm text-gray-500">{ORDER_STATUS_LABELS[status] ?? status}</p>
                   </div>
                 ))}
               </div>
@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-white mb-4">Kullanıcı Büyümesi</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcı Büyümesi</h3>
               <div className="h-80">
                 <Line data={userGrowthData} options={chartOptions} />
               </div>
@@ -519,7 +519,7 @@ export default function AnalyticsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="admin-card">
-                <h3 className="text-lg font-semibold text-white mb-4">Kategori Dağılımı</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Kategori Dağılımı</h3>
                 <div className="h-80">
                   <Doughnut
                     data={categoryChartData}
@@ -537,21 +537,21 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               <div className="admin-card">
-                <h3 className="text-lg font-semibold text-white mb-4">Kategorilere Göre Ürünler</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Kategorilere Göre Ürünler</h3>
                 <div className="space-y-4">
                   {data?.productReport.categoryDistribution?.map((cat: any) => (
                     <div key={cat.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-white">{cat.name}</span>
+                        <span className="text-gray-900">{cat.name}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="w-32 bg-dark-700 rounded-full h-2">
+                        <div className="w-32 bg-gray-100 rounded-full h-2">
                           <div
                             className="bg-primary-500 h-2 rounded-full"
                             style={{ width: `${cat.percentage}%` }}
                           />
                         </div>
-                        <span className="text-gray-400 text-sm w-12 text-right">{cat.count}</span>
+                        <span className="text-gray-500 text-sm w-12 text-right">{cat.count}</span>
                       </div>
                     </div>
                   ))}
@@ -592,27 +592,27 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-white mb-4">Takas İstatistikleri</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Takas İstatistikleri</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-green-900/20 border border-green-700 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-green-400">{data?.tradeReport.completedTrades || 0}</p>
-                  <p className="text-sm text-gray-400">Tamamlanan</p>
+                  <p className="text-2xl font-bold text-green-700">{data?.tradeReport.completedTrades || 0}</p>
+                  <p className="text-sm text-gray-500">Tamamlanan</p>
                 </div>
                 <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-yellow-400">{data?.tradeReport.pendingTrades || 0}</p>
-                  <p className="text-sm text-gray-400">Bekleyen</p>
+                  <p className="text-2xl font-bold text-yellow-700">{data?.tradeReport.pendingTrades || 0}</p>
+                  <p className="text-sm text-gray-500">Bekleyen</p>
                 </div>
                 <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-red-400">{data?.tradeReport.disputedTrades || 0}</p>
-                  <p className="text-sm text-gray-400">Anlaşmazlık</p>
+                  <p className="text-2xl font-bold text-red-600">{data?.tradeReport.disputedTrades || 0}</p>
+                  <p className="text-sm text-gray-500">Anlaşmazlık</p>
                 </div>
                 <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-400">
+                  <p className="text-2xl font-bold text-blue-700">
                     {data?.tradeReport.totalTrades && data?.tradeReport.completedTrades
                       ? ((data.tradeReport.completedTrades / data.tradeReport.totalTrades) * 100).toFixed(1)
                       : 0}%
                   </p>
-                  <p className="text-sm text-gray-400">Başarı Oranı</p>
+                  <p className="text-sm text-gray-500">Başarı Oranı</p>
                 </div>
               </div>
             </div>
@@ -677,11 +677,11 @@ function StatCard({ title, value, icon: Icon, color }: { title: string; value: s
     <div className="admin-card">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-400">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
         </div>
         <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
+          <Icon className="h-6 w-6 text-gray-900" />
         </div>
       </div>
     </div>

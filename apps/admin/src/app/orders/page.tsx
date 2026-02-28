@@ -216,13 +216,13 @@ export default function OrdersPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Siparişler</h1>
-          <p className="text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900">Siparişler</h1>
+          <p className="text-gray-500 mt-1">
             Toplam {total} sipariş
             {(selectedUserId || productId) && (
               <span className="ml-2">
                 — Filtreleniyor
-                <button onClick={clearUserFilter} className="ml-2 text-primary-500 hover:underline">Filtreyi kaldır</button>
+                <button onClick={clearUserFilter} className="ml-2 text-primary-600 hover:underline">Filtreyi kaldır</button>
               </span>
             )}
           </p>
@@ -230,7 +230,7 @@ export default function OrdersPage() {
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
             <input
               type="text"
               placeholder="Sipariş no ara..."
@@ -249,7 +249,7 @@ export default function OrdersPage() {
                 className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   userRole === 'buyer'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-dark-700 text-gray-400 hover:text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Alıcı
@@ -260,14 +260,14 @@ export default function OrdersPage() {
                 className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   userRole === 'seller'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-dark-700 text-gray-400 hover:text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Satıcı
               </button>
             </div>
             <div className="relative">
-              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
               <input
                 type="text"
                 placeholder="Kullanıcı ara..."
@@ -282,29 +282,29 @@ export default function OrdersPage() {
             {selectedUserId && (
               <button
                 onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
               >
                 <XCircleIcon className="h-5 w-5" />
               </button>
             )}
             
               {showUserDropdown && userSearch.length >= 2 && (
-                <div className="absolute z-50 w-full mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {loadingUsers ? (
-                    <div className="p-3 text-center text-gray-400">Aranıyor...</div>
+                    <div className="p-3 text-center text-gray-500">Aranıyor...</div>
                   ) : users.length > 0 ? (
                     users.map((user) => (
                       <button
                         key={user.id}
                         onClick={() => handleSelectUser(user)}
-                        className="w-full px-4 py-2 text-left hover:bg-dark-600 text-white"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
                       >
                         <div className="font-medium">{user.displayName}</div>
-                        <div className="text-xs text-gray-400">{user.email}</div>
+                        <div className="text-xs text-gray-500">{user.email}</div>
                       </button>
                     ))
                   ) : (
-                    <div className="p-3 text-center text-gray-400">Kullanıcı bulunamadı</div>
+                    <div className="p-3 text-center text-gray-500">Kullanıcı bulunamadı</div>
                   )}
                 </div>
               )}
@@ -349,7 +349,7 @@ export default function OrdersPage() {
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-gray-400">
+                    <td colSpan={9} className="text-center py-8 text-gray-500">
                       Sipariş bulunamadı
                     </td>
                   </tr>
@@ -377,7 +377,7 @@ export default function OrdersPage() {
                             <button
                               onClick={() => updateOrderStatus(order.id)}
                               disabled={updatingStatus}
-                              className="p-1 text-green-400 hover:text-green-300 hover:bg-green-900/30 rounded"
+                              className="p-1 text-green-700 hover:text-green-300 hover:bg-green-50 rounded"
                               title="Kaydet"
                             >
                               <CheckIcon className="h-4 w-4" />
@@ -385,7 +385,7 @@ export default function OrdersPage() {
                             <button
                               onClick={cancelEditing}
                               disabled={updatingStatus}
-                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded"
+                              className="p-1 text-red-600 hover:text-red-300 hover:bg-red-50 rounded"
                               title="İptal"
                             >
                               <XMarkIcon className="h-4 w-4" />
@@ -396,7 +396,7 @@ export default function OrdersPage() {
                             {getStatusBadge(order.status)}
                             <button
                               onClick={() => startEditing(order)}
-                              className="p-1 text-gray-500 hover:text-white hover:bg-dark-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                               title="Durumu Değiştir"
                             >
                               <PencilIcon className="h-3 w-3" />
@@ -407,7 +407,7 @@ export default function OrdersPage() {
                       <td>
                         <Link
                           href={`/users/${order.buyer.id}`}
-                          className="text-white hover:text-primary-500"
+                          className="text-gray-900 hover:text-primary-600"
                         >
                           {order.buyer.displayName}
                         </Link>
@@ -415,31 +415,31 @@ export default function OrdersPage() {
                       <td>
                         <Link
                           href={`/users/${order.seller.id}`}
-                          className="text-white hover:text-primary-500"
+                          className="text-gray-900 hover:text-primary-600"
                         >
                           {order.seller.displayName}
                         </Link>
                       </td>
                       <td>{order.itemCount} adet</td>
-                      <td className="text-primary-400 font-medium">
+                      <td className="text-primary-600 font-medium">
                         ₺{order.totalAmount.toLocaleString()}
                       </td>
-                      <td className="text-green-400">
+                      <td className="text-green-700">
                         ₺{order.commission.toLocaleString()}
                       </td>
-                      <td>{new Date(order.createdAt).toLocaleDateString('tr-TR')}</td>
+                      <td className="whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</td>
                       <td>
                         <div className="flex gap-1">
                           <button
                             onClick={() => startEditing(order)}
-                            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-lg"
+                            className="p-2 text-blue-700 hover:text-blue-300 hover:bg-blue-50 rounded-lg"
                             title="Durumu Değiştir"
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
                             <Link
                               href={`/orders/${order.id}`}
-                              className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                               title="Detay"
                             >
                               <EyeIcon className="h-5 w-5" />
@@ -455,7 +455,7 @@ export default function OrdersPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">Sayfa {page} / {Math.ceil(total / 20)}</p>
+          <p className="text-sm text-gray-500">Sayfa {page} / {Math.ceil(total / 20)}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

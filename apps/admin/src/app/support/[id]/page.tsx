@@ -193,7 +193,7 @@ export default function SupportTicketDetailPage() {
                   </h2>
                   <button
                     onClick={() => setShowReplyModal(true)}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                    className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
                   >
                     Yanıtla
                   </button>
@@ -279,7 +279,7 @@ export default function SupportTicketDetailPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => setShowStatusModal(true)}
-                    className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                    className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
                   >
                     Durum Güncelle
                   </button>
@@ -349,7 +349,7 @@ export default function SupportTicketDetailPage() {
                 </button>
                 <button
                   onClick={handleReply}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Gönder'}
@@ -390,7 +390,7 @@ export default function SupportTicketDetailPage() {
                 </button>
                 <button
                   onClick={handleStatusUpdate}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}
                 >
                   {processing ? 'İşleniyor...' : 'Güncelle'}

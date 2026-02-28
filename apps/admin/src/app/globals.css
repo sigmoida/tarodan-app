@@ -4,33 +4,32 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 346 77% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 346 77% 58%;
+    --background: 0 0% 97.5%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 25 95% 53%;
     --radius: 0.5rem;
   }
 
-  /* Legacy variables for backward compatibility */
   :root {
-    --primary-color: #e94560;
-    --dark-bg: #1a1a2e;
-    --dark-surface: #16213e;
+    --primary-color: #f97316;
+    --light-bg: #f8f8f8;
+    --light-surface: #ffffff;
   }
 }
 
@@ -45,8 +44,8 @@
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -54,12 +53,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
+  background: #d1d5db;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: #9ca3af;
 }
 
 /* Table styles */
@@ -81,7 +80,7 @@
 
 /* Card styles */
 .admin-card {
-  @apply bg-card rounded-lg border border-border p-6;
+  @apply bg-card rounded-lg border border-border p-6 shadow-sm;
 }
 
 /* Button styles */
@@ -99,18 +98,15 @@
 
 /* Input styles */
 .admin-input {
-  @apply w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+  @apply w-full px-3 py-2 bg-white border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
 }
 
-/* Dark modal inputs - koyu arka plan, beyaz yazi (okunakli) */
+/* Light modal inputs */
 .input-dark {
-  @apply w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
-  background-color: hsl(217.2, 32.6%, 17.5%);
-  border-color: hsl(217.2, 32.6%, 25%);
-  color: #f1f5f9;
+  @apply w-full px-3 py-2 rounded-lg border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
 }
 .input-dark::placeholder {
-  color: hsl(215, 20%, 65%);
+  color: hsl(var(--muted-foreground));
 }
 .input-dark:focus {
   border-color: hsl(var(--primary));
@@ -122,19 +118,19 @@
 }
 
 .badge-success {
-  @apply bg-green-900/50 text-green-400;
+  @apply bg-green-50 text-green-700;
 }
 
 .badge-warning {
-  @apply bg-yellow-900/50 text-yellow-400;
+  @apply bg-yellow-50 text-yellow-700;
 }
 
 .badge-danger {
-  @apply bg-red-900/50 text-red-400;
+  @apply bg-red-50 text-red-700;
 }
 
 .badge-info {
-  @apply bg-blue-900/50 text-blue-400;
+  @apply bg-blue-50 text-blue-700;
 }
 
 .badge-gray {

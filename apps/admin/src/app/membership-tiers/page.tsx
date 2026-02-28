@@ -123,8 +123,8 @@ export default function MembershipTiersPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Üyelik Seviyeleri</h1>
-          <p className="text-gray-400 mt-1">Üyelik seviyelerini yönetin</p>
+          <h1 className="text-2xl font-bold text-gray-900">Üyelik Seviyeleri</h1>
+          <p className="text-gray-500 mt-1">Üyelik seviyelerini yönetin</p>
         </div>
 
         {/* Tiers List */}
@@ -132,10 +132,10 @@ export default function MembershipTiersPage() {
           {loading ? (
             <div className="col-span-full text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
-              <p className="text-gray-400 mt-4">Yükleniyor...</p>
+              <p className="text-gray-500 mt-4">Yükleniyor...</p>
             </div>
           ) : tiers.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-gray-400">
+            <div className="col-span-full text-center py-12 text-gray-500">
               Henüz üyelik seviyesi yok
             </div>
           ) : (
@@ -143,71 +143,71 @@ export default function MembershipTiersPage() {
               <div key={tier.id} className="admin-card">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{tier.name}</h3>
-                    <p className="text-sm text-gray-400 uppercase">{tier.type}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">{tier.name}</h3>
+                    <p className="text-sm text-gray-500 uppercase">{tier.type}</p>
                   </div>
                   <button
                     onClick={() => openEditModal(tier)}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                     title="Düzenle"
                   >
                     <PencilIcon className="h-5 w-5" />
                   </button>
                 </div>
                 {tier.description && (
-                  <p className="text-sm text-gray-400 mb-4">{tier.description}</p>
+                  <p className="text-sm text-gray-500 mb-4">{tier.description}</p>
                 )}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Aylık:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-gray-500">Aylık:</span>
+                    <span className="text-gray-900 font-medium">
                       ₺{tier.monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Yıllık:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-gray-500">Yıllık:</span>
+                    <span className="text-gray-900 font-medium">
                       ₺{tier.yearlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Ücretsiz İlan:</span>
-                    <span className="text-white">{tier.maxFreeListings}</span>
+                    <span className="text-gray-500">Ücretsiz İlan:</span>
+                    <span className="text-gray-900">{tier.maxFreeListings}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Toplam İlan:</span>
-                    <span className="text-white">{tier.maxTotalListings}</span>
+                    <span className="text-gray-500">Toplam İlan:</span>
+                    <span className="text-gray-900">{tier.maxTotalListings}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Görsel/İlan:</span>
-                    <span className="text-white">{tier.maxImagesPerListing}</span>
+                    <span className="text-gray-500">Görsel/İlan:</span>
+                    <span className="text-gray-900">{tier.maxImagesPerListing}</span>
                   </div>
-                  <div className="pt-2 border-t border-dark-700">
+                  <div className="pt-2 border-t border-gray-200">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Kullanıcı Sayısı:</span>
-                      <span className="text-white font-medium">{tier.userCount}</span>
+                      <span className="text-gray-500">Kullanıcı Sayısı:</span>
+                      <span className="text-gray-900 font-medium">{tier.userCount}</span>
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-dark-700">
+                <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex flex-wrap gap-2">
                     {tier.canCreateCollections && (
-                      <span className="px-2 py-1 text-xs bg-green-900/30 text-green-400 rounded">
+                      <span className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">
                         Koleksiyon
                       </span>
                     )}
                     {tier.canTrade && (
-                      <span className="px-2 py-1 text-xs bg-blue-900/30 text-blue-400 rounded">
+                      <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
                         Takas
                       </span>
                     )}
                     {tier.isAdFree && (
-                      <span className="px-2 py-1 text-xs bg-purple-900/30 text-purple-400 rounded">
+                      <span className="px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded">
                         Reklamsız
                       </span>
                     )}
                     {!tier.isActive && (
-                      <span className="px-2 py-1 text-xs bg-gray-700 text-gray-400 rounded">
+                      <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded">
                         Pasif
                       </span>
                     )}
@@ -222,12 +222,12 @@ export default function MembershipTiersPage() {
       {/* Edit Modal */}
       {showModal && editingTier && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-dark-800 rounded-xl p-6 max-w-2xl w-full mx-4 border border-dark-700 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-white mb-4">Üyelik Seviyesi Düzenle</h2>
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Üyelik Seviyesi Düzenle</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Ad *
                   </label>
                   <input
@@ -239,7 +239,7 @@ export default function MembershipTiersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Sıralama
                   </label>
                   <input
@@ -251,7 +251,7 @@ export default function MembershipTiersPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-600 mb-2">
                   Açıklama
                 </label>
                 <textarea
@@ -263,7 +263,7 @@ export default function MembershipTiersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Aylık Fiyat (₺)
                   </label>
                   <input
@@ -275,7 +275,7 @@ export default function MembershipTiersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Yıllık Fiyat (₺)
                   </label>
                   <input
@@ -289,7 +289,7 @@ export default function MembershipTiersPage() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Ücretsiz İlan
                   </label>
                   <input
@@ -300,7 +300,7 @@ export default function MembershipTiersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Toplam İlan
                   </label>
                   <input
@@ -311,7 +311,7 @@ export default function MembershipTiersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Görsel/İlan
                   </label>
                   <input
@@ -324,7 +324,7 @@ export default function MembershipTiersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Öne Çıkan İlan Slotları
                   </label>
                   <input
@@ -335,7 +335,7 @@ export default function MembershipTiersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Komisyon İndirimi (%)
                   </label>
                   <input
@@ -353,49 +353,49 @@ export default function MembershipTiersPage() {
                     type="checkbox"
                     checked={formData.canCreateCollections}
                     onChange={(e) => setFormData({ ...formData, canCreateCollections: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary-600"
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
                   />
-                  <span className="text-sm text-gray-300">Koleksiyon Oluşturabilir</span>
+                  <span className="text-sm text-gray-600">Koleksiyon Oluşturabilir</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={formData.canTrade}
                     onChange={(e) => setFormData({ ...formData, canTrade: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary-600"
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
                   />
-                  <span className="text-sm text-gray-300">Takas Yapabilir</span>
+                  <span className="text-sm text-gray-600">Takas Yapabilir</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={formData.isAdFree}
                     onChange={(e) => setFormData({ ...formData, isAdFree: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary-600"
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
                   />
-                  <span className="text-sm text-gray-300">Reklamsız</span>
+                  <span className="text-sm text-gray-600">Reklamsız</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary-600"
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
                   />
-                  <span className="text-sm text-gray-300">Aktif</span>
+                  <span className="text-sm text-gray-600">Aktif</span>
                 </label>
               </div>
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-dark-600 text-gray-300 rounded-lg hover:bg-dark-700 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   İptal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   Güncelle
                 </button>

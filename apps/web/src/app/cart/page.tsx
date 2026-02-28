@@ -4,14 +4,16 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { TrashIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, ShoppingCartIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useCartStore } from '@/stores/cartStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 
 export default function CartPage() {
   const {
     items,
+    offlineItems,
     subtotal,
     grandTotal,
     isLoading,
@@ -21,7 +23,8 @@ export default function CartPage() {
     totalDiscount,
     appliedDiscounts,
   } = useCartStore();
-  const { t } = useTranslation();
+  const { isAuthenticated } = useAuthStore();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     fetchCart();
@@ -57,7 +60,11 @@ export default function CartPage() {
     );
   }
 
-  if (items.length === 0) {
+  const hasOnlineItems = items.length > 0;
+  const hasOfflineItems = offlineItems.length > 0;
+  const isEmpty = !hasOnlineItems && !hasOfflineItems;
+
+  if (isEmpty) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -81,8 +88,8 @@ export default function CartPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('cart.myCart')}</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Cart Items - API: productTitle, effectivePrice, productImage, sellerName */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Online cart items (authenticated) */}
             {items.map((item, index) => (
               <motion.div
                 key={item.id}
@@ -124,6 +131,52 @@ export default function CartPage() {
                 </div>
                 <button
                   onClick={() => handleRemove(item.productId)}
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors self-start"
+                >
+                  <TrashIcon className="w-5 h-5" />
+                </button>
+              </motion.div>
+            ))}
+            {/* Offline cart items (guest) */}
+            {!isAuthenticated && offlineItems.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="card p-4 flex gap-4"
+              >
+                <Link href={`/listings/${item.productId}`}>
+                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <Image
+                      src={item.imageUrl || 'https://via.placeholder.com/96'}
+                      alt={item.title}
+                      width={96}
+                      height={96}
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                </Link>
+                <div className="flex-1">
+                  <Link href={`/listings/${item.productId}`}>
+                    <h3 className="font-semibold text-gray-900 hover:text-primary-500 line-clamp-2">
+                      {item.title}
+                    </h3>
+                  </Link>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {t('product.seller')}: @{item.seller.displayName}
+                  </p>
+                  <p className="text-lg font-bold text-primary-500 mt-2">
+                    {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const filtered = offlineItems.filter(i => i.id !== item.id);
+                    useCartStore.setState({ offlineItems: filtered });
+                    fetchCart();
+                    toast.success(t('product.removedFromCart'));
+                  }}
                   className="p-2 text-gray-400 hover:text-red-500 transition-colors self-start"
                 >
                   <TrashIcon className="w-5 h-5" />
@@ -175,6 +228,20 @@ export default function CartPage() {
               >
                 {t('cart.proceedToCheckout')}
               </Link>
+              {!isAuthenticated && (
+                <div className="mt-3 space-y-2">
+                  <Link
+                    href={`/login?redirect=${encodeURIComponent('/cart')}`}
+                    className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+                  >
+                    <LockClosedIcon className="w-4 h-4" />
+                    {locale === 'en' ? 'Login for faster checkout' : 'Hızlı ödeme için giriş yapın'}
+                  </Link>
+                  <p className="text-xs text-gray-500 text-center">
+                    {locale === 'en' ? 'Your cart will be saved after login.' : 'Sepetiniz giriş yaptıktan sonra korunacak.'}
+                  </p>
+                </div>
+              )}
 
               <Link
                 href="/listings"

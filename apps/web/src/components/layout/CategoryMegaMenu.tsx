@@ -18,7 +18,7 @@ const CATEGORY_MENU = {
   tr: {
     newArrivals: { label: 'Yeni Gelenler', icon: SparklesIcon, href: '/listings?sortBy=created_desc' },
     brands: {
-      label: 'Markalar',
+      label: 'Üreticiler',
       icon: FireIcon,
       items: [
         'Audi', 'Alfa Romeo', 'BMW', 'Ferrari', 'Ford', 'Lamborghini',
@@ -149,7 +149,7 @@ export default function CategoryMegaMenu() {
                 {/* Left Sidebar - Menu Sections */}
                 <div className="w-56 bg-gray-50 border-r border-gray-200 py-4">
                   <Link
-                    href="/brands"
+                    href="/ureticiler"
                     className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-orange-600 transition-colors"
                   >
                     <span className="flex items-center gap-2">

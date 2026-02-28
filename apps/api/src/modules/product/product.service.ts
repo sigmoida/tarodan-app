@@ -374,10 +374,8 @@ export class ProductService implements OnModuleInit {
     };
 
     const esResult = await this.searchService.searchProductIds(esOptions);
-    if (esResult.ids.length === 0 && !search) {
-      return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
-    }
-    if (esResult.ids.length === 0) return null; // let fallback handle text search
+    // ES index boş olabilir (örn. db reset sonrası); arama yoksa PostgreSQL fallback kullanılsın
+    if (esResult.ids.length === 0) return null;
 
     const products = await this.prisma.product.findMany({
       where: { id: { in: esResult.ids } },

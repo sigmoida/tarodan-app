@@ -128,6 +128,7 @@ export class CollectionItemResponseDto {
   productTitle: string;
   productImage?: string;
   productPrice?: number;
+  productStatus?: string;
   sortOrder: number;
   isFeatured: boolean;
   addedAt: Date;

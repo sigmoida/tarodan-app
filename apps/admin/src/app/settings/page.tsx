@@ -217,12 +217,12 @@ export default function SettingsPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Platform Ayarları</h1>
-          <p className="text-gray-400 mt-1">Sistem yapılandırmasını yönetin</p>
+          <h1 className="text-2xl font-bold text-gray-900">Platform Ayarları</h1>
+          <p className="text-gray-500 mt-1">Sistem yapılandırmasını yönetin</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-dark-700 pb-2">
+        <div className="flex gap-2 border-b border-gray-200 pb-2">
           {[
             { id: 'general', label: 'Genel' },
             { id: 'listing', label: 'İlan' },
@@ -235,8 +235,8 @@ export default function SettingsPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 py-2 rounded-t-lg transition-colors ${activeTab === tab.id
-                ? 'bg-dark-700 text-white'
-                : 'text-gray-400 hover:text-white'
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-500 hover:text-gray-900'
                 }`}
             >
               {tab.label}
@@ -247,10 +247,10 @@ export default function SettingsPage() {
         {/* General Settings */}
         {activeTab === 'general' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Genel Ayarlar</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Genel Ayarlar</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Site Adı</label>
+                <label className="block text-sm text-gray-500 mb-2">Site Adı</label>
                 <input
                   type="text"
                   value={settings.siteName}
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Destek E-posta</label>
+                <label className="block text-sm text-gray-500 mb-2">Destek E-posta</label>
                 <input
                   type="email"
                   value={settings.supportEmail}
@@ -268,7 +268,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Logo URL</label>
+                <label className="block text-sm text-gray-500 mb-2">Logo URL</label>
                 <input
                   type="text"
                   value={settings.logoUrl}
@@ -279,7 +279,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">Logo görseli için doğrudan URL</p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Saat Dilimi</label>
+                <label className="block text-sm text-gray-500 mb-2">Saat Dilimi</label>
                 <select
                   value={settings.timezone}
                   onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
@@ -292,7 +292,7 @@ export default function SettingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Para Birimi</label>
+                <label className="block text-sm text-gray-500 mb-2">Para Birimi</label>
                 <select
                   value={settings.currency}
                   onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
@@ -304,7 +304,7 @@ export default function SettingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Dil</label>
+                <label className="block text-sm text-gray-500 mb-2">Dil</label>
                 <select
                   value={settings.language}
                   onChange={(e) => setSettings({ ...settings, language: e.target.value })}
@@ -321,10 +321,10 @@ export default function SettingsPage() {
         {/* Listing Settings */}
         {activeTab === 'listing' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">İlan Ayarları</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">İlan Ayarları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Ücretsiz İlan Limiti
                 </label>
                 <input
@@ -341,7 +341,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Premium İlan Limiti
                 </label>
                 <input
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Business İlan Limiti
                 </label>
                 <input
@@ -375,7 +375,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Minimum Ürün Fiyatı (₺)
                 </label>
                 <input
@@ -393,7 +393,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Maksimum Ürün Fiyatı (₺)
                 </label>
                 <input
@@ -417,10 +417,10 @@ export default function SettingsPage() {
         {/* Trade Settings */}
         {activeTab === 'trade' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Takas Ayarları</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Takas Ayarları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Yanıt Süresi (Saat)
                 </label>
                 <input
@@ -436,7 +436,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Ödeme Süresi (Saat)
                 </label>
                 <input
@@ -452,7 +452,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Kargo Süresi (Gün)
                 </label>
                 <input
@@ -468,7 +468,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Onay Süresi (Gün)
                 </label>
                 <input
@@ -490,10 +490,10 @@ export default function SettingsPage() {
         {/* Message Settings */}
         {activeTab === 'message' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Mesaj Ayarları</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Mesaj Ayarları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
+                <label className="block text-sm text-gray-500 mb-2">
                   Maksimum Mesaj Uzunluğu
                 </label>
                 <input
@@ -516,14 +516,14 @@ export default function SettingsPage() {
         {/* Membership Settings */}
         {activeTab === 'membership' && (
           <div className="admin-card">
-            <h2 className="text-lg font-semibold text-white mb-4">Üyelik Fiyatları</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Üyelik Fiyatları</h2>
             <div className="space-y-6">
               {/* Discount Percentage */}
-              <div className="border border-gray-700 rounded-lg p-4">
-                <h3 className="text-md font-semibold text-white mb-4">Yıllık İndirim Oranı</h3>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-gray-900 mb-4">Yıllık İndirim Oranı</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
+                    <label className="block text-sm text-gray-500 mb-2">
                       İndirim Yüzdesi (%)
                     </label>
                     <input
@@ -540,7 +540,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500 mt-1">
                       Yıllık üyelik için uygulanacak indirim yüzdesi
                     </p>
-                    <p className="text-xs text-blue-400 mt-2">
+                    <p className="text-xs text-blue-700 mt-2">
                       Yıllık fiyat = (Aylık Fiyat × 12) × (1 - İndirim%)
                     </p>
                   </div>
@@ -548,11 +548,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Premium Tier */}
-              <div className="border border-gray-700 rounded-lg p-4">
-                <h3 className="text-md font-semibold text-white mb-4">Premium Üyelik</h3>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-gray-900 mb-4">Premium Üyelik</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
+                    <label className="block text-sm text-gray-500 mb-2">
                       Aylık Fiyat (₺)
                     </label>
                     <input
@@ -570,10 +570,10 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
+                    <label className="block text-sm text-gray-500 mb-2">
                       Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
                     </label>
-                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                    <div className="admin-input bg-white text-gray-500 cursor-not-allowed">
                       {Math.round((settings.premiumMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -584,11 +584,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Business Tier */}
-              <div className="border border-gray-700 rounded-lg p-4">
-                <h3 className="text-md font-semibold text-white mb-4">Business Üyelik</h3>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-gray-900 mb-4">Business Üyelik</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
+                    <label className="block text-sm text-gray-500 mb-2">
                       Aylık Fiyat (₺)
                     </label>
                     <input
@@ -606,10 +606,10 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
+                    <label className="block text-sm text-gray-500 mb-2">
                       Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
                     </label>
-                    <div className="admin-input bg-gray-800 text-gray-400 cursor-not-allowed">
+                    <div className="admin-input bg-white text-gray-500 cursor-not-allowed">
                       {Math.round((settings.businessMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">

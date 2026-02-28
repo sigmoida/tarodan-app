@@ -144,7 +144,7 @@ export default function BrandsPage() {
                     </div>
                     <button
                         onClick={openCreateModal}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600 transition-colors"
                     >
                         <PlusIcon className="w-5 h-5" />
                         Yeni Marka Ekle
@@ -201,7 +201,7 @@ export default function BrandsPage() {
                                                         className="w-10 h-10 rounded-lg object-contain bg-gray-100"
                                                     />
                                                 ) : (
-                                                    <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 font-bold">
+                                                    <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
                                                         {brand.name.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
@@ -223,7 +223,7 @@ export default function BrandsPage() {
                                                     Ziyaret Et
                                                 </a>
                                             ) : (
-                                                <span className="text-gray-400 text-sm">-</span>
+                                                <span className="text-gray-500 text-sm">-</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -254,14 +254,14 @@ export default function BrandsPage() {
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => openEditModal(brand)}
-                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                                                    className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
                                                     title="Düzenle"
                                                 >
                                                     <PencilIcon className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setDeleteConfirm(brand.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                                                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
                                                     title="Sil"
                                                 >
                                                     <TrashIcon className="w-4 h-4" />
@@ -376,7 +376,7 @@ export default function BrandsPage() {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                                            className="px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600"
                                         >
                                             {editingBrand ? 'Güncelle' : 'Ekle'}
                                         </button>
@@ -408,7 +408,7 @@ export default function BrandsPage() {
                                     </button>
                                     <button
                                         onClick={() => handleDelete(deleteConfirm)}
-                                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                        className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600"
                                     >
                                         Sil
                                     </button>

@@ -115,15 +115,15 @@ export default function UsersPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Kullanıcılar</h1>
-            <p className="text-gray-400 mt-1">Toplam {total} kullanıcı</p>
+            <h1 className="text-2xl font-bold text-gray-900">Kullanıcılar</h1>
+            <p className="text-gray-500 mt-1">Toplam {total} kullanıcı</p>
           </div>
         </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 flex gap-2">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
             <input
               type="text"
               placeholder="E-posta veya isim ara..."
@@ -173,7 +173,7 @@ export default function UsersPage() {
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-400">
+                    <td colSpan={8} className="text-center py-8 text-gray-500">
                       Kullanıcı bulunamadı
                     </td>
                   </tr>
@@ -182,14 +182,14 @@ export default function UsersPage() {
                     <tr key={user.id}>
                       <td>
                         <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center mr-3">
-                            <span className="text-primary-500 font-medium">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                            <span className="text-primary-600 font-medium">
                               {user.displayName?.charAt(0) ?? '?'}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium text-white">{user.displayName}</p>
-                            <p className="text-sm text-gray-400">{user.email}</p>
+                            <p className="font-medium text-gray-900">{user.displayName}</p>
+                            <p className="text-sm text-gray-500">{user.email}</p>
                           </div>
                         </div>
                       </td>
@@ -219,12 +219,12 @@ export default function UsersPage() {
                       </td>
                       <td>{user.ordersCount}</td>
                       <td>{user.productsCount}</td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {new Date(user.createdAt).toLocaleDateString('tr-TR')}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {user.lastLoginAt ? (
-                          <span className="text-gray-300">
+                          <span className="text-gray-600">
                             {new Date(user.lastLoginAt).toLocaleDateString('tr-TR', {
                               day: '2-digit',
                               month: '2-digit',
@@ -237,11 +237,11 @@ export default function UsersPage() {
                           <span className="text-gray-500">Hiç giriş yapmadı</span>
                         )}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/users/${user.id}`}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -250,8 +250,8 @@ export default function UsersPage() {
                             onClick={() => handleBanUser(user.id, user.isBanned)}
                             className={`p-2 rounded-lg ${
                               user.isBanned
-                                ? 'text-green-400 hover:bg-green-500/10'
-                                : 'text-red-400 hover:bg-red-500/10'
+                                ? 'text-green-700 hover:bg-green-500/10'
+                                : 'text-red-600 hover:bg-red-500/10'
                             }`}
                             title={user.isBanned ? 'Engeli Kaldır' : 'Engelle'}
                           >
@@ -273,7 +273,7 @@ export default function UsersPage() {
 
         {/* Pagination */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-500">
             Sayfa {page} / {Math.ceil(total / 20)}
           </p>
           <div className="flex gap-2">
