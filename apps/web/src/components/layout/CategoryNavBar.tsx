@@ -55,8 +55,8 @@ const CATEGORY_BAR_ITEMS = {
 };
 
 // Helper function to group manufacturers alphabetically
-function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: string; items: string[] }> {
-    const groups: Array<{ range: string; items: string[] }> = [
+function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: string; items: Array<{ name: string; id: string }> }> {
+    const groups: Array<{ range: string; items: Array<{ name: string; id: string }> }> = [
         { range: 'A-E', items: [] },
         { range: 'E-M', items: [] },
         { range: 'N-S', items: [] },
@@ -66,13 +66,13 @@ function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: strin
     manufacturers.forEach((mfr) => {
         const firstLetter = mfr.name.charAt(0).toUpperCase();
         if (firstLetter >= 'A' && firstLetter <= 'E') {
-            groups[0].items.push(mfr.name);
+            groups[0].items.push({ name: mfr.name, id: mfr.id });
         } else if (firstLetter >= 'E' && firstLetter <= 'M') {
-            groups[1].items.push(mfr.name);
+            groups[1].items.push({ name: mfr.name, id: mfr.id });
         } else if (firstLetter >= 'N' && firstLetter <= 'S') {
-            groups[2].items.push(mfr.name);
+            groups[2].items.push({ name: mfr.name, id: mfr.id });
         } else if (firstLetter >= 'T' && firstLetter <= 'Z') {
-            groups[3].items.push(mfr.name);
+            groups[3].items.push({ name: mfr.name, id: mfr.id });
         }
     });
 
@@ -80,7 +80,7 @@ function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: strin
     return groups
         .map((group) => ({
             range: group.range,
-            items: group.items.sort((a, b) => a.localeCompare(b)),
+            items: group.items.sort((a, b) => a.name.localeCompare(b.name)),
         }))
         .filter((group) => group.items.length > 0);
 }
@@ -227,12 +227,12 @@ export default function CategoryNavBar() {
                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{group.range}</p>
                                             <div className="flex flex-wrap gap-x-1 gap-y-0.5">
                                                 {group.items.map((item, idx) => (
-                                                    <span key={item} className="inline-flex">
+                                                    <span key={item.id} className="inline-flex">
                                                         <Link
-                                                            href={`/listings?manufacturer=${encodeURIComponent(item)}`}
+                                                            href={`/listings?manufacturer=${encodeURIComponent(item.name)}&manufacturerId=${encodeURIComponent(item.id)}`}
                                                             className="text-xs text-gray-600 hover:text-orange-600 transition-colors"
                                                         >
-                                                            {item}
+                                                            {item.name}
                                                         </Link>
                                                         {idx < group.items.length - 1 && <span className="text-gray-300 mx-1">·</span>}
                                                     </span>
