@@ -397,7 +397,7 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
-      <div className="flex-1 flex min-h-0 max-w-4xl mx-auto w-full shadow-lg rounded-none sm:rounded-lg overflow-hidden bg-white mt-0 sm:mt-4 mb-4">
+      <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full lg:max-w-[90%] xl:max-w-[85%] overflow-hidden bg-white border-x border-gray-200 sm:mt-0">
         {/* Sol panel: Konuşma listesi (e-ticaret tarzı) */}
         <div className="w-full sm:w-80 flex flex-col min-h-0 bg-white border-r border-gray-200">
           <div className="flex-shrink-0 px-4 py-4 border-b border-gray-200 bg-white">
@@ -620,7 +620,7 @@ export default function MessagesPage() {
                       {sending ? '...' : t('common.send')}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">ℹ️ {t('message.blockedContent')}</p>
+                  <p className="text-xs text-gray-300 mt-1.5">{newMessage.length}/{maxMessageLength}</p>
                 </div>
               </div>
             </>

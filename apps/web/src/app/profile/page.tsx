@@ -334,10 +334,10 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
-      {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-600 pt-8 pb-24">
-        <div className="max-w-5xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-orange-500 pt-8 pb-24">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
@@ -416,7 +416,7 @@ export default function ProfilePage() {
               {/* Edit Button */}
               <Link
                 href="/profile/edit"
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded text-white transition-colors flex-shrink-0"
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded text-white text-sm font-medium transition-colors flex-shrink-0"
               >
                 <PencilSquareIcon className="w-5 h-5" />
                 <span>{t('profile.editProfile')}</span>
@@ -427,7 +427,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-5xl mx-auto px-4 -mt-16">
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 -mt-16">
         {/* Stats Cards */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -496,7 +496,7 @@ export default function ProfilePage() {
               {profile.membership.tier.type === 'free' && (
                 <Link
                   href="/pricing"
-                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded transition-all shadow-sm hover:shadow-md"
+                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded transition-colors"
                 >
                   🚀 Premium'a Yükselt
                 </Link>

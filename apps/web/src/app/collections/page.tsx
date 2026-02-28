@@ -9,9 +9,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
-  BarsArrowUpIcon,
-  BarsArrowDownIcon,
   FolderPlusIcon,
+  EyeIcon,
+  HeartIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
@@ -38,7 +39,6 @@ interface Collection {
 
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
-// Flatten category tree for dropdown (root + children with indent)
 function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
   const out: { id: string; name: string; slug: string }[] = [];
   for (const c of tree) {
@@ -51,7 +51,7 @@ function flattenCategories(tree: { id: string; name: string; slug: string; child
 }
 
 export default function CollectionsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -61,7 +61,6 @@ export default function CollectionsPage() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
-  const [showFilters, setShowFilters] = useState(false);
   const [categorySlug, setCategorySlug] = useState(searchParams.get('category') || '');
 
   useEffect(() => {
@@ -77,7 +76,6 @@ export default function CollectionsPage() {
     router.replace(q ? `?${q}` : '/collections', { scroll: false });
   };
 
-  // Categories for filter dropdown (refresh=1 so API cache is cleared and we get simplified 8 categories)
   const { data: categoriesTree } = useQuery({
     queryKey: ['categories', 'collections'],
     queryFn: async () => {
@@ -91,7 +89,6 @@ export default function CollectionsPage() {
     [categoriesTree],
   );
 
-  // Public collections: React Query (cache + refetch on sort/search/category)
   const categoryParam = typeof categorySlug === 'string' ? categorySlug.trim() : '';
   const publicQuery = useQuery({
     queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParam || null],
@@ -109,7 +106,6 @@ export default function CollectionsPage() {
   });
   const collections = publicQuery.data ?? [];
 
-  // My collections: React Query (only when authenticated)
   const myQuery = useQuery({
     queryKey: ['collections', 'mine'],
     queryFn: async (): Promise<Collection[]> => {
@@ -134,11 +130,9 @@ export default function CollectionsPage() {
     setShowCreateModal(true);
   };
 
-  // Client-side filtering and sorting for my collections
   const filteredAndSortedCollections = useMemo(() => {
     let result = activeTab === 'public' ? collections : myCollections;
 
-    // Client-side search for my collections (public uses backend search)
     if (activeTab === 'mine' && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(
@@ -149,7 +143,6 @@ export default function CollectionsPage() {
       );
     }
 
-    // Client-side sorting for my collections
     if (activeTab === 'mine') {
       const sorted = [...result];
       switch (sortBy) {
@@ -160,16 +153,8 @@ export default function CollectionsPage() {
           sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           break;
         case 'name':
-          // Case-insensitive alphabetical sort (Turkish locale aware)
-          const collator = new Intl.Collator('tr', { 
-            sensitivity: 'base',
-            numeric: false
-          });
-          sorted.sort((a, b) => {
-            const nameA = a.name.toLowerCase();
-            const nameB = b.name.toLowerCase();
-            return collator.compare(nameA, nameB);
-          });
+          const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
+          sorted.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
           break;
         case 'items_asc':
           sorted.sort((a, b) => (a.itemCount || 0) - (b.itemCount || 0));
@@ -184,66 +169,60 @@ export default function CollectionsPage() {
     return result;
   }, [activeTab, collections, myCollections, searchQuery, sortBy]);
 
-  const handleSearch = () => {
-    // Public: useQuery refetches when searchQuery/sortBy (queryKey) change. Mine: client-side filter via useMemo.
-  };
-
   const displayedCollections = filteredAndSortedCollections;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{t('collection.collections')}</h1>
-            <p className="text-gray-600 mt-1">
-              {t('footer.description')}
-            </p>
+      {/* Page Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+                {t('collection.collections')}
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">{t('footer.description')}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {isAuthenticated && limits?.canCreateCollections && (
+                <button
+                  onClick={handleCreateClick}
+                  className="px-4 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <FolderPlusIcon className="w-4 h-4" />
+                  {t('collection.createCollection')}
+                </button>
+              )}
+              {isAuthenticated && !limits?.canCreateCollections && (
+                <Link
+                  href="/pricing"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
+                >
+                  {t('membership.upgrade')}
+                </Link>
+              )}
+            </div>
           </div>
-          {isAuthenticated && limits?.canCreateCollections && (
-            <button
-              onClick={handleCreateClick}
-              className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded transition-colors"
-            >
-              + {t('collection.createCollection')}
-            </button>
-          )}
-          {isAuthenticated && !limits?.canCreateCollections && (
-            <Link
-              href="/pricing"
-              className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded transition-colors"
-            >
-              {t('membership.upgrade')}
-            </Link>
-          )}
         </div>
+      </div>
 
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
         {/* Tabs */}
         {isAuthenticated && (
-          <div className="flex gap-4 mb-6">
+          <div className="flex gap-1 mb-5 bg-gray-100 rounded p-0.5 w-fit">
             <button
-              onClick={() => {
-                setActiveTab('public');
-                setSearchQuery('');
-              }}
-              className={`px-4 py-2 rounded transition-colors ${
-                activeTab === 'public'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
+              className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                activeTab === 'public' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {t('collection.isPublic')}
             </button>
             <button
-              onClick={() => {
-                setActiveTab('mine');
-                setSearchQuery('');
-              }}
-              className={`px-4 py-2 rounded transition-colors ${
-                activeTab === 'mine'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
+              className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                activeTab === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {t('collection.myCollections')} ({myCollections.length})
@@ -251,170 +230,158 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {/* Search and Filters */}
-        <div className="mb-6 space-y-4">
-          {/* Search Bar */}
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        {/* Search & Sort Bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder={t('collection.searchCollections')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                ✕
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="w-4 h-4" />
               </button>
             )}
           </div>
-
-          {/* Sort and Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors text-gray-700"
-              >
-                <FunnelIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">{t('product.filters')}</span>
-              </button>
-              {activeTab === 'public' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 font-medium">{t('common.category')}:</label>
-                  <select
-                    value={categorySlug}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white min-w-[160px]"
-                  >
-                    <option value="">{t('common.all')}</option>
-                    {flatCategories.map((cat) => (
-                      <option key={cat.id} value={cat.slug}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 font-medium">{t('common.sort')}:</label>
+          <div className="flex items-center gap-2">
+            {activeTab === 'public' && (
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                value={categorySlug}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400 min-w-[140px]"
               >
-                <option value="popular">{t('common.popular')}</option>
-                <option value="recent">{t('common.newest')}</option>
-                <option value="name">A-Z</option>
-                <option value="items_desc">{t('common.desc')}</option>
-                <option value="items_asc">{t('common.asc')}</option>
+                <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
+                {flatCategories.map((cat) => (
+                  <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                ))}
               </select>
-            </div>
+            )}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400"
+            >
+              <option value="popular">{t('common.popular')}</option>
+              <option value="recent">{t('common.newest')}</option>
+              <option value="name">A-Z</option>
+              <option value="items_desc">{t('common.desc')}</option>
+              <option value="items_asc">{t('common.asc')}</option>
+            </select>
           </div>
-
-          {/* Results Count */}
-          {(displayedCollections.length > 0 || categoryParam || searchQuery.trim()) && (
-            <p className="text-sm text-gray-600">
-              {displayedCollections.length} koleksiyon bulundu
-              {categoryParam && flatCategories.find((c) => c.slug === categoryParam) && (
-                <> · Kategori: {flatCategories.find((c) => c.slug === categoryParam)?.name}</>
-              )}
-              {searchQuery.trim() && ` · "${searchQuery}"`}
-            </p>
-          )}
         </div>
+
+        {/* Results Info */}
+        {(displayedCollections.length > 0 || categoryParam || searchQuery.trim()) && (
+          <p className="text-xs text-gray-500 mb-4">
+            {displayedCollections.length} {locale === 'en' ? 'collections found' : 'koleksiyon bulundu'}
+            {categoryParam && flatCategories.find((c) => c.slug === categoryParam) && (
+              <> · {flatCategories.find((c) => c.slug === categoryParam)?.name}</>
+            )}
+            {searchQuery.trim() && ` · "${searchQuery}"`}
+          </p>
+        )}
 
         {/* Collections Grid */}
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-gray-200" />
+                <div className="p-3 space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : displayedCollections.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">
-              {searchQuery
-                ? `"${searchQuery}" ${t('common.noResults')}`
-                : activeTab === 'mine'
-                ? t('collection.noCollections')
-                : t('collection.noCollections')}
+          <div className="text-center py-20 bg-white rounded border border-gray-200">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-50 rounded mb-4">
+              <FolderPlusIcon className="w-7 h-7 text-gray-400" />
+            </div>
+            <p className="text-gray-600 text-lg font-medium mb-1">
+              {searchQuery ? `"${searchQuery}" ${t('common.noResults')}` : t('collection.noCollections')}
+            </p>
+            <p className="text-gray-400 text-sm mb-4">
+              {locale === 'en' ? 'Start building your collection today' : 'Koleksiyonunuzu bugün oluşturmaya başlayın'}
             </p>
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="mt-4 px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors"
-              >
+              <button onClick={() => setSearchQuery('')} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
                 {t('common.clear')}
               </button>
             )}
             {activeTab === 'mine' && !searchQuery && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="mt-4 px-6 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded transition-colors"
-              >
+              <button onClick={() => setShowCreateModal(true)} className="px-5 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors">
                 {t('collection.createCollection')}
               </button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {displayedCollections.map((collection) => (
-              <Link
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {displayedCollections.map((collection, index) => (
+              <motion.div
                 key={collection.id}
-                href={`/collections/${collection.id}`}
-                className="bg-white rounded overflow-hidden shadow-sm hover:shadow-md hover:ring-2 hover:ring-primary-500 transition-all"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.02 }}
               >
-                <div className="aspect-video bg-gray-100 relative">
-                  {collection.coverImageUrl ? (
-                    <OptimizedImage
-                      src={collection.coverImageUrl}
-                      alt={collection.name}
-                      fill
-                      className="object-cover"
-                      fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
-                      logContext={{ collectionId: collection.id, page: 'collections' }}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-6xl">
-                      🚗
-                    </div>
-                  )}
-                  <div className="absolute top-2 right-2">
-                    {collection.isPublic ? (
-                      <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-sm">
-                        {t('collection.isPublic')}
-                      </span>
+                <Link
+                  href={`/collections/${collection.id}`}
+                  className="block bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full"
+                >
+                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                    {collection.coverImageUrl ? (
+                      <OptimizedImage
+                        src={collection.coverImageUrl}
+                        alt={collection.name}
+                        fill
+                        className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                        fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Koleksiyon"
+                        logContext={{ collectionId: collection.id, page: 'collections' }}
+                      />
                     ) : (
-                      <span className="px-2 py-1 bg-gray-500/90 text-white text-xs rounded-sm">
-                        {t('collection.isPrivate')}
-                      </span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 text-4xl">
+                        🚗
+                      </div>
                     )}
+                    <div className="absolute top-1.5 right-1.5">
+                      {collection.isPublic ? (
+                        <span className="px-1.5 py-0.5 bg-emerald-500/90 text-white text-[10px] font-medium rounded">
+                          {t('collection.isPublic')}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 bg-gray-600/90 text-white text-[10px] font-medium rounded">
+                          {t('collection.isPrivate')}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold text-gray-900">{collection.name}</h3>
-                  {collection.description && (
-                    <p className="text-gray-500 text-sm mt-1 line-clamp-2">
-                      {collection.description}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between mt-3 text-sm text-gray-500">
-                    <span>{collection.itemCount} ürün</span>
-                    <span>@{collection.userName || collection.user?.displayName || 'Kullanıcı'}</span>
+                  <div className="p-2.5">
+                    <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
+                    {collection.description && (
+                      <p className="text-gray-400 text-[10px] mt-0.5 line-clamp-1">{collection.description}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
+                      <span className="font-medium">{collection.itemCount} {locale === 'en' ? 'items' : 'ürün'}</span>
+                      <div className="flex items-center gap-2">
+                        {collection.viewCount !== undefined && (
+                          <span className="flex items-center gap-0.5"><EyeIcon className="w-3 h-3" />{collection.viewCount}</span>
+                        )}
+                        {collection.likeCount !== undefined && (
+                          <span className="flex items-center gap-0.5"><HeartIcon className="w-3 h-3" />{collection.likeCount}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1.5 pt-1.5 border-t border-gray-100">
+                      <span className="text-[10px] text-gray-400">@{collection.userName || collection.user?.displayName || 'Kullanıcı'}</span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </motion.div>
             ))}
           </div>
         )}
@@ -440,27 +407,18 @@ export default function CollectionsPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded max-w-md w-full p-6 text-center"
           >
-            <div className="w-16 h-16 bg-amber-100 rounded flex items-center justify-center mx-auto mb-4">
-              <FolderPlusIcon className="w-8 h-8 text-amber-600" />
+            <div className="w-14 h-14 bg-orange-50 rounded flex items-center justify-center mx-auto mb-4">
+              <FolderPlusIcon className="w-7 h-7 text-orange-500" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              Premium Üyelik Gerekli
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Koleksiyon oluşturma özelliği sadece Premium ve üzeri üyelikler için aktiftir. 
-              Üyeliğinizi yükselterek kendi koleksiyonlarınızı oluşturabilir ve paylaşabilirsiniz.
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Premium Üyelik Gerekli</h2>
+            <p className="text-gray-500 text-sm mb-5">
+              Koleksiyon oluşturma özelliği sadece Premium ve üzeri üyelikler için aktiftir.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => setShowPremiumModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors"
-              >
+            <div className="flex gap-3">
+              <button onClick={() => setShowPremiumModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors text-sm">
                 Vazgeç
               </button>
-              <Link
-                href="/membership"
-                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded font-medium hover:bg-primary-600 transition-colors text-center"
-              >
+              <Link href="/membership" className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded font-medium hover:bg-orange-600 transition-colors text-center text-sm">
                 Üyeliği Yükselt
               </Link>
             </div>
@@ -502,11 +460,8 @@ function CreateCollectionModal({
       if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';
       alert(errorMessage);
-      // If it's a membership restriction error, suggest upgrading
       if (errorMessage.includes('üyeliğiniz') || errorMessage.includes('yetkiniz yok')) {
-        setTimeout(() => {
-          window.location.href = '/pricing';
-        }, 2000);
+        setTimeout(() => { window.location.href = '/pricing'; }, 2000);
       }
     } finally {
       setLoading(false);
@@ -516,41 +471,39 @@ function CreateCollectionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900">Yeni Koleksiyon</h2>
+        <h2 className="text-lg font-bold mb-4 text-gray-900">Yeni Koleksiyon</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">İsim</label>
+            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">İsim</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
               placeholder="Hot Wheels Koleksiyonum"
               required
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Açıklama</label>
+            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Açıklama</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
               placeholder="Koleksiyon hakkında..."
               rows={3}
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Kategori</label>
+            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Kategori</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-orange-400"
             >
               <option value="">Kategori seçin (isteğe bağlı)</option>
               {flatCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
@@ -560,24 +513,18 @@ function CreateCollectionModal({
               id="isPublic"
               checked={isPublic}
               onChange={(e) => setIsPublic(e.target.checked)}
-              className="w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+              className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
             />
-            <label htmlFor="isPublic" className="text-sm text-gray-700">
-              Herkese açık koleksiyon
-            </label>
+            <label htmlFor="isPublic" className="text-sm text-gray-700">Herkese açık koleksiyon</label>
           </div>
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors font-medium"
-            >
+            <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
               İptal
             </button>
             <button
               type="submit"
               disabled={loading || !name}
-              className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Oluşturuluyor...' : 'Oluştur'}
             </button>

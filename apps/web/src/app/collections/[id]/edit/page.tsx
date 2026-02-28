@@ -227,7 +227,7 @@ export default function EditCollectionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
           <p className="text-gray-600">{t('collection.loading')}</p>
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function EditCollectionPage() {
           <p className="text-red-600 mb-4">{error || t('collection.collectionNotFound')}</p>
           <button
             onClick={() => router.push('/collections')}
-            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm font-medium transition-colors"
           >
             {t('collection.backToCollections')}
           </button>
@@ -252,32 +252,32 @@ export default function EditCollectionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-          >
-            <ArrowLeftIcon className="w-5 h-5" />
-            <span>{t('common.back')}</span>
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-3xl mx-auto px-6 sm:px-8 py-4">
+          <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors mb-3">
+            <ArrowLeftIcon className="w-4 h-4" />{t('common.back')}
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">{t('collection.editCollectionTitle')}</h1>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+            {t('collection.editCollectionTitle')}
+          </h1>
         </div>
+      </div>
+      <div className="max-w-3xl mx-auto px-6 sm:px-8 py-6">
 
         {/* Form */}
-        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+        <div className="bg-white rounded border border-gray-200 p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('collection.collectionNameLabel')}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
                 placeholder={t('collection.namePlaceholder')}
                 required
                 minLength={3}
@@ -290,13 +290,13 @@ export default function EditCollectionPage() {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('collection.descriptionLabel')}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
                 placeholder={t('collection.descriptionPlaceholder')}
                 rows={5}
                 maxLength={500}
@@ -308,13 +308,13 @@ export default function EditCollectionPage() {
 
             {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('common.category')}
               </label>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400"
               >
                 <option value="">{t('common.none')}</option>
                 {flatCategories.map((cat) => (
@@ -332,7 +332,7 @@ export default function EditCollectionPage() {
               </label>
               <div className="space-y-3">
                 {coverImagePreview && (
-                  <div className="relative w-full h-48 rounded-xl overflow-hidden border border-gray-300">
+                  <div className="relative w-full h-48 rounded overflow-hidden border border-gray-200">
                     <OptimizedImage
                       src={coverImagePreview}
                       alt="Cover preview"
@@ -347,7 +347,7 @@ export default function EditCollectionPage() {
                   accept="image/*"
                   onChange={handleCoverImageChange}
                   disabled={isUploadingCover}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {isUploadingCover && (
                   <p className="text-sm text-gray-500">Yükleniyor...</p>
@@ -359,13 +359,13 @@ export default function EditCollectionPage() {
             </div>
 
             {/* Public/Private */}
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
               <input
                 type="checkbox"
                 id="isPublic"
                 checked={isPublic}
                 onChange={(e) => setIsPublic(e.target.checked)}
-                className="w-5 h-5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
               />
               <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 cursor-pointer">
                 {t('collection.publicCollection')}
@@ -383,14 +383,14 @@ export default function EditCollectionPage() {
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium"
+                  className="flex-1 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || !name.trim()}
-                  className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="flex-1 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? t('collection.saving') : t('collection.saveChanges')}
                 </button>
@@ -400,7 +400,7 @@ export default function EditCollectionPage() {
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors"
               >
                 <TrashIcon className="w-5 h-5" />
                 {t('collection.deleteCollection')}
@@ -413,11 +413,11 @@ export default function EditCollectionPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">
+          <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-bold mb-3 text-gray-900">
               {t('collection.deleteCollection')}
             </h2>
-            <p className="text-gray-700 mb-6">
+            <p className="text-gray-500 text-sm mb-5">
               {t('collection.deleteCollectionConfirm')}
             </p>
             <div className="flex gap-3">
@@ -425,7 +425,7 @@ export default function EditCollectionPage() {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={isDeleting}
-                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('common.cancel')}
               </button>
@@ -433,7 +433,7 @@ export default function EditCollectionPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting ? t('collection.deleting') : t('collection.yesDelete')}
               </button>

@@ -57,15 +57,23 @@ export default function RootLayout({
             <Footer />
             <CookieConsentBanner />
             <Toaster
-              position="top-right"
+              position="bottom-right"
               toastOptions={{
-                duration: 4000,
+                duration: 2500,
                 style: {
-                  background: '#1a1a1a',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  padding: '12px 16px',
+                  background: '#fff',
+                  color: '#1a1a1a',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  padding: '10px 14px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                },
+                success: {
+                  style: { borderLeft: '3px solid #22c55e' },
+                },
+                error: {
+                  style: { borderLeft: '3px solid #ef4444' },
                 },
               }}
             />

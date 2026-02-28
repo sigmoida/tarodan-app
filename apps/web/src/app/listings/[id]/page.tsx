@@ -854,7 +854,7 @@ export default function ListingDetailPage() {
               {isTradeAvailable && (
                 <div className="absolute top-4 left-4 badge badge-trade text-base z-10">
                   <ArrowsRightLeftIcon className="w-5 h-5 mr-1" />
-                  {t('product.tradeAccepted')}
+                  {locale === 'en' ? 'Trade Available' : 'Takasa Açık'}
                 </div>
               )}
 

@@ -8,7 +8,6 @@ import Image from 'next/image';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  CurrencyDollarIcon,
   InboxArrowDownIcon,
   PaperAirplaneIcon,
   CheckCircleIcon,
@@ -19,7 +18,6 @@ import {
   ChatBubbleLeftIcon,
   ArrowLeftIcon,
   TagIcon,
-  UserIcon,
   CalendarIcon,
   ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
@@ -200,90 +198,65 @@ export default function OffersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Header */}
-      <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              <span>{locale === 'en' ? 'Back to Profile' : 'Profile Dön'}</span>
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <CurrencyDollarIcon className="w-8 h-8 text-white" />
-            </div>
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+                <span className="w-1 h-6 bg-orange-500 rounded-sm" />
                 {locale === 'en' ? 'My Offers' : 'Tekliflerim'}
               </h1>
-              <p className="text-orange-100">
+              <p className="text-sm text-gray-500 mt-1">
                 {locale === 'en' ? 'Manage your offers and negotiations' : 'Tekliflerinizi ve pazarlıklarınızı yönetin'}
               </p>
             </div>
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+              {locale === 'en' ? 'Back to Profile' : 'Profile Dön'}
+            </Link>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/10 backdrop-blur-sm rounded-xl p-4"
-            >
-              <div className="flex items-center gap-3">
-                <ClockIcon className="w-8 h-8 text-amber-200" />
-                <div>
-                  <p className="text-2xl font-bold text-white">{pendingCount}</p>
-                  <p className="text-sm text-orange-100">{locale === 'en' ? 'Pending' : 'Bekleyen'}</p>
-                </div>
+          {/* Stats Row */}
+          <div className="mt-4 flex flex-wrap gap-4 bg-white rounded border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <ClockIcon className="w-5 h-5 text-amber-500" />
+              <div>
+                <p className="text-lg font-semibold text-gray-900">{pendingCount}</p>
+                <p className="text-xs text-gray-500">{locale === 'en' ? 'Pending' : 'Bekleyen'}</p>
               </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white/10 backdrop-blur-sm rounded-xl p-4"
-            >
-              <div className="flex items-center gap-3">
-                <CheckCircleIcon className="w-8 h-8 text-green-300" />
-                <div>
-                  <p className="text-2xl font-bold text-white">{acceptedCount}</p>
-                  <p className="text-sm text-orange-100">{locale === 'en' ? 'Accepted' : 'Kabul Edilen'}</p>
-                </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircleIcon className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-lg font-semibold text-gray-900">{acceptedCount}</p>
+                <p className="text-xs text-gray-500">{locale === 'en' ? 'Accepted' : 'Kabul Edilen'}</p>
               </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white/10 backdrop-blur-sm rounded-xl p-4"
-            >
-              <div className="flex items-center gap-3">
-                <TagIcon className="w-8 h-8 text-white" />
-                <div>
-                  <p className="text-2xl font-bold text-white">₺{totalValue.toLocaleString('tr-TR')}</p>
-                  <p className="text-sm text-orange-100">{locale === 'en' ? 'Total Value' : 'Toplam Değer'}</p>
-                </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <TagIcon className="w-5 h-5 text-orange-500" />
+              <div>
+                <p className="text-lg font-semibold text-gray-900">₺{totalValue.toLocaleString('tr-TR')}</p>
+                <p className="text-xs text-gray-500">{locale === 'en' ? 'Total Value' : 'Toplam Değer'}</p>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
         {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm p-2 mb-6 inline-flex">
+        <div className="bg-gray-100 rounded p-0.5 mb-6 inline-flex">
           <button
             onClick={() => setActiveTab('received')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+            className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'received'
-                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <InboxArrowDownIcon className="w-5 h-5" />
@@ -291,10 +264,10 @@ export default function OffersPage() {
           </button>
           <button
             onClick={() => setActiveTab('sent')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+            className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'sent'
-                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <PaperAirplaneIcon className="w-5 h-5" />
@@ -312,13 +285,13 @@ export default function OffersPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-16 bg-white rounded-2xl shadow-sm"
+            className="text-center py-16 bg-white rounded shadow-sm"
           >
             <ExclamationCircleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <p className="text-red-500 mb-4">{error}</p>
             <button
               onClick={() => queryClient.invalidateQueries({ queryKey: ['offers'] })}
-              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-colors"
+              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
             >
               {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
             </button>
@@ -327,9 +300,9 @@ export default function OffersPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded-2xl shadow-sm"
+            className="text-center py-16 bg-white rounded shadow-sm"
           >
-            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-20 h-20 bg-orange-100 rounded flex items-center justify-center mx-auto mb-4">
               {activeTab === 'received' ? (
                 <InboxArrowDownIcon className="w-10 h-10 text-orange-500" />
               ) : (
@@ -348,7 +321,7 @@ export default function OffersPage() {
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
             >
               <TagIcon className="w-5 h-5" />
               {locale === 'en' ? 'Browse Listings' : 'İlanlara Göz At'}
@@ -372,7 +345,7 @@ export default function OffersPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -100 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                    className="bg-white rounded shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                   >
                     <div className="flex flex-col md:flex-row">
                       {/* Product Image */}
@@ -390,13 +363,13 @@ export default function OffersPage() {
                             logContext={{ productId: offer.product.id, page: 'offers' }}
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">
+                          <div className="w-full h-full bg-orange-100 flex items-center justify-center">
                             <TagIcon className="w-10 h-10 text-orange-400" />
                           </div>
                         )}
                         {/* Discount Badge */}
                         {discount > 0 && (
-                          <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-lg text-sm font-bold flex items-center gap-1">
+                          <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
                             <ArrowTrendingDownIcon className="w-4 h-4" />
                             %{discount}
                           </div>
@@ -419,7 +392,7 @@ export default function OffersPage() {
                           </div>
 
                           {/* Status Badge */}
-                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${statusConfig.bg} ${statusConfig.text}`}>
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded ${statusConfig.bg} ${statusConfig.text}`}>
                             <StatusIcon className="w-4 h-4" />
                             <span className="text-sm font-medium">{statusConfig.label}</span>
                           </div>
@@ -427,7 +400,7 @@ export default function OffersPage() {
 
                         {/* Offer Amount & User */}
                         <div className="flex items-center gap-6 mb-4">
-                          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl px-4 py-3">
+                          <div className="bg-orange-50 border border-orange-200 rounded px-4 py-3">
                             <p className="text-xs text-gray-500 mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
                             <p className="text-2xl font-bold text-orange-600">
                               ₺{offer.amount.toLocaleString('tr-TR')}
@@ -436,7 +409,7 @@ export default function OffersPage() {
 
                           {otherUser && (
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold">
+                              <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">
                                 {otherUser.avatarUrl ? (
                                   <Image
                                     src={otherUser.avatarUrl}
@@ -459,7 +432,7 @@ export default function OffersPage() {
                           )}
 
                           {timeRemaining && (
-                            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded">
                               <ClockIcon className="w-4 h-4" />
                               <span className="text-sm font-medium">{timeRemaining} kaldı</span>
                             </div>
@@ -468,7 +441,7 @@ export default function OffersPage() {
 
                         {/* Message */}
                         {offer.message && (
-                          <div className="flex items-start gap-2 bg-gray-50 rounded-lg p-3 mb-4">
+                          <div className="flex items-start gap-2 bg-gray-50 rounded p-3 mb-4">
                             <ChatBubbleLeftIcon className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                             <p className="text-gray-600 text-sm italic">"{offer.message}"</p>
                           </div>
@@ -495,7 +468,7 @@ export default function OffersPage() {
                                   <button
                                     onClick={() => handleAccept(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded-xl text-sm font-medium transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     {actionLoading === offer.id ? (
                                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -507,7 +480,7 @@ export default function OffersPage() {
                                   <button
                                     onClick={() => handleReject(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-xl text-sm font-medium transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     <XMarkIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Reject' : 'Reddet'}
@@ -517,7 +490,7 @@ export default function OffersPage() {
                                 <button
                                   onClick={() => handleCancel(offer.id)}
                                   disabled={actionLoading === offer.id}
-                                  className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded-xl text-sm font-medium transition-colors"
+                                  className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded text-sm font-medium transition-colors"
                                 >
                                   {actionLoading === offer.id ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -533,7 +506,7 @@ export default function OffersPage() {
                           {offer.status === 'accepted' && (
                             <Link
                               href="/orders"
-                              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-medium transition-colors"
+                              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
                             >
                               {locale === 'en' ? 'View Order' : 'Siparişi Görüntüle'}
                             </Link>

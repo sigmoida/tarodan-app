@@ -562,10 +562,10 @@ export default function Home() {
                 </div>
               </div>
             ) : featuredCollectorToShow ? (
-              <div className="bg-white border border-gray-200 p-5 flex flex-col" style={{borderRadius:'4px'}}>
+              <div className="bg-orange-50 border border-orange-100 p-5 flex flex-col" style={{borderRadius:'4px'}}>
                   <div className="flex justify-start mb-4">
                     <h2 className="text-xl font-extrabold text-heading tracking-tight flex items-center gap-2">
-                      <div className="w-1 h-7 bg-primary-500 rounded-sm flex-shrink-0" />
+                      <div className="w-1 h-7 bg-orange-500 rounded-sm flex-shrink-0" />
                       {locale === 'en' ? 'Collector of the Week' : 'Haftanın Koleksiyoneri'}
                     </h2>
                   </div>
@@ -627,7 +627,7 @@ export default function Home() {
                 </div>
               </div>
             ) : companyOfWeek ? (
-              <div className="bg-orange-50 border border-orange-100 p-5 flex flex-col" style={{borderRadius:'4px'}}>
+              <div className="bg-white border border-gray-200 p-5 flex flex-col" style={{borderRadius:'4px'}}>
                   <div className="flex justify-start mb-4">
                     <h2 className="text-xl font-extrabold text-heading tracking-tight flex items-center gap-2">
                       <div className="w-1 h-7 bg-primary-500 rounded-sm flex-shrink-0" />

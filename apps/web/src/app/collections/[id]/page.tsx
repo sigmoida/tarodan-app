@@ -73,7 +73,6 @@ interface Collection {
   updatedAt: string;
 }
 
-// UUID format checker
 const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 export default function CollectionDetailPage() {
@@ -81,7 +80,7 @@ export default function CollectionDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -131,25 +130,16 @@ export default function CollectionDetailPage() {
   }, [collectionIdOrSlug, collectionQuery.isError, collectionQuery.error, t]);
 
   const handleLike = async () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
-    if (!collection?.id) {
-      toast.error(t('collection.collectionInfoNotFound'));
-      return;
-    }
+    if (!isAuthenticated) { setShowAuthModal(true); return; }
+    if (!collection?.id) { toast.error(t('collection.collectionInfoNotFound')); return; }
     try {
       await collectionsApi.like(collection.id);
       toast.success(isLiked ? t('collection.unliked') : t('collection.liked'));
       await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || t('collection.likeFailed');
-      if (error?.response?.status === 404) {
-        toast.error(t('collection.collectionNotFound'));
-      } else {
-        toast.error(errorMessage);
-      }
+      if (error?.response?.status === 404) toast.error(t('collection.collectionNotFound'));
+      else toast.error(errorMessage);
     }
   };
 
@@ -171,7 +161,6 @@ export default function CollectionDetailPage() {
     try {
       const response = await userApi.getMyProducts();
       const products = response.data.data || response.data.products || [];
-      // Filter out products that are already in the collection
       const existingProductIds = collection?.items?.map(item => item.productId) || [];
       const availableProducts = products.filter((p: UserProduct) => !existingProductIds.includes(p.id));
       setMyProducts(availableProducts);
@@ -194,19 +183,13 @@ export default function CollectionDetailPage() {
     if (file) {
       setCustomImageFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setCustomImagePreview(reader.result as string);
-      };
+      reader.onloadend = () => { setCustomImagePreview(reader.result as string); };
       reader.readAsDataURL(file);
     }
   };
 
   const handleAddCustomItem = async () => {
-    if (!customTitle.trim() || !collection) {
-      toast.error('Ürün ismi zorunludur');
-      return;
-    }
-
+    if (!customTitle.trim() || !collection) { toast.error('Ürün ismi zorunludur'); return; }
     setAddingItem(true);
     try {
       await collectionsApi.addItem(collection.id, {
@@ -220,15 +203,7 @@ export default function CollectionDetailPage() {
       });
       toast.success(t('collection.productsAddedToCollection'));
       setShowAddItemModal(false);
-      // Reset form
-      setCustomTitle('');
-      setCustomDescription('');
-      setCustomBrand('');
-      setCustomModel('');
-      setCustomYear('');
-      setCustomScale('');
-      setCustomImageFile(null);
-      setCustomImagePreview(null);
+      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomImageFile(null); setCustomImagePreview(null);
       await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to add custom item:', error);
@@ -239,17 +214,10 @@ export default function CollectionDetailPage() {
   };
 
   const handleAddItemToCollection = async () => {
-    if (selectedProductIds.length === 0 || !collection) {
-      toast.error(t('collection.selectItems'));
-      return;
-    }
-
+    if (selectedProductIds.length === 0 || !collection) { toast.error(t('collection.selectItems')); return; }
     setAddingItem(true);
     try {
-      // Add all selected products
-      const addPromises = selectedProductIds.map(productId =>
-        collectionsApi.addItem(collection.id, { productId })
-      );
+      const addPromises = selectedProductIds.map(productId => collectionsApi.addItem(collection.id, { productId }));
       await Promise.all(addPromises);
       toast.success(`${selectedProductIds.length} ${t('collection.productsAddedToCollection')}`);
       setShowAddItemModal(false);
@@ -264,13 +232,7 @@ export default function CollectionDetailPage() {
   };
 
   const toggleProductSelection = (productId: string) => {
-    setSelectedProductIds(prev => {
-      if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
-      } else {
-        return [...prev, productId];
-      }
-    });
+    setSelectedProductIds(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
 
   const isOwner = user?.id === collection?.userId;
@@ -278,13 +240,33 @@ export default function CollectionDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="bg-white border-b border-gray-200">
+          <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+            <div className="animate-pulse flex items-center gap-3">
+              <div className="w-5 h-5 bg-gray-200 rounded" />
+              <div className="h-4 bg-gray-200 rounded w-32" />
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
           <div className="animate-pulse space-y-6">
-            <div className="h-64 bg-gray-200 rounded-xl" />
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded border border-gray-200 p-6 flex gap-6">
+              <div className="w-48 h-48 bg-gray-200 rounded flex-shrink-0" />
+              <div className="flex-1 space-y-3">
+                <div className="h-6 bg-gray-200 rounded w-1/3" />
+                <div className="h-4 bg-gray-200 rounded w-2/3" />
+                <div className="h-3 bg-gray-200 rounded w-1/4" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-64 bg-gray-200 rounded-lg" />
+                <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-gray-200" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -296,10 +278,18 @@ export default function CollectionDetailPage() {
   if (error || !collection) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="text-center py-16">
+        <div className="bg-white border-b border-gray-200">
+          <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+            <Link href="/collections" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm">
+              <ArrowLeftIcon className="w-4 h-4" />
+              {t('collection.backToCollections')}
+            </Link>
+          </div>
+        </div>
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
+          <div className="text-center py-20 bg-white rounded border border-gray-200">
             <p className="text-gray-600 mb-4">{error || t('collection.collectionNotFound')}</p>
-            <Link href="/collections" className="text-primary-500 hover:text-primary-600">
+            <Link href="/collections" className="text-orange-500 hover:text-orange-600 text-sm font-medium">
               {t('collection.backToCollections')}
             </Link>
           </div>
@@ -312,7 +302,6 @@ export default function CollectionDetailPage() {
     return item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
   };
 
-  // Sort items: featured first, then by sortOrder
   const sortedItems = collection.items
     ? [...collection.items].sort((a, b) => {
         if (a.isFeatured && !b.isFeatured) return -1;
@@ -323,42 +312,35 @@ export default function CollectionDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Back Button */}
-        <Link
-          href="/collections"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-          {t('collection.backToCollections')}
-        </Link>
+      {/* Page Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-4">
+          <Link href="/collections" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors">
+            <ArrowLeftIcon className="w-4 h-4" />
+            {t('collection.backToCollections')}
+          </Link>
+        </div>
+      </div>
 
-        {/* Collection Header */}
-        <div className="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm relative">
-          {/* Like Button - Top Right */}
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
+        {/* Collection Header Card */}
+        <div className="mb-6 bg-white rounded border border-gray-200 p-5 relative">
           {!isOwner && (
             <div className="absolute top-4 right-4">
               <button
                 onClick={handleLike}
-                className={`p-2 rounded-lg transition-colors ${
-                  isLiked
-                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                className={`p-2 rounded transition-colors ${
+                  isLiked ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100 text-gray-500'
                 }`}
               >
-                {isLiked ? (
-                  <HeartIconSolid className="w-6 h-6" />
-                ) : (
-                  <HeartIcon className="w-6 h-6" />
-                )}
+                {isLiked ? <HeartIconSolid className="w-5 h-5" /> : <HeartIcon className="w-5 h-5" />}
               </button>
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Cover Image - Left, Smaller */}
+          <div className="flex flex-col md:flex-row gap-5">
             <div className="flex-shrink-0">
-              <div className="w-48 h-48 md:w-56 md:h-56 bg-gray-700 rounded-xl overflow-hidden relative">
+              <div className="w-40 h-40 md:w-48 md:h-48 bg-gray-100 rounded overflow-hidden relative">
                 {collection.coverImageUrl ? (
                   <OptimizedImage
                     src={collection.coverImageUrl}
@@ -369,54 +351,50 @@ export default function CollectionDetailPage() {
                     logContext={{ collectionId: collection.id, page: 'collection-detail-cover' }}
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-5xl">
-                    🚗
-                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 text-4xl">🚗</div>
                 )}
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-1.5 right-1.5">
                   {collection.isPublic ? (
-                    <span className="px-2 py-1 bg-green-500/90 text-white text-xs rounded-full font-medium">
-                      {t('collection.isPublic')}
-                    </span>
+                    <span className="px-1.5 py-0.5 bg-emerald-500/90 text-white text-[10px] font-medium rounded">{t('collection.isPublic')}</span>
                   ) : (
-                    <span className="px-2 py-1 bg-gray-600/90 text-white text-xs rounded-full font-medium">
-                      {t('collection.isPrivate')}
-                    </span>
+                    <span className="px-1.5 py-0.5 bg-gray-600/90 text-white text-[10px] font-medium rounded">{t('collection.isPrivate')}</span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Collection Info - Right */}
             <div className="flex-1 flex flex-col justify-between">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-3 text-gray-900">{collection.name}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  <div className="w-1 h-7 bg-orange-500 rounded-sm flex-shrink-0" />
+                  {collection.name}
+                </h1>
                 {collection.description && (
-                  <p className="text-gray-600 text-base mb-4 leading-relaxed">{collection.description}</p>
+                  <p className="text-gray-500 text-sm mb-3 leading-relaxed">{collection.description}</p>
                 )}
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                  <span className="font-medium">@{collection.userName}</span>
-                  <span className="flex items-center gap-1.5">
-                    <EyeIcon className="w-4 h-4" />
-                    {collection.viewCount} {t('collection.views')}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <HeartIcon className="w-4 h-4" />
-                    {collection.likeCount} {t('collection.likes')}
-                  </span>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
+                  <span className="font-medium text-gray-600">@{collection.userName}</span>
+                  <span className="flex items-center gap-1"><EyeIcon className="w-3.5 h-3.5" />{collection.viewCount} {t('collection.views')}</span>
+                  <span className="flex items-center gap-1"><HeartIcon className="w-3.5 h-3.5" />{collection.likeCount} {t('collection.likes')}</span>
                   <span className="font-medium">{collection.itemCount} {t('collection.products')}</span>
                 </div>
               </div>
 
-              {/* Actions */}
               {isOwner && collection && (
-                <div className="flex items-center gap-3 mt-4">
+                <div className="flex items-center gap-2 mt-4">
                   <Link
                     href={`/collections/${collectionIdOrSlug}/edit`}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                   >
                     {t('collection.edit')}
                   </Link>
+                  <button
+                    onClick={handleOpenAddModal}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    {t('collection.addProduct')}
+                  </button>
                 </div>
               )}
             </div>
@@ -425,13 +403,10 @@ export default function CollectionDetailPage() {
 
         {/* Collection Items */}
         {sortedItems.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-            <p className="text-gray-700 mb-4 text-lg">{t('collection.noProductsYet')}</p>
+          <div className="text-center py-20 bg-white rounded border border-gray-200">
+            <p className="text-gray-600 mb-4 text-base">{t('collection.noProductsYet')}</p>
             {isOwner && (
-              <button
-                onClick={handleOpenAddModal}
-                className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors font-medium"
-              >
+              <button onClick={handleOpenAddModal} className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors">
                 {t('collection.addProduct')}
               </button>
             )}
@@ -439,69 +414,60 @@ export default function CollectionDetailPage() {
         ) : (
           <div>
             {isOwner && (
-              <div className="mb-6 flex justify-end">
+              <div className="mb-4 flex justify-end">
                 <button
                   onClick={handleOpenAddModal}
-                  className="px-4 py-2 bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5"
                 >
-                  <PlusIcon className="w-5 h-5" />
+                  <PlusIcon className="w-4 h-4" />
                   {t('collection.addProduct')}
                 </button>
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {sortedItems.map((item, index) => (
                 <motion.div
                   key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
+                  transition={{ delay: index * 0.03 }}
                 >
-                  <div className="bg-white rounded-xl overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all relative shadow-sm border border-gray-200">
+                  <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all relative group">
                     {item.isFeatured && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-semibold">
-                          {t('collection.featured')}
-                        </span>
+                      <div className="absolute top-1.5 left-1.5 z-10">
+                        <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-[10px] font-semibold rounded">{t('collection.featured')}</span>
                       </div>
                     )}
                     {item.isCustom && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full font-semibold">
-                          Koleksiyon Ürünü
-                        </span>
+                      <div className="absolute top-1.5 right-1.5 z-10">
+                        <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-semibold rounded">Koleksiyon</span>
                       </div>
                     )}
                     {item.productId ? (
-                      <Link
-                        href={`/listings/${item.productId}`}
-                        className="block"
-                      >
-                        <div className="aspect-square bg-gray-100 relative">
+                      <Link href={`/listings/${item.productId}`} className="block">
+                        <div className="aspect-square bg-gray-100 relative overflow-hidden">
                           <OptimizedImage
                             src={getItemImage(item)}
                             alt={item.productTitle}
                             fill
-                            className="object-cover"
+                            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
                             fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
                             logContext={{ itemId: item.id, page: 'collection-detail-linked' }}
                           />
                         </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
-                            {item.productTitle}
-                          </h3>
+                        <div className="p-2.5">
+                          <h3 className="font-medium text-sm line-clamp-2 text-gray-900 group-hover:text-orange-600 transition-colors">{item.productTitle}</h3>
                           {item.productPrice !== undefined && (
-                            <p className="text-primary-500 font-bold text-xl">
-                              {item.productPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                            <p className="text-orange-600 font-bold text-sm mt-1">
+                              {item.productPrice.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
                             </p>
                           )}
                         </div>
                       </Link>
                     ) : (
                       <>
-                        <div className="aspect-square bg-gray-100 relative">
+                        <div className="aspect-square bg-gray-100 relative overflow-hidden">
                           <OptimizedImage
                             src={item.customImageUrl || item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
                             alt={item.productTitle}
@@ -511,32 +477,23 @@ export default function CollectionDetailPage() {
                             logContext={{ itemId: item.id, page: 'collection-detail-custom' }}
                           />
                         </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
-                            {item.productTitle}
-                          </h3>
+                        <div className="p-2.5">
+                          <h3 className="font-medium text-sm line-clamp-2 text-gray-900">{item.productTitle}</h3>
                           {item.customBrand && (
-                            <p className="text-gray-600 text-sm mb-1">
-                              {item.customBrand} {item.customModel && `- ${item.customModel}`}
-                            </p>
+                            <p className="text-gray-500 text-xs mt-0.5">{item.customBrand}{item.customModel && ` · ${item.customModel}`}</p>
                           )}
                           {item.customYear && (
-                            <p className="text-gray-500 text-xs">
-                              {item.customYear}
-                            </p>
+                            <p className="text-gray-400 text-[10px] mt-0.5">{item.customYear}{item.customScale && ` · ${item.customScale}`}</p>
                           )}
                         </div>
                       </>
                     )}
                     {isOwner && (
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleRemoveItem(item.id);
-                        }}
-                        className="absolute top-2 right-2 p-2 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors z-10"
+                        onClick={(e) => { e.preventDefault(); handleRemoveItem(item.id); }}
+                        className="absolute top-1.5 right-1.5 p-1.5 bg-red-500/80 hover:bg-red-600 rounded transition-colors z-10 opacity-0 group-hover:opacity-100"
                       >
-                        <TrashIcon className="w-4 h-4 text-white" />
+                        <TrashIcon className="w-3.5 h-3.5 text-white" />
                       </button>
                     )}
                   </div>
@@ -545,263 +502,167 @@ export default function CollectionDetailPage() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Add Item Modal */}
-        {showAddItemModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900">{t('collection.addProductToCollection')}</h2>
-              
-              {/* Tabs */}
-              <div className="flex gap-2 mb-4 border-b border-gray-200">
-                <button
-                  onClick={() => setActiveTab('products')}
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    activeTab === 'products'
-                      ? 'text-primary-600 border-b-2 border-primary-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  İlanlarım
-                </button>
-                <button
-                  onClick={() => setActiveTab('custom')}
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    activeTab === 'custom'
-                      ? 'text-primary-600 border-b-2 border-primary-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Custom Ürün Ekle
-                </button>
-              </div>
-              
-              {activeTab === 'products' && (
-                <>
-                  {loadingProducts ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
-                    </div>
-                  ) : myProducts.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-700 mb-4">
-                    {t('collection.noProductsToAdd')}
-                  </p>
-                  <Link
-                    href="/listings/new"
-                    className="text-primary-500 hover:text-primary-600 font-medium"
-                    onClick={() => setShowAddItemModal(false)}
-                  >
-                    {t('collection.createNewListing')} →
-                  </Link>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm text-gray-600">
-                      {selectedProductIds.length > 0 
-                        ? `${selectedProductIds.length} ${t('collection.productsSelected')}`
-                        : t('collection.selectProducts')}
-                    </p>
-                    {selectedProductIds.length > 0 && (
-                      <button
-                        onClick={() => setSelectedProductIds([])}
-                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                      >
-                        {t('collection.clearSelection')}
-                      </button>
-                    )}
+      {/* Add Item Modal */}
+      {showAddItemModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
+            <h2 className="text-lg font-bold mb-4 text-gray-900">{t('collection.addProductToCollection')}</h2>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mb-4 bg-gray-100 rounded p-0.5">
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  activeTab === 'products' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                İlanlarım
+              </button>
+              <button
+                onClick={() => setActiveTab('custom')}
+                className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  activeTab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Custom Ürün
+              </button>
+            </div>
+
+            {activeTab === 'products' && (
+              <>
+                {loadingProducts ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
                   </div>
-                  
-                  <div className="flex-1 overflow-y-auto mb-4 space-y-2">
-                    {myProducts.map((product) => {
-                      const imageUrl = product.images?.[0]
-                        ? typeof product.images[0] === 'string'
-                          ? product.images[0]
-                          : product.images[0].url
-                        : 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
-                      const isSelected = selectedProductIds.includes(product.id);
-                      return (
-                        <button
-                          key={product.id}
-                          onClick={() => toggleProductSelection(product.id)}
-                          className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                            isSelected
-                              ? 'bg-primary-50 ring-2 ring-primary-500 border border-primary-200'
-                              : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                          }`}
-                        >
-                          <div className="relative">
-                            <img
-                              src={imageUrl}
-                              alt={product.title}
-                              className="w-16 h-16 rounded-lg object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
-                              }}
-                            />
-                            {isSelected && (
-                              <div className="absolute top-1 right-1 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 text-left">
-                            <p className="font-medium text-gray-900 line-clamp-1">{product.title}</p>
-                            <p className="text-primary-600 text-sm font-semibold">{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
-                          </div>
-                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? 'bg-primary-500 border-primary-500'
-                              : 'border-gray-300'
-                          }`}>
-                            {isSelected && (
-                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
+                ) : myProducts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600 mb-3 text-sm">{t('collection.noProductsToAdd')}</p>
+                    <Link href="/listings/new" className="text-orange-500 hover:text-orange-600 text-sm font-medium" onClick={() => setShowAddItemModal(false)}>
+                      {t('collection.createNewListing')} →
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs text-gray-500">
+                        {selectedProductIds.length > 0
+                          ? `${selectedProductIds.length} ${t('collection.productsSelected')}`
+                          : t('collection.selectProducts')}
+                      </p>
+                      {selectedProductIds.length > 0 && (
+                        <button onClick={() => setSelectedProductIds([])} className="text-xs text-orange-600 hover:text-orange-700 font-medium">
+                          {t('collection.clearSelection')}
                         </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="flex gap-3 pt-2 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setShowAddItemModal(false);
-                        setSelectedProductIds([]);
-                      }}
-                      className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      onClick={handleAddItemToCollection}
-                      disabled={selectedProductIds.length === 0 || addingItem}
-                      className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      {addingItem 
-                        ? `${t('common.adding')} (${selectedProductIds.length})` 
-                        : selectedProductIds.length > 0 
-                          ? `${selectedProductIds.length} ${t('collection.addProduct')}`
-                          : t('common.add')}
-                    </button>
-                  </div>
-                </>
-                  )}
-                </>
-              )}
-              
-              {activeTab === 'custom' && (
-                <div className="flex-1 overflow-y-auto">
-                  <div className="space-y-4">
-                    {/* Title - Required */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        İsim <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={customTitle}
-                        onChange={(e) => setCustomTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Ürün ismi"
-                      />
-                    </div>
-
-                    {/* Image - Optional */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Resim
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleCustomImageChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      />
-                      {customImagePreview && (
-                        <div className="mt-2">
-                          <img
-                            src={customImagePreview}
-                            alt="Preview"
-                            className="w-32 h-32 object-cover rounded-lg"
-                          />
-                        </div>
                       )}
                     </div>
 
-                    {/* Description */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Açıklama
-                      </label>
-                      <textarea
-                        value={customDescription}
-                        onChange={(e) => setCustomDescription(e.target.value)}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Ürün açıklaması"
-                      />
+                    <div className="flex-1 overflow-y-auto mb-4 space-y-1.5">
+                      {myProducts.map((product) => {
+                        const imageUrl = product.images?.[0]
+                          ? typeof product.images[0] === 'string' ? product.images[0] : product.images[0].url
+                          : 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
+                        const isSelected = selectedProductIds.includes(product.id);
+                        return (
+                          <button
+                            key={product.id}
+                            onClick={() => toggleProductSelection(product.id)}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded transition-colors ${
+                              isSelected ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 hover:bg-gray-100 border border-gray-100'
+                            }`}
+                          >
+                            <div className="relative">
+                              <img
+                                src={imageUrl}
+                                alt={product.title}
+                                className="w-12 h-12 rounded object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/374151/9ca3af?text=Ürün'; }}
+                              />
+                              {isSelected && (
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-medium text-gray-900 text-sm line-clamp-1">{product.title}</p>
+                              <p className="text-orange-600 text-xs font-semibold">{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Brand */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Marka
-                      </label>
-                      <input
-                        type="text"
-                        value={customBrand}
-                        onChange={(e) => setCustomBrand(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Marka"
-                      />
-                    </div>
-
-                    {/* Model */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Model
-                      </label>
-                      <input
-                        type="text"
-                        value={customModel}
-                        onChange={(e) => setCustomModel(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Model"
-                      />
-                    </div>
-
-                    {/* Year */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Yıl
-                      </label>
-                      <input
-                        type="number"
-                        value={customYear}
-                        onChange={(e) => setCustomYear(e.target.value ? parseInt(e.target.value) : '')}
-                        min="1900"
-                        max="2100"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Yıl"
-                      />
-                    </div>
-
-                    {/* Scale */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Ölçek
-                      </label>
-                      <select
-                        value={customScale}
-                        onChange={(e) => setCustomScale(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    <div className="flex gap-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => { setShowAddItemModal(false); setSelectedProductIds([]); }}
+                        className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                       >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        onClick={handleAddItemToCollection}
+                        disabled={selectedProductIds.length === 0 || addingItem}
+                        className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {addingItem
+                          ? `${t('common.adding')} (${selectedProductIds.length})`
+                          : selectedProductIds.length > 0
+                            ? `${selectedProductIds.length} ${t('collection.addProduct')}`
+                            : t('common.add')}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {activeTab === 'custom' && (
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1 font-medium">İsim <span className="text-red-500">*</span></label>
+                    <input type="text" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Ürün ismi" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1 font-medium">Resim</label>
+                    <input type="file" accept="image/*" onChange={handleCustomImageChange}
+                      className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" />
+                    {customImagePreview && (
+                      <div className="mt-2"><img src={customImagePreview} alt="Preview" className="w-24 h-24 object-cover rounded" /></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1 font-medium">Açıklama</label>
+                    <textarea value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} rows={2}
+                      className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Açıklama" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Marka</label>
+                      <input type="text" value={customBrand} onChange={(e) => setCustomBrand(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Marka" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Model</label>
+                      <input type="text" value={customModel} onChange={(e) => setCustomModel(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Model" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Yıl</label>
+                      <input type="number" value={customYear} onChange={(e) => setCustomYear(e.target.value ? parseInt(e.target.value) : '')} min="1900" max="2100"
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Yıl" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Ölçek</label>
+                      <select value={customScale} onChange={(e) => setCustomScale(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400">
                         <option value="">Seçiniz</option>
                         <option value="1:18">1:18</option>
                         <option value="1:24">1:24</option>
@@ -811,60 +672,50 @@ export default function CollectionDetailPage() {
                       </select>
                     </div>
                   </div>
-
-                  <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setShowAddItemModal(false);
-                        setCustomTitle('');
-                        setCustomDescription('');
-                        setCustomBrand('');
-                        setCustomModel('');
-                        setCustomYear('');
-                        setCustomScale('');
-                        setCustomImageFile(null);
-                        setCustomImagePreview(null);
-                      }}
-                      className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors font-medium"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      onClick={handleAddCustomItem}
-                      disabled={!customTitle.trim() || addingItem}
-                      className="flex-1 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      {addingItem ? t('common.adding') : t('common.add')}
-                    </button>
-                  </div>
                 </div>
-              )}
-              
-              {activeTab === 'products' && (myProducts.length === 0 || loadingProducts) && (
-                <button
-                  onClick={() => {
-                    setShowAddItemModal(false);
-                    setSelectedProductIds([]);
-                  }}
-                  className="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors mt-4 font-medium"
-                >
-                  {t('common.close')}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* Auth Required Modal for Like */}
-        <AuthRequiredModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          title={t('collection.loginToLike')}
-          message={t('collection.loginToLikeMsg')}
-          icon={<HeartIcon className="w-10 h-10 text-primary-500" />}
-          redirectPath={`/collections/${collectionIdOrSlug}`}
-        />
-      </div>
+                <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowAddItemModal(false);
+                      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomImageFile(null); setCustomImagePreview(null);
+                    }}
+                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    onClick={handleAddCustomItem}
+                    disabled={!customTitle.trim() || addingItem}
+                    className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addingItem ? t('common.adding') : t('common.add')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'products' && (myProducts.length === 0 || loadingProducts) && (
+              <button
+                onClick={() => { setShowAddItemModal(false); setSelectedProductIds([]); }}
+                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors mt-4"
+              >
+                {t('common.close')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={t('collection.loginToLike')}
+        message={t('collection.loginToLikeMsg')}
+        icon={<HeartIcon className="w-10 h-10 text-orange-500" />}
+        redirectPath={`/collections/${collectionIdOrSlug}`}
+      />
     </div>
   );
 }

@@ -199,22 +199,31 @@ export default function CategoryNavBar() {
                                 </div>
                             </div>
                             <div>
-                                <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                                <h3 className="text-orange-500 font-bold text-sm mb-3 uppercase tracking-wide">
                                     {manufacturersMenu.title}
                                 </h3>
-                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                    {manufacturersMenu.groups.flatMap(g => g.items).slice(0, 16).map((item) => (
-                                        <Link
-                                            key={item}
-                                            href={`/listings?manufacturer=${encodeURIComponent(item)}`}
-                                            className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
-                                        >
-                                            {item}
-                                        </Link>
+                                <div className="space-y-2.5">
+                                    {manufacturersMenu.groups.map((group) => (
+                                        <div key={group.range}>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{group.range}</p>
+                                            <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+                                                {group.items.map((item, idx) => (
+                                                    <span key={item} className="inline-flex">
+                                                        <Link
+                                                            href={`/listings?manufacturer=${encodeURIComponent(item)}`}
+                                                            className="text-xs text-gray-600 hover:text-orange-600 transition-colors"
+                                                        >
+                                                            {item}
+                                                        </Link>
+                                                        {idx < group.items.length - 1 && <span className="text-gray-300 mx-1">·</span>}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
                                     ))}
                                     <Link
                                         href="/listings"
-                                        className="text-sm text-orange-500 font-semibold hover:text-orange-600 transition-colors py-1"
+                                        className="text-xs text-orange-500 font-semibold hover:text-orange-600 transition-colors inline-block mt-1"
                                     >
                                         {locale === 'en' ? 'All Manufacturers →' : 'Tüm Üreticiler →'}
                                     </Link>

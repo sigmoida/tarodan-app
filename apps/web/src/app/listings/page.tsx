@@ -13,6 +13,8 @@ import {
   XMarkIcon,
   StarIcon,
   TagIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, categoriesApi } from '@/lib/api';
@@ -40,6 +42,7 @@ interface Listing {
     logo?: string | null;
   } | string;
   scale?: string;
+  year?: number | string;
   condition: string;
   trade_available?: boolean;
   isTradeEnabled?: boolean;
@@ -104,7 +107,6 @@ export default function ListingsPage() {
     }));
   }, [searchParams]);
 
-  // Resolve category slug to id when ?category=slug is in URL
   const categorySlug = filters.category || searchParams.get('category') || '';
   const { data: categoryBySlug } = useQuery({
     queryKey: ['categoryBySlug', categorySlug],
@@ -117,7 +119,6 @@ export default function ListingsPage() {
   });
   const resolvedCategoryId = searchParams.get('categoryId') || categoryBySlug?.id;
 
-  // Listings Query
   const { data: listings = [], isLoading } = useQuery({
     queryKey: ['listings', filters, resolvedCategoryId ?? ''],
     queryFn: async (): Promise<Listing[]> => {
@@ -181,6 +182,15 @@ export default function ListingsPage() {
     return image.url || placeholder;
   };
 
+  const getGridClass = () => {
+    switch (productLayout) {
+      case 'grid-3': return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4';
+      case 'grid-4': return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
+      case 'grid-6': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3';
+      default: return 'space-y-2';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <h1 className="sr-only">
@@ -188,11 +198,58 @@ export default function ListingsPage() {
           filters.brand ? `${filters.brand} Model Araç Koleksiyonu` : t('product.title')}
       </h1>
 
-      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
-        <div className="flex gap-8">
+      {/* Page Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+                {filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowMobileSidebar(true)}
+                className="lg:hidden flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <FunnelIcon className="w-4 h-4" />
+                {t('product.filters')}
+                {activeFilterCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-sm">{activeFilterCount}</span>
+                )}
+              </button>
+              <ProductLayoutSelector
+                layout={productLayout}
+                onLayoutChange={setProductLayout}
+                storageKey="listings-product-layout"
+              />
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:border-orange-400 text-gray-700"
+              >
+                <option value="created_desc">{t('product.sortNewest')}</option>
+                <option value="created_asc">{t('product.sortOldest')}</option>
+                <option value="view_count_desc">{t('product.sortPopular')}</option>
+                <option value="price_asc">{t('product.sortPriceLow')}</option>
+                <option value="price_desc">{t('product.sortPriceHigh')}</option>
+                <option value="title_asc">A-Z</option>
+                <option value="title_desc">Z-A</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+        <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
-          <div className="hidden lg:block w-64 flex-shrink-0">
-            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded border border-gray-100 shadow-soft">
+          <div className="hidden lg:block w-56 flex-shrink-0">
+            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded border border-gray-200">
               <SidebarFilters
                 filters={filters}
                 onFilterChange={setFilters}
@@ -227,127 +284,91 @@ export default function ListingsPage() {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Results Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowMobileSidebar(true)}
-                  className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded text-sm font-medium hover:bg-gray-50"
-                >
-                  <FunnelIcon className="w-5 h-5" />
-                  <span>{t('product.filters')}</span>
-                  {activeFilterCount > 0 && (
-                    <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-sm">{activeFilterCount}</span>
-                  )}
-                </button>
-                <p className="text-base font-semibold text-gray-900">
-                  {listings.length} <span className="font-normal text-gray-500">ürün bulundu</span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <ProductLayoutSelector
-                  layout={productLayout}
-                  onLayoutChange={setProductLayout}
-                  storageKey="listings-product-layout"
-                />
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                  className="px-3 py-2 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:border-orange-400"
-                >
-                  <option value="created_desc">{t('product.sortNewest')}</option>
-                  <option value="created_asc">{t('product.sortOldest')}</option>
-                  <option value="view_count_desc">{t('product.sortPopular')}</option>
-                  <option value="price_asc">{t('product.sortPriceLow')}</option>
-                  <option value="price_desc">{t('product.sortPriceHigh')}</option>
-                  <option value="title_asc">A-Z</option>
-                  <option value="title_desc">Z-A</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Active Filters Pills */}
+            {/* Active Filters */}
             {activeFilterCount > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
                 {[
                   { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
                   { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
                   { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
-                  <span key={f.k} className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded">
+                  <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
                       setFilters(updates);
-                    }} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
+                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => setFilters({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setFilters({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 text-sm rounded">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-violet-100 text-violet-700 text-sm rounded">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
                     {t('product.preOrder')}
-                    <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.limited && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 text-sm rounded">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.set && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-sky-100 text-sky-700 text-sm rounded">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
                     {t('product.sets')}
-                    <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900"><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
-                <button onClick={clearFilters} className="text-sm text-orange-600 hover:text-orange-700 font-medium">{t('product.clearFilters')}</button>
+                <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>
               </div>
             )}
 
-            <div className="border-b border-gray-200 pb-4 mb-6" />
-
-            {/* GRID */}
+            {/* Grid Content */}
             {isLoading ? (
-              <div className={
-                productLayout === 'grid-3' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' :
-                  productLayout === 'grid-4' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6' :
-                    productLayout === 'grid-6' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-3'
-              }>
+              <div className={getGridClass()}>
                 {[...Array(12)].map((_, i) => (
-                  <div key={i} className={`card animate-pulse ${productLayout === 'list' ? 'flex gap-4' : 'aspect-square'} bg-gray-200 rounded h-60`}></div>
+                  <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-3 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : listings.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded border border-gray-100">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded mb-4">
-                  <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+              <div className="text-center py-20 bg-white rounded border border-gray-200">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-50 rounded mb-4">
+                  <MagnifyingGlassIcon className="w-7 h-7 text-gray-400" />
                 </div>
-                <p className="text-gray-500 text-lg mb-2">{t('product.noListings')}</p>
+                <p className="text-gray-600 text-lg font-medium mb-1">{t('product.noListings')}</p>
+                <p className="text-gray-400 text-sm mb-4">{locale === 'en' ? 'Try adjusting your filters' : 'Filtrelerinizi değiştirmeyi deneyin'}</p>
                 {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors">{t('product.clearFilters')}</button>
+                  <button onClick={clearFilters} className="px-5 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium">{t('product.clearFilters')}</button>
                 )}
               </div>
             ) : productLayout === 'list' ? (
-              <div className="space-y-3">
+              /* LIST VIEW */
+              <div className="space-y-2">
                 {listings.map((listing, index) => (
-                  <motion.div key={listing.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
+                  <motion.div key={listing.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.02 }}>
                     <Link href={`/listings/${listing.id}`}>
-                        <div className="bg-white rounded overflow-hidden border border-gray-200 hover:shadow-md transition-all flex gap-4 p-4">
-                        <div className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
+                      <div className="bg-white rounded border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all flex gap-4 p-3">
+                        <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
                           <OptimizedImage
                             src={getImageUrl(listing.images?.[0], index)}
                             alt={listing.title}
@@ -358,30 +379,24 @@ export default function ListingsPage() {
                             priority={index === 0}
                           />
                           {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-1 right-1 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5"><ArrowsRightLeftIcon className="w-3 h-3" /></div>
+                            <div className="absolute top-1 right-1 bg-emerald-500 text-white p-0.5 rounded">
+                              <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
+                            </div>
                           )}
                         </div>
                         <div className="flex-1 flex items-center justify-between min-w-0">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">{listing.title}</h3>
-                            <p className="text-sm text-gray-500 mb-1">
-                              {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` • ${listing.scale}` : ''}{listing.year ? ` • ${listing.year}` : ''}
+                            <h3 className="font-medium text-gray-900 line-clamp-1 text-sm">{listing.title}</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` · ${listing.scale}` : ''}{listing.year ? ` · ${listing.year}` : ''}
                             </p>
-                            {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
-                              <div className="flex items-center gap-1"><StarIconSolid className="w-3.5 h-3.5 text-yellow-400" /><span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span><span className="text-xs text-gray-500">({listing.rating.count})</span></div>
-                            )}
+                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
                           </div>
-                          <div className="flex items-center gap-4 ml-4">
-                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{formatCondition(listing.condition, locale)}</span>
-                            <div className="flex flex-col items-end">
-                              {isProductOnSaleDisplay(listing) && (
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className="text-xs text-gray-400 line-through">{getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</span>
-                                  <span className="text-xs font-semibold text-red-500 bg-red-50 px-1 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
-                                </div>
-                              )}
-                              <p className="text-lg font-bold text-primary-500 whitespace-nowrap">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</p>
-                            </div>
+                          <div className="flex items-center gap-3 ml-4">
+                            {isProductOnSaleDisplay(listing) && (
+                              <span className="text-xs text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
+                            )}
+                            <p className="text-base font-bold text-orange-600 whitespace-nowrap">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
                           </div>
                         </div>
                       </div>
@@ -390,56 +405,52 @@ export default function ListingsPage() {
                 ))}
               </div>
             ) : (
-              <div className={
-                productLayout === 'grid-3' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' :
-                  productLayout === 'grid-4' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' :
-                    'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4'
-              }>
+              /* GRID VIEW */
+              <div className={getGridClass()}>
                 {listings.map((listing, index) => (
-                  <motion.div key={listing.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
+                  <motion.div key={listing.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.02 }}>
                     <Link href={`/listings/${listing.id}`}>
-                      <div className="bg-white rounded overflow-hidden border border-gray-100 hover:shadow-lg hover:border-orange-200 transition-all group h-full flex flex-col">
+                      <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
                         <div className="relative aspect-square bg-gray-100">
                           <OptimizedImage
                             src={getImageUrl(listing.images?.[0], index)}
                             alt={listing.title}
                             fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
                             fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index < 4}
                           />
                           {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"><ArrowsRightLeftIcon className="w-3 h-3" /><span className="hidden sm:inline">{t('nav.trades')}</span></div>
+                            <div className="absolute top-1.5 left-1.5 bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
+                              <span className="hidden sm:inline">{locale === 'en' ? 'Trade' : 'Takas'}</span>
+                            </div>
                           )}
                           {isProductOnSaleDisplay(listing) && (
-                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
-                              %{listing.discountPercent ?? 0} {t('product.discount') || 'İndirim'}
+                            <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                              %{listing.discountPercent ?? 0}
                             </div>
                           )}
                         </div>
-                        <div className="p-3 flex-1 flex flex-col">
-                          <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm mb-1 group-hover:text-orange-600 transition-colors">{listing.title}</h3>
-                          <p className="text-xs text-gray-500 mb-2">
-                            {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` • ${listing.scale}` : ''}{listing.year ? ` • ${listing.year}` : ''}
+                        <div className="p-2.5 flex-1 flex flex-col">
+                          <h3 className="font-medium text-gray-900 line-clamp-2 text-xs leading-tight mb-1 group-hover:text-orange-600 transition-colors">{listing.title}</h3>
+                          <p className="text-[10px] text-gray-400 mb-1.5">
+                            {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` · ${listing.scale}` : ''}{listing.year ? ` · ${listing.year}` : ''}
                           </p>
                           {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
-                            <div className="flex items-center gap-1 mb-2">
-                              <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" /><span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
-                              <span className="text-xs text-gray-400">({listing.rating.count})</span>
+                            <div className="flex items-center gap-0.5 mb-1.5">
+                              <StarIconSolid className="w-3 h-3 text-yellow-400" />
+                              <span className="text-[10px] font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
+                              <span className="text-[10px] text-gray-400">({listing.rating.count})</span>
                             </div>
                           )}
-                          <div className="mt-auto pt-2 border-t border-gray-100 space-y-1">
-                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block">{formatCondition(listing.condition, locale)}</span>
-                            <div className="flex flex-col">
-                              {isProductOnSaleDisplay(listing) && (
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className="text-xs text-gray-400 line-through">{getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</span>
-                                  <span className="text-xs font-semibold text-red-500 bg-red-50 px-1 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
-                                </div>
-                              )}
-                              <p className="text-lg font-bold text-orange-600">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</p>
-                            </div>
+                          <div className="mt-auto pt-1.5 border-t border-gray-100">
+                            <span className="text-[9px] text-gray-400 bg-gray-50 px-1 py-0.5 rounded inline-block mb-1">{formatCondition(listing.condition, locale)}</span>
+                            {isProductOnSaleDisplay(listing) && (
+                              <span className="text-[10px] text-gray-400 line-through ml-1.5">{getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</span>
+                            )}
+                            <p className="text-sm font-bold text-orange-600">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
                           </div>
                         </div>
                       </div>

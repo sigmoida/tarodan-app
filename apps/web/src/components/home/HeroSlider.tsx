@@ -101,7 +101,7 @@ export default function HeroSlider() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.15 }}
     >
-      <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-heading font-display leading-[1.1] tracking-tight mb-5 whitespace-pre-line">
+      <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
         {slide.title}
       </h1>
       <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
@@ -124,7 +124,7 @@ export default function HeroSlider() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.6, delay: 0.25 }}
-      className="relative hidden md:block aspect-[4/3] w-full max-w-2xl overflow-hidden border border-gray-200 bg-white" style={{borderRadius:'4px'}}
+      className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white" style={{borderRadius:'4px'}}
     >
       <Image
         src={slide.image}
@@ -149,8 +149,8 @@ export default function HeroSlider() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20 lg:py-24 relative z-10">
-            <div className="grid md:grid-cols-2 gap-10 items-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32 relative z-10">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
               {slide.imageRight ? (
                 <>{textContent}{imageContent}</>
               ) : (
