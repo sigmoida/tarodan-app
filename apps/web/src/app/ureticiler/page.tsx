@@ -506,7 +506,7 @@ export default function UreticilerPage() {
                           <GlobeAltIcon className="w-3.5 h-3.5" />
                           {brand.parent}
                         </span>
-                        <span className="font-medium text-gray-600">{brand.productCount} ürün</span>
+                        <span className="font-medium text-gray-600">{brand.scale}</span>
                       </div>
                     </div>
                     <ChevronRightIcon className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
@@ -547,7 +547,7 @@ export default function UreticilerPage() {
                                 {brand.popularModels.map((model) => (
                                   <li key={model}>
                                     <Link
-                                      href={`/listings?brand=${encodeURIComponent(brand.name)}&q=${encodeURIComponent(model)}`}
+                                      href={`/listings?manufacturer=${encodeURIComponent(brand.name)}&search=${encodeURIComponent(model)}`}
                                       className="flex items-center gap-2 text-sm text-gray-600 hover:text-orange-600 transition-colors group"
                                     >
                                       <span className="w-1.5 h-1.5 bg-gray-300 group-hover:bg-orange-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
@@ -559,7 +559,7 @@ export default function UreticilerPage() {
                               </ul>
 
                               <Link
-                                href={`/listings?brand=${encodeURIComponent(brand.name)}`}
+                                href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
                                 className="inline-flex items-center gap-1 mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors"
                               >
                                 Tüm {brand.name} ilanları
