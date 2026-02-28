@@ -443,11 +443,13 @@ export class ProductService implements OnModuleInit {
     if (brandId) {
       where.brandId = brandId;
     } else if (brand) {
-      where.title = { contains: brand, mode: 'insensitive' };
+      where.brand = { name: { equals: brand, mode: 'insensitive' } };
     }
 
     if (manufacturerId) {
       where.manufacturerId = manufacturerId;
+    } else if (query.manufacturer) {
+      where.manufacturer = { name: { contains: query.manufacturer, mode: 'insensitive' } };
     }
 
     if (carModelId) where.carModelId = carModelId;

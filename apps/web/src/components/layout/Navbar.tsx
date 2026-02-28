@@ -37,6 +37,7 @@ const AuthRequiredModal = dynamic(
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
+import { isValidImageSrc } from '@/components/OptimizedImage';
 
 const POPULAR_SEARCHES = {
   tr: ['Hot Wheels', 'Matchbox', 'Minichamps', '1:18 ölçek', 'Ferrari', 'Porsche'],
@@ -608,17 +609,20 @@ export default function Navbar() {
                                       className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      {product.imageUrl ? (
+                                      {product.imageUrl && isValidImageSrc(product.imageUrl) ? (
                                         <img
                                           src={product.imageUrl}
                                           alt={product.title}
                                           className="w-12 h-12 rounded-lg object-cover bg-gray-100 flex-shrink-0 border border-gray-200"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                          }}
                                         />
-                                      ) : (
-                                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center border border-gray-200">
-                                          <ShoppingBagIcon className="w-5 h-5 text-gray-400" />
-                                        </div>
-                                      )}
+                                      ) : null}
+                                      <div className={`w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center border border-gray-200 ${product.imageUrl && isValidImageSrc(product.imageUrl) ? 'hidden' : ''}`}>
+                                        <ShoppingBagIcon className="w-5 h-5 text-gray-400" />
+                                      </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm text-gray-900 font-medium truncate">{product.title}</p>
                                         <p className="text-xs text-orange-600 font-semibold">
@@ -704,9 +708,17 @@ export default function Navbar() {
                                       className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-purple-50 flex-shrink-0 flex items-center justify-center text-purple-600 text-sm font-bold border border-purple-100">
-                                        {mfr.name.charAt(0)}
-                                      </div>
+                                      {mfr.logo ? (
+                                        <img
+                                          src={mfr.logo}
+                                          alt={mfr.name}
+                                          className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-purple-50 flex-shrink-0 flex items-center justify-center text-purple-600 text-sm font-bold border border-purple-100">
+                                          {mfr.name.charAt(0)}
+                                        </div>
+                                      )}
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mfr.name}</span>
                                       <span className="text-[11px] text-purple-600 font-medium px-2 py-0.5 bg-purple-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Manufacturer' : 'Üretici'}

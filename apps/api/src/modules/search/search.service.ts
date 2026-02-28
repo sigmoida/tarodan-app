@@ -248,6 +248,7 @@ export class SearchService implements OnModuleInit {
               isLimited: { type: 'boolean' },
               isSet: { type: 'boolean' },
               quantity: { type: 'integer' },
+              viewCount: { type: 'integer' },
               createdAt: { type: 'date' },
               updatedAt: { type: 'date' },
             },
@@ -355,7 +356,19 @@ export class SearchService implements OnModuleInit {
     if (condition) filter.push({ term: { condition } });
 
     // Scale filter – exact keyword match (e.g. "1:18")
-    if (scale) filter.push({ term: { scale } });
+    // Support both "1:18" (value) and "1-18" (slug) formats for backward compatibility
+    if (scale) {
+      const scaleSlug = scale.replace(':', '-');
+      filter.push({
+        bool: {
+          should: [
+            { term: { scale } }, // Try exact match first (value format: "1:18")
+            { term: { scale: scaleSlug } }, // Fallback to slug format ("1-18")
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
 
     // Material filter – exact keyword match (e.g. "diecast")
     if (material) filter.push({ term: { material } });
@@ -377,24 +390,10 @@ export class SearchService implements OnModuleInit {
 
     // Text-based fallback filters (when ID is not available)
     if (brand && !brandId) {
-      must.push({
-        multi_match: {
-          query: brand,
-          fields: ['title', 'description', 'brandName'],
-          type: 'phrase',
-          boost: 2,
-        },
-      });
+      filter.push({ term: { 'brandName.keyword': brand } });
     }
     if (manufacturer && !manufacturerId) {
-      must.push({
-        multi_match: {
-          query: manufacturer,
-          fields: ['title', 'description', 'manufacturerName'],
-          type: 'phrase',
-          boost: 2,
-        },
-      });
+      filter.push({ term: { 'manufacturerName.keyword': manufacturer } });
     }
     if (vehicleType) {
       must.push({
@@ -414,6 +413,10 @@ export class SearchService implements OnModuleInit {
       case 'newest':
       case 'created_desc': sort = [{ createdAt: 'desc' }]; break;
       case 'created_asc': sort = [{ createdAt: 'asc' }]; break;
+      case 'view_count_desc': sort = [{ viewCount: 'desc' }]; break;
+      case 'view_count_asc': sort = [{ viewCount: 'asc' }]; break;
+      case 'title_asc': sort = [{ 'title.keyword': 'asc' }]; break;
+      case 'title_desc': sort = [{ 'title.keyword': 'desc' }]; break;
       default: sort = query ? [{ _score: 'desc' }] : [{ createdAt: 'desc' }];
     }
 
@@ -515,7 +518,8 @@ export class SearchService implements OnModuleInit {
       sellerId: product.sellerId,
       sellerName: product.seller?.displayName,
       imageUrl: product.images?.[0]?.url,
-      scale: scaleAttr?.attribute?.slug || scaleAttr?.attribute?.value || undefined,
+      scale: scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
+      viewCount: product.viewCount || 0,
       material: materialAttr?.attribute?.slug || undefined,
       isTradeEnabled: product.isTradeEnabled,
       isPreorder: product.isPreorder,
@@ -710,7 +714,7 @@ export class SearchService implements OnModuleInit {
     products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
     brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
     categories: Array<{ id: string; name: string; slug: string }>;
-    manufacturers: Array<{ id: string; name: string; slug: string }>;
+    manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
     suggestions: string[];
   }> {
     const trimmed = query.trim();
@@ -867,12 +871,12 @@ export class SearchService implements OnModuleInit {
   private async richAutocompleteManufacturers(
     query: string,
     limit: number,
-  ): Promise<Array<{ id: string; name: string; slug: string }>> {
+  ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
     const manufacturers = await this.prisma.manufacturer.findMany({
       where: {
         name: { contains: query, mode: 'insensitive' },
       },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, logo: true },
       take: limit,
       orderBy: { name: 'asc' },
     });

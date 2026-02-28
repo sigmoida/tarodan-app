@@ -315,45 +315,96 @@ export default function ListingsPage() {
                 {[
                   { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
                   { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
-                  { k: 'manufacturer', v: filters.manufacturer }
+                  { k: 'manufacturer', v: filters.manufacturer }, { k: 'vehicleType', v: filters.vehicleType }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
-                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
+                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : 
+                     f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
                       setFilters(updates);
+                      
+                      // Update URL
+                      const params = new URLSearchParams(searchParams.toString());
+                      if (f.k === 'category') {
+                        params.delete('category');
+                        params.delete('categoryId');
+                      } else if (f.k === 'manufacturer') {
+                        params.delete('manufacturer');
+                        params.delete('manufacturerId');
+                      } else {
+                        params.delete(f.k);
+                      }
+                      router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => setFilters({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, minPrice: '', maxPrice: '' });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('minPrice');
+                      params.delete('maxPrice');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => setFilters({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, tradeOnly: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('tradeOnly');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
                     {t('product.preOrder')}
-                    <button onClick={() => setFilters({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, preOrder: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('preOrder');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.limited && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => setFilters({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, limited: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('limited');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.set && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
                     {t('product.sets')}
-                    <button onClick={() => setFilters({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => {
+                      setFilters({ ...filters, set: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('set');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                  </span>
+                )}
+                {filters.discountOnly && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded border border-red-200">
+                    {locale === 'en' ? 'On Sale' : 'İndirimli'}
+                    <button onClick={() => {
+                      setFilters({ ...filters, discountOnly: false });
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('discountOnly');
+                      router.replace(`/listings?${params.toString()}`);
+                    }} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>
