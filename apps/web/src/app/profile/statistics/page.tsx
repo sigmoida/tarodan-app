@@ -30,8 +30,17 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 
+interface RecentSale {
+  id: string;
+  productTitle: string;
+  productImage?: string;
+  buyerName: string;
+  amount: number;
+  soldAt: string;
+  orderId?: string;
+}
+
 interface UserStats {
-  // Basic counts
   productsCount: number;
   activeProductsCount: number;
   soldProductsCount: number;
@@ -40,20 +49,12 @@ interface UserStats {
   tradesCount: number;
   successfulTradesCount: number;
   collectionsCount: number;
-  
-  // Engagement
   totalViews: number;
   totalFavorites: number;
-  
-  // Rating
   rating: number;
   reviewsCount: number;
-  
-  // Revenue
   totalRevenue: number;
   totalSpent: number;
-  
-  // Membership info
   memberSince: string;
   membershipTier: string;
 }
@@ -63,6 +64,7 @@ export default function StatisticsPage() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function StatisticsPage() {
       return;
     }
     loadStatistics();
+    loadRecentSales();
   }, [isAuthenticated]);
 
   const loadStatistics = async () => {
@@ -156,7 +159,30 @@ export default function StatisticsPage() {
     }
   };
 
-  // Animation variants
+  const loadRecentSales = async () => {
+    try {
+      const response = await api.get('/orders/my', { params: { role: 'seller', limit: 10 } }).catch(() => null);
+      if (response?.data) {
+        const orders = response.data.data || response.data.orders || [];
+        const sales: RecentSale[] = orders
+          .filter((o: any) => o.isSeller || o.sellerId === user?.id)
+          .slice(0, 10)
+          .map((o: any) => ({
+            id: o.id,
+            productTitle: o.product?.title || o.items?.[0]?.product?.title || 'Ürün',
+            productImage: o.product?.imageUrl || o.items?.[0]?.product?.imageUrl,
+            buyerName: o.buyer?.displayName || 'Alıcı',
+            amount: parseFloat(o.totalAmount || o.amount || o.total || '0'),
+            soldAt: o.createdAt,
+            orderId: o.id,
+          }));
+        setRecentSales(sales);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -394,6 +420,57 @@ export default function StatisticsPage() {
                 </div>
               </motion.div>
             </div>
+
+            {/* Recent Sales */}
+            {recentSales.length > 0 && (
+              <motion.div 
+                variants={itemVariants}
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <ShoppingBagIcon className="w-5 h-5 text-green-500" />
+                    Son Satışlar
+                  </h3>
+                  <Link 
+                    href="/orders" 
+                    className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+                  >
+                    Tümünü Gör
+                  </Link>
+                </div>
+                <div className="space-y-3">
+                  {recentSales.map((sale) => (
+                    <Link 
+                      key={sale.id}
+                      href={`/orders?highlight=${sale.orderId}`}
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                        {sale.productImage ? (
+                          <img src={sale.productImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <TagIcon className="w-5 h-5 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate group-hover:text-orange-600">
+                          {sale.productTitle}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          @{sale.buyerName} &middot; {new Date(sale.soldAt).toLocaleDateString('tr-TR')}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-green-600 whitespace-nowrap">
+                        +{sale.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* Engagement & Other Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

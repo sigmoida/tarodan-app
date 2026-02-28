@@ -82,7 +82,7 @@ export default function LoginPage() {
       }
       const message = error.response?.data?.message || error.message || t('auth.invalidCredentials');
       
-      if (message.includes('doğrulayın') || message.includes('verify')) {
+      if (message.includes('doğrula') || message.includes('verify') || message.includes('verification')) {
         setShowVerificationBanner(true);
       }
       
@@ -135,26 +135,33 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-amber-50 border border-amber-200 p-4 mb-6 flex gap-3"
-              style={{ borderRadius: '6px' }}
+              className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 mb-6"
             >
-              <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-amber-800 mb-2">
+              <div className="flex gap-3 mb-3">
+                <ExclamationTriangleIcon className="w-6 h-6 text-amber-600 flex-shrink-0" />
+                <p className="text-sm font-medium text-amber-900">
                   {locale === 'en' 
-                    ? 'Your email is not verified yet. Please check your inbox for the verification link.' 
-                    : 'E-postanız henüz doğrulanmadı. Lütfen gelen kutunuzdaki doğrulama linkine tıklayın.'}
+                    ? 'Your email is not verified yet. Please check your inbox or spam folder for the verification link.' 
+                    : 'E-postanız henüz doğrulanmadı. Gelen kutunuzu veya spam klasörünüzü kontrol edin.'}
                 </p>
+              </div>
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={handleResendVerification}
                   disabled={isResending}
-                  className="text-sm font-semibold text-amber-700 hover:text-amber-800 underline disabled:opacity-50"
+                  className="w-full py-2.5 bg-amber-200 hover:bg-amber-300 text-amber-900 font-semibold text-sm rounded-lg transition-colors disabled:opacity-50"
                 >
                   {isResending 
                     ? (locale === 'en' ? 'Sending...' : 'Gönderiliyor...') 
-                    : (locale === 'en' ? 'Resend verification email' : 'Doğrulama e-postasını tekrar gönder')}
+                    : (locale === 'en' ? 'Resend verification email' : 'Doğrulama E-postasını Tekrar Gönder')}
                 </button>
+                <Link
+                  href="/verify-email"
+                  className="block w-full py-2 text-center text-sm text-amber-800 hover:text-amber-900 underline"
+                >
+                  {locale === 'en' ? 'Go to verification page' : 'Doğrulama sayfasına git'}
+                </Link>
               </div>
             </motion.div>
           )}

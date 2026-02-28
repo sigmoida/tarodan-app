@@ -1,4 +1,5 @@
-version: '3.8'
+# Tarodan - Yerel geliştirme: veritabanı, cache, arama, e-posta testi.
+# Dosya depolama (resim/avatar): MinIO yok; AWS S3 kullanılır (apps/api/.env içinde AWS_* ve S3_*).
 
 name: tarodan
 

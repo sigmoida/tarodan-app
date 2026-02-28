@@ -151,7 +151,8 @@ export default function ListingsPage() {
 
       const params = buildListParams();
       const response = await listingsApi.getAll(params);
-      return response.data.data || response.data.products || [];
+      const raw = response?.data;
+      return Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
     },
     meta: { page: 'listings' },
   });
@@ -177,11 +178,14 @@ export default function ListingsPage() {
     'https://placehold.co/400x400/f3e5f5/6a1b9a?text=Premium',
     'https://placehold.co/400x400/fff8e1/f57f17?text=Rare+Model',
   ];
-  const getImageUrl = (image: any, index?: number): string => {
+  const getImageUrl = (image: any, index?: number, productTitle?: string): string => {
     const placeholder = LISTING_PLACEHOLDERS[(index ?? 0) % LISTING_PLACEHOLDERS.length];
     if (!image) return placeholder;
-    if (typeof image === 'string') return image;
-    return image.url || placeholder;
+    let raw = typeof image === 'string' ? image : image.url;
+    if (raw && raw.includes('picsum.photos') && productTitle) {
+      raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+    }
+    return raw || placeholder;
   };
 
   const getGridClass = () => {
@@ -372,7 +376,7 @@ export default function ListingsPage() {
                       <div className="bg-white rounded border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all flex gap-4 p-3">
                         <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
                           <OptimizedImage
-                            src={getImageUrl(listing.images?.[0], index)}
+                            src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
                             className="object-cover"
@@ -415,7 +419,7 @@ export default function ListingsPage() {
                       <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
                         <div className="relative aspect-square bg-gray-100">
                           <OptimizedImage
-                            src={getImageUrl(listing.images?.[0], index)}
+                            src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
                             className="object-cover group-hover:scale-[1.03] transition-transform duration-300"

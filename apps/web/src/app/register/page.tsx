@@ -88,92 +88,155 @@ export default function RegisterPage() {
 
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-white flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-            <span className="text-lg font-bold text-gray-900">TARODAN</span>
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={40} height={40} className="rounded-lg object-contain" />
+            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+              Tarodan
+            </span>
           </Link>
         </header>
 
         <main className="flex-1 flex items-center justify-center px-4 py-8">
           <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md border border-gray-200 bg-white p-8 text-center"
-            style={{ borderRadius: '8px' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-lg"
           >
-            <div className="flex justify-center mb-5">
-              <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="w-16 h-16 bg-green-50 border border-green-200 flex items-center justify-center"
-                style={{ borderRadius: '50%' }}
-              >
-                <EnvelopeIcon className="w-8 h-8 text-green-600" />
-              </motion.div>
-            </div>
-
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              {locale === 'en' ? 'Check Your Email!' : 'E-postanızı Kontrol Edin!'}
-            </h2>
-            
-            <p className="text-sm text-gray-500 mb-1">
-              {locale === 'en' ? 'We have sent a verification link to:' : 'Doğrulama linki gönderildi:'}
-            </p>
-            
-            <p className="font-semibold text-gray-800 mb-5">{registeredEmail}</p>
-
-            <div className="bg-gray-50 border border-gray-200 p-4 mb-5 text-left" style={{ borderRadius: '6px' }}>
-              <p className="text-sm text-gray-700 font-medium mb-2">
-                {locale === 'en' ? 'Next steps:' : 'Sonraki adımlar:'}
-              </p>
-              <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
-                <li>{locale === 'en' ? 'Open your email inbox' : 'E-posta kutunuzu açın'}</li>
-                <li>{locale === 'en' ? 'Find the email from Tarodan' : 'Tarodan\'dan gelen e-postayı bulun'}</li>
-                <li>{locale === 'en' ? 'Click the verification link' : 'Doğrulama linkine tıklayın'}</li>
-                <li>{locale === 'en' ? 'Login to your account' : 'Hesabınıza giriş yapın'}</li>
-              </ol>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 p-3 mb-5" style={{ borderRadius: '6px' }}>
-              <p className="text-xs text-amber-700">
-                {locale === 'en' 
-                  ? "Can't find the email? Check your spam/junk folder." 
-                  : "E-postayı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin."}
-              </p>
-            </div>
-
-            <div className="space-y-2.5">
-              <Link
-                href="/login"
-                className="block w-full py-2.5 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 transition-colors text-center"
-                style={{ borderRadius: '6px' }}
-              >
-                {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
-              </Link>
+            <div className="bg-white rounded-3xl shadow-2xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center relative overflow-hidden">
+              {/* Decorative background circles */}
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-50 rounded-full opacity-60" />
+              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-orange-50 rounded-full opacity-60" />
               
-              <button
-                onClick={async () => {
-                  try {
-                    await api.post('/auth/resend-verification', { email: registeredEmail });
-                    toast.success(locale === 'en' ? 'Verification email resent!' : 'Doğrulama e-postası tekrar gönderildi!');
-                  } catch (error) {
-                    toast.error(locale === 'en' ? 'Could not resend email' : 'E-posta gönderilemedi');
-                  }
-                }}
-                className="block w-full py-2.5 bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors"
-                style={{ borderRadius: '6px' }}
-              >
-                {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
-              </button>
+              <div className="relative z-10">
+                <div className="flex justify-center mb-6">
+                  <motion.div 
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+                    className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30"
+                  >
+                    <EnvelopeIcon className="w-12 h-12 text-white" />
+                  </motion.div>
+                </div>
+
+                <motion.h2
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-2xl md:text-3xl font-bold text-gray-900 mb-2"
+                >
+                  {locale === 'en' ? 'Almost There!' : 'Neredeyse Tamam!'}
+                </motion.h2>
+                
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-gray-500 mb-1"
+                >
+                  {locale === 'en' ? 'We sent a verification link to:' : 'Doğrulama linki gönderildi:'}
+                </motion.p>
+                
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.45 }}
+                  className="font-semibold text-gray-800 mb-6 text-lg bg-gray-50 py-2 px-4 rounded-lg inline-block"
+                >
+                  {registeredEmail}
+                </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-6 mb-6 text-left"
+                >
+                  <p className="text-sm text-gray-700 font-semibold mb-4 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">?</span>
+                    {locale === 'en' ? 'What to do next:' : 'Şimdi ne yapmalısınız:'}
+                  </p>
+                  <div className="space-y-3">
+                    {[
+                      { step: '1', text: locale === 'en' ? 'Open your email inbox' : 'E-posta kutunuzu açın' },
+                      { step: '2', text: locale === 'en' ? 'Find the email from Tarodan' : 'Tarodan\'dan gelen e-postayı bulun' },
+                      { step: '3', text: locale === 'en' ? 'Click the verification link' : 'Doğrulama linkine tıklayın' },
+                      { step: '4', text: locale === 'en' ? 'Come back and login!' : 'Geri gelip giriş yapın!' },
+                    ].map((item, i) => (
+                      <motion.div
+                        key={item.step}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.6 + i * 0.1 }}
+                        className="flex items-center gap-3"
+                      >
+                        <span className="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {item.step}
+                        </span>
+                        <span className="text-sm text-gray-700">{item.text}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.9 }}
+                  className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3"
+                >
+                  <span className="text-amber-500 text-lg flex-shrink-0 mt-0.5">💡</span>
+                  <p className="text-sm text-amber-800 text-left">
+                    {locale === 'en' 
+                      ? "Can't find it? Check your spam/junk folder. Verification link expires in 24 hours." 
+                      : "Bulamıyor musunuz? Spam/Gereksiz klasörünü kontrol edin. Doğrulama linki 24 saat geçerlidir."}
+                  </p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1 }}
+                  className="space-y-3"
+                >
+                  <Link
+                    href="/login"
+                    className="block w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 text-center"
+                  >
+                    {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
+                  </Link>
+                  
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.post('/auth/resend-verification', { email: registeredEmail });
+                        toast.success(locale === 'en' ? 'Verification email resent!' : 'Doğrulama e-postası tekrar gönderildi!');
+                      } catch (error) {
+                        toast.error(locale === 'en' ? 'Could not resend email' : 'E-posta gönderilemedi');
+                      }
+                    }}
+                    className="block w-full py-3 bg-white border-2 border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all"
+                  >
+                    {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
+                  </button>
+                  
+                  <Link
+                    href="/verify-email"
+                    className="block text-center text-sm text-gray-500 hover:text-orange-600 transition-colors mt-2"
+                  >
+                    {locale === 'en' ? 'Need to verify later? Go to verification page' : 'Daha sonra mı doğrulayacaksınız? Doğrulama sayfasına gidin'}
+                  </Link>
+                </motion.div>
+              </div>
             </div>
           </motion.div>
         </main>
 
         <footer className="p-6 text-center">
-          <p className="text-xs text-gray-400">
+          <p className="text-sm text-gray-400">
             © {new Date().getFullYear()} Tarodan. {locale === 'en' ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
           </p>
         </footer>

@@ -22,11 +22,17 @@ import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigService } from '@nestjs/config';
-import { StorageService } from '../src/modules/storage/storage.service';
-import { PrismaService } from '../src/prisma';
-
 const prisma = new PrismaClient();
+
+// StorageService is not imported so seed can run without @aws-sdk (ts-node). Use placeholders for images.
+type StorageServiceLike = {
+  onModuleInit(): Promise<void>;
+  isStorageAvailable(): boolean;
+  uploadFile(buffer: Buffer, opts: any): Promise<{ key: string }>;
+} | null;
+function initStorageService(): StorageServiceLike {
+  return null;
+}
 
 // Helper to generate random price
 const randomPrice = (min: number, max: number) => 
@@ -70,16 +76,8 @@ const getMimeType = (filename: string): string => {
   return mimeTypes[ext] || 'image/jpeg';
 };
 
-const initStorageService = (): StorageService | null => {
-  try {
-    const configService = { get: (key: string, dv?: any) => process.env[key] || dv } as any;
-    const prismaService = new PrismaService();
-    return new StorageService(configService, prismaService);
-  } catch { return null; }
-};
-
 const uploadPhoto = async (
-  storageService: StorageService,
+  storageService: { uploadFile: (buffer: Buffer, opts: any) => Promise<{ key: string }> },
   filepath: string,
   bucket: 'products' | 'avatars' | 'collections' = 'products',
   folder: string = 'product-images',
@@ -1024,11 +1022,7 @@ async function main() {
 
   const storageService = initStorageService();
   let useS3 = false;
-
-  if (storageService) {
-    await storageService.onModuleInit();
-    useS3 = storageService.isStorageAvailable();
-  }
+  // When running seed via ts-node, StorageService is not loaded; use placeholders only.
 
   let uploadedCount = 0;
   for (let i = 0; i < products.length; i++) {
@@ -1041,10 +1035,12 @@ async function main() {
       if (imageUrl) uploadedCount++;
     }
 
+    // S3 yoksa ürün adlı placeholder (picsum rastgele fotoğraf; placehold.co ürün adı gösterir)
+    const placeholderUrl = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title.substring(0, 30))}`;
     await prisma.productImage.create({
       data: {
         productId: products[i].id,
-        url: imageUrl || `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title)}`,
+        url: imageUrl || placeholderUrl,
         sortOrder: 0,
       },
     });

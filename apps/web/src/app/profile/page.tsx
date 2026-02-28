@@ -320,7 +320,7 @@ export default function ProfilePage() {
         { icon: UserCircleIcon, label: t('profile.editProfile'), href: '/profile/edit', desc: 'Profil bilgilerinizi düzenleyin' },
         { icon: MapPinIcon, label: t('address.myAddresses'), href: '/profile/addresses', desc: 'Teslimat adresleriniz' },
         { icon: CreditCardIcon, label: t('payment.paymentMethods'), href: '/profile/payments', desc: 'Ödeme yöntemleriniz' },
-        { icon: BellIcon, label: t('nav.notifications'), href: '/profile/notifications', desc: 'Bildirim ayarları' },
+        { icon: BellIcon, label: t('nav.notifications'), href: '/notifications', desc: 'Bildirim ayarları' },
         { icon: ShieldCheckIcon, label: 'Güvenlik', href: '/profile/change-password', desc: 'Şifre ve güvenlik ayarları' },
       ],
     },

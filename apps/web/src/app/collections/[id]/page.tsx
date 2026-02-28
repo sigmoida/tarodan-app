@@ -42,6 +42,7 @@ interface CollectionItem {
   productTitle: string;
   productImage?: string;
   productPrice?: number;
+  productStatus?: string;
   sortOrder: number;
   isFeatured: boolean;
   addedAt: string;
@@ -303,11 +304,13 @@ export default function CollectionDetailPage() {
   };
 
   const sortedItems = collection.items
-    ? [...collection.items].sort((a, b) => {
-        if (a.isFeatured && !b.isFeatured) return -1;
-        if (!a.isFeatured && b.isFeatured) return 1;
-        return a.sortOrder - b.sortOrder;
-      })
+    ? [...collection.items]
+        .filter((item) => item.isCustom || !item.productStatus || item.productStatus === 'active')
+        .sort((a, b) => {
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          return a.sortOrder - b.sortOrder;
+        })
     : [];
 
   return (
@@ -442,6 +445,13 @@ export default function CollectionDetailPage() {
                     {item.isCustom && (
                       <div className="absolute top-1.5 right-1.5 z-10">
                         <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-semibold rounded">Koleksiyon</span>
+                      </div>
+                    )}
+                    {(item as any).productStatus === 'sold' && (
+                      <div className="absolute top-1.5 left-1.5 z-10">
+                        <span className="px-1.5 py-0.5 bg-red-600 text-white text-[10px] font-semibold rounded">
+                          {locale === 'en' ? 'SOLD' : 'SATILDI'}
+                        </span>
                       </div>
                     )}
                     {item.productId ? (
