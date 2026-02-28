@@ -413,18 +413,6 @@ export default function CollectionDetailPage() {
           </div>
         ) : (
           <div>
-            {isOwner && (
-              <div className="mb-4 flex justify-end">
-                <button
-                  onClick={handleOpenAddModal}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  {t('collection.addProduct')}
-                </button>
-              </div>
-            )}
-
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {sortedItems.map((item, index) => (
                 <motion.div

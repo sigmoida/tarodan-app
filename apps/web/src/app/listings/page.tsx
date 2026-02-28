@@ -208,9 +208,9 @@ export default function ListingsPage() {
 
   const getGridClass = () => {
     switch (productLayout) {
-      case 'grid-3': return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4';
-      case 'grid-4': return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
-      case 'grid-6': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3';
+      case 'grid-3': return 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4';
+      case 'grid-4': return 'grid grid-cols-4 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-4';
+      case 'grid-6': return 'grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-3';
       default: return 'space-y-2';
     }
   };
@@ -224,28 +224,30 @@ export default function ListingsPage() {
 
       {/* Page Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
-                {filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+        <div className="mx-auto px-3 sm:px-6 lg:px-12 xl:px-16 py-4 sm:py-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                  <div className="w-1 h-6 bg-orange-500 rounded-sm flex-shrink-0" />
+                  <span className="truncate">{filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                  {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
+                </p>
+              </div>
               <button
                 onClick={() => setShowMobileSidebar(true)}
-                className="lg:hidden flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors flex-shrink-0 ml-2"
               >
                 <FunnelIcon className="w-4 h-4" />
-                {t('product.filters')}
+                <span className="hidden sm:inline">{t('product.filters')}</span>
                 {activeFilterCount > 0 && (
                   <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-sm">{activeFilterCount}</span>
                 )}
               </button>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto">
               <ProductLayoutSelector
                 layout={productLayout}
                 onLayoutChange={setProductLayout}
@@ -254,7 +256,7 @@ export default function ListingsPage() {
               <select
                 value={filters.sortBy}
                 onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:border-orange-400 text-gray-700"
+                className="px-2.5 py-1.5 border border-gray-200 rounded bg-white text-xs sm:text-sm focus:outline-none focus:border-orange-400 text-gray-700 flex-shrink-0"
               >
                 <option value="created_desc">{t('product.sortNewest')}</option>
                 <option value="created_asc">{t('product.sortOldest')}</option>
@@ -269,7 +271,7 @@ export default function ListingsPage() {
         </div>
       </div>
 
-      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+      <div className="mx-auto px-3 sm:px-6 lg:px-12 xl:px-16 py-4 sm:py-5">
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">

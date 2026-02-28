@@ -310,9 +310,6 @@ export default function RegisterPage() {
           className="w-full max-w-[420px]"
         >
           <div className="mb-7">
-            <Link href="/" className="inline-block mb-7">
-              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={44} height={44} className="rounded-lg object-contain" />
-            </Link>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-1">
               {t('auth.createAccount')}
             </h1>

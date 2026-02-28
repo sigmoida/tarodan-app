@@ -399,30 +399,42 @@ export default function OffersPage() {
                         </div>
 
                         {/* Offer Amount & User */}
-                        <div className="flex items-center gap-6 mb-4">
-                          <div className="bg-orange-50 border border-orange-200 rounded px-4 py-3">
-                            <p className="text-xs text-gray-500 mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
-                            <p className="text-2xl font-bold text-orange-600">
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-6 mb-4">
+                          <div className="bg-orange-50 border border-orange-200 rounded px-3 py-2 sm:px-4 sm:py-3">
+                            <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5 sm:mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
+                            <p className="text-lg sm:text-2xl font-bold text-orange-600">
                               ₺{offer.amount.toLocaleString('tr-TR')}
                             </p>
                           </div>
 
                           {otherUser && (
-                            <div className="flex items-center gap-3">
-                              <UserAvatar displayName={otherUser.displayName} size="sm" className="!w-10 !h-10" />
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">
+                                {otherUser.avatarUrl ? (
+                                  <Image
+                                    src={otherUser.avatarUrl}
+                                    alt={otherUser.displayName}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full rounded-full object-cover"
+                                  />
+                                ) : (
+                                  otherUser.displayName.charAt(0).toUpperCase()
+                                )}
+                              </div>
                               <div>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-[10px] sm:text-xs text-gray-500">
                                   {activeTab === 'received' ? (locale === 'en' ? 'From' : 'Teklif Veren') : (locale === 'en' ? 'Seller' : 'Satıcı')}
                                 </p>
-                                <p className="font-medium text-gray-900">{otherUser.displayName}</p>
+                                <p className="text-sm sm:text-base font-medium text-gray-900">{otherUser.displayName}</p>
                               </div>
                             </div>
                           )}
 
                           {timeRemaining && (
-                            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded">
-                              <ClockIcon className="w-4 h-4" />
-                              <span className="text-sm font-medium">{timeRemaining} kaldı</span>
+                            <div className="flex items-center gap-1.5 sm:gap-2 text-amber-600 bg-amber-50 px-2 py-1.5 sm:px-3 sm:py-2 rounded">
+                              <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{timeRemaining} kaldı</span>
                             </div>
                           )}
                         </div>
