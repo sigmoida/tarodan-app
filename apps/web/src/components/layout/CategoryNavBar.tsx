@@ -6,52 +6,19 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { categoriesApi, manufacturersApi } from '@/lib/api';
 
-// Üreticiler listesi - Alfabetik gruplandırılmış
-const MANUFACTURERS_MENU = {
-    tr: {
-        title: 'ÜRETİCİLER',
-        groups: [
-            {
-                range: 'A-E',
-                items: ['Abrex', 'Airfix', 'American Diorama', 'Atlantic', 'Atlas Editions', 'Bburago', 'Brekina', 'Britains', 'Cada', 'Cararama', 'Corgi', 'CMJ - Jian Feng Juan Toys', 'CMC', 'Cobi', 'Cult', 'DeAgostini', 'Diecast Masters', 'Ebbro'],
-            },
-            {
-                range: 'E-M',
-                items: ['GreenLight Collectibles', 'GT Spirit', 'i0lcek', 'IXO', 'Kess', 'KK Olcek', 'LCD', 'Looksmart', 'Maisto', 'Matrix', 'MINI GT', 'Minichamps', 'Mitica', 'Model Car Group', 'Motormax'],
-            },
-            {
-                range: 'N-S',
-                items: ['NewRay', 'Norev', 'OttOmobile', 'Oxford', 'Diecast', 'Paragon', 'Pop Race', 'Olcekxtric', 'Schuco', 'Siku', 'Solido', 'Spark', 'Sun Star'],
-            },
-            {
-                range: 'T-Z',
-                items: ['Tarmac Works', 'TopSpeed', 'Touring', 'Modelcars', 'Triple 9 Collection', 'Trumpeter', 'Unbranded', 'Welly', 'Werk83', 'WhiteBox'],
-            },
-        ],
-    },
-    en: {
-        title: 'MANUFACTURERS',
-        groups: [
-            {
-                range: 'A-E',
-                items: ['Abrex', 'Airfix', 'American Diorama', 'Atlantic', 'Atlas Editions', 'Bburago', 'Brekina', 'Britains', 'Cada', 'Cararama', 'Corgi', 'CMJ - Jian Feng Juan Toys', 'CMC', 'Cobi', 'Cult', 'DeAgostini', 'Diecast Masters', 'Ebbro'],
-            },
-            {
-                range: 'E-M',
-                items: ['GreenLight Collectibles', 'GT Spirit', 'i0lcek', 'IXO', 'Kess', 'KK Olcek', 'LCD', 'Looksmart', 'Maisto', 'Matrix', 'MINI GT', 'Minichamps', 'Mitica', 'Model Car Group', 'Motormax'],
-            },
-            {
-                range: 'N-S',
-                items: ['NewRay', 'Norev', 'OttOmobile', 'Oxford', 'Diecast', 'Paragon', 'Pop Race', 'Olcekxtric', 'Schuco', 'Siku', 'Solido', 'Spark', 'Sun Star'],
-            },
-            {
-                range: 'T-Z',
-                items: ['Tarmac Works', 'TopSpeed', 'Touring', 'Modelcars', 'Triple 9 Collection', 'Trumpeter', 'Unbranded', 'Welly', 'Werk83', 'WhiteBox'],
-            },
-        ],
-    },
-};
+interface Category {
+    id: string;
+    name: string;
+    slug: string;
+}
+
+interface Manufacturer {
+    id: string;
+    name: string;
+    slug: string;
+}
 
 // Ölçek listesi
 const SCALES_MENU = {
@@ -87,42 +54,36 @@ const CATEGORY_BAR_ITEMS = {
     ],
 };
 
-const CATEGORIES_MENU = {
-    tr: {
-        title: 'KATEGORİLER',
-        vehicleTypes: [
-            { label: 'Arabalar', slug: 'araba' },
-            { label: 'Motosikletler', slug: 'motosiklet' },
-            { label: 'Motorsports / Yarış', slug: 'motorsports' },
-            { label: 'Ticari Araçlar', slug: 'ticari' },
-            { label: 'İnşaat Araçları', slug: 'insaat' },
-            { label: 'Tarım Araçları', slug: 'tarim' },
-            { label: 'Askeri Araçlar', slug: 'askeri' },
-            { label: 'Acil Durum Araçları', slug: 'acil-durum' },
-            { label: 'Gemiler', slug: 'gemi' },
-            { label: 'Trenler', slug: 'tren' },
-            { label: 'Uçaklar', slug: 'ucak' },
-            { label: 'Setler', slug: 'set' },
-        ],
-    },
-    en: {
-        title: 'CATEGORIES',
-        vehicleTypes: [
-            { label: 'Cars', slug: 'araba' },
-            { label: 'Motorcycles', slug: 'motosiklet' },
-            { label: 'Motorsports / Racing', slug: 'motorsports' },
-            { label: 'Commercial Vehicles', slug: 'ticari' },
-            { label: 'Construction', slug: 'insaat' },
-            { label: 'Agriculture', slug: 'tarim' },
-            { label: 'Military', slug: 'askeri' },
-            { label: 'Emergency Vehicles', slug: 'acil-durum' },
-            { label: 'Ships', slug: 'gemi' },
-            { label: 'Trains', slug: 'tren' },
-            { label: 'Aircrafts', slug: 'ucak' },
-            { label: 'Sets', slug: 'set' },
-        ],
-    },
-};
+// Helper function to group manufacturers alphabetically
+function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: string; items: string[] }> {
+    const groups: Array<{ range: string; items: string[] }> = [
+        { range: 'A-E', items: [] },
+        { range: 'E-M', items: [] },
+        { range: 'N-S', items: [] },
+        { range: 'T-Z', items: [] },
+    ];
+
+    manufacturers.forEach((mfr) => {
+        const firstLetter = mfr.name.charAt(0).toUpperCase();
+        if (firstLetter >= 'A' && firstLetter <= 'E') {
+            groups[0].items.push(mfr.name);
+        } else if (firstLetter >= 'E' && firstLetter <= 'M') {
+            groups[1].items.push(mfr.name);
+        } else if (firstLetter >= 'N' && firstLetter <= 'S') {
+            groups[2].items.push(mfr.name);
+        } else if (firstLetter >= 'T' && firstLetter <= 'Z') {
+            groups[3].items.push(mfr.name);
+        }
+    });
+
+    // Sort items within each group and filter out empty groups
+    return groups
+        .map((group) => ({
+            range: group.range,
+            items: group.items.sort((a, b) => a.localeCompare(b)),
+        }))
+        .filter((group) => group.items.length > 0);
+}
 
 type DropdownType = 'scales' | 'categories' | null;
 
@@ -132,10 +93,50 @@ export default function CategoryNavBar() {
     const navRef = useRef<HTMLDivElement>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Fetch data from APIs
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await categoriesApi.findAll();
+                const cats = Array.isArray(response.data) ? response.data : response.data.data || [];
+                setCategories(cats);
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            }
+        };
+
+        const fetchManufacturers = async () => {
+            try {
+                const response = await manufacturersApi.findAll();
+                const items = Array.isArray(response.data) ? response.data : response.data.data || [];
+                setManufacturers(items);
+            } catch (error) {
+                console.error('Failed to fetch manufacturers:', error);
+            }
+        };
+
+        fetchCategories();
+        fetchManufacturers();
+    }, []);
+
     const categoryItems = CATEGORY_BAR_ITEMS[locale as 'tr' | 'en'];
-    const manufacturersMenu = MANUFACTURERS_MENU[locale as 'tr' | 'en'];
     const scalesMenu = SCALES_MENU[locale as 'tr' | 'en'];
-    const categoriesMenu = CATEGORIES_MENU[locale as 'tr' | 'en'];
+
+    // Group manufacturers alphabetically
+    const manufacturerGroups = groupManufacturers(manufacturers);
+    const manufacturersMenu = {
+        title: locale === 'en' ? 'MANUFACTURERS' : 'ÜRETİCİLER',
+        groups: manufacturerGroups,
+    };
+
+    // Map categories to vehicle types (categories are vehicle types in this system)
+    const vehicleTypes = categories.map((cat) => ({
+        label: cat.name,
+        slug: cat.slug,
+    }));
 
     const handleMouseEnter = (dropdown: DropdownType) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -205,7 +206,7 @@ export default function CategoryNavBar() {
                                     {locale === 'en' ? 'VEHICLE TYPES' : 'ARAÇ TÜRLERİ'}
                                 </h3>
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                    {categoriesMenu.vehicleTypes.map((type) => (
+                                    {vehicleTypes.map((type) => (
                                         <Link
                                             key={type.slug}
                                             href={`/listings?vehicleType=${encodeURIComponent(type.slug)}`}

@@ -175,16 +175,33 @@ export default function ListingsPage() {
   });
 
   const clearFilters = () => {
+    // Reset all filter state
     setFilters({
       search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
-    // Remove all filter params from URL
+    
+    // Remove all filter params from URL (keep only sortBy if it exists)
     const currentParams = new URLSearchParams(searchParams.toString());
-    const hasAnyFilter = Array.from(currentParams.keys()).some(key => key !== 'sortBy');
+    const filterParams = [
+      'search', 'brand', 'scale', 'material', 'condition',
+      'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
+      'limited', 'set', 'category', 'categoryId', 'manufacturer',
+      'manufacturerId', 'vehicleType'
+    ];
+    
+    // Check if any filter parameter exists
+    const hasAnyFilter = filterParams.some(param => currentParams.has(param));
+    
     if (hasAnyFilter) {
-      router.replace('/listings');
+      // Build new URL with only sortBy if it exists
+      const newParams = new URLSearchParams();
+      if (currentParams.has('sortBy')) {
+        newParams.set('sortBy', currentParams.get('sortBy')!);
+      }
+      const newUrl = newParams.toString() ? `/listings?${newParams.toString()}` : '/listings';
+      router.replace(newUrl);
     }
   };
 
