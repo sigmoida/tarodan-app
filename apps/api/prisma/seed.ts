@@ -94,10 +94,29 @@ const uploadPhoto = async (
 };
 
 const PHOTOS_ROOT = path.join(process.cwd(), '..', '..', 'photos');
+const WEB_PUBLIC_PHOTOS = path.join(process.cwd(), '..', 'web', 'public', 'photos');
+
+/** photos/ klasörünü apps/web/public/photos/ altına kopyalar. Başka bilgisayarda çekildiğinde görseller çalışır. */
+function copyPhotosToPublic() {
+  if (!fs.existsSync(PHOTOS_ROOT)) {
+    console.log('⚠️ photos/ klasörü bulunamadı, placeholder kullanılacak.');
+    return;
+  }
+  const destDir = path.dirname(WEB_PUBLIC_PHOTOS);
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  try {
+    fs.cpSync(PHOTOS_ROOT, WEB_PUBLIC_PHOTOS, { recursive: true });
+    console.log('✅ photos/ → apps/web/public/photos/ kopyalandı');
+  } catch (err: any) {
+    console.warn(`⚠️ photos kopyalanamadı: ${err.message}`);
+  }
+}
 
 async function main() {
   console.log('🌱 Starting COMPREHENSIVE database seed...');
   console.log('📦 This will create a large dataset for testing ALL features\n');
+
+  copyPhotosToPublic();
 
   // ==========================================================================
   // 1. Create Categories - Sadece araç türü (üst seviye)
@@ -936,6 +955,7 @@ async function main() {
 
   const products: any[] = [];
   const sellers = users.filter(u => u.isSeller);
+
   // Count products per category to guarantee minimum 5 active per category
   const catProductCounts: Record<string, number> = {};
   const catActiveAssigned: Record<string, number> = {};
@@ -977,8 +997,9 @@ async function main() {
     const slugBase = d.img.replace('product-', '').replace('.png', '');
     const slug = `${slugBase}-${i}`;
 
-    const product = await prisma.product.create({
-      data: {
+    const product = await prisma.product.upsert({
+      where: { slug },
+      create: {
         sellerId: seller.id,
         categoryId: category.id,
         brandId: brand?.id ?? null,
@@ -999,9 +1020,28 @@ async function main() {
         quantity: 1,
         createdAt: randomPastDate(60),
       },
+      update: {
+        sellerId: seller.id,
+        categoryId: category.id,
+        brandId: brand?.id ?? null,
+        carModelId: model?.id ?? null,
+        title: d.title,
+        description: d.desc,
+        price,
+        condition: d.cond,
+        status,
+        isTradeEnabled: i % 3 !== 2,
+        isSet: d.isSet ?? false,
+        isLimited: d.isLimited ?? false,
+        isPreorder: d.isPreorder ?? false,
+        releaseDate: new Date(d.year, 0, 1),
+        viewCount: Math.floor(Math.random() * 500) + 10,
+        quantity: 1,
+      },
     });
 
-    // Assign scale + material attributes
+    // Assign scale + material attributes (upsert için önce mevcut attribute'ları sil)
+    await prisma.productAttribute.deleteMany({ where: { productId: product.id } });
     const sAttr = scaleAttrs[d.scale];
     const mAttr = materialAttrs[d.material];
     if (sAttr) {
@@ -1015,6 +1055,35 @@ async function main() {
   }
 
   console.log(`✅ Created ${products.length} products (with brands, models, attributes)`);
+
+  // ==========================================================================
+  // 10b. İndirim uygula (rastgele ~15 ürüne %10–30 indirim; oldPrice > price)
+  // ==========================================================================
+  const discountCount = Math.min(15, Math.floor(products.length * 0.2));
+  const indicesToDiscount = new Set<number>();
+  while (indicesToDiscount.size < discountCount) {
+    indicesToDiscount.add(Math.floor(Math.random() * products.length));
+  }
+  const saleStart = new Date();
+  const saleEnd = new Date(saleStart.getTime() + 14 * 24 * 60 * 60 * 1000); // 2 hafta
+  for (const idx of indicesToDiscount) {
+    const p = products[idx];
+    const originalPrice = Number(p.price);
+    const discountPct = Math.floor(Math.random() * (30 - 10 + 1) + 10);
+    const salePrice = Math.round((originalPrice * (100 - discountPct) / 100) * 100) / 100;
+    if (salePrice >= originalPrice) continue;
+    await prisma.product.update({
+      where: { id: p.id },
+      data: {
+        oldPrice: originalPrice,
+        price: salePrice,
+        saleStartDate: saleStart,
+        saleEndDate: saleEnd,
+      },
+    });
+    products[idx] = { ...p, price: salePrice, oldPrice: originalPrice };
+  }
+  console.log(`✅ ${discountCount} ürüne indirim uygulandı (%10–30)`);
 
   // ==========================================================================
   // 11. Create Product Images (upload to S3 or use placeholder)
@@ -1031,23 +1100,28 @@ async function main() {
     const imgPath = path.join(PHOTOS_ROOT, 'products', imgFile);
     let imageUrl: string | null = null;
 
+    // Upsert senaryosunda mevcut görselleri sil (yeniden oluşturulacak)
+    await prisma.productImage.deleteMany({ where: { productId: products[i].id } });
+
     if (useS3 && fs.existsSync(imgPath)) {
       imageUrl = await uploadPhoto(storageService!, imgPath, 'products', 'product-images');
       if (imageUrl) uploadedCount++;
     }
 
-    // S3 yoksa ürün adlı placeholder (picsum rastgele fotoğraf; placehold.co ürün adı gösterir)
+    // S3 yoksa: photos/products/ dosyası varsa /photos/products/xxx kullan (public'e kopyalandı); yoksa placeholder
+    const localPhotoUrl = fs.existsSync(imgPath) ? `/photos/products/${imgFile}` : null;
     const placeholderUrl = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title.substring(0, 30))}`;
     await prisma.productImage.create({
       data: {
         productId: products[i].id,
-        url: imageUrl || placeholderUrl,
+        url: imageUrl || localPhotoUrl || placeholderUrl,
         sortOrder: 0,
       },
     });
   }
 
-  console.log(`✅ Created product images (${uploadedCount} uploaded to S3, ${products.length - uploadedCount} placeholder)`);
+  const localCount = useS3 ? 0 : products.filter((_, i) => fs.existsSync(path.join(PHOTOS_ROOT, 'products', productData[i].img))).length;
+  console.log(`✅ Created product images (${uploadedCount} S3, ${localCount} yerel fotoğraf, ${products.length - uploadedCount - localCount} placeholder)`);
 
   // ==========================================================================
   // 12. Create Collections (one per category + thematic)
@@ -1078,6 +1152,8 @@ async function main() {
     const coverPath = path.join(PHOTOS_ROOT, 'collections', cd.coverFile);
     if (useS3 && fs.existsSync(coverPath)) {
       coverUrl = await uploadPhoto(storageService!, coverPath, 'collections', 'collection-covers');
+    } else if (fs.existsSync(coverPath)) {
+      coverUrl = `/photos/collections/${cd.coverFile}`;
     }
 
     const collection = await prisma.collection.upsert({

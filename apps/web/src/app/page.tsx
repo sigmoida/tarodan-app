@@ -265,10 +265,16 @@ export default function Home() {
   const fetchDiscountedProducts = async () => {
     setIsLoadingDiscounted(true);
     try {
-      const response = await listingsApi.getAll({ limit: 12, page: 1, discountOnly: true, status: 'active' });
+      const response = await listingsApi.getAll({ limit: 24, page: 1, discountOnly: true, status: 'active' });
       const raw = response?.data;
       const products = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
-      setDiscountedProducts(Array.isArray(products) ? products : []);
+      // Sadece gerçek indirimli ürünler: oldPrice > price (API bazen %0 veya yanlış fiyat dönebilir)
+      const withRealDiscount = (Array.isArray(products) ? products : []).filter((p: Product) => {
+        const effective = getProductEffectivePrice(p);
+        const original = getProductOriginalPriceForDisplay(p);
+        return isProductOnSaleDisplay(p) && original > effective;
+      });
+      setDiscountedProducts(withRealDiscount);
     } catch (error) {
       console.error('Failed to fetch discounted products:', error);
     } finally {

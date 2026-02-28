@@ -51,6 +51,8 @@ export class UserService {
   private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
     if (!imageUrl) return null;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    // Same-origin path (örn. /photos/products/xxx.png) – frontend doğrudan kullanır
+    if (imageUrl.startsWith('/')) return imageUrl;
     if (this.storageService) {
       try {
         return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);

@@ -806,8 +806,8 @@ export class CartService {
    */
   private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
     if (!imageUrl) return null;
-    // Already a full URL - return as-is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    // Already a full URL or same-origin path - return as-is
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
     // S3 key - resolve to presigned URL
     if (this.storageService) {
       try {

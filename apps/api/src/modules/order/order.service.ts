@@ -1585,7 +1585,7 @@ export class OrderService {
    */
   private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
     if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
     if (this.storageService) {
       try {
         return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);

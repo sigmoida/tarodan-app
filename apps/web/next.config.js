@@ -16,7 +16,7 @@ function getCacheHeaders() {
     { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/tarodan-logo.jpg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/images/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
-    // Yeni statik path: { source: '/yeni-klasor/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+    { source: '/photos/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
   ];
 }
 

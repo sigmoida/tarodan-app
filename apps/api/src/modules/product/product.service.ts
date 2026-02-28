@@ -353,7 +353,7 @@ export class ProductService implements OnModuleInit {
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: { viewCount: 'desc' },
+      orderBy: [{ viewCount: 'desc' }, { id: 'asc' }],
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -1669,11 +1669,14 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
             }
           }
 
-          // 5. Fallback: Only return the original URL if it's a valid HTTP(S) URL.
+          // 5. Fallback: Return URL if valid for browser (http/https veya / ile başlayan same-origin path)
           //    Raw S3 keys (e.g. "dev/products/...") are NOT valid browser URLs and crash the frontend.
-          const fallbackUrl = img.url && (img.url.startsWith('http://') || img.url.startsWith('https://'))
-            ? img.url
-            : null;
+          const isValidBrowserUrl = img.url && (
+            img.url.startsWith('http://') ||
+            img.url.startsWith('https://') ||
+            img.url.startsWith('/')
+          );
+          const fallbackUrl = isValidBrowserUrl ? img.url : null;
           return {
             id: img.id,
             url: fallbackUrl,

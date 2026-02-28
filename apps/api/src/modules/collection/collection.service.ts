@@ -1398,8 +1398,8 @@ export class CollectionService {
    */
   private async resolveCoverImageUrl(url: string | null | undefined): Promise<string | undefined> {
     if (!url) return undefined;
-    // Already a full URL - return as-is
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // Already a full URL or same-origin path - return as-is
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
     // S3 key - resolve to presigned URL
     try {
       return await this.storageService.getPresignedDownloadUrl('collections', url, 86400); // 24 hours
@@ -1411,7 +1411,7 @@ export class CollectionService {
 
   private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
     if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
     try {
       return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
     } catch (e: any) {

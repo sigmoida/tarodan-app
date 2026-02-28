@@ -43,3 +43,6 @@ node_modules
 docs/IMAGE_GENERATION_PROMPTS.md
 docs/MVP_IMAGE_PLAN.md
 scripts/generate-images.mjs
+
+# Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
+apps/web/public/photos/
