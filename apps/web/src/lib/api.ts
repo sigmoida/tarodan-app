@@ -523,6 +523,14 @@ export const searchApi = {
     api.get('/search/products', { params: { q, ...params } }),
   autocomplete: (q: string) =>
     api.get('/search/autocomplete', { params: { q } }),
+  autocompleteRich: (q: string) =>
+    api.get<{
+      products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
+      brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      categories: Array<{ id: string; name: string; slug: string }>;
+      manufacturers: Array<{ id: string; name: string; slug: string }>;
+      suggestions: string[];
+    }>('/search/autocomplete-rich', { params: { q } }),
 };
 
 // Discounts

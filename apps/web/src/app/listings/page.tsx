@@ -63,11 +63,22 @@ export default function ListingsPage() {
   const searchParams = useSearchParams();
   const { t, locale } = useTranslation();
 
+  const KNOWN_BRANDS = [
+    'Porsche', 'Ferrari', 'BMW', 'Mercedes', 'Audi', 'Lamborghini',
+    'McLaren', 'Bugatti', 'Koenigsegg', 'Pagani',
+  ];
+
+  const urlSearch = searchParams.get('search') || '';
+  const autoDetectedBrand = urlSearch
+    ? KNOWN_BRANDS.find(b => b.toLowerCase() === urlSearch.toLowerCase()) || ''
+    : '';
+
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
 
   const [filters, setFilters] = useState({
-    brand: searchParams.get('brand') || '',
+    search: autoDetectedBrand ? '' : urlSearch,
+    brand: searchParams.get('brand') || autoDetectedBrand || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
     condition: '',
@@ -86,24 +97,30 @@ export default function ListingsPage() {
   });
 
   useEffect(() => {
+    const newSearch = searchParams.get('search') || '';
+    const detectedBrand = newSearch
+      ? KNOWN_BRANDS.find(b => b.toLowerCase() === newSearch.toLowerCase()) || ''
+      : '';
+
     setFilters(prev => ({
       ...prev,
+      search: detectedBrand ? '' : newSearch,
       tradeOnly: searchParams.get('tradeOnly') === 'true',
       discountOnly: searchParams.get('discountOnly') === 'true',
       preOrder: searchParams.get('preOrder') === 'true',
       limited: searchParams.get('limited') === 'true',
       set: searchParams.get('set') === 'true',
-      brand: searchParams.get('brand') || prev.brand,
-      scale: searchParams.get('scale') || prev.scale,
-      material: searchParams.get('material') || prev.material,
-      condition: searchParams.get('condition') || prev.condition,
-      minPrice: searchParams.get('minPrice') || prev.minPrice,
-      maxPrice: searchParams.get('maxPrice') || prev.maxPrice,
+      brand: searchParams.get('brand') || detectedBrand || '',
+      scale: searchParams.get('scale') || '',
+      material: searchParams.get('material') || '',
+      condition: searchParams.get('condition') || '',
+      minPrice: searchParams.get('minPrice') || '',
+      maxPrice: searchParams.get('maxPrice') || '',
       sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
-      category: searchParams.get('category') || prev.category,
-      manufacturer: searchParams.get('manufacturer') || prev.manufacturer,
-      manufacturerId: searchParams.get('manufacturerId') || prev.manufacturerId,
-      vehicleType: searchParams.get('vehicleType') || prev.vehicleType,
+      category: searchParams.get('category') || '',
+      manufacturer: searchParams.get('manufacturer') || '',
+      manufacturerId: searchParams.get('manufacturerId') || '',
+      vehicleType: searchParams.get('vehicleType') || '',
     }));
   }, [searchParams]);
 
@@ -130,6 +147,7 @@ export default function ListingsPage() {
 
       const buildListParams = (): Record<string, any> => {
         const p: Record<string, any> = { limit: 100, page: 1 };
+        if (filters.search) p.search = filters.search;
         if (urlCategoryId) p.categoryId = urlCategoryId;
         if (mappedCondition) p.condition = mappedCondition;
         if (filters.minPrice) p.minPrice = Number(filters.minPrice);
@@ -158,12 +176,16 @@ export default function ListingsPage() {
 
   const clearFilters = () => {
     setFilters({
-      brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
-    const params = new URLSearchParams();
-    router.push(`/listings?${params.toString()}`);
+    // Remove all filter params from URL
+    const currentParams = new URLSearchParams(searchParams.toString());
+    const hasAnyFilter = Array.from(currentParams.keys()).some(key => key !== 'sortBy');
+    if (hasAnyFilter) {
+      router.replace('/listings');
+    }
   };
 
   const activeFilterCount = Object.entries(filters)

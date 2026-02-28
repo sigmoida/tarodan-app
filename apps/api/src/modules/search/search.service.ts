@@ -60,6 +60,14 @@ export interface SearchResponse {
   took: number;
 }
 
+export interface RichAutocompleteResult {
+  products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
+  brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+  categories: Array<{ id: string; name: string; slug: string }>;
+  manufacturers: Array<{ id: string; name: string; slug: string }>;
+  suggestions: string[];
+}
+
 @Injectable()
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
@@ -694,6 +702,181 @@ export class SearchService implements OnModuleInit {
       distinct: ['title'],
     });
     return products.map((p) => p.title);
+  }
+
+  // ──────────────────────────── Rich Autocomplete ────────────────────────────
+
+  async autocompleteRich(query: string): Promise<{
+    products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
+    brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+    categories: Array<{ id: string; name: string; slug: string }>;
+    manufacturers: Array<{ id: string; name: string; slug: string }>;
+    suggestions: string[];
+  }> {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return { products: [], brands: [], categories: [], manufacturers: [], suggestions: [] };
+    }
+
+    // Run all queries in parallel
+    const [products, brands, categories, manufacturers, suggestions] = await Promise.all([
+      this.richAutocompleteProducts(trimmed, 5),
+      this.richAutocompleteBrands(trimmed, 3),
+      this.richAutocompleteCategories(trimmed, 3),
+      this.richAutocompleteManufacturers(trimmed, 3),
+      this.autocomplete(trimmed, 5),
+    ]);
+
+    return { products, brands, categories, manufacturers, suggestions };
+  }
+
+  private async richAutocompleteProducts(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>> {
+    if (this.esAvailable) {
+      try {
+        const response = await this.client.search({
+          index: this.PRODUCTS_INDEX,
+          query: {
+            bool: {
+              should: [
+                { match: { 'title.edge_ngram': { query, boost: 4 } } },
+                { match: { 'title.ngram': { query, boost: 2 } } },
+                {
+                  multi_match: {
+                    query,
+                    type: 'phrase_prefix',
+                    fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName'],
+                    boost: 3,
+                  },
+                },
+                { fuzzy: { title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1.5 } } },
+              ],
+              minimum_should_match: 1,
+              filter: [
+                { term: { status: ProductStatus.active } },
+                { bool: { must_not: { prefix: { id: 'membership-' } } } },
+              ],
+            },
+          },
+          _source: ['id', 'title', 'imageUrl', 'price', 'brandName'],
+          size: limit,
+        });
+
+        return response.hits.hits.map((hit: any) => ({
+          id: hit._source.id,
+          title: hit._source.title,
+          imageUrl: hit._source.imageUrl,
+          price: hit._source.price,
+          brandName: hit._source.brandName,
+        }));
+      } catch {
+        // Fall through to Prisma fallback
+      }
+    }
+
+    // Prisma fallback
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: ProductStatus.active,
+        NOT: { id: { startsWith: 'membership-' } },
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { brand: { name: { contains: query, mode: 'insensitive' } } },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { url: true } },
+        brand: { select: { name: true } },
+      },
+      take: limit,
+    });
+
+    return products.map((p) => ({
+      id: p.id,
+      title: p.title,
+      imageUrl: p.images[0]?.url,
+      price: parseFloat(p.price.toString()),
+      brandName: (p as any).brand?.name,
+    }));
+  }
+
+  // Known car brands for autocomplete (matched against product titles / brand relation)
+  private static readonly KNOWN_CAR_BRANDS = [
+    'Audi', 'Alfa Romeo', 'BMW', 'Chevrolet', 'Dodge', 'Ferrari', 'Ford',
+    'Honda', 'Jaguar', 'Lamborghini', 'Land Rover', 'Maserati', 'McLaren',
+    'Mercedes-Benz', 'Nissan', 'Porsche', 'Subaru', 'Tesla', 'Toyota', 'Volkswagen',
+    'Aston Martin', 'Bentley', 'Bugatti', 'Cadillac', 'Citroën', 'Fiat',
+    'Hyundai', 'Jeep', 'Kia', 'Lexus', 'Mazda', 'Mini', 'Mitsubishi',
+    'Opel', 'Peugeot', 'Renault', 'Rolls-Royce', 'Seat', 'Škoda', 'Volvo',
+  ];
+
+  private async richAutocompleteBrands(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
+    // 1. Search DB Brand table
+    const brands = await this.prisma.brand.findMany({
+      where: {
+        isActive: true,
+        name: { contains: query, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, slug: true, logo: true },
+      take: limit,
+      orderBy: { name: 'asc' },
+    });
+
+    // 2. If DB brands are empty, match against known car brands
+    if (brands.length === 0) {
+      const lowerQ = query.toLowerCase();
+      const matched = SearchService.KNOWN_CAR_BRANDS
+        .filter(b => b.toLowerCase().includes(lowerQ))
+        .slice(0, limit)
+        .map(name => ({
+          id: `brand-${name.toLowerCase().replace(/\s+/g, '-')}`,
+          name,
+          slug: name.toLowerCase().replace(/\s+/g, '-'),
+          logo: null,
+        }));
+      return matched;
+    }
+
+    return brands;
+  }
+
+  private async richAutocompleteCategories(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ id: string; name: string; slug: string }>> {
+    const categories = await this.prisma.category.findMany({
+      where: {
+        isActive: true,
+        name: { contains: query, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, slug: true },
+      take: limit,
+      orderBy: { name: 'asc' },
+    });
+    return categories;
+  }
+
+  private async richAutocompleteManufacturers(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ id: string; name: string; slug: string }>> {
+    const manufacturers = await this.prisma.manufacturer.findMany({
+      where: {
+        name: { contains: query, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, slug: true },
+      take: limit,
+      orderBy: { name: 'asc' },
+    });
+    return manufacturers;
   }
 
   // ──────────────────────────── Fallback Search ────────────────────────────
