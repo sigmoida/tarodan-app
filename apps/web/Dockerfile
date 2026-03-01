@@ -22,8 +22,14 @@ COPY apps/web/package.json ./apps/web/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
+# Copy photos for seed data (static product images)
+COPY photos ./photos
+
 # Copy app source
 COPY apps/web ./apps/web
+
+# Copy photos to public directory (so Next.js can serve them)
+RUN cp -r ./photos ./apps/web/public/photos 2>/dev/null || true
 
 # Switch to production for Next.js build
 ENV NODE_ENV=production
