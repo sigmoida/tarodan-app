@@ -21,6 +21,9 @@ COPY apps/api/prisma ./apps/api/prisma/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
+# Copy photos for seed data
+COPY photos ./photos
+
 # Copy app source
 COPY apps/api ./apps/api
 
