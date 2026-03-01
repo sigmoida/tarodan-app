@@ -105,13 +105,13 @@ function copyPhotosToPublic() {
     console.log('⚠️ photos/ klasörü bulunamadı, placeholder kullanılacak.');
     return;
   }
-  const destDir = path.dirname(WEB_PUBLIC_PHOTOS);
-  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
   try {
+    const destDir = path.dirname(WEB_PUBLIC_PHOTOS);
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
     fs.cpSync(PHOTOS_ROOT, WEB_PUBLIC_PHOTOS, { recursive: true });
     console.log('✅ photos/ → apps/web/public/photos/ kopyalandı');
   } catch (err: any) {
-    console.warn(`⚠️ photos kopyalanamadı: ${err.message}`);
+    console.warn(`⚠️ photos web/public'e kopyalanamadı: ${err.message} — Docker ortamında bu normaldir.`);
   }
 }
 
