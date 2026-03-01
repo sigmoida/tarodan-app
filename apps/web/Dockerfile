@@ -28,9 +28,6 @@ COPY photos ./photos
 # Copy app source
 COPY apps/web ./apps/web
 
-# Copy photos to public directory (so Next.js can serve them)
-RUN cp -r ./photos ./apps/web/public/photos 2>/dev/null || true
-
 # Switch to production for Next.js build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -52,6 +49,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
+# Copy product/collection photos into public (Docker COPY guarantees this works)
+COPY --from=builder /app/photos ./apps/web/public/photos
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app
