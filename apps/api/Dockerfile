@@ -55,6 +55,7 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/photos ./photos
 
 # Copy entrypoint script (runs migrations before starting)
 COPY apps/api/entrypoint.sh ./entrypoint.sh

@@ -93,7 +93,10 @@ const uploadPhoto = async (
   }
 };
 
-const PHOTOS_ROOT = path.join(process.cwd(), '..', '..', 'photos');
+// Support both monorepo (cwd=apps/api → ../../photos) and Docker (cwd=/app → ./photos)
+const monorepoPhotos = path.join(process.cwd(), '..', '..', 'photos');
+const dockerPhotos = path.join(process.cwd(), 'photos');
+const PHOTOS_ROOT = fs.existsSync(monorepoPhotos) ? monorepoPhotos : dockerPhotos;
 const WEB_PUBLIC_PHOTOS = path.join(process.cwd(), '..', 'web', 'public', 'photos');
 
 /** photos/ klasörünü apps/web/public/photos/ altına kopyalar. Başka bilgisayarda çekildiğinde görseller çalışır. */
