@@ -317,6 +317,7 @@ export const addressesApi = {
   getAll: () => api.get('/users/me/addresses'),
   getOne: (id: string) => api.get(`/users/me/addresses/${id}`),
   create: (data: {
+    title?: string;
     fullName: string;
     phone: string;
     city: string;

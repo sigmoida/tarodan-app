@@ -240,7 +240,7 @@ export default function EditListingPage() {
       setBrands(data);
     } catch (error) {
       console.error('Failed to fetch brands:', error);
-      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
+      toast.error('Markalar yüklenemedi');
     } finally {
       setBrandsLoading(false);
     }
@@ -255,7 +255,7 @@ export default function EditListingPage() {
       setModels(data);
     } catch (error) {
       console.error('Failed to fetch models:', error);
-      toast.error(locale === 'en' ? 'Failed to load models' : 'Modeller yüklenemedi');
+      toast.error('Modeller yüklenemedi');
     } finally {
       setModelsLoading(false);
     }
