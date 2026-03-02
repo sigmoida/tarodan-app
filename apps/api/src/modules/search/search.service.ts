@@ -292,7 +292,9 @@ export class SearchService implements OnModuleInit {
       });
     } catch (error) {
       this.esAvailable = false;
-      this.logger.warn('Elasticsearch index creation failed – app will use PostgreSQL fallback');
+      this.logger.warn(
+        `Elasticsearch index creation failed – app will use PostgreSQL fallback. Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
