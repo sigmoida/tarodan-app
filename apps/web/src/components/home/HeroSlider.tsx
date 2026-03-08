@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -81,6 +81,12 @@ export default function HeroSlider() {
   const { isAuthenticated } = useAuthStore();
   const [currentSlide, setCurrentSlide] = useState(0);
   const slides = HERO_SLIDES[locale as 'tr' | 'en'];
+  
+  // Touch/swipe state
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const touchStartTime = useRef<number | null>(null);
+  const isSwiping = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -89,77 +95,186 @@ export default function HeroSlider() {
     return () => clearInterval(interval);
   }, [slides.length]);
 
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % slides.length);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % slides.length);
+  }, [slides.length]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  }, [slides.length]);
+
+  // Touch handlers for swipe detection
+  const touchStartY = useRef<number | null>(null);
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setTouchStartX(touch.clientX);
+    touchStartY.current = touch.clientY;
+    touchStartTime.current = Date.now();
+    isSwiping.current = false;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartX === null || touchStartY.current === null) return;
+    
+    const touch = e.touches[0];
+    const currentX = touch.clientX;
+    const currentY = touch.clientY;
+    const deltaX = Math.abs(currentX - touchStartX);
+    const deltaY = Math.abs(currentY - touchStartY.current);
+    
+    // If horizontal movement is greater than vertical, it's a swipe
+    if (deltaX > deltaY && deltaX > 10) {
+      isSwiping.current = true;
+      // Prevent default scroll behavior during horizontal swipe
+      e.preventDefault();
+    }
+    
+    setTouchEndX(currentX);
+  }, [touchStartX]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchStartX === null || touchEndX === null) {
+      setTouchStartX(null);
+      setTouchEndX(null);
+      return;
+    }
+
+    const distance = touchStartX - touchEndX;
+    const minSwipeDistance = 50;
+    const timeElapsed = touchStartTime.current ? Date.now() - touchStartTime.current : 0;
+    const minSwipeTime = 300; // Maximum time for a swipe (ms)
+
+    // Only trigger swipe if:
+    // 1. Minimum distance threshold is met
+    // 2. Swipe was fast enough (not too slow)
+    // 3. It was actually a swipe (isSwiping flag)
+    if (isSwiping.current && Math.abs(distance) > minSwipeDistance && timeElapsed < minSwipeTime) {
+      if (distance > 0) {
+        // Swiped left - next slide
+        nextSlide();
+      } else {
+        // Swiped right - previous slide
+        prevSlide();
+      }
+    }
+
+    // Reset touch state
+    setTouchStartX(null);
+    setTouchEndX(null);
+    touchStartY.current = null;
+    touchStartTime.current = null;
+    isSwiping.current = false;
+  }, [touchStartX, touchEndX, nextSlide, prevSlide]);
 
   const slide = slides[currentSlide];
 
-  const textContent = (
-    <motion.div
-      key={`text-${currentSlide}`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.15 }}
-    >
-      <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
-        {slide.title}
-      </h1>
-      <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
-        {slide.subtitle}
-      </p>
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button variant="primary" size="md" href={slide.cta1.href}>
-          {slide.cta1.label}
-        </Button>
-        <Button variant="secondary" size="md" href={slide.cta2.href}>
-          {slide.cta2.label}
-        </Button>
-      </div>
-    </motion.div>
-  );
-
-  const imageContent = (
-    <motion.div
-      key={`img-${currentSlide}`}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, delay: 0.25 }}
-      className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white" style={{borderRadius:'4px'}}
-    >
-      <Image
-        src={slide.image}
-        alt={locale === 'tr' ? 'Diecast model araç koleksiyonu' : 'Diecast model car collection'}
-        fill
-        sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
-        className="object-cover object-center"
-        priority
-        quality={90}
-        unoptimized={slide.image.startsWith('http')}
-      />
-    </motion.div>
-  );
-
   return (
     <section className="relative overflow-hidden bg-white">
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={currentSlide}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="relative"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32 relative z-10">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              {slide.imageRight ? (
-                <>{textContent}{imageContent}</>
-              ) : (
-                <>{imageContent}{textContent}</>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32 relative z-10">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <AnimatePresence mode="wait" initial={false}>
+            {slide.imageRight ? (
+              <motion.div
+                key={`text-${currentSlide}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
+                  {slide.title}
+                </h1>
+                <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
+                  {slide.subtitle}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="primary" size="md" href={slide.cta1.href}>
+                    {slide.cta1.label}
+                  </Button>
+                  <Button variant="secondary" size="md" href={slide.cta2.href}>
+                    {slide.cta2.label}
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={`image-left-${currentSlide}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.5 }}
+                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white"
+                style={{ borderRadius: '4px', touchAction: 'pan-y' }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <Image
+                  src={slide.image}
+                  alt={locale === 'tr' ? 'Diecast model araç koleksiyonu' : 'Diecast model car collection'}
+                  fill
+                  sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
+                  className="object-cover object-center"
+                  priority
+                  quality={90}
+                  unoptimized={slide.image.startsWith('http')}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {slide.imageRight ? (
+              <motion.div
+                key={`image-right-${currentSlide}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.5 }}
+                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white"
+                style={{ borderRadius: '4px', touchAction: 'pan-y' }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <Image
+                  src={slide.image}
+                  alt={locale === 'tr' ? 'Diecast model araç koleksiyonu' : 'Diecast model car collection'}
+                  fill
+                  sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
+                  className="object-cover object-center"
+                  priority
+                  quality={90}
+                  unoptimized={slide.image.startsWith('http')}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={`text-${currentSlide}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
+                  {slide.title}
+                </h1>
+                <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
+                  {slide.subtitle}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="primary" size="md" href={slide.cta1.href}>
+                    {slide.cta1.label}
+                  </Button>
+                  <Button variant="secondary" size="md" href={slide.cta2.href}>
+                    {slide.cta2.label}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Navigation Arrows */}
       <button
