@@ -22,16 +22,31 @@ import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { StorageService } from '../src/modules/storage/storage.service';
+import { PrismaService } from '../src/prisma';
 const prisma = new PrismaClient();
 
-// StorageService is not imported so seed can run without @aws-sdk (ts-node). Use placeholders for images.
-type StorageServiceLike = {
-  onModuleInit(): Promise<void>;
-  isStorageAvailable(): boolean;
-  uploadFile(buffer: Buffer, opts: any): Promise<{ key: string }>;
-} | null;
-function initStorageService(): StorageServiceLike {
-  return null;
+// Initialize StorageService for seed script
+function initStorageService(): StorageService | null {
+  try {
+    // Create mock ConfigService that reads from process.env
+    const configService = {
+      get: (key: string, defaultValue?: any) => {
+        return process.env[key] || defaultValue;
+      },
+    } as any;
+
+    // Create PrismaService instance
+    const prismaService = new PrismaService();
+
+    // Create StorageService instance
+    const storageService = new StorageService(configService, prismaService);
+    
+    return storageService;
+  } catch (error: any) {
+    console.error('⚠️ Failed to initialize StorageService:', error.message);
+    return null;
+  }
 }
 
 // Helper to generate random price
@@ -1093,38 +1108,67 @@ async function main() {
   // ==========================================================================
   console.log('Creating product images...');
 
+  // Initialize StorageService
   const storageService = initStorageService();
-  let useS3 = false;
-  // When running seed via ts-node, StorageService is not loaded; use placeholders only.
+  let isStorageAvailable = false;
 
-  let uploadedCount = 0;
-  for (let i = 0; i < products.length; i++) {
+  // Initialize storage service if available
+  if (storageService) {
+    try {
+      await storageService.onModuleInit();
+      isStorageAvailable = storageService.isStorageAvailable();
+      if (isStorageAvailable) {
+        console.log('✅ S3 storage available, uploading product images...');
+      } else {
+        console.log('⚠️ S3 storage not available, using placeholders...');
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ StorageService initialization failed: ${error.message}`);
+      isStorageAvailable = false;
+    }
+  } else {
+    console.log('⚠️ StorageService not initialized, using placeholders...');
+  }
+
+  // Delete all existing product images first (for upsert scenario)
+  const productIds = products.map(p => p.id);
+  await prisma.productImage.deleteMany({ where: { productId: { in: productIds } } });
+
+  // Prepare all image upload tasks
+  const imageUploadTasks = products.map(async (product, i) => {
     const imgFile = productData[i].img;
     const imgPath = path.join(PHOTOS_ROOT, 'products', imgFile);
     let imageUrl: string | null = null;
 
-    // Upsert senaryosunda mevcut görselleri sil (yeniden oluşturulacak)
-    await prisma.productImage.deleteMany({ where: { productId: products[i].id } });
-
-    if (useS3 && fs.existsSync(imgPath)) {
-      imageUrl = await uploadPhoto(storageService!, imgPath, 'products', 'product-images');
-      if (imageUrl) uploadedCount++;
+    // Always attempt upload if storage is available and file exists
+    if (isStorageAvailable && storageService && fs.existsSync(imgPath)) {
+      imageUrl = await uploadPhoto(storageService, imgPath, 'products', 'product-images');
     }
 
-    // S3 yoksa: photos/products/ dosyası varsa /photos/products/xxx kullan (public'e kopyalandı); yoksa placeholder
-    const localPhotoUrl = fs.existsSync(imgPath) ? `/photos/products/${imgFile}` : null;
-    const placeholderUrl = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title.substring(0, 30))}`;
-    await prisma.productImage.create({
-      data: {
-        productId: products[i].id,
-        url: imageUrl || localPhotoUrl || placeholderUrl,
-        sortOrder: 0,
-      },
-    });
-  }
+    // Use placeholder if upload failed or storage unavailable
+    // NEVER store local paths in database
+    if (!imageUrl) {
+      imageUrl = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title.substring(0, 30))}`;
+    }
 
-  const localCount = useS3 ? 0 : products.filter((_, i) => fs.existsSync(path.join(PHOTOS_ROOT, 'products', productData[i].img))).length;
-  console.log(`✅ Created product images (${uploadedCount} S3, ${localCount} yerel fotoğraf, ${products.length - uploadedCount - localCount} placeholder)`);
+    return {
+      productId: product.id,
+      url: imageUrl,
+      sortOrder: 0,
+    };
+  });
+
+  // Execute all uploads in parallel
+  const imageData = await Promise.all(imageUploadTasks);
+
+  // Bulk create all product images
+  await prisma.productImage.createMany({
+    data: imageData,
+  });
+
+  const uploadedCount = imageData.filter(img => !img.url.startsWith('https://placehold.co')).length;
+  const placeholderCount = imageData.length - uploadedCount;
+  console.log(`✅ Created product images (${uploadedCount} S3 uploads, ${placeholderCount} placeholders)`);
 
   // ==========================================================================
   // 12. Create Collections (one per category + thematic)
@@ -1153,10 +1197,16 @@ async function main() {
 
     let coverUrl: string | null = null;
     const coverPath = path.join(PHOTOS_ROOT, 'collections', cd.coverFile);
-    if (useS3 && fs.existsSync(coverPath)) {
-      coverUrl = await uploadPhoto(storageService!, coverPath, 'collections', 'collection-covers');
-    } else if (fs.existsSync(coverPath)) {
-      coverUrl = `/photos/collections/${cd.coverFile}`;
+    
+    // Always attempt upload if storage is available and file exists
+    if (isStorageAvailable && storageService && fs.existsSync(coverPath)) {
+      coverUrl = await uploadPhoto(storageService, coverPath, 'collections', 'collection-covers');
+    }
+    
+    // Use placeholder if upload failed or storage unavailable
+    // NEVER store local paths in database
+    if (!coverUrl) {
+      coverUrl = `https://placehold.co/1200x400/1a1a2e/eee?text=${encodeURIComponent(cd.name.substring(0, 30))}`;
     }
 
     const collection = await prisma.collection.upsert({
