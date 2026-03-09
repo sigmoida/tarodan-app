@@ -91,22 +91,80 @@ const getMimeType = (filename: string): string => {
   return mimeTypes[ext] || 'image/jpeg';
 };
 
-const uploadPhoto = async (
-  storageService: { uploadFile: (buffer: Buffer, opts: any) => Promise<{ key: string }> },
-  filepath: string,
-  bucket: 'products' | 'avatars' | 'collections' = 'products',
-  folder: string = 'product-images',
-): Promise<string | null> => {
-  try {
-    const buffer = fs.readFileSync(filepath);
-    const filename = `${randomUUID().substring(0, 8)}-${path.basename(filepath).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const result = await storageService.uploadFile(buffer, { bucket, folder, filename, mimeType: getMimeType(filepath) });
-    return result.key;
-  } catch (err: any) {
-    console.error(`⚠️ Upload failed ${path.basename(filepath)}: ${err.message}`);
-    return null;
-  }
+let sharp: any;
+try {
+  sharp = require('sharp');
+} catch {
+  sharp = null;
+}
+
+const CACHE_OPTS = {
+  contentType: 'image/webp' as const,
+  cacheControl: 'public, max-age=31536000, immutable',
+  skipMediaFile: true,
 };
+
+/** Upload product image as card + detail variants. Throws on failure. */
+async function uploadProductImageVariants(
+  storageService: StorageService,
+  filepath: string,
+  productId: string,
+): Promise<{ cardKey: string; detailKey: string }> {
+  if (!sharp) throw new Error('sharp not installed - run npm install sharp');
+  const buffer = fs.readFileSync(filepath);
+  const baseId = randomUUID();
+  const folder = `product-images/${productId}`;
+
+  const cardBuffer = await sharp(buffer)
+    .resize(500, 500, { fit: 'cover' })
+    .webp({ quality: 85 })
+    .toBuffer();
+
+  const detailBuffer = await sharp(buffer)
+    .resize(1200, 1200, { fit: 'inside' })
+    .webp({ quality: 90 })
+    .toBuffer();
+
+  const cardResult = await storageService.uploadFile(cardBuffer, {
+    bucket: 'products',
+    folder,
+    filename: `${baseId}-card.webp`,
+    mimeType: 'image/webp',
+    ...CACHE_OPTS,
+  });
+
+  const detailResult = await storageService.uploadFile(detailBuffer, {
+    bucket: 'products',
+    folder,
+    filename: `${baseId}-detail.webp`,
+    mimeType: 'image/webp',
+    ...CACHE_OPTS,
+  });
+
+  return { cardKey: cardResult.key, detailKey: detailResult.key };
+}
+
+/** Upload collection cover. Throws on failure. */
+async function uploadCollectionCover(
+  storageService: StorageService,
+  filepath: string,
+): Promise<string> {
+  if (!sharp) throw new Error('sharp not installed - run npm install sharp');
+  const buffer = fs.readFileSync(filepath);
+  const webpBuffer = await sharp(buffer)
+    .resize(1200, 600, { fit: 'cover' })
+    .webp({ quality: 85 })
+    .toBuffer();
+
+  const result = await storageService.uploadFile(webpBuffer, {
+    bucket: 'collections',
+    folder: 'covers',
+    filename: `${randomUUID()}.webp`,
+    mimeType: 'image/webp',
+    ...CACHE_OPTS,
+  });
+  return result.key;
+}
 
 // Support both monorepo (cwd=apps/api → ../../photos) and Docker (cwd=/app → ./photos)
 const monorepoPhotos = path.join(process.cwd(), '..', '..', 'photos');
@@ -1113,62 +1171,44 @@ async function main() {
   let isStorageAvailable = false;
 
   // Initialize storage service if available
-  if (storageService) {
-    try {
-      await storageService.onModuleInit();
-      isStorageAvailable = storageService.isStorageAvailable();
-      if (isStorageAvailable) {
-        console.log('✅ S3 storage available, uploading product images...');
-      } else {
-        console.log('⚠️ S3 storage not available, using placeholders...');
-      }
-    } catch (error: any) {
-      console.warn(`⚠️ StorageService initialization failed: ${error.message}`);
-      isStorageAvailable = false;
-    }
-  } else {
-    console.log('⚠️ StorageService not initialized, using placeholders...');
+  if (!storageService) {
+    throw new Error('StorageService not initialized - cannot seed product images. Ensure AWS credentials are configured.');
   }
+  await storageService.onModuleInit();
+  isStorageAvailable = storageService.isStorageAvailable();
+  if (!isStorageAvailable) {
+    throw new Error('S3 storage not available - cannot seed product images. Ensure S3 bucket is accessible.');
+  }
+  if (!sharp) {
+    throw new Error('sharp not installed - run pnpm add sharp in apps/api');
+  }
+  console.log('✅ S3 storage available, uploading product images...');
 
   // Delete all existing product images first (for upsert scenario)
   const productIds = products.map(p => p.id);
   await prisma.productImage.deleteMany({ where: { productId: { in: productIds } } });
 
-  // Prepare all image upload tasks
+  // Prepare all image upload tasks - fail loudly on any error
   const imageUploadTasks = products.map(async (product, i) => {
     const imgFile = productData[i].img;
     const imgPath = path.join(PHOTOS_ROOT, 'products', imgFile);
-    let imageUrl: string | null = null;
-
-    // Always attempt upload if storage is available and file exists
-    if (isStorageAvailable && storageService && fs.existsSync(imgPath)) {
-      imageUrl = await uploadPhoto(storageService, imgPath, 'products', 'product-images');
+    if (!fs.existsSync(imgPath)) {
+      throw new Error(`Product image file not found: ${imgPath}`);
     }
-
-    // Use placeholder if upload failed or storage unavailable
-    // NEVER store local paths in database
-    if (!imageUrl) {
-      imageUrl = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productData[i].title.substring(0, 30))}`;
-    }
-
+    const { cardKey, detailKey } = await uploadProductImageVariants(storageService, imgPath, product.id);
     return {
       productId: product.id,
-      url: imageUrl,
+      cardKey,
+      detailKey,
       sortOrder: 0,
     };
   });
 
-  // Execute all uploads in parallel
   const imageData = await Promise.all(imageUploadTasks);
-
-  // Bulk create all product images
   await prisma.productImage.createMany({
     data: imageData,
   });
-
-  const uploadedCount = imageData.filter(img => !img.url.startsWith('https://placehold.co')).length;
-  const placeholderCount = imageData.length - uploadedCount;
-  console.log(`✅ Created product images (${uploadedCount} S3 uploads, ${placeholderCount} placeholders)`);
+  console.log(`✅ Created product images (${imageData.length} S3 uploads)`);
 
   // ==========================================================================
   // 12. Create Collections (one per category + thematic)
@@ -1195,23 +1235,15 @@ async function main() {
   for (const cd of collectionDefs) {
     const catId = cd.catSlug ? categories.find(c => c.slug === cd.catSlug)?.id ?? null : null;
 
-    let coverUrl: string | null = null;
     const coverPath = path.join(PHOTOS_ROOT, 'collections', cd.coverFile);
-    
-    // Always attempt upload if storage is available and file exists
-    if (isStorageAvailable && storageService && fs.existsSync(coverPath)) {
-      coverUrl = await uploadPhoto(storageService, coverPath, 'collections', 'collection-covers');
+    if (!fs.existsSync(coverPath)) {
+      throw new Error(`Collection cover file not found: ${coverPath}`);
     }
-    
-    // Use placeholder if upload failed or storage unavailable
-    // NEVER store local paths in database
-    if (!coverUrl) {
-      coverUrl = `https://placehold.co/1200x400/1a1a2e/eee?text=${encodeURIComponent(cd.name.substring(0, 30))}`;
-    }
+    const coverKey = await uploadCollectionCover(storageService!, coverPath);
 
     const collection = await prisma.collection.upsert({
       where: { id: `collection-${cd.slug}` },
-      update: { coverImageUrl: coverUrl, categoryId: catId },
+      update: { coverImageKey: coverKey, categoryId: catId },
       create: {
         id: `collection-${cd.slug}`,
         userId: cd.user.id,
@@ -1219,7 +1251,7 @@ async function main() {
         name: cd.name,
         slug: cd.slug,
         description: cd.desc,
-        coverImageUrl: coverUrl,
+        coverImageKey: coverKey,
         isPublic: true,
         isFeatured: cd.featured,
         viewCount: Math.floor(Math.random() * 200) + 20,

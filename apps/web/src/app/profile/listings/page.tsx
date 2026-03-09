@@ -103,7 +103,7 @@ export default function ProfileListingsPage() {
       return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
     }
     const firstImage = listing.images[0];
-    return typeof firstImage === 'string' ? firstImage : firstImage.url;
+    return typeof firstImage === 'string' ? firstImage : (firstImage as any).cardUrl ?? (firstImage as any).detailUrl ?? (firstImage as any).url;
   };
 
   const handleDelete = async (listingId: string) => {

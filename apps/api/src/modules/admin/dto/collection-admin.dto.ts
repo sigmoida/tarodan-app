@@ -79,10 +79,10 @@ export class CreateAdminCollectionDto {
     @IsBoolean()
     isFeatured?: boolean;
 
-    @ApiPropertyOptional({ example: 'https://example.com/cover.jpg' })
+    @ApiPropertyOptional({ example: 'dev/collections/covers/uuid.webp' })
     @IsOptional()
     @IsString()
-    coverImageUrl?: string;
+    coverImageKey?: string;
 
     @ApiPropertyOptional({ example: 'uuid-user-id' })
     @IsOptional()
@@ -112,10 +112,10 @@ export class UpdateAdminCollectionDto {
     @IsBoolean()
     isFeatured?: boolean;
 
-    @ApiPropertyOptional({ example: 'https://example.com/new-cover.jpg' })
+    @ApiPropertyOptional({ example: 'dev/collections/covers/uuid.webp' })
     @IsOptional()
     @IsString()
-    coverImageUrl?: string;
+    coverImageKey?: string;
 }
 
 export class AddCollectionItemsDto {

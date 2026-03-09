@@ -25,7 +25,7 @@ export class CreateCollectionDto {
 
   @IsOptional()
   @IsString()
-  coverImageUrl?: string;
+  coverImageKey?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -50,7 +50,7 @@ export class UpdateCollectionDto {
 
   @IsOptional()
   @IsString()
-  coverImageUrl?: string;
+  coverImageKey?: string;
 
   @IsOptional()
   @IsBoolean()

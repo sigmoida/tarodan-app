@@ -6,11 +6,13 @@ import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { SearchIndexingService } from './search-indexing.service';
 import { PrismaModule } from '../../prisma';
+import { StorageModule } from '../storage/storage.module';
 import { QUEUE_NAMES } from '../../workers/constants';
 
 @Module({
   imports: [
     PrismaModule,
+    StorageModule,
     ConfigModule,
     ScheduleModule.forRoot(),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),

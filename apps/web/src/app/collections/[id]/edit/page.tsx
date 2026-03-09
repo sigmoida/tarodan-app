@@ -189,7 +189,6 @@ export default function EditCollectionPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         categoryId: categoryId || null,
-        coverImageUrl: coverImageUrl.trim() || undefined,
         isPublic,
       });
       

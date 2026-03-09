@@ -79,7 +79,7 @@ export default function EditListingPage() {
     isPreorder: false,
     isSet: false,
     quantity: '' as string | number,
-    imageUrls: [] as string[],
+    images: [] as Array<{ cardKey: string; detailKey: string }>,
     status: 'active' as string,
   });
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -442,14 +442,14 @@ export default function EditListingPage() {
           isPreorder: savedData?.isPreorder !== undefined ? savedData.isPreorder : ((listing as any).isPreorder ?? prev.isPreorder ?? false),
           isSet: savedData?.isSet !== undefined ? savedData.isSet : ((listing as any).isSet ?? prev.isSet ?? false),
           quantity: quantityToUse,
-          imageUrls: savedData?.imageUrls?.length > 0 ? savedData.imageUrls : (listing.images?.map((img: any) => img.url || img) || prev.imageUrls || []),
+          images: savedData?.images?.length > 0 ? savedData.images : (savedData?.imageUrls?.length > 0 ? savedData.imageUrls.map((k: string) => ({ cardKey: k, detailKey: k })) : (listing.images?.map((img: any) => ({ cardKey: img.cardKey ?? img.url, detailKey: img.detailKey ?? img.url })) || prev.images || [])),
           status: savedData?.status || listing.status || prev.status || 'active',
         };
 
-        // Set preview URLs for existing images (they should already be presigned URLs from API)
-        const previewUrls = savedData?.imageUrls?.length > 0 
-          ? [] // Will be set separately if needed
-          : (listing.images?.map((img: any) => img.url || img) || []);
+        // Set preview URLs for existing images (cardUrl from API or cardKey for presigned fallback)
+        const previewUrls = savedData?.imageUrls?.length > 0 || savedData?.images?.length > 0
+          ? []
+          : (listing.images?.map((img: any) => img.cardUrl ?? img.detailUrl ?? img.url ?? img) || []);
         setImagePreviewUrls(previewUrls);
 
         if (process.env.NODE_ENV === 'development') {
@@ -506,7 +506,7 @@ export default function EditListingPage() {
     if (!files || files.length === 0) return;
 
     const maxImages = limits?.maxImagesPerListing || 3;
-    const currentCount = formData.imageUrls.length;
+    const currentCount = formData.images.length;
 
     if (currentCount + files.length > maxImages) {
       toast.error(`En fazla ${maxImages} resim yükleyebilirsiniz`);
@@ -518,22 +518,18 @@ export default function EditListingPage() {
       const fileArray = Array.from(files);
       const response = await mediaApi.uploadProductImages(fileArray);
 
-      // Extract keys for storage (to be saved to database)
-      const uploadedKeys = response.data
-        .map((result: any) => result.key)
-        .filter(Boolean);
-      
-      // Extract presigned URLs for preview
-      const uploadedPreviewUrls = response.data
-        .map((result: any) => result.url || result.key)
-        .filter(Boolean);
+      const uploadedImages = response.data.map((r: { cardKey: string; detailKey: string }) => ({
+        cardKey: r.cardKey,
+        detailKey: r.detailKey,
+      }));
+      const previewUrls = response.data.map((r: { cardUrl?: string; cardKey?: string }) => r.cardUrl || r.cardKey || '').filter(Boolean);
 
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, ...uploadedKeys],
+        images: [...formData.images, ...uploadedImages],
       });
-      setImagePreviewUrls([...imagePreviewUrls, ...uploadedPreviewUrls]);
-      toast.success(`${uploadedKeys.length} resim başarıyla yüklendi`);
+      setImagePreviewUrls([...imagePreviewUrls, ...previewUrls]);
+      toast.success(`${uploadedImages.length} resim başarıyla yüklendi`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
@@ -542,10 +538,10 @@ export default function EditListingPage() {
     }
   };
 
-  const removeImageUrl = (index: number) => {
+  const removeImage = (index: number) => {
     setFormData({
       ...formData,
-      imageUrls: formData.imageUrls.filter((_, i) => i !== index),
+      images: formData.images.filter((_, i) => i !== index),
     });
     setImagePreviewUrls(imagePreviewUrls.filter((_, i) => i !== index));
   };
@@ -604,7 +600,7 @@ export default function EditListingPage() {
         isPreorder: formData.isPreorder,
         isSet: formData.isSet,
         quantity: formData.quantity && formData.quantity !== '' ? Number(formData.quantity) : null,
-        imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
+        images: formData.images.length > 0 ? formData.images : undefined,
         status: formData.status,
       };
       // Sale/discount fields: send to backend so listing shows updated price
@@ -1208,7 +1204,7 @@ export default function EditListingPage() {
                     accept="image/*"
                     multiple
                     onChange={(e) => handleFileUpload(e.target.files)}
-                    disabled={uploadingImages || formData.imageUrls.length >= (limits?.maxImagesPerListing || 3)}
+                    disabled={uploadingImages || formData.images.length >= (limits?.maxImagesPerListing || 3)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   {uploadingImages && (
@@ -1216,11 +1212,10 @@ export default function EditListingPage() {
                   )}
                 </div>
 
-                {formData.imageUrls.length > 0 && (
+                {formData.images.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {formData.imageUrls.map((key, index) => {
-                      // Use preview URL if available, otherwise try to use key (fallback)
-                      const previewUrl = imagePreviewUrls[index] || key;
+                    {formData.images.map((img, index) => {
+                      const previewUrl = imagePreviewUrls[index] || (typeof img === 'object' ? img?.cardKey : img);
                       return (
                         <div key={index} className="relative group">
                           <img
@@ -1233,7 +1228,7 @@ export default function EditListingPage() {
                           />
                           <button
                             type="button"
-                            onClick={() => removeImageUrl(index)}
+                            onClick={() => removeImage(index)}
                             className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             ×
@@ -1245,7 +1240,7 @@ export default function EditListingPage() {
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                {formData.imageUrls.length} / {limits?.maxImagesPerListing || 3} resim yüklendi
+                {formData.images.length} / {limits?.maxImagesPerListing || 3} resim yüklendi
               </p>
             </div>
 

@@ -50,7 +50,9 @@ import { useTranslation } from '@/i18n';
 
 interface ProductImage {
   id?: string;
-  url: string;
+  url?: string;
+  cardUrl?: string;
+  detailUrl?: string;
   sortOrder?: number;
 }
 
@@ -234,19 +236,21 @@ export default function ListingDetailPage() {
   const offlineCartItem = listing ? offlineItems.find(item => item.productId === listing.id) : null;
   const isInCart = !!cartItem || !!offlineCartItem;
 
-  // Helper function to get image URL
-  const getImageUrl = (image: ProductImage | string): string => {
-    if (typeof image === 'string') {
-      return image || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
-    }
-    return image?.url || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+  // Helper: detail URL for gallery/lightbox
+  const getDetailImageUrl = (image: ProductImage | string): string => {
+    if (typeof image === 'string') return image || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+    return (image as ProductImage)?.detailUrl ?? (image as ProductImage)?.cardUrl ?? (image as ProductImage)?.url ?? 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+  };
+  const getCardImageUrl = (image: ProductImage | string): string => {
+    if (typeof image === 'string') return image || 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
+    return (image as ProductImage)?.cardUrl ?? (image as ProductImage)?.detailUrl ?? (image as ProductImage)?.url ?? 'https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün';
   };
 
-  // Calculate images array early so it can be used in useEffect hooks
+  // Calculate images array (detail URLs for gallery/lightbox)
   const images = useMemo(() => {
     if (!listing) return ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
     return listing.images?.length
-      ? listing.images.map(img => getImageUrl(img))
+      ? listing.images.map(img => getDetailImageUrl(img))
       : ['https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün'];
   }, [listing]);
 
@@ -303,7 +307,7 @@ export default function ListingDetailPage() {
       toast.success(t('product.addedToCart'));
     } catch (error: any) {
       if (error?.message === 'AUTH_REQUIRED') {
-        const imgUrl = typeof listing.images?.[0] === 'string' ? listing.images[0] : (listing.images?.[0] as any)?.url || '';
+        const imgUrl = getCardImageUrl(listing.images?.[0] ?? '');
         addToOfflineCart({
           productId: listing.id,
           title: listing.title,

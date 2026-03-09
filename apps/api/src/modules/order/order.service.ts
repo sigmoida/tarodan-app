@@ -1169,7 +1169,7 @@ export class OrderService {
       product: {
         id: order.product.id,
         title: order.product.title,
-        image: await this.resolveProductImageUrl(order.product.images?.[0]?.url),
+        image: this.resolveProductImageUrl(order.product.images?.[0]?.cardKey),
       },
       seller: order.seller,
       shippingAddress: order.shippingAddress,
@@ -1583,16 +1583,11 @@ export class OrderService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
-      } catch (e: any) {
-        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
-        return null;
-      }
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -1601,7 +1596,7 @@ export class OrderService {
    * Format order response
    */
   private async formatOrderResponse(order: any, userId: string) {
-    const resolvedImageUrl = await this.resolveProductImageUrl(order.product?.images?.[0]?.url);
+    const resolvedImageUrl = this.resolveProductImageUrl(order.product?.images?.[0]?.cardKey);
     const product = order.product ? {
       id: order.product.id,
       title: order.product.title,

@@ -85,7 +85,7 @@ export class CollectionService {
         name: dto.name,
         slug,
         description: dto.description,
-        coverImageUrl: dto.coverImageUrl,
+        coverImageKey: dto.coverImageKey,
         isPublic: dto.isPublic ?? true,
         categoryId: dto.categoryId || undefined,
       },
@@ -216,15 +216,14 @@ export class CollectionService {
     }
 
     // Generate cover image if not exists
-    if (!collection.coverImageUrl) {
+    if (!collection.coverImageKey) {
       await this.generateCoverImage(collectionId);
-      // Reload collection to get updated coverImageUrl
       const updated = await this.prisma.collection.findUnique({
         where: { id: collectionId },
-        select: { coverImageUrl: true },
+        select: { coverImageKey: true },
       });
-      if (updated?.coverImageUrl) {
-        collection.coverImageUrl = updated.coverImageUrl;
+      if (updated?.coverImageKey) {
+        collection.coverImageKey = updated.coverImageKey;
       }
     }
 
@@ -290,7 +289,7 @@ export class CollectionService {
             }
             const arr = imagesByProduct.get(img.productId)!;
             if (arr.length < 1) {
-              arr.push({ url: img.url });
+              arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
             }
           }
           
@@ -341,15 +340,14 @@ export class CollectionService {
     }
 
     // Generate cover image if not exists
-    if (!collection.coverImageUrl) {
+    if (!collection.coverImageKey) {
       await this.generateCoverImage(collection.id);
-      // Reload collection to get updated coverImageUrl
       const updated = await this.prisma.collection.findUnique({
         where: { id: collection.id },
-        select: { coverImageUrl: true },
+        select: { coverImageKey: true },
       });
-      if (updated?.coverImageUrl) {
-        collection.coverImageUrl = updated.coverImageUrl;
+      if (updated?.coverImageKey) {
+        collection.coverImageKey = updated.coverImageKey;
       }
     }
 
@@ -392,7 +390,7 @@ export class CollectionService {
     ]);
 
     // Generate cover images for collections that don't have one (fire and forget)
-    const collectionsWithoutCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
+    const collectionsWithoutCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
     if (collectionsWithoutCover.length > 0) {
       // Generate covers in background (don't await)
       Promise.all(
@@ -414,7 +412,7 @@ export class CollectionService {
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
-        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
+        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
         isPublic: c.isPublic,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
@@ -507,7 +505,7 @@ export class CollectionService {
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
-        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
+        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
         isPublic: c.isPublic,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
@@ -592,7 +590,7 @@ export class CollectionService {
         name: c.name,
         slug: c.slug,
         description: c.description || undefined,
-        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
+        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
         isPublic: c.isPublic,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
@@ -649,7 +647,7 @@ export class CollectionService {
       data: {
         ...(dto.name && { name: dto.name, slug: newSlug }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.coverImageUrl !== undefined && { coverImageUrl: dto.coverImageUrl }),
+        ...(dto.coverImageKey !== undefined && { coverImageKey: dto.coverImageKey }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
         ...(dto.categoryId !== undefined
           ? (dto.categoryId == null || dto.categoryId === ''
@@ -688,7 +686,7 @@ export class CollectionService {
   async updateCollectionCover(
     collectionId: string,
     userId: string,
-    coverImageUrl: string,
+    coverImageKey: string,
   ): Promise<CollectionResponseDto> {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
@@ -704,7 +702,7 @@ export class CollectionService {
 
     const updated = await this.prisma.collection.update({
       where: { id: collectionId },
-      data: { coverImageUrl },
+      data: { coverImageKey },
       include: {
         user: { select: { id: true, displayName: true } },
         items: {
@@ -775,10 +773,11 @@ export class CollectionService {
         return null;
       }
 
-      // Get image URLs from items (resolve S3 keys to presigned URLs)
+      // Get image URLs from items (product cardKey -> public URL, or customImageUrl)
       const imageUrls: string[] = [];
       for (const item of collection.items) {
-        const rawUrl = item.customImageUrl || item.product?.images?.[0]?.url;
+        const firstImg = item.product?.images?.[0];
+        const rawUrl = item.customImageUrl || (firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : null);
         if (rawUrl) {
           const resolved = await this.resolveProductImageUrl(rawUrl);
           if (resolved) imageUrls.push(resolved);
@@ -806,10 +805,9 @@ export class CollectionService {
             bucket: 'collections',
           });
 
-          // Save S3 key to DB (not presigned URL - it would expire)
           await this.prisma.collection.update({
             where: { id: collectionId },
-            data: { coverImageUrl: uploadResult.key },
+            data: { coverImageKey: uploadResult.key },
           });
 
           return uploadResult.key;
@@ -872,10 +870,9 @@ export class CollectionService {
         bucket: 'collections',
       });
 
-      // Save S3 key to DB (not presigned URL - it would expire)
       await this.prisma.collection.update({
         where: { id: collectionId },
-        data: { coverImageUrl: uploadResult.key },
+        data: { coverImageKey: uploadResult.key },
       });
 
       return uploadResult.key;
@@ -1428,37 +1425,25 @@ export class CollectionService {
       .replace(/^-|-$/g, '');
   }
 
-  /**
-   * Resolve coverImageUrl - if it's an S3 key, generate presigned URL
-   * If it's already an http(s) URL, return as-is
-   */
-  private async resolveCoverImageUrl(url: string | null | undefined): Promise<string | undefined> {
-    if (!url) return undefined;
-    // Already a full URL or same-origin path - return as-is
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
-    // S3 key - resolve to presigned URL
-    try {
-      return await this.storageService.getPresignedDownloadUrl('collections', url, 86400); // 24 hours
-    } catch (e: any) {
-      this.logger.warn(`Failed to resolve cover image presigned URL for key: ${url} - ${e.message}`);
-      return undefined;
-    }
-  }
-
   private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
     if (!imageUrl) return null;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
+    // S3 key (dev/ or prod/) -> public URL
+    if (imageUrl.includes('dev/') || imageUrl.includes('prod/')) {
+      return this.storageService.getPublicAssetUrl(imageUrl);
+    }
     try {
       return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
     } catch (e: any) {
-      this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
+      this.logger.warn(`Failed to resolve product image: ${imageUrl} - ${e.message}`);
       return null;
     }
   }
 
   private async mapCollectionToDto(collection: any, isLiked?: boolean): Promise<CollectionResponseDto> {
-    // Resolve coverImageUrl (S3 key -> presigned URL)
-    const resolvedCoverUrl = await this.resolveCoverImageUrl(collection.coverImageUrl);
+    const resolvedCoverUrl = collection.coverImageKey
+      ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
+      : undefined;
 
     // Filter out products that are not active or sold
     const activeItems = (collection.items && Array.isArray(collection.items))
@@ -1555,7 +1540,7 @@ export class CollectionService {
         id: item.id || '',
         productId: product.id || '',
         productTitle: product.title || 'İsimsiz Ürün',
-        productImage: (await this.resolveProductImageUrl(firstImage?.url)) || undefined,
+        productImage: firstImage?.cardKey ? this.storageService.getPublicAssetUrl(firstImage.cardKey) : undefined,
         productPrice: product.price ? parseFloat(String(product.price)) : 0,
         productStatus: (product as any).status ?? 'active',
         sortOrder: item.sortOrder || 0,

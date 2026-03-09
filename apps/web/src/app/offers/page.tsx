@@ -355,7 +355,7 @@ export default function OffersPage() {
                       >
                         {offer.product.images?.[0] ? (
                           <OptimizedImage
-                            src={offer.product.images[0].url}
+                            src={(offer.product.images[0] as any).cardUrl ?? (offer.product.images[0] as any).detailUrl ?? (offer.product.images[0] as any).url ?? offer.product.images[0]}
                             alt={offer.product.title}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"

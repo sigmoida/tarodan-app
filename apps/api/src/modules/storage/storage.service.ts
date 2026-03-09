@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, PutObjectCommandInput, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 
@@ -29,6 +29,9 @@ export interface UploadOptions {
   isPublic?: boolean; // Artık kullanılmıyor, her şey private
   entityType?: string;
   entityId?: string;
+  cacheControl?: string;
+  contentType?: string;
+  skipMediaFile?: boolean;
 }
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -169,30 +172,33 @@ export class StorageService implements OnModuleInit {
     const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
 
     try {
-      // S3'e yükle - PRIVATE (public read yok)
-      const command = new PutObjectCommand({
+      const contentType = options.contentType ?? options.mimeType ?? 'application/octet-stream';
+      const commandParams: PutObjectCommandInput = {
         Bucket: this.baseBucket,
         Key: key,
         Body: buffer,
-        ContentType: options.mimeType || 'application/octet-stream',
-        // Public erişim YOK - sadece presigned URL ile erişilebilir
+        ContentType: contentType,
         Metadata: {
           'uploader-id': uploaderId || '',
           'entity-type': options.entityType || '',
           'entity-id': options.entityId || '',
         },
-      });
+      };
+      if (options.cacheControl) {
+        commandParams.CacheControl = options.cacheControl;
+      }
+      const command = new PutObjectCommand(commandParams);
 
       await this.s3Client.send(command);
 
-      // Database'e kaydet
-      // URL artık presigned URL değil, sadece identifier olarak key kullanılıyor
-      await this.prisma.mediaFile.create({
+      // Database'e kaydet (skipMediaFile=true ise atla - public product/collection assets)
+      if (!options.skipMediaFile) {
+        await this.prisma.mediaFile.create({
         data: {
           bucket: options.bucket, // Orijinal bucket tipi (products, avatars, vs.)
           key,                     // Full S3 key (dev/products/...)
           filename,
-          mimeType: options.mimeType || 'application/octet-stream',
+          mimeType: contentType,
           size: buffer.length,
           uploaderId,
           entityType: options.entityType,
@@ -201,6 +207,7 @@ export class StorageService implements OnModuleInit {
           url: key, // URL yerine key saklanıyor, presigned URL endpoint'ten alınacak
         },
       });
+      }
 
       this.logger.log(`✅ File uploaded (private): ${key}`);
 
@@ -280,6 +287,20 @@ export class StorageService implements OnModuleInit {
     for (const file of files) {
       await this.deleteFile(file.bucket, file.key);
     }
+  }
+
+  /**
+   * Build direct public URL for public-read S3 assets (product/collection images).
+   * Key must include env prefix (e.g. dev/products/product-images/...).
+   */
+  getPublicAssetUrl(key: string): string {
+    const baseUrl = this.configService.get('S3_PUBLIC_BASE_URL', '');
+    if (!baseUrl) {
+      this.logger.warn('S3_PUBLIC_BASE_URL not configured; returning empty URL');
+      return '';
+    }
+    const normalizedKey = key.startsWith('/') ? key.slice(1) : key;
+    return `${baseUrl.replace(/\/$/, '')}/${normalizedKey}`;
   }
 
   /**

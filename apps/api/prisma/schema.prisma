@@ -430,7 +430,8 @@ model Product {
 model ProductImage {
   id        String   @id @default(uuid())
   productId String   @map("product_id")
-  url       String
+  cardKey   String   @map("card_key")
+  detailKey String   @map("detail_key")
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -719,7 +720,7 @@ model Collection {
   name          String
   slug          String
   description   String?
-  coverImageUrl String?          @map("cover_image_url")
+  coverImageKey String?          @map("cover_image_key")
   isPublic      Boolean          @default(true) @map("is_public")
   viewCount     Int              @default(0) @map("view_count")
   likeCount     Int              @default(0) @map("like_count")

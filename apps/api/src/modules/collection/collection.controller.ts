@@ -341,20 +341,8 @@ export class CollectionController {
       throw new BadRequestException('Kapak resmi gerekli');
     }
 
-    let s3Key: string;
-    try {
-      const uploadResult = await this.mediaService.upload(coverFile, {
-        folder: 'collection-covers',
-        bucket: 'collections',
-        resize: { width: 1200, height: 600, fit: 'cover' },
-      });
-      // Save S3 key (not presigned URL - it would expire)
-      s3Key = uploadResult.key;
-    } catch (error: any) {
-      throw new BadRequestException('Kapak resmi yükleme başarısız: ' + (error.message || 'Bilinmeyen hata'));
-    }
-
-    return this.collectionService.updateCollectionCover(id, req.user.id, s3Key);
+    const uploadResult = await this.mediaService.uploadCollectionCover(coverFile);
+    return this.collectionService.updateCollectionCover(id, req.user.id, uploadResult.key);
   }
 
 }

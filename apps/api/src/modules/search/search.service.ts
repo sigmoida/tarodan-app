@@ -9,6 +9,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
 import { ProductStatus } from '@prisma/client';
+import { StorageService } from '../storage/storage.service';
 
 export interface ProductSearchResult {
   id: string;
@@ -81,6 +82,7 @@ export class SearchService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
   ) {}
 
   async onModuleInit() {
@@ -578,7 +580,7 @@ export class SearchService implements OnModuleInit {
       carModelName: product.carModel?.name || undefined,
       sellerId: product.sellerId,
       sellerName: product.seller?.displayName,
-      imageUrl: product.images?.[0]?.url,
+      imageUrl: product.images?.[0]?.cardKey ? this.storageService.getPublicAssetUrl(product.images[0].cardKey) : undefined,
       scale: scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
       viewCount: product.viewCount || 0,
       material: materialAttr?.attribute?.slug || undefined,
@@ -598,7 +600,7 @@ export class SearchService implements OnModuleInit {
     manufacturer: { select: { id: true, name: true } },
     carModel: { select: { id: true, name: true } },
     seller: { select: { id: true, displayName: true } },
-    images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { url: true } },
+    images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
     productAttributes: {
       include: {
         attribute: { include: { group: { select: { slug: true } } } },
@@ -855,7 +857,7 @@ export class SearchService implements OnModuleInit {
         id: true,
         title: true,
         price: true,
-        images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { url: true } },
+        images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
         brand: { select: { name: true } },
       },
       take: limit,
@@ -864,7 +866,7 @@ export class SearchService implements OnModuleInit {
     return products.map((p) => ({
       id: p.id,
       title: p.title,
-      imageUrl: p.images[0]?.url,
+      imageUrl: p.images[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
       price: parseFloat(p.price.toString()),
       brandName: (p as any).brand?.name,
     }));
@@ -1066,7 +1068,7 @@ export class SearchService implements OnModuleInit {
           brand: { select: { name: true } },
           manufacturer: { select: { name: true } },
           seller: { select: { displayName: true } },
-          images: { take: 1, select: { url: true } },
+          images: { take: 1, select: { cardKey: true } },
         },
         orderBy,
         skip: (page - 1) * pageSize,
@@ -1092,7 +1094,7 @@ export class SearchService implements OnModuleInit {
           manufacturerId: p.manufacturerId || undefined,
           manufacturerName: (p as any).manufacturer?.name || undefined,
           sellerName: p.seller.displayName,
-          imageUrl: p.images[0]?.url,
+          imageUrl: p.images[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
           score: 0,
         };
       }),
@@ -1337,7 +1339,7 @@ export class SearchService implements OnModuleInit {
       viewCount: collection.viewCount || 0,
       likeCount: collection.likeCount || 0,
       itemCount: collection._count?.items ?? 0,
-      coverImageUrl: collection.coverImageUrl || undefined,
+      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
     };

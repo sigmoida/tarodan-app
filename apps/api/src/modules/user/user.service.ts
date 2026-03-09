@@ -48,18 +48,11 @@ export class UserService {
     return null;
   }
 
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
-    // Same-origin path (örn. /photos/products/xxx.png) – frontend doğrudan kullanır
-    if (imageUrl.startsWith('/')) return imageUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
-      } catch (e: any) {
-        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
-        return null;
-      }
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -1361,7 +1354,7 @@ export class UserService {
         name: true,
         viewCount: true,
         likeCount: true,
-        coverImageUrl: true,
+        coverImageKey: true,
         _count: { select: { items: true } },
       },
     });
@@ -1405,7 +1398,7 @@ export class UserService {
         name: c.name,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
-        coverImage: c.coverImageUrl,
+        coverImage: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
         itemCount: c._count.items,
       })),
       company: {
@@ -1472,14 +1465,14 @@ export class UserService {
         productId: item.productId,
         productTitle: item.product?.title || item.customTitle || 'Ürün',
         productPrice: item.product?.price ? Number(item.product.price) : null,
-        productImage: await this.resolveProductImageUrl(item.customImageUrl || item.product?.images?.[0]?.url),
+        productImage: this.resolveProductImageUrl(item.customImageUrl || item.product?.images?.[0]?.cardKey),
       })));
 
       return {
         id: collection.id,
         name: collection.name,
         description: collection.description,
-        coverImageUrl: collection.coverImageUrl,
+        coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
         viewCount: collection.viewCount,
         likeCount: collection.likeCount,
         itemCount: collection._count.items,
@@ -1586,7 +1579,7 @@ export class UserService {
       id: topCollection.id,
       name: topCollection.name,
       description: topCollection.description,
-      coverImageUrl: topCollection.coverImageUrl,
+      coverImageUrl: topCollection.coverImageKey ? this.storageService.getPublicAssetUrl(topCollection.coverImageKey) : undefined,
       viewCount: topCollection.viewCount,
       likeCount: topCollection.likeCount,
       itemCount: topCollection._count.items,
@@ -1606,7 +1599,7 @@ export class UserService {
           productId: item.product!.id,
           productTitle: item.product!.title,
           productPrice: Number(item.product!.price),
-          productImage: await this.resolveProductImageUrl(item.product!.images[0]?.url),
+          productImage: this.resolveProductImageUrl(item.product!.images[0]?.cardKey),
         }))),
     };
   }
@@ -1772,7 +1765,7 @@ export class UserService {
           id: item.id,
           productTitle: item.product!.title,
           productPrice: Number(item.product!.price),
-          productImage: await this.resolveProductImageUrl(item.product!.images[0]?.url),
+          productImage: this.resolveProductImageUrl(item.product!.images[0]?.cardKey),
         })));
 
       return {
@@ -1780,7 +1773,7 @@ export class UserService {
         name: collection.name,
         viewCount: collection.viewCount,
         likeCount: collection.likeCount,
-        coverImageUrl: collection.coverImageUrl,
+        coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
         _count: collection._count,
         items: activeItems,
       };
@@ -1836,7 +1829,7 @@ export class UserService {
         name: c.name,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
-        coverImageUrl: c.coverImageUrl,
+        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
         itemCount: c._count?.items || 0,
         previewItems: c.items || [],
       })),
@@ -1846,7 +1839,7 @@ export class UserService {
         price: Number(p.price),
         viewCount: p.viewCount,
         likeCount: p.likeCount,
-        image: await this.resolveProductImageUrl(p.images[0]?.url),
+        image: this.resolveProductImageUrl(p.images[0]?.cardKey),
       }))),
     };
   }
