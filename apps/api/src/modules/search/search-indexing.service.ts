@@ -12,6 +12,8 @@ export class SearchIndexingService {
     @InjectQueue(QUEUE_NAMES.SEARCH) private readonly searchQueue: Queue,
   ) {}
 
+  // ── Product ──
+
   async queueIndexProduct(productId: string): Promise<void> {
     await this.searchQueue.add('index', {
       type: 'index',
@@ -35,6 +37,34 @@ export class SearchIndexingService {
       type: 'reindex-all',
       entityType: 'product',
     } as SearchJobData, { attempts: 1 });
-    this.logger.log('Queued full reindex');
+    this.logger.log('Queued full product reindex');
+  }
+
+  // ── Collection ──
+
+  async queueIndexCollection(collectionId: string): Promise<void> {
+    await this.searchQueue.add('index-collection', {
+      type: 'index',
+      entityType: 'collection',
+      entityId: collectionId,
+    } as SearchJobData);
+    this.logger.debug(`Queued index for collection ${collectionId}`);
+  }
+
+  async queueRemoveCollection(collectionId: string): Promise<void> {
+    await this.searchQueue.add('delete-collection', {
+      type: 'delete',
+      entityType: 'collection',
+      entityId: collectionId,
+    } as SearchJobData);
+    this.logger.debug(`Queued delete for collection ${collectionId}`);
+  }
+
+  async queueReindexAllCollections(): Promise<void> {
+    await this.searchQueue.add('reindex-all-collections', {
+      type: 'reindex-all',
+      entityType: 'collection',
+    } as SearchJobData, { attempts: 1 });
+    this.logger.log('Queued full collection reindex');
   }
 }

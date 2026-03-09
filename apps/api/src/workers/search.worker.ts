@@ -9,7 +9,7 @@ import { SearchService } from '../modules/search/search.service';
 
 export interface SearchJobData {
   type: 'index' | 'update' | 'delete' | 'bulk-index' | 'reindex-all';
-  entityType: 'product';
+  entityType: 'product' | 'collection';
   entityId?: string;
   entityIds?: string[];
 }
@@ -20,11 +20,12 @@ export class SearchWorker {
 
   constructor(private readonly searchService: SearchService) {}
 
+  // ── Product jobs ──
+
   @Process('index')
   async handleIndex(job: Job<SearchJobData>) {
     const { entityId } = job.data;
     if (!entityId) throw new Error('entityId is required for indexing');
-
     this.logger.log(`Index job ${job.id}: product ${entityId}`);
     await this.searchService.indexProduct(entityId);
     return { success: true, entityId };
@@ -34,7 +35,6 @@ export class SearchWorker {
   async handleUpdate(job: Job<SearchJobData>) {
     const { entityId } = job.data;
     if (!entityId) throw new Error('entityId is required for update');
-
     this.logger.log(`Update job ${job.id}: product ${entityId}`);
     await this.searchService.indexProduct(entityId);
     return { success: true, entityId };
@@ -44,7 +44,6 @@ export class SearchWorker {
   async handleDelete(job: Job<SearchJobData>) {
     const { entityId } = job.data;
     if (!entityId) throw new Error('entityId is required for delete');
-
     this.logger.log(`Delete job ${job.id}: product ${entityId}`);
     await this.searchService.removeProduct(entityId);
     return { success: true, entityId };
@@ -54,7 +53,6 @@ export class SearchWorker {
   async handleBulkIndex(job: Job<SearchJobData>) {
     const { entityIds } = job.data;
     if (!entityIds?.length) return { success: true, indexed: 0 };
-
     this.logger.log(`Bulk index job ${job.id}: ${entityIds.length} products`);
     let indexed = 0;
     for (const id of entityIds) {
@@ -76,6 +74,36 @@ export class SearchWorker {
     this.logger.log(`Reindex complete: ${total} products`);
     return { success: true, total };
   }
+
+  // ── Collection jobs ──
+
+  @Process('index-collection')
+  async handleIndexCollection(job: Job<SearchJobData>) {
+    const { entityId } = job.data;
+    if (!entityId) throw new Error('entityId is required for collection indexing');
+    this.logger.log(`Index collection job ${job.id}: ${entityId}`);
+    await this.searchService.indexCollection(entityId);
+    return { success: true, entityId };
+  }
+
+  @Process('delete-collection')
+  async handleDeleteCollection(job: Job<SearchJobData>) {
+    const { entityId } = job.data;
+    if (!entityId) throw new Error('entityId is required for collection delete');
+    this.logger.log(`Delete collection job ${job.id}: ${entityId}`);
+    await this.searchService.removeCollection(entityId);
+    return { success: true, entityId };
+  }
+
+  @Process('reindex-all-collections')
+  async handleReindexAllCollections(job: Job<SearchJobData>) {
+    this.logger.log(`Reindex-all-collections job ${job.id}`);
+    const total = await this.searchService.reindexAllCollections();
+    this.logger.log(`Collections reindex complete: ${total}`);
+    return { success: true, total };
+  }
+
+  // ── Lifecycle ──
 
   @OnQueueCompleted()
   onCompleted(job: Job) {

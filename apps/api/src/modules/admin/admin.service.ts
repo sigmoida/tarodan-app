@@ -6961,8 +6961,48 @@ export class AdminService {
     sortOrder?: 'asc' | 'desc';
   }) {
     const { page = 1, limit = 20, search, userId, isPublic, isFeatured, sortBy = 'createdAt', sortOrder = 'desc' } = query;
-    const where: Prisma.CollectionWhereInput = {};
 
+    const esSortMap: Record<string, 'popular' | 'recent' | 'name'> = {
+      createdAt: 'recent', viewCount: 'popular', likeCount: 'popular', name: 'name',
+    };
+
+    if (search && this.searchService.isAvailable()) {
+      const esResult = await this.searchService.searchCollections({
+        query: search,
+        isPublic,
+        isFeatured,
+        userId,
+        sortBy: esSortMap[sortBy] ?? 'recent',
+        page,
+        pageSize: limit,
+      });
+
+      if (esResult && esResult.ids.length > 0) {
+        const collections = await this.prisma.collection.findMany({
+          where: { id: { in: esResult.ids } },
+          include: {
+            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            _count: { select: { items: true } },
+          },
+        });
+        const orderMap = new Map(esResult.ids.map((id, i) => [id, i]));
+        collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+        return {
+          data: collections.map(c => ({
+            id: c.id, name: c.name, slug: c.slug, description: c.description,
+            coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+            viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
+            owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+          })),
+          total: esResult.total, page, limit, totalPages: Math.ceil(esResult.total / limit),
+        };
+      }
+      if (esResult && esResult.total === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+    }
+
+    const where: Prisma.CollectionWhereInput = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -6989,24 +7029,12 @@ export class AdminService {
 
     return {
       data: collections.map(c => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        coverImageUrl: c.coverImageUrl,
-        isPublic: c.isPublic,
-        isFeatured: c.isFeatured,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count.items,
-        owner: c.user,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
+        id: c.id, name: c.name, slug: c.slug, description: c.description,
+        coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+        viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
+        owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
       })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      total, page, limit, totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -7109,6 +7137,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_create', 'Collection', collection.id, null, collection);
 
+    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {});
+
     return {
       ...collection,
       itemCount: 0,
@@ -7155,6 +7185,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_update', 'Collection', collectionId, existing, updated);
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return {
       ...updated,
       itemCount: updated._count.items,
@@ -7179,6 +7211,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_delete', 'Collection', collectionId, existing, null);
+
+    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {});
 
     return { success: true };
   }
@@ -7226,6 +7260,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_items_add', 'Collection', collectionId, null, { addedProductIds: productIds });
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return {
       success: true,
       addedCount: successfulItems.length,
@@ -7251,6 +7287,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_item_remove', 'CollectionItem', itemId, item, null);
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return { success: true };
   }
 
@@ -7273,6 +7311,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_visibility_change', 'Collection', collectionId, { isPublic: existing.isPublic }, { isPublic });
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return { success: true, isPublic: updated.isPublic };
   }
 
@@ -7294,6 +7334,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
+
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
 
     return { success: true, isFeatured: updated.isFeatured };
   }
