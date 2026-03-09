@@ -41,6 +41,7 @@ import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
+import { SearchIndexingService } from '../search/search-indexing.service';
 import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
@@ -55,6 +56,7 @@ export class AdminService {
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
+    private readonly searchIndexing: SearchIndexingService,
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
@@ -1012,14 +1014,10 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_update', 'Product', productId, product, updated);
 
-    // Update Elasticsearch
-    try {
-      if (this.searchService) {
-        await this.searchService.indexProduct(productId);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to update product ${productId} in Elasticsearch:`, error);
-    }
+    // Update Elasticsearch (async)
+    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+    });
 
     // Invalidate caches
     if (this.cache) {
@@ -1054,13 +1052,10 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
 
-    // Index to Elasticsearch when product is approved
-    try {
-      await this.searchService.indexProduct(productId);
-    } catch (error) {
-      this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
-      // Don't fail the request if indexing fails
-    }
+    // Index to Elasticsearch when product is approved (async)
+    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+    });
 
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
@@ -1128,12 +1123,10 @@ export class AdminService {
 
         await this.createAuditLog(adminId, 'product_bulk_approve', 'Product', productId, product, { ...updated, note });
 
-        // Index to Elasticsearch
-        try {
-          await this.searchService.indexProduct(productId);
-        } catch (error) {
-          this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
-        }
+        // Index to Elasticsearch (async)
+        this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+          this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+        });
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);

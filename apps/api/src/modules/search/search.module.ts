@@ -1,14 +1,22 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
+import { SearchIndexingService } from './search-indexing.service';
 import { PrismaModule } from '../../prisma';
+import { QUEUE_NAMES } from '../../workers/constants';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, ScheduleModule.forRoot()],
+  imports: [
+    PrismaModule,
+    ConfigModule,
+    ScheduleModule.forRoot(),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
+  ],
   controllers: [SearchController],
-  providers: [SearchService],
-  exports: [SearchService],
+  providers: [SearchService, SearchIndexingService],
+  exports: [SearchService, SearchIndexingService],
 })
 export class SearchModule {}

@@ -26,6 +26,7 @@ export interface ProductSearchResult {
   sellerName: string;
   imageUrl?: string;
   score: number;
+  highlight?: { title?: string[]; description?: string[] };
 }
 
 export interface SearchOptions {
@@ -58,6 +59,7 @@ export interface SearchResponse {
   page: number;
   pageSize: number;
   took: number;
+  aggregations?: Record<string, { buckets: Array<{ key: string; doc_count: number }> }>;
 }
 
 export interface RichAutocompleteResult {
@@ -81,10 +83,9 @@ export class SearchService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const node = this.configService.get(
-      'ELASTICSEARCH_NODE',
-      'http://localhost:9200',
-    );
+    const node =
+      this.configService.get('ELASTICSEARCH_URL') ||
+      this.configService.get('ELASTICSEARCH_NODE', 'http://localhost:9200');
 
     this.client = new Client({
       node,
@@ -445,8 +446,7 @@ export class SearchService implements OnModuleInit {
     }
 
     try {
-      const response = await this.client.search({
-        index: this.PRODUCTS_INDEX,
+      const searchBody: any = {
         query: {
           bool: {
             must: must.length > 0 ? must : [{ match_all: {} }],
@@ -456,6 +456,27 @@ export class SearchService implements OnModuleInit {
         sort,
         from: (page - 1) * pageSize,
         size: pageSize,
+      };
+      if (query) {
+        searchBody.highlight = {
+          fields: {
+            title: { fragment_size: 120, number_of_fragments: 1 },
+            description: { fragment_size: 200, number_of_fragments: 2 },
+          },
+          pre_tags: ['<em>'],
+          post_tags: ['</em>'],
+        };
+      }
+      searchBody.aggs = {
+        categories: { terms: { field: 'categoryId', size: 50 } },
+        brands: { terms: { field: 'brandId', size: 50 } },
+        conditions: { terms: { field: 'condition', size: 10 } },
+        price_range: { stats: { field: 'price' } },
+      };
+
+      const response = await this.client.search({
+        index: this.PRODUCTS_INDEX,
+        ...searchBody,
       });
 
       const hits = response.hits.hits;
@@ -463,6 +484,7 @@ export class SearchService implements OnModuleInit {
         typeof response.hits.total === 'number'
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
+      const aggs = (response as any).aggregations;
 
       if (hits.length === 0 && query) {
         this.logger.debug('ES returned 0 results, falling back to database');
@@ -486,11 +508,22 @@ export class SearchService implements OnModuleInit {
           sellerName: hit._source.sellerName,
           imageUrl: hit._source.imageUrl,
           score: hit._score || 0,
+          highlight: hit.highlight
+            ? { title: hit.highlight.title, description: hit.highlight.description }
+            : undefined,
         })),
         total,
         page,
         pageSize,
         took: response.took || 0,
+        aggregations: aggs
+          ? {
+              categories: aggs.categories,
+              brands: aggs.brands,
+              conditions: aggs.conditions,
+              price_range: aggs.price_range,
+            }
+          : undefined,
       };
     } catch (error) {
       this.logger.warn('Elasticsearch search error, falling back to database');
