@@ -23,6 +23,8 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
 import { StorageService } from '../storage/storage.service';
+import { SearchIndexingService } from '../search/search-indexing.service';
+import { SearchService } from '../search/search.service';
 import * as https from 'https';
 import * as http from 'http';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,6 +48,8 @@ export class CollectionService {
     private readonly notificationService: NotificationService,
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,
+    private readonly searchIndexing: SearchIndexingService,
+    private readonly searchService: SearchService,
   ) {}
 
   // ==========================================================================
@@ -101,6 +105,10 @@ export class CollectionService {
           orderBy: { sortOrder: 'asc' },
         },
       },
+    });
+
+    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {
+      this.logger.warn('Failed to queue collection index for ES');
     });
 
     return await this.mapCollectionToDto(collection, false);
@@ -431,25 +439,95 @@ export class CollectionService {
     categoryId?: string,
     categorySlug?: string,
   ): Promise<CollectionListResponseDto> {
-    // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
 
-    // Resolve category slug to id if provided (case-insensitive)
     let resolvedCategoryId = categoryId;
     if (!resolvedCategoryId && categorySlug?.trim()) {
       const slug = categorySlug.trim().toLowerCase();
       const cat = await this.prisma.category.findFirst({
-        where: {
-          slug: { equals: slug, mode: 'insensitive' },
-          isActive: true,
-        },
+        where: { slug: { equals: slug, mode: 'insensitive' }, isActive: true },
         select: { id: true },
       });
       resolvedCategoryId = cat?.id ?? undefined;
     }
 
-    // Build where clause
+    // Try Elasticsearch first
+    const esResult = await this.searchService.searchCollections({
+      query: search,
+      categoryId: resolvedCategoryId,
+      isPublic: true,
+      sortBy,
+      page: safePage,
+      pageSize: safePageSize,
+    });
+
+    if (esResult && esResult.ids.length > 0) {
+      return this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
+    }
+
+    if (esResult && esResult.total === 0) {
+      return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
+    }
+
+    // Prisma fallback
+    return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+  }
+
+  private async hydrateCollections(
+    ids: string[],
+    total: number,
+    page: number,
+    pageSize: number,
+  ): Promise<CollectionListResponseDto> {
+    const collections = await this.prisma.collection.findMany({
+      where: { id: { in: ids } },
+      include: {
+        user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        _count: { select: { items: true } },
+      },
+    });
+
+    const orderMap = new Map(ids.map((id, i) => [id, i]));
+    collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+
+    const noCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
+    if (noCover.length > 0) {
+      Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
+    }
+
+    return {
+      collections: await Promise.all(collections.map(async (c) => ({
+        id: c.id,
+        userId: c.userId,
+        userName: c.user.displayName,
+        categoryId: c.categoryId ?? undefined,
+        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
+        name: c.name,
+        slug: c.slug,
+        description: c.description || undefined,
+        coverImageUrl: await this.resolveCoverImageUrl(c.coverImageUrl),
+        isPublic: c.isPublic,
+        viewCount: c.viewCount,
+        likeCount: c.likeCount,
+        itemCount: c._count?.items ?? 0,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      }))),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  private async browsePublicCollectionsPrisma(
+    safePage: number,
+    safePageSize: number,
+    sortBy: string,
+    search?: string,
+    resolvedCategoryId?: string,
+  ): Promise<CollectionListResponseDto> {
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
@@ -461,33 +539,17 @@ export class CollectionService {
         ],
       } : {}),
     };
-    
-    // Build orderBy clause
+
     let orderBy: Prisma.CollectionOrderByWithRelationInput;
     let needsInMemorySort = false;
-    
+
     switch (sortBy) {
-      case 'popular':
-        orderBy = { viewCount: 'desc' };
-        break;
-      case 'recent':
-        orderBy = { createdAt: 'desc' };
-        break;
-      case 'name':
-        // Case-insensitive sorting: fetch all and sort in memory
-        needsInMemorySort = true;
-        orderBy = { createdAt: 'desc' }; // Temporary, will sort after fetch
-        break;
-      case 'items':
-      case 'items_asc':
-      case 'items_desc':
-        // For items count, we need to fetch all and sort in memory
-        // Prisma doesn't support direct _count ordering
-        needsInMemorySort = true;
-        orderBy = { createdAt: 'desc' }; // Will sort after fetch
-        break;
-      default:
-        orderBy = { viewCount: 'desc' };
+      case 'popular': orderBy = { viewCount: 'desc' }; break;
+      case 'recent': orderBy = { createdAt: 'desc' }; break;
+      case 'name': needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
+      case 'items': case 'items_asc': case 'items_desc':
+        needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
+      default: orderBy = { viewCount: 'desc' };
     }
 
     let [collections, total] = await Promise.all([
@@ -498,63 +560,26 @@ export class CollectionService {
           category: { select: { id: true, name: true, slug: true } },
           _count: { select: { items: true } },
         },
-        ...(needsInMemorySort
-          ? {} // Fetch all for in-memory sort
-          : {
-              orderBy,
-              skip: (safePage - 1) * safePageSize,
-              take: safePageSize,
-            }
-        ),
+        ...(needsInMemorySort ? {} : { orderBy, skip: (safePage - 1) * safePageSize, take: safePageSize }),
       }),
       this.prisma.collection.count({ where }),
     ]);
 
-    // Sort in memory if needed (for name or items)
     if (needsInMemorySort) {
       if (sortBy === 'name') {
-        // Case-insensitive alphabetical sort (Turkish locale aware)
-        const collator = new Intl.Collator('tr', { 
-          sensitivity: 'base',
-          numeric: false
-        });
-        collections = collections.sort((a, b) => {
-          const nameA = a.name.toLowerCase();
-          const nameB = b.name.toLowerCase();
-          return collator.compare(nameA, nameB);
-        });
+        const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
+        collections = collections.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
       } else if (sortBy === 'items' || sortBy === 'items_desc') {
-        // Sort by item count descending (most items first)
-        collections = collections.sort((a, b) => {
-          const countA = a._count?.items ?? 0;
-          const countB = b._count?.items ?? 0;
-          return countB - countA;
-        });
+        collections = collections.sort((a, b) => (b._count?.items ?? 0) - (a._count?.items ?? 0));
       } else if (sortBy === 'items_asc') {
-        // Sort by item count ascending (least items first)
-        collections = collections.sort((a, b) => {
-          const countA = a._count?.items ?? 0;
-          const countB = b._count?.items ?? 0;
-          return countA - countB;
-        });
+        collections = collections.sort((a, b) => (a._count?.items ?? 0) - (b._count?.items ?? 0));
       }
-      // Apply pagination after sorting
       collections = collections.slice((safePage - 1) * safePageSize, safePage * safePageSize);
     }
 
-    // Generate cover images for collections that don't have one (fire and forget)
-    const collectionsWithoutCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
-    if (collectionsWithoutCover.length > 0) {
-      // Generate covers in background (don't await)
-      Promise.all(
-        collectionsWithoutCover.map((c) =>
-          this.generateCoverImage(c.id).catch((err) => {
-            this.logger.warn(`Failed to generate cover for collection ${c.id}: ${err.message}`);
-          })
-        )
-      ).catch(() => {
-        // Ignore errors in background generation
-      });
+    const noCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
+    if (noCover.length > 0) {
+      Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
     }
 
     return {
@@ -650,7 +675,10 @@ export class CollectionService {
       },
     });
 
-    // Check if user has liked this collection (owner always false)
+    this.searchIndexing.queueIndexCollection(updated.id).catch(() => {
+      this.logger.warn('Failed to queue collection index for ES');
+    });
+
     return await this.mapCollectionToDto(updated, false);
   }
 
@@ -876,6 +904,10 @@ export class CollectionService {
     await this.prisma.collection.delete({
       where: { id: collectionId },
     });
+
+    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {
+      this.logger.warn('Failed to queue collection remove from ES');
+    });
   }
 
   // ==========================================================================
@@ -950,6 +982,7 @@ export class CollectionService {
         },
       });
 
+      this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
       return await this.mapItemToDto(item);
     }
 
@@ -981,6 +1014,7 @@ export class CollectionService {
       },
     });
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
     return await this.mapItemToDto(item);
   }
 
@@ -1015,6 +1049,8 @@ export class CollectionService {
     await this.prisma.collectionItem.delete({
       where: { id: itemId },
     });
+
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
   }
 
   // ==========================================================================

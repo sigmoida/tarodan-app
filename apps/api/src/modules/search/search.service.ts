@@ -26,6 +26,7 @@ export interface ProductSearchResult {
   sellerName: string;
   imageUrl?: string;
   score: number;
+  highlight?: { title?: string[]; description?: string[] };
 }
 
 export interface SearchOptions {
@@ -58,6 +59,7 @@ export interface SearchResponse {
   page: number;
   pageSize: number;
   took: number;
+  aggregations?: Record<string, { buckets: Array<{ key: string; doc_count: number }> }>;
 }
 
 export interface RichAutocompleteResult {
@@ -73,6 +75,7 @@ export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
   private client: Client;
   private readonly PRODUCTS_INDEX = 'products';
+  private readonly COLLECTIONS_INDEX = 'collections';
   private esAvailable = false;
 
   constructor(
@@ -81,10 +84,9 @@ export class SearchService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const node = this.configService.get(
-      'ELASTICSEARCH_NODE',
-      'http://localhost:9200',
-    );
+    const node =
+      this.configService.get('ELASTICSEARCH_URL') ||
+      this.configService.get('ELASTICSEARCH_NODE', 'http://localhost:9200');
 
     this.client = new Client({
       node,
@@ -95,9 +97,12 @@ export class SearchService implements OnModuleInit {
     });
 
     await this.ensureIndexExists();
+    await this.ensureCollectionsIndexExists();
 
-    // db:reset sonrası ES index boş kalabilir; DB'de ürün varsa arka planda doldur
-    setImmediate(() => this.syncIndexIfEmpty());
+    setImmediate(() => {
+      this.syncIndexIfEmpty();
+      this.syncCollectionsIndexIfEmpty();
+    });
   }
 
   /** ES bağlı ama index boş, DB'de ürün varsa reindex çalıştır (db:reset senaryosu) */
@@ -445,8 +450,7 @@ export class SearchService implements OnModuleInit {
     }
 
     try {
-      const response = await this.client.search({
-        index: this.PRODUCTS_INDEX,
+      const searchBody: any = {
         query: {
           bool: {
             must: must.length > 0 ? must : [{ match_all: {} }],
@@ -456,6 +460,27 @@ export class SearchService implements OnModuleInit {
         sort,
         from: (page - 1) * pageSize,
         size: pageSize,
+      };
+      if (query) {
+        searchBody.highlight = {
+          fields: {
+            title: { fragment_size: 120, number_of_fragments: 1 },
+            description: { fragment_size: 200, number_of_fragments: 2 },
+          },
+          pre_tags: ['<em>'],
+          post_tags: ['</em>'],
+        };
+      }
+      searchBody.aggs = {
+        categories: { terms: { field: 'categoryId', size: 50 } },
+        brands: { terms: { field: 'brandId', size: 50 } },
+        conditions: { terms: { field: 'condition', size: 10 } },
+        price_range: { stats: { field: 'price' } },
+      };
+
+      const response = await this.client.search({
+        index: this.PRODUCTS_INDEX,
+        ...searchBody,
       });
 
       const hits = response.hits.hits;
@@ -463,6 +488,7 @@ export class SearchService implements OnModuleInit {
         typeof response.hits.total === 'number'
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
+      const aggs = (response as any).aggregations;
 
       if (hits.length === 0 && query) {
         this.logger.debug('ES returned 0 results, falling back to database');
@@ -486,11 +512,22 @@ export class SearchService implements OnModuleInit {
           sellerName: hit._source.sellerName,
           imageUrl: hit._source.imageUrl,
           score: hit._score || 0,
+          highlight: hit.highlight
+            ? { title: hit.highlight.title, description: hit.highlight.description }
+            : undefined,
         })),
         total,
         page,
         pageSize,
         took: response.took || 0,
+        aggregations: aggs
+          ? {
+              categories: aggs.categories,
+              brands: aggs.brands,
+              conditions: aggs.conditions,
+              price_range: aggs.price_range,
+            }
+          : undefined,
       };
     } catch (error) {
       this.logger.warn('Elasticsearch search error, falling back to database');
@@ -1143,6 +1180,326 @@ export class SearchService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error('Delta sync failed');
+    }
+  }
+
+  // ──────────────────────────── Collections Index ────────────────────────────
+
+  private async ensureCollectionsIndexExists(): Promise<void> {
+    if (!this.esAvailable) return;
+    try {
+      const exists = await this.client.indices.exists({ index: this.COLLECTIONS_INDEX });
+      if (!exists) {
+        await this.client.indices.create({
+          index: this.COLLECTIONS_INDEX,
+          settings: {
+            number_of_shards: 1,
+            number_of_replicas: 0,
+            max_ngram_diff: 13,
+            analysis: {
+              analyzer: {
+                turkish: {
+                  type: 'custom',
+                  tokenizer: 'standard',
+                  filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
+                },
+                turkish_edge_ngram: {
+                  type: 'custom',
+                  tokenizer: 'edge_ngram_tokenizer',
+                  filter: ['lowercase', 'asciifolding'],
+                },
+                turkish_search: {
+                  type: 'custom',
+                  tokenizer: 'standard',
+                  filter: ['lowercase', 'asciifolding'],
+                },
+              },
+              tokenizer: {
+                edge_ngram_tokenizer: {
+                  type: 'edge_ngram',
+                  min_gram: 2,
+                  max_gram: 15,
+                  token_chars: ['letter', 'digit'],
+                },
+              },
+              filter: {
+                turkish_stop: { type: 'stop', stopwords: '_turkish_' },
+                turkish_stemmer: { type: 'stemmer', language: 'turkish' },
+                asciifolding: { type: 'asciifolding', preserve_original: true },
+              },
+            },
+          },
+          mappings: {
+            properties: {
+              id: { type: 'keyword' },
+              name: {
+                type: 'text',
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              slug: { type: 'keyword' },
+              description: {
+                type: 'text',
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: {
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              userId: { type: 'keyword' },
+              userName: {
+                type: 'text',
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
+              },
+              categoryId: { type: 'keyword' },
+              categoryName: {
+                type: 'text',
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: { keyword: { type: 'keyword' } },
+              },
+              isPublic: { type: 'boolean' },
+              isFeatured: { type: 'boolean' },
+              viewCount: { type: 'integer' },
+              likeCount: { type: 'integer' },
+              itemCount: { type: 'integer' },
+              coverImageUrl: { type: 'keyword' },
+              createdAt: { type: 'date' },
+              updatedAt: { type: 'date' },
+            },
+          },
+        });
+        this.logger.log('Created Elasticsearch collections index');
+      }
+      await this.prisma.searchIndex.upsert({
+        where: { indexName: this.COLLECTIONS_INDEX },
+        update: { status: 'active' },
+        create: { indexName: this.COLLECTIONS_INDEX, status: 'active', settings: {} },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Collections index creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async syncCollectionsIndexIfEmpty(): Promise<void> {
+    if (!this.esAvailable) return;
+    try {
+      const [esRes, dbCount] = await Promise.all([
+        this.client.count({ index: this.COLLECTIONS_INDEX }).catch(() => ({ count: 0 })),
+        this.prisma.collection.count({ where: { isPublic: true } }),
+      ]);
+      const esCount = esRes?.count ?? 0;
+      if (esCount === 0 && dbCount > 0) {
+        this.logger.log(`Collections index empty, ${dbCount} public collections in DB – reindexing...`);
+        const indexed = await this.reindexAllCollections();
+        this.logger.log(`Collections reindex complete: ${indexed} indexed.`);
+      }
+    } catch (err) {
+      this.logger.warn('syncCollectionsIndexIfEmpty failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  private buildCollectionDocument(collection: any): Record<string, any> {
+    return {
+      id: collection.id,
+      name: collection.name,
+      slug: collection.slug,
+      description: collection.description || '',
+      userId: collection.userId,
+      userName: collection.user?.displayName || '',
+      categoryId: collection.categoryId || undefined,
+      categoryName: collection.category?.name || undefined,
+      isPublic: collection.isPublic,
+      isFeatured: collection.isFeatured || false,
+      viewCount: collection.viewCount || 0,
+      likeCount: collection.likeCount || 0,
+      itemCount: collection._count?.items ?? 0,
+      coverImageUrl: collection.coverImageUrl || undefined,
+      createdAt: collection.createdAt,
+      updatedAt: collection.updatedAt,
+    };
+  }
+
+  private readonly collectionInclude = {
+    user: { select: { id: true, displayName: true } },
+    category: { select: { id: true, name: true, slug: true } },
+    _count: { select: { items: true } },
+  };
+
+  async indexCollection(collectionId: string): Promise<void> {
+    if (!this.esAvailable) return;
+    const collection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+      include: this.collectionInclude,
+    });
+    if (!collection) return;
+    try {
+      await this.client.index({
+        index: this.COLLECTIONS_INDEX,
+        id: collection.id,
+        document: this.buildCollectionDocument(collection),
+      });
+    } catch (error) {
+      this.logger.warn(`ES indexing error for collection ${collectionId}`);
+    }
+  }
+
+  async removeCollection(collectionId: string): Promise<void> {
+    if (!this.esAvailable) return;
+    try {
+      await this.client.delete({ index: this.COLLECTIONS_INDEX, id: collectionId });
+    } catch (error) {
+      this.logger.warn(`ES delete error for collection ${collectionId}`);
+    }
+  }
+
+  async reindexAllCollections(): Promise<number> {
+    if (!this.esAvailable) return 0;
+    await this.prisma.searchIndex.upsert({
+      where: { indexName: this.COLLECTIONS_INDEX },
+      update: { status: 'rebuilding' },
+      create: { indexName: this.COLLECTIONS_INDEX, status: 'rebuilding', settings: {} },
+    });
+    try {
+      const collections = await this.prisma.collection.findMany({
+        include: this.collectionInclude,
+      });
+      const exists = await this.client.indices.exists({ index: this.COLLECTIONS_INDEX });
+      if (exists) await this.client.indices.delete({ index: this.COLLECTIONS_INDEX });
+      await this.ensureCollectionsIndexExists();
+      if (collections.length > 0) {
+        const operations = collections.flatMap((c) => [
+          { index: { _index: this.COLLECTIONS_INDEX, _id: c.id } },
+          this.buildCollectionDocument(c),
+        ]);
+        await this.client.bulk({ refresh: true, operations });
+      }
+      await this.prisma.searchIndex.update({
+        where: { indexName: this.COLLECTIONS_INDEX },
+        data: { status: 'active', documentCount: collections.length, lastSyncedAt: new Date() },
+      });
+      this.logger.log(`Reindexed ${collections.length} collections`);
+      return collections.length;
+    } catch (error) {
+      this.logger.error('Collections reindex error');
+      await this.prisma.searchIndex.update({
+        where: { indexName: this.COLLECTIONS_INDEX },
+        data: { status: 'error' },
+      });
+      throw new InternalServerErrorException('Collections reindex failed');
+    }
+  }
+
+  // ──────────────────────────── Collections Search ────────────────────────────
+
+  async searchCollections(options: {
+    query?: string;
+    categoryId?: string;
+    isPublic?: boolean;
+    isFeatured?: boolean;
+    userId?: string;
+    sortBy?: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ ids: string[]; total: number } | null> {
+    if (!this.esAvailable) return null;
+
+    const { query, categoryId, isPublic, isFeatured, userId, sortBy = 'popular', page = 1, pageSize = 20 } = options;
+
+    const must: any[] = [];
+    const filter: any[] = [];
+
+    if (query && query.trim()) {
+      must.push({
+        bool: {
+          should: [
+            { match: { name: { query, boost: 5 } } },
+            { match: { 'name.edge_ngram': { query, boost: 3 } } },
+            { match: { description: { query, boost: 1.5 } } },
+            { match: { 'description.edge_ngram': { query, boost: 1 } } },
+            { match: { userName: { query, boost: 2 } } },
+            { match: { 'userName.edge_ngram': { query, boost: 1 } } },
+            { match: { categoryName: { query, boost: 2 } } },
+            {
+              multi_match: {
+                query,
+                fields: ['name^3', 'description', 'userName^2', 'categoryName^2'],
+                fuzziness: 'AUTO',
+                prefix_length: 1,
+                boost: 1.5,
+              },
+            },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
+
+    if (isPublic !== undefined) filter.push({ term: { isPublic } });
+    if (isFeatured !== undefined) filter.push({ term: { isFeatured } });
+    if (categoryId) filter.push({ term: { categoryId } });
+    if (userId) filter.push({ term: { userId } });
+
+    let sort: any[];
+    switch (sortBy) {
+      case 'popular': sort = [{ viewCount: 'desc' }, { likeCount: 'desc' }]; break;
+      case 'recent': sort = [{ createdAt: 'desc' }]; break;
+      case 'name': sort = [{ 'name.keyword': 'asc' }]; break;
+      case 'items': case 'items_desc': sort = [{ itemCount: 'desc' }]; break;
+      case 'items_asc': sort = [{ itemCount: 'asc' }]; break;
+      default: sort = query ? [{ _score: 'desc' }] : [{ viewCount: 'desc' }];
+    }
+
+    try {
+      const response = await this.client.search({
+        index: this.COLLECTIONS_INDEX,
+        query: {
+          bool: {
+            must: must.length > 0 ? must : [{ match_all: {} }],
+            filter,
+          },
+        },
+        sort,
+        from: (page - 1) * pageSize,
+        size: pageSize,
+        _source: ['id'],
+      });
+
+      const total =
+        typeof response.hits.total === 'number'
+          ? response.hits.total
+          : (response.hits.total as any)?.value || 0;
+
+      return {
+        ids: response.hits.hits.map((hit: any) => hit._source.id),
+        total,
+      };
+    } catch (error) {
+      this.logger.warn('Collections search error, falling back to Prisma');
+      return null;
     }
   }
 

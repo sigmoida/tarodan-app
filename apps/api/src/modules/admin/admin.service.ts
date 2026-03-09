@@ -41,6 +41,7 @@ import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
+import { SearchIndexingService } from '../search/search-indexing.service';
 import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
@@ -55,6 +56,7 @@ export class AdminService {
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
+    private readonly searchIndexing: SearchIndexingService,
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
@@ -1012,14 +1014,10 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_update', 'Product', productId, product, updated);
 
-    // Update Elasticsearch
-    try {
-      if (this.searchService) {
-        await this.searchService.indexProduct(productId);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to update product ${productId} in Elasticsearch:`, error);
-    }
+    // Update Elasticsearch (async)
+    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+    });
 
     // Invalidate caches
     if (this.cache) {
@@ -1054,13 +1052,10 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
 
-    // Index to Elasticsearch when product is approved
-    try {
-      await this.searchService.indexProduct(productId);
-    } catch (error) {
-      this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
-      // Don't fail the request if indexing fails
-    }
+    // Index to Elasticsearch when product is approved (async)
+    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+    });
 
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
@@ -1128,12 +1123,10 @@ export class AdminService {
 
         await this.createAuditLog(adminId, 'product_bulk_approve', 'Product', productId, product, { ...updated, note });
 
-        // Index to Elasticsearch
-        try {
-          await this.searchService.indexProduct(productId);
-        } catch (error) {
-          this.logger.error(`Failed to index product ${productId} to Elasticsearch:`, error);
-        }
+        // Index to Elasticsearch (async)
+        this.searchIndexing.queueIndexProduct(productId).catch((error) => {
+          this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
+        });
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
@@ -6968,8 +6961,48 @@ export class AdminService {
     sortOrder?: 'asc' | 'desc';
   }) {
     const { page = 1, limit = 20, search, userId, isPublic, isFeatured, sortBy = 'createdAt', sortOrder = 'desc' } = query;
-    const where: Prisma.CollectionWhereInput = {};
 
+    const esSortMap: Record<string, 'popular' | 'recent' | 'name'> = {
+      createdAt: 'recent', viewCount: 'popular', likeCount: 'popular', name: 'name',
+    };
+
+    if (search && this.searchService.isAvailable()) {
+      const esResult = await this.searchService.searchCollections({
+        query: search,
+        isPublic,
+        isFeatured,
+        userId,
+        sortBy: esSortMap[sortBy] ?? 'recent',
+        page,
+        pageSize: limit,
+      });
+
+      if (esResult && esResult.ids.length > 0) {
+        const collections = await this.prisma.collection.findMany({
+          where: { id: { in: esResult.ids } },
+          include: {
+            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            _count: { select: { items: true } },
+          },
+        });
+        const orderMap = new Map(esResult.ids.map((id, i) => [id, i]));
+        collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+        return {
+          data: collections.map(c => ({
+            id: c.id, name: c.name, slug: c.slug, description: c.description,
+            coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+            viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
+            owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+          })),
+          total: esResult.total, page, limit, totalPages: Math.ceil(esResult.total / limit),
+        };
+      }
+      if (esResult && esResult.total === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+    }
+
+    const where: Prisma.CollectionWhereInput = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -6996,24 +7029,12 @@ export class AdminService {
 
     return {
       data: collections.map(c => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        coverImageUrl: c.coverImageUrl,
-        isPublic: c.isPublic,
-        isFeatured: c.isFeatured,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count.items,
-        owner: c.user,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
+        id: c.id, name: c.name, slug: c.slug, description: c.description,
+        coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+        viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
+        owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
       })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      total, page, limit, totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -7116,6 +7137,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_create', 'Collection', collection.id, null, collection);
 
+    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {});
+
     return {
       ...collection,
       itemCount: 0,
@@ -7162,6 +7185,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_update', 'Collection', collectionId, existing, updated);
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return {
       ...updated,
       itemCount: updated._count.items,
@@ -7186,6 +7211,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_delete', 'Collection', collectionId, existing, null);
+
+    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {});
 
     return { success: true };
   }
@@ -7233,6 +7260,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_items_add', 'Collection', collectionId, null, { addedProductIds: productIds });
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return {
       success: true,
       addedCount: successfulItems.length,
@@ -7258,6 +7287,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_item_remove', 'CollectionItem', itemId, item, null);
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return { success: true };
   }
 
@@ -7280,6 +7311,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_visibility_change', 'Collection', collectionId, { isPublic: existing.isPublic }, { isPublic });
 
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
+
     return { success: true, isPublic: updated.isPublic };
   }
 
@@ -7301,6 +7334,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
+
+    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
 
     return { success: true, isFeatured: updated.isFeatured };
   }

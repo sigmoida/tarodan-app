@@ -19,6 +19,7 @@ import { AnalyticsWorker } from './analytics.worker';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentModule } from '../modules/payment/payment.module';
 import { StorageModule } from '../modules/storage/storage.module';
+import { SearchModule } from '../modules/search/search.module';
 import { QUEUE_NAMES } from './constants';
 
 @Module({
@@ -27,6 +28,7 @@ import { QUEUE_NAMES } from './constants';
     PrismaModule,
     PaymentModule,
     StorageModule,
+    SearchModule,
     // Configure BullMQ with Redis connection
     BullModule.forRootAsync({
       imports: [ConfigModule],

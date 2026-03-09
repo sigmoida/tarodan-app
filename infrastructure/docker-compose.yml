@@ -54,6 +54,23 @@ services:
       timeout: 10s
       retries: 5
 
+  # Kibana for Elasticsearch UI (dev)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    container_name: tarodan-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   # MailHog for Email Testing
   mailhog:
     image: mailhog/mailhog:latest
