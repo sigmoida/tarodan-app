@@ -8,6 +8,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 interface Category {
   id: string;
@@ -52,6 +53,7 @@ export default function EditListingPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { locale } = useTranslation();
   const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
 
   const [categories, setCategories] = useState<Category[]>([]);

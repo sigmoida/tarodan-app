@@ -412,7 +412,7 @@ export default function OffersPage() {
                             <div className="flex items-center gap-2 sm:gap-3">
                               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">
                                 {otherUser.avatarUrl ? (
-                                  <Image
+                                  <OptimizedImage
                                     src={otherUser.avatarUrl}
                                     alt={otherUser.displayName}
                                     width={40}

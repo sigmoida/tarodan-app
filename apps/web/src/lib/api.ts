@@ -327,6 +327,7 @@ export const addressesApi = {
     isDefault?: boolean;
   }) => api.post('/users/me/addresses', data),
   update: (id: string, data: {
+    title?: string;
     fullName?: string;
     phone?: string;
     city?: string;

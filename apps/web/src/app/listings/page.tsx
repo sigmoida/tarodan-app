@@ -182,7 +182,7 @@ export default function ListingsPage() {
     meta: { page: 'listings' },
   });
 
-  const listings = listingsData?.listings ?? [];
+  const listings: Listing[] = listingsData?.listings ?? [];
   const pagination = listingsData?.meta ?? { total: 0, page: currentPage, limit: pageLimit, totalPages: 1 };
 
   const clearFilters = () => {
