@@ -23,7 +23,6 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
 import { StorageService } from '../storage/storage.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { SearchService } from '../search/search.service';
 import * as https from 'https';
 import * as http from 'http';
@@ -48,7 +47,6 @@ export class CollectionService {
     private readonly notificationService: NotificationService,
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,
-    private readonly searchIndexing: SearchIndexingService,
     private readonly searchService: SearchService,
   ) {}
 
@@ -105,10 +103,6 @@ export class CollectionService {
           orderBy: { sortOrder: 'asc' },
         },
       },
-    });
-
-    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {
-      this.logger.warn('Failed to queue collection index for ES');
     });
 
     return await this.mapCollectionToDto(collection, false);
@@ -673,10 +667,6 @@ export class CollectionService {
       },
     });
 
-    this.searchIndexing.queueIndexCollection(updated.id).catch(() => {
-      this.logger.warn('Failed to queue collection index for ES');
-    });
-
     return await this.mapCollectionToDto(updated, false);
   }
 
@@ -902,9 +892,6 @@ export class CollectionService {
       where: { id: collectionId },
     });
 
-    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {
-      this.logger.warn('Failed to queue collection remove from ES');
-    });
   }
 
   // ==========================================================================
@@ -979,7 +966,6 @@ export class CollectionService {
         },
       });
 
-      this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
       return await this.mapItemToDto(item);
     }
 
@@ -1011,7 +997,6 @@ export class CollectionService {
       },
     });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
     return await this.mapItemToDto(item);
   }
 
@@ -1046,8 +1031,6 @@ export class CollectionService {
     await this.prisma.collectionItem.delete({
       where: { id: itemId },
     });
-
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
   }
 
   // ==========================================================================

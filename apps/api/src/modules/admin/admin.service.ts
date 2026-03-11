@@ -41,7 +41,6 @@ import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
@@ -56,7 +55,6 @@ export class AdminService {
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
-    private readonly searchIndexing: SearchIndexingService,
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
@@ -1017,10 +1015,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_update', 'Product', productId, product, updated);
 
-    // Update Elasticsearch (async)
-    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-    });
 
     // Invalidate caches
     if (this.cache) {
@@ -1055,10 +1049,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
 
-    // Index to Elasticsearch when product is approved (async)
-    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-    });
 
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
@@ -1126,10 +1116,6 @@ export class AdminService {
 
         await this.createAuditLog(adminId, 'product_bulk_approve', 'Product', productId, product, { ...updated, note });
 
-        // Index to Elasticsearch (async)
-        this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-          this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-        });
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
@@ -7140,8 +7126,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_create', 'Collection', collection.id, null, collection);
 
-    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {});
-
     return {
       ...collection,
       itemCount: 0,
@@ -7188,8 +7172,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_update', 'Collection', collectionId, existing, updated);
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return {
       ...updated,
       itemCount: updated._count.items,
@@ -7214,8 +7196,6 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_delete', 'Collection', collectionId, existing, null);
-
-    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {});
 
     return { success: true };
   }
@@ -7263,8 +7243,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_items_add', 'Collection', collectionId, null, { addedProductIds: productIds });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return {
       success: true,
       addedCount: successfulItems.length,
@@ -7290,8 +7268,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_item_remove', 'CollectionItem', itemId, item, null);
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return { success: true };
   }
 
@@ -7314,8 +7290,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_visibility_change', 'Collection', collectionId, { isPublic: existing.isPublic }, { isPublic });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return { success: true, isPublic: updated.isPublic };
   }
 
@@ -7337,8 +7311,6 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
-
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
 
     return { success: true, isFeatured: updated.isFeatured };
   }

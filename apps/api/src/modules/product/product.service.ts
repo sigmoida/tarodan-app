@@ -13,7 +13,6 @@ import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
@@ -40,7 +39,6 @@ export class ProductService implements OnModuleInit {
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
-    private readonly searchIndexing: SearchIndexingService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
@@ -200,13 +198,6 @@ export class ProductService implements OnModuleInit {
 
     // Invalidate product list cache
     await this.cache.delPattern('products:list:*');
-
-    // Index to Elasticsearch (async, only if status is active)
-    if (product.status === ProductStatus.active) {
-      this.searchIndexing.queueIndexProduct(product.id).catch(() => {
-        this.logger.warn('Failed to queue product index for Elasticsearch');
-      });
-    }
 
     const productWithAttrs = await this.prisma.product.findUnique({
       where: { id: product.id },
@@ -911,17 +902,6 @@ export class ProductService implements OnModuleInit {
         }
       }
 
-      // Update Elasticsearch index (async)
-      if (updated.status === ProductStatus.active) {
-        this.searchIndexing.queueIndexProduct(updated.id).catch(() => {
-          this.logger.warn('Failed to queue product index for Elasticsearch');
-        });
-      } else {
-        this.searchIndexing.queueRemoveProduct(updated.id).catch(() => {
-          this.logger.warn('Failed to queue product remove from Elasticsearch');
-        });
-      }
-
       return await this.formatProductResponse(updated);
     } catch (error) {
       if (error.code === 'P2025') {
@@ -1167,11 +1147,6 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     // Invalidate user's membership limits cache to refresh listing counts
     await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
-
-    // Remove from Elasticsearch index (async)
-    this.searchIndexing.queueRemoveProduct(id).catch(() => {
-      this.logger.warn('Failed to queue product remove from Elasticsearch');
-    });
 
     return { message: 'Ürün silindi' };
   }
