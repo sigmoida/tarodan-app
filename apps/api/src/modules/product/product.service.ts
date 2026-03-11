@@ -20,6 +20,7 @@ import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
 import { buildProductWhere } from './helpers/build-product-where';
+import { fulltextProductSearch } from './helpers/fulltext-search';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -445,9 +446,15 @@ export class ProductService implements OnModuleInit {
   private async findAllViaPostgres(query: ProductQueryDto) {
     const { discountOnly, sortBy, page = 1, limit = 20 } = query;
 
+    // Full-text search via tsvector/tsquery (replaces ILIKE contains)
+    let fulltextIds: string[] | undefined;
+    if (query.search) {
+      fulltextIds = await fulltextProductSearch(this.prisma, query.search);
+    }
+
     const where = buildProductWhere(
       { ...query, material: query.material },
-      { includeTextSearch: true },
+      { fulltextIds },
     );
 
     // discountOnly requires async DiscountService access, applied separately

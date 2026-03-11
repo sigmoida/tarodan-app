@@ -394,6 +394,12 @@ async function main() {
     create: { name: 'Malzeme', slug: 'material', isRequired: false, sortOrder: 2 },
   });
 
+  const vehicleTypeGroup = await prisma.attributeGroup.upsert({
+    where: { slug: 'vehicle_type' },
+    update: {},
+    create: { name: 'Araç Türü', slug: 'vehicle_type', description: 'Ürünün temsil ettiği araç kategorisi', isRequired: false, sortOrder: 3 },
+  });
+
   const scaleValues = ['1:18', '1:24', '1:43', '1:64', '1:72', '1:160', '1:350', '1:400', '1:700'];
   const materialValues = [
     { value: 'diecast', display: 'Diecast Metal' },
@@ -421,7 +427,47 @@ async function main() {
     });
   }
 
-  console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials)`);
+  const vehicleTypeValues = [
+    { value: 'car', display: 'Araba' },
+    { value: 'motorcycle', display: 'Motosiklet' },
+    { value: 'motorsports', display: 'Motorsports' },
+    { value: 'truck', display: 'Ticari Araç' },
+    { value: 'emergency', display: 'Acil Durum Aracı' },
+    { value: 'construction', display: 'İnşaat Aracı' },
+    { value: 'agriculture', display: 'Tarım Aracı' },
+    { value: 'military', display: 'Askeri Araç' },
+    { value: 'ship', display: 'Gemi / Tekne' },
+    { value: 'train', display: 'Tren' },
+    { value: 'aircraft', display: 'Uçak / Helikopter' },
+    { value: 'bus', display: 'Otobüs / Minibüs' },
+  ];
+
+  const vehicleTypeAttrs: Record<string, any> = {};
+  for (const vt of vehicleTypeValues) {
+    vehicleTypeAttrs[vt.value] = await prisma.attribute.upsert({
+      where: { groupId_slug: { groupId: vehicleTypeGroup.id, slug: vt.value } },
+      update: {},
+      create: { groupId: vehicleTypeGroup.id, value: vt.value, slug: vt.value, displayValue: vt.display, sortOrder: vehicleTypeValues.indexOf(vt) },
+    });
+  }
+
+  console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`);
+
+  // Map seed category slug (cat) -> vehicle_type attribute slug for product attributes
+  const catToVehicleTypeSlug: Record<string, string> = {
+    araba: 'car',
+    kamyon: 'truck',
+    motosiklet: 'motorcycle',
+    motorspor: 'motorsports',
+    gemi: 'ship',
+    tren: 'train',
+    ucak: 'aircraft',
+    otobus: 'bus',
+    acil: 'emergency',
+    insaat: 'construction',
+    tarim: 'agriculture',
+    askeri: 'military',
+  };
 
   // ==========================================================================
   // 2. Create Membership Tiers
@@ -1116,15 +1162,20 @@ async function main() {
       },
     });
 
-    // Assign scale + material attributes (upsert için önce mevcut attribute'ları sil)
+    // Assign scale + material + vehicle_type attributes (upsert için önce mevcut attribute'ları sil)
     await prisma.productAttribute.deleteMany({ where: { productId: product.id } });
     const sAttr = scaleAttrs[d.scale];
     const mAttr = materialAttrs[d.material];
+    const vehicleTypeSlug = catToVehicleTypeSlug[d.cat];
+    const vtAttr = vehicleTypeSlug ? vehicleTypeAttrs[vehicleTypeSlug] : null;
     if (sAttr) {
       try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: sAttr.id } }); } catch {}
     }
     if (mAttr) {
       try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: mAttr.id } }); } catch {}
+    }
+    if (vtAttr) {
+      try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: vtAttr.id } }); } catch {}
     }
 
     products.push(product);

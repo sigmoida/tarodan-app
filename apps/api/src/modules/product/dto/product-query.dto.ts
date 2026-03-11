@@ -133,8 +133,8 @@ export class ProductQueryDto {
   set?: boolean;
 
   @ApiPropertyOptional({
-    example: 'araba',
-    description: 'Filter by vehicle type (Elasticsearch only – ignored in Postgres fallback)',
+    example: 'car',
+    description: 'Filter by vehicle type slug (matched via ProductAttribute join in PG, keyword term in ES)',
   })
   @IsOptional()
   @IsString()

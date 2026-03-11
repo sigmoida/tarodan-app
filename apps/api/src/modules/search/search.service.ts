@@ -11,6 +11,7 @@ import { Client } from '@elastic/elasticsearch';
 import { ProductStatus } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
 import { buildProductWhere } from '../product/helpers/build-product-where';
+import { fulltextProductSearch } from '../product/helpers/fulltext-search';
 
 export interface ProductSearchResult {
   id: string;
@@ -273,6 +274,7 @@ export class SearchService implements OnModuleInit {
               imageUrl: { type: 'keyword' },
               scale: { type: 'keyword' },
               material: { type: 'keyword' },
+              vehicleType: { type: 'keyword' },
               isTradeEnabled: { type: 'boolean' },
               isPreorder: { type: 'boolean' },
               isLimited: { type: 'boolean' },
@@ -428,13 +430,7 @@ export class SearchService implements OnModuleInit {
       filter.push({ term: { 'manufacturerName.keyword': manufacturer } });
     }
     if (vehicleType) {
-      must.push({
-        multi_match: {
-          query: vehicleType,
-          fields: ['title', 'description', 'categoryName'],
-          type: 'best_fields',
-        },
-      });
+      filter.push({ term: { vehicleType } });
     }
 
     // Sorting
@@ -562,6 +558,9 @@ export class SearchService implements OnModuleInit {
     const materialAttr = product.productAttributes?.find(
       (pa: any) => pa.attribute?.group?.slug === 'material',
     );
+    const vehicleTypeAttr = product.productAttributes?.find(
+      (pa: any) => pa.attribute?.group?.slug === 'vehicle_type',
+    );
 
     return {
       id: product.id,
@@ -585,6 +584,7 @@ export class SearchService implements OnModuleInit {
       scale: scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
       viewCount: product.viewCount || 0,
       material: materialAttr?.attribute?.slug || undefined,
+      vehicleType: vehicleTypeAttr?.attribute?.slug || undefined,
       isTradeEnabled: product.isTradeEnabled,
       isPreorder: product.isPreorder,
       isLimited: product.isLimited,
@@ -952,13 +952,18 @@ export class SearchService implements OnModuleInit {
   /**
    * Postgres fallback when Elasticsearch is unavailable.
    * Uses the shared buildProductWhere helper for index-friendly filters.
-   * vehicleType is skipped (ES-only). Scale uses attribute join instead of text search.
+   * Full-text search uses tsvector/tsquery with GIN index (replaces ILIKE contains).
    */
   private async fallbackSearch(options: SearchOptions): Promise<SearchResponse> {
     const {
       query, discountOnly,
       page = 1, pageSize = 20, sortBy = 'relevance',
     } = options;
+
+    let fulltextIds: string[] | undefined;
+    if (query) {
+      fulltextIds = await fulltextProductSearch(this.prisma, query);
+    }
 
     const where = buildProductWhere(
       {
@@ -971,6 +976,7 @@ export class SearchService implements OnModuleInit {
         brand: options.brand,
         scale: options.scale,
         material: options.material,
+        vehicleType: options.vehicleType,
         manufacturer: options.manufacturer,
         tradeOnly: options.tradeOnly,
         preOrder: options.preOrder,
@@ -979,7 +985,7 @@ export class SearchService implements OnModuleInit {
         minPrice: options.minPrice,
         maxPrice: options.maxPrice,
       },
-      { includeTextSearch: true },
+      { fulltextIds },
     );
 
     if (discountOnly) {

@@ -13,6 +13,7 @@ export interface ProductFilterParams {
   brand?: string;
   scale?: string;
   material?: string;
+  vehicleType?: string;
   manufacturer?: string;
   manufacturerId?: string;
   carModelId?: string;
@@ -26,19 +27,16 @@ export interface ProductFilterParams {
 
 export interface BuildWhereOptions {
   /**
-   * When true, adds a title/description `contains` clause for the `search` param.
-   * Used only in Postgres fallback when Elasticsearch is unavailable.
+   * Pre-filtered product IDs from full-text search (tsvector/tsquery).
+   * When provided, adds an `id IN (...)` condition to the where clause.
    */
-  includeTextSearch?: boolean;
+  fulltextIds?: string[];
 }
 
 /**
  * Builds a Prisma ProductWhereInput from filter params using only
  * index-friendly operations: ID equality, enum/boolean checks, ranges,
  * and attribute-join based lookups.
- *
- * Deliberately excluded from Postgres path:
- * - vehicleType: relies on text heuristics, only meaningful via Elasticsearch
  *
  * Deliberately NOT included:
  * - discountOnly: requires async service access (DiscountService), must be
@@ -50,7 +48,7 @@ export function buildProductWhere(
 ): Prisma.ProductWhereInput {
   const {
     search, categoryId, sellerId, brandId, condition,
-    brand, scale, material, manufacturer, manufacturerId,
+    brand, scale, material, vehicleType, manufacturer, manufacturerId,
     carModelId, tradeOnly, preOrder, limited,
     set: setFilter, minPrice, maxPrice,
   } = params;
@@ -64,14 +62,12 @@ export function buildProductWhere(
     NOT: { id: { startsWith: 'membership-' } },
   };
 
-  // ── Text search (Postgres fallback only – ES is the primary text engine) ──
-  if (search && options.includeTextSearch) {
-    andConditions.push({
-      OR: [
-        { title: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } },
-      ],
-    });
+  // ── Full-text search results (pre-filtered via tsvector/tsquery) ──
+  if (options.fulltextIds && options.fulltextIds.length > 0) {
+    andConditions.push({ id: { in: options.fulltextIds } });
+  } else if (options.fulltextIds && options.fulltextIds.length === 0 && search) {
+    // Search was requested but full-text returned nothing – force empty result
+    andConditions.push({ id: { equals: '__NO_MATCH__' } });
   }
 
   // ── ID-based filters (exact match on indexed foreign keys) ──
@@ -133,6 +129,21 @@ export function buildProductWhere(
             isActive: true,
             group: { slug: 'material', isActive: true },
             slug: material,
+          },
+        },
+      },
+    });
+  }
+
+  // Vehicle type: match via attribute group "vehicle_type" (slug)
+  if (vehicleType) {
+    andConditions.push({
+      productAttributes: {
+        some: {
+          attribute: {
+            isActive: true,
+            group: { slug: 'vehicle_type', isActive: true },
+            slug: vehicleType,
           },
         },
       },
