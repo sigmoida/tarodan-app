@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
 import { ProductStatus } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
+import { buildProductWhere } from '../product/helpers/build-product-where';
 
 export interface ProductSearchResult {
   id: string;
@@ -948,106 +949,41 @@ export class SearchService implements OnModuleInit {
 
   // ──────────────────────────── Fallback Search ────────────────────────────
 
+  /**
+   * Postgres fallback when Elasticsearch is unavailable.
+   * Uses the shared buildProductWhere helper for index-friendly filters.
+   * vehicleType is skipped (ES-only). Scale uses attribute join instead of text search.
+   */
   private async fallbackSearch(options: SearchOptions): Promise<SearchResponse> {
     const {
-      query,
-      categoryId,
-      brandId,
-      manufacturerId,
-      minPrice,
-      maxPrice,
-      condition,
-      brand,
-      scale,
-      material,
-      manufacturer,
-      tradeOnly,
-      discountOnly,
-      preOrder,
-      limited,
-      set: setFilter,
-      sellerId,
-      page = 1,
-      pageSize = 20,
-      sortBy = 'relevance',
+      query, discountOnly,
+      page = 1, pageSize = 20, sortBy = 'relevance',
     } = options;
 
-    const where: any = {
-      status: ProductStatus.active,
-      NOT: { id: { startsWith: 'membership-' } },
-    };
-    const andConditions: any[] = [];
+    const where = buildProductWhere(
+      {
+        search: query,
+        categoryId: options.categoryId,
+        brandId: options.brandId,
+        manufacturerId: options.manufacturerId,
+        sellerId: options.sellerId,
+        condition: options.condition,
+        brand: options.brand,
+        scale: options.scale,
+        material: options.material,
+        manufacturer: options.manufacturer,
+        tradeOnly: options.tradeOnly,
+        preOrder: options.preOrder,
+        limited: options.limited,
+        set: options.set,
+        minPrice: options.minPrice,
+        maxPrice: options.maxPrice,
+      },
+      { includeTextSearch: true },
+    );
 
-    if (query) {
-      andConditions.push({
-        OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          { description: { contains: query, mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    if (categoryId) where.categoryId = categoryId;
-    if (brandId) where.brandId = brandId;
-    if (manufacturerId) where.manufacturerId = manufacturerId;
-    if (sellerId) where.sellerId = sellerId;
-    if (condition) where.condition = condition;
-
-    if (brand && !brandId) {
-      andConditions.push({
-        OR: [
-          { title: { contains: brand, mode: 'insensitive' } },
-          { brand: { name: { contains: brand, mode: 'insensitive' } } },
-        ],
-      });
-    }
-
-    if (manufacturer && !manufacturerId) {
-      andConditions.push({
-        OR: [
-          { title: { contains: manufacturer, mode: 'insensitive' } },
-          { manufacturer: { name: { contains: manufacturer, mode: 'insensitive' } } },
-        ],
-      });
-    }
-
-    if (scale) {
-      andConditions.push({
-        OR: [
-          { title: { contains: scale, mode: 'insensitive' } },
-          { description: { contains: scale, mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    if (material) {
-      where.productAttributes = {
-        some: {
-          attribute: {
-            isActive: true,
-            group: { slug: 'material', isActive: true },
-            slug: material,
-          },
-        },
-      };
-    }
-
-    if (tradeOnly) where.isTradeEnabled = true;
-    if (preOrder) where.isPreorder = true;
-    if (limited) where.isLimited = true;
-    if (setFilter) where.isSet = true;
     if (discountOnly) {
-      andConditions.push({ oldPrice: { not: null } });
-    }
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
-    }
-
-    if (andConditions.length > 0) {
-      where.AND = andConditions;
+      (where.AND as any[]).push({ oldPrice: { not: null } });
     }
 
     let orderBy: any;

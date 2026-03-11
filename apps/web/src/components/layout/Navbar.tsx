@@ -221,7 +221,7 @@ export default function Navbar() {
     if (!autoResults || debouncedQuery.length < 2) return [];
     const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'search'; id: string; label: string; href: string }> = [];
     autoResults.products?.forEach((p) => items.push({ type: 'product', id: p.id, label: p.title, href: `/listings/${p.id}` }));
-    autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}` }));
+    autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}&brandId=${b.id}` }));
     autoResults.categories?.forEach((c) => items.push({ type: 'category', id: c.id, label: c.name, href: `/listings?categoryId=${c.id}` }));
     autoResults.manufacturers?.forEach((m) => items.push({ type: 'manufacturer', id: m.id, label: m.name, href: `/listings?manufacturer=${encodeURIComponent(m.name)}&manufacturerId=${m.id}` }));
     items.push({ type: 'search', id: '__search__', label: debouncedQuery, href: `/listings?search=${encodeURIComponent(debouncedQuery)}` });

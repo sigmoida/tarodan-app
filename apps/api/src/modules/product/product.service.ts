@@ -19,6 +19,7 @@ import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
+import { buildProductWhere } from './helpers/build-product-where';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -434,100 +435,22 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
-   * Original PostgreSQL-based listing (fallback)
+   * PostgreSQL-based listing (primary for non-search queries, fallback for search when ES is down).
+   *
+   * All filters use indexed columns, foreign keys, or attribute joins.
+   * vehicleType is excluded (ES-only text heuristic).
+   * Text search (when present) uses title/description contains as a fallback.
+   * Sorting is always DB-level with skip/take pagination (no in-memory scoring).
    */
   private async findAllViaPostgres(query: ProductQueryDto) {
-    const {
-      search, categoryId, sellerId, condition, brand, scale,
-      material: materialSlug, tradeOnly, discountOnly, preOrder,
-      limited, set: setFilter, minPrice, maxPrice, sortBy,
-      page = 1, limit = 20, carModelId, brandId, manufacturerId,
-    } = query;
+    const { discountOnly, sortBy, page = 1, limit = 20 } = query;
 
-    const where: Prisma.ProductWhereInput = {
-      status: ProductStatus.active,
-      NOT: { id: { startsWith: 'membership-' } },
-      AND: [{ OR: [{ quantity: { gt: 0 } }, { quantity: null }] }],
-    };
+    const where = buildProductWhere(
+      { ...query, material: query.material },
+      { includeTextSearch: true },
+    );
 
-    if (search) {
-      const searchCondition = {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), searchCondition] : [searchCondition];
-    }
-
-    if (brandId) {
-      where.brandId = brandId;
-    } else if (brand) {
-      where.brand = { name: { equals: brand, mode: 'insensitive' } };
-    }
-
-    if (manufacturerId) {
-      where.manufacturerId = manufacturerId;
-    } else if (query.manufacturer) {
-      where.manufacturer = { name: { contains: query.manufacturer, mode: 'insensitive' } };
-    }
-
-    if (carModelId) where.carModelId = carModelId;
-
-    if (scale) {
-      const scaleCondition = {
-        OR: [
-          { title: { contains: scale, mode: 'insensitive' } },
-          { description: { contains: scale, mode: 'insensitive' } },
-        ],
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), scaleCondition] : [scaleCondition];
-    }
-
-    if (materialSlug) {
-      where.productAttributes = {
-        some: {
-          attribute: {
-            isActive: true,
-            group: { slug: 'material', isActive: true },
-            slug: materialSlug,
-          },
-        },
-      };
-    }
-
-    if (query.vehicleType) {
-      const vehicleTypeSearchTerms: Record<string, string[]> = {
-        'araba': ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'],
-        'motosiklet': ['motosiklet', 'motorcycle', 'motor', 'bike'],
-        'motorsports': ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'],
-        'acil-durum': ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'],
-        'ticari': ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'],
-        'insaat': ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'],
-        'tarim': ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'],
-        'askeri': ['askeri', 'military', 'tank', 'zırhlı', 'armored'],
-        'gemi': ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'],
-        'tren': ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'],
-        'ucak': ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'],
-        'set': ['set', 'koleksiyon', 'collection', 'paket', 'bundle'],
-      };
-      const searchTerms = vehicleTypeSearchTerms[query.vehicleType] || [query.vehicleType];
-      const vehicleTypeCondition = {
-        OR: searchTerms.map((term) => ({
-          OR: [
-            { title: { contains: term, mode: 'insensitive' } },
-            { description: { contains: term, mode: 'insensitive' } },
-          ],
-        })),
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), vehicleTypeCondition] : [vehicleTypeCondition];
-    }
-
-    if (tradeOnly) where.isTradeEnabled = true;
-    if (preOrder) where.isPreorder = true;
-    if (limited) where.isLimited = true;
-    if (setFilter) where.isSet = true;
-
+    // discountOnly requires async DiscountService access, applied separately
     if (discountOnly) {
       const now = new Date();
       const manualDiscountCondition = {
@@ -544,44 +467,34 @@ export class ProductService implements OnModuleInit {
         if (criteria.categoryIds.length > 0) campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
         if (criteria.productIds.length > 0) campaignConditions.push({ id: { in: criteria.productIds } });
         const combinedCondition = { OR: [manualDiscountCondition, ...campaignConditions] };
-        where.AND = where.AND ? [...(where.AND as any[]), combinedCondition] : [combinedCondition];
+        (where.AND as any[]).push(combinedCondition);
       }
     }
 
-    if (categoryId) where.categoryId = categoryId;
-    if (sellerId) where.sellerId = sellerId;
-    if (condition) where.condition = condition as any;
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
-    }
-
-    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
-    const useScoring = !sortBy;
+    // DB-level sorting (replaces old in-memory scoring)
+    let orderBy: Prisma.ProductOrderByWithRelationInput[];
     switch (sortBy) {
-      case 'price_asc': orderBy = { price: 'asc' }; break;
-      case 'price_desc': orderBy = { price: 'desc' }; break;
-      case 'created_asc': orderBy = { createdAt: 'asc' }; break;
-      case 'created_desc': orderBy = { createdAt: 'desc' }; break;
-      case 'title_asc': orderBy = { title: 'asc' }; break;
-      case 'title_desc': orderBy = { title: 'desc' }; break;
-      case 'view_count_asc': orderBy = { viewCount: 'asc' }; break;
-      case 'view_count_desc': orderBy = { viewCount: 'desc' }; break;
+      case 'price_asc': orderBy = [{ price: 'asc' }]; break;
+      case 'price_desc': orderBy = [{ price: 'desc' }]; break;
+      case 'created_asc': orderBy = [{ createdAt: 'asc' }]; break;
+      case 'created_desc': orderBy = [{ createdAt: 'desc' }]; break;
+      case 'title_asc': orderBy = [{ title: 'asc' }]; break;
+      case 'title_desc': orderBy = [{ title: 'desc' }]; break;
+      case 'view_count_asc': orderBy = [{ viewCount: 'asc' }]; break;
+      case 'view_count_desc': orderBy = [{ viewCount: 'desc' }]; break;
+      default:
+        orderBy = [{ viewCount: 'desc' }, { likeCount: 'desc' }, { createdAt: 'desc' }];
     }
 
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: useScoring ? undefined : orderBy,
-      skip: useScoring ? 0 : (page - 1) * limit,
-      take: useScoring ? undefined : limit,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: useScoring
-          ? { include: { membership: { include: { tier: { select: { type: true } } } } } }
-          : { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
@@ -590,41 +503,8 @@ export class ProductService implements OnModuleInit {
       },
     });
 
-    let productsToReturn = products;
-    if (useScoring) {
-      productsToReturn = products
-        .map((product) => {
-          let membershipScore = 1;
-          const seller = product.seller as any;
-          const membership = seller?.membership;
-          if (membership && membership.status === 'active' && membership.tier?.type) {
-            const tierType = membership.tier.type;
-            if (tierType === 'premium' || tierType === 'business') membershipScore = 3;
-          }
-          const viewCount = product.viewCount || 0;
-          let viewScore = viewCount >= 10000 ? 3 : viewCount >= 1000 ? 2 : 1;
-          const likeCount = product.likeCount || 0;
-          let likeScore = likeCount >= 100 ? 3 : likeCount >= 50 ? 2 : 1;
-          return { ...product, _score: membershipScore + viewScore + likeScore, _random: Math.random() };
-        })
-        .sort((a, b) => b._score !== a._score ? b._score - a._score : b._random - a._random)
-        .slice((page - 1) * limit, page * limit)
-        .map(({ _score, _random, ...product }) => {
-          const cleanedProduct = { ...product };
-          if ((cleanedProduct.seller as any).membership) {
-            cleanedProduct.seller = {
-              id: cleanedProduct.seller.id,
-              displayName: (cleanedProduct.seller as any).displayName,
-              isVerified: (cleanedProduct.seller as any).isVerified,
-              sellerType: (cleanedProduct.seller as any).sellerType,
-            };
-          }
-          return cleanedProduct;
-        });
-    }
-
     const formattedProducts = await Promise.all(
-      productsToReturn.map((p) => this.formatProductResponse(p)),
+      products.map((p) => this.formatProductResponse(p)),
     );
 
     return {

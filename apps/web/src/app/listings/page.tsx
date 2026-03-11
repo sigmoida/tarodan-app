@@ -81,6 +81,7 @@ export default function ListingsPage() {
   const [filters, setFilters] = useState({
     search: autoDetectedBrand ? '' : urlSearch,
     brand: searchParams.get('brand') || autoDetectedBrand || '',
+    brandId: searchParams.get('brandId') || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
     condition: '',
@@ -116,6 +117,7 @@ export default function ListingsPage() {
       limited: searchParams.get('limited') === 'true',
       set: searchParams.get('set') === 'true',
       brand: searchParams.get('brand') || detectedBrand || '',
+      brandId: searchParams.get('brandId') || '',
       scale: searchParams.get('scale') || '',
       material: searchParams.get('material') || '',
       condition: searchParams.get('condition') || '',
@@ -157,7 +159,8 @@ export default function ListingsPage() {
         if (mappedCondition) p.condition = mappedCondition;
         if (filters.minPrice) p.minPrice = Number(filters.minPrice);
         if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
-        if (filters.brand) p.brand = filters.brand;
+        if (filters.brandId) p.brandId = filters.brandId;
+        else if (filters.brand) p.brand = filters.brand;
         if (filters.scale) p.scale = filters.scale;
         if (filters.material) p.material = filters.material;
         if (filters.manufacturerId) p.manufacturerId = filters.manufacturerId;
@@ -187,7 +190,7 @@ export default function ListingsPage() {
 
   const clearFilters = () => {
     setFilters({
-      search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      search: '', brand: '', brandId: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
@@ -195,7 +198,7 @@ export default function ListingsPage() {
 
     const currentParams = new URLSearchParams(searchParams.toString());
     const filterParams = [
-      'search', 'brand', 'scale', 'material', 'condition',
+      'search', 'brand', 'brandId', 'scale', 'material', 'condition',
       'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
       'limited', 'set', 'category', 'categoryId', 'manufacturer',
       'manufacturerId', 'vehicleType', 'page'
@@ -355,6 +358,7 @@ export default function ListingsPage() {
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
+                      if (f.k === 'brand') updates.brandId = '';
                       setFilters(updates);
                       setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
@@ -364,6 +368,9 @@ export default function ListingsPage() {
                       } else if (f.k === 'manufacturer') {
                         params.delete('manufacturer');
                         params.delete('manufacturerId');
+                      } else if (f.k === 'brand') {
+                        params.delete('brand');
+                        params.delete('brandId');
                       } else {
                         params.delete(f.k);
                       }

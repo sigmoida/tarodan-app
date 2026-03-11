@@ -35,6 +35,7 @@ interface ManufacturerItem {
 interface SidebarFiltersProps {
     filters: {
         brand: string;
+        brandId?: string;
         scale: string;
         material?: string;
         condition: string;
@@ -167,11 +168,12 @@ export default function SidebarFilters({
         }));
     };
 
-    const handleBrandChange = (brand: string) => {
-        onFilterChange({
-            ...filters,
-            brand: filters.brand === brand ? '' : brand,
-        });
+    const handleBrandChange = (brandId: string, brandName: string) => {
+        if (filters.brandId === brandId) {
+            onFilterChange({ ...filters, brandId: '', brand: '' });
+        } else {
+            onFilterChange({ ...filters, brandId, brand: brandName });
+        }
     };
 
     const handleScaleChange = (scale: string) => {
@@ -308,24 +310,29 @@ export default function SidebarFilters({
                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
                             />
                             <div className="space-y-1">
-                                {filteredBrands.map((brand) => (
-                                    <label
-                                        key={brand.id}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.brand === brand.name
-                                            ? 'bg-orange-100 text-orange-700'
-                                            : 'text-gray-700 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="brand"
-                                            checked={filters.brand === brand.name}
-                                            onChange={() => handleBrandChange(brand.name)}
-                                            className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
-                                        />
-                                        <span className="text-sm">{brand.name}</span>
-                                    </label>
-                                ))}
+                                {filteredBrands.map((brand) => {
+                                    const isSelected = filters.brandId
+                                        ? filters.brandId === brand.id
+                                        : filters.brand === brand.name;
+                                    return (
+                                        <label
+                                            key={brand.id}
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
+                                                ? 'bg-orange-100 text-orange-700'
+                                                : 'text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="brand"
+                                                checked={isSelected}
+                                                onChange={() => handleBrandChange(brand.id, brand.name)}
+                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
+                                            />
+                                            <span className="text-sm">{brand.name}</span>
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

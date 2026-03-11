@@ -15,7 +15,7 @@ import { ProductStatus, ProductCondition } from '@prisma/client';
 export class ProductQueryDto {
   @ApiPropertyOptional({
     example: 'star wars',
-    description: 'Search query for title/description',
+    description: 'Full-text search query (primary: Elasticsearch, fallback: Postgres title/description)',
   })
   @IsOptional()
   @IsString()
@@ -73,7 +73,7 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: '1:64',
-    description: 'Filter by scale',
+    description: 'Filter by scale (matched via ProductAttribute join, not text search)',
   })
   @IsOptional()
   @IsString()
@@ -134,7 +134,7 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: 'araba',
-    description: 'Filter by vehicle type (searches in title/description)',
+    description: 'Filter by vehicle type (Elasticsearch only – ignored in Postgres fallback)',
   })
   @IsOptional()
   @IsString()
@@ -207,7 +207,7 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: 'Hot Wheels',
-    description: 'Filter by manufacturer name (text search)',
+    description: 'Filter by manufacturer name (exact match on relation, prefer manufacturerId)',
   })
   @IsOptional()
   @IsString()
