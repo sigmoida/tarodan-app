@@ -22,6 +22,7 @@
     "all": "All",
     "none": "None",
     "more": "More",
+    "shopping": "Shopping",
     "less": "Less",
     "seeAll": "See All",
     "viewDetails": "View Details",
@@ -709,6 +710,7 @@
   "profile": {
     "profile": "Profile",
     "myProfile": "My Profile",
+    "accountSettings": "Account Settings",
     "editProfile": "Edit Profile",
     "settings": "Settings",
     "displayName": "Display Name",

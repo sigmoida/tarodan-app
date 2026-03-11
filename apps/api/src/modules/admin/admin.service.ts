@@ -596,7 +596,7 @@ export class AdminService {
             price: true,
             status: true,
             createdAt: true,
-            images: { take: 1, select: { url: true } },
+            images: { take: 1, select: { cardKey: true } },
           },
         },
         buyerOrders: {
@@ -670,27 +670,35 @@ export class AdminService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Calculate average rating received
-    const avgRating = user.receivedRatings.length > 0
-      ? user.receivedRatings.reduce((sum, r) => sum + r.score, 0) / user.receivedRatings.length
+    const u = user as typeof user & {
+      receivedRatings: Array<{ score: number }>;
+      initiatedTrades: Array<{ createdAt: Date }>;
+      receivedTrades: Array<{ createdAt: Date }>;
+      buyerOrders: Array<{ totalAmount: unknown; commissionAmount: unknown; seller: unknown }>;
+      sellerOrders: Array<{ totalAmount: unknown; commissionAmount: unknown; buyer: unknown }>;
+      products: Array<{ images?: Array<{ cardKey: string }> }>;
+      givenRatings: unknown[];
+      _count: { products: number; buyerOrders: number; sellerOrders: number; givenRatings: number; receivedRatings: number; initiatedTrades: number; receivedTrades: number; sentMessages: number; receivedMessages: number };
+    };
+
+    const avgRating = u.receivedRatings.length > 0
+      ? u.receivedRatings.reduce((sum, r) => sum + r.score, 0) / u.receivedRatings.length
       : null;
 
-    // Combine and sort all trades
     const allTrades = [
-      ...user.initiatedTrades.map((t) => ({ ...t, role: 'initiator' as const })),
-      ...user.receivedTrades.map((t) => ({ ...t, role: 'receiver' as const })),
+      ...u.initiatedTrades.map((t) => ({ ...t, role: 'initiator' as const })),
+      ...u.receivedTrades.map((t) => ({ ...t, role: 'receiver' as const })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
-    // Combine and sort all orders (as buyer and seller)
     const allOrders = [
-      ...user.buyerOrders.map((o) => ({
+      ...u.buyerOrders.map((o) => ({
         ...o,
         role: 'buyer' as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         otherParty: o.seller,
       })),
-      ...user.sellerOrders.map((o) => ({
+      ...u.sellerOrders.map((o) => ({
         ...o,
         role: 'seller' as const,
         totalAmount: Number(o.totalAmount),
@@ -700,11 +708,11 @@ export class AdminService {
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
     return {
-      ...user,
-      lastLoginAt: user.lastLoginAt ?? null,
-      lastActivityAt: user.lastActivityAt ?? null,
+      ...u,
+      lastLoginAt: u.lastLoginAt ?? null,
+      lastActivityAt: u.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
-      products: await Promise.all(user.products.map(async (p) => ({
+      products: await Promise.all(u.products.map(async (p) => ({
         ...p,
         price: Number(p.price),
         imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
@@ -712,23 +720,23 @@ export class AdminService {
       recentOrders: allOrders,
       recentTrades: allTrades.map((t) => ({
         ...t,
-        cashAmount: t.cashAmount ? Number(t.cashAmount) : null,
+        cashAmount: (t as any).cashAmount ? Number((t as any).cashAmount) : null,
       })),
-      givenRatings: user.givenRatings,
-      receivedRatings: user.receivedRatings,
+      givenRatings: u.givenRatings,
+      receivedRatings: u.receivedRatings,
       stats: {
-        productsCount: user._count.products,
-        ordersCount: user._count.buyerOrders + user._count.sellerOrders,
-        buyerOrdersCount: user._count.buyerOrders,
-        sellerOrdersCount: user._count.sellerOrders,
-        tradesCount: user._count.initiatedTrades + user._count.receivedTrades,
-        initiatedTradesCount: user._count.initiatedTrades,
-        receivedTradesCount: user._count.receivedTrades,
-        messagesCount: user._count.sentMessages + user._count.receivedMessages,
-        sentMessagesCount: user._count.sentMessages,
-        receivedMessagesCount: user._count.receivedMessages,
-        givenRatingsCount: user._count.givenRatings,
-        receivedRatingsCount: user._count.receivedRatings,
+        productsCount: u._count.products,
+        ordersCount: u._count.buyerOrders + u._count.sellerOrders,
+        buyerOrdersCount: u._count.buyerOrders,
+        sellerOrdersCount: u._count.sellerOrders,
+        tradesCount: u._count.initiatedTrades + u._count.receivedTrades,
+        initiatedTradesCount: u._count.initiatedTrades,
+        receivedTradesCount: u._count.receivedTrades,
+        messagesCount: u._count.sentMessages + u._count.receivedMessages,
+        sentMessagesCount: u._count.sentMessages,
+        receivedMessagesCount: u._count.receivedMessages,
+        givenRatingsCount: u._count.givenRatings,
+        receivedRatingsCount: u._count.receivedRatings,
       },
     };
   }
@@ -2913,7 +2921,7 @@ export class AdminService {
           type: 'product',
           title: p.title,
           description: p.description?.substring(0, 200) || '',
-          imageUrl: p.images[0]?.url || null,
+          imageUrl: this.resolveProductImageUrl(p.images[0]?.cardKey) || null,
           price: Number(p.price),
           seller: p.seller,
           category: p.category?.name || 'Kategorisiz',
@@ -7048,7 +7056,7 @@ export class AdminService {
                 id: true,
                 title: true,
                 price: true,
-                images: { take: 1, select: { url: true } },
+                images: { take: 1, select: { cardKey: true } },
               },
             },
           },
@@ -7243,7 +7251,7 @@ export class AdminService {
                 id: true,
                 title: true,
                 price: true,
-                images: { take: 1, select: { url: true } },
+                images: { take: 1, select: { cardKey: true } },
               },
             },
           },
