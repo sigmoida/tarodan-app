@@ -12,6 +12,11 @@ import { ProductStatus } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
 import { buildProductWhere } from '../product/helpers/build-product-where';
 import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import {
+  fulltextBrandSearch,
+  fulltextCategorySearch,
+  fulltextManufacturerSearch,
+} from '../../common/helpers/fulltext-search';
 
 export interface ProductSearchResult {
   id: string;
@@ -759,11 +764,14 @@ export class SearchService implements OnModuleInit {
   }
 
   private async fallbackAutocomplete(query: string, limit: number): Promise<string[]> {
+    const productIds = await fulltextProductSearch(this.prisma, query, limit);
+    if (productIds.length === 0) return [];
+
     const products = await this.prisma.product.findMany({
       where: {
+        id: { in: productIds },
         status: ProductStatus.active,
         NOT: { id: { startsWith: 'membership-' } },
-        title: { contains: query, mode: 'insensitive' },
       },
       select: { title: true },
       take: limit,
@@ -844,25 +852,25 @@ export class SearchService implements OnModuleInit {
       }
     }
 
-    // Prisma fallback
-    const products = await this.prisma.product.findMany({
-      where: {
-        status: ProductStatus.active,
-        NOT: { id: { startsWith: 'membership-' } },
-        OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          { brand: { name: { contains: query, mode: 'insensitive' } } },
-        ],
-      },
-      select: {
-        id: true,
-        title: true,
-        price: true,
-        images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
-        brand: { select: { name: true } },
-      },
-      take: limit,
-    });
+    // Prisma fallback – tsvector search for product IDs, then hydrate
+    const productIds = await fulltextProductSearch(this.prisma, query, limit);
+    const products = productIds.length > 0
+      ? await this.prisma.product.findMany({
+          where: {
+            id: { in: productIds },
+            status: ProductStatus.active,
+            NOT: { id: { startsWith: 'membership-' } },
+          },
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
+            brand: { select: { name: true } },
+          },
+          take: limit,
+        })
+      : [];
 
     return products.map((p) => ({
       id: p.id,
@@ -887,64 +895,59 @@ export class SearchService implements OnModuleInit {
     query: string,
     limit: number,
   ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
-    // 1. Search DB Brand table
-    const brands = await this.prisma.brand.findMany({
-      where: {
-        isActive: true,
-        name: { contains: query, mode: 'insensitive' },
-      },
-      select: { id: true, name: true, slug: true, logo: true },
-      take: limit,
-      orderBy: { name: 'asc' },
-    });
+    const brandIds = await fulltextBrandSearch(this.prisma, query, limit);
 
-    // 2. If DB brands are empty, match against known car brands
-    if (brands.length === 0) {
-      const lowerQ = query.toLowerCase();
-      const matched = SearchService.KNOWN_CAR_BRANDS
-        .filter(b => b.toLowerCase().includes(lowerQ))
-        .slice(0, limit)
-        .map(name => ({
-          id: `brand-${name.toLowerCase().replace(/\s+/g, '-')}`,
-          name,
-          slug: name.toLowerCase().replace(/\s+/g, '-'),
-          logo: null,
-        }));
-      return matched;
+    if (brandIds.length > 0) {
+      return this.prisma.brand.findMany({
+        where: { id: { in: brandIds }, isActive: true },
+        select: { id: true, name: true, slug: true, logo: true },
+        take: limit,
+        orderBy: { name: 'asc' },
+      });
     }
 
-    return brands;
+    // Fallback: match against known car brands (static list)
+    const lowerQ = query.toLowerCase();
+    const matched = SearchService.KNOWN_CAR_BRANDS
+      .filter(b => b.toLowerCase().includes(lowerQ))
+      .slice(0, limit)
+      .map(name => ({
+        id: `brand-${name.toLowerCase().replace(/\s+/g, '-')}`,
+        name,
+        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        logo: null,
+      }));
+    return matched;
   }
 
   private async richAutocompleteCategories(
     query: string,
     limit: number,
   ): Promise<Array<{ id: string; name: string; slug: string }>> {
-    const categories = await this.prisma.category.findMany({
-      where: {
-        isActive: true,
-        name: { contains: query, mode: 'insensitive' },
-      },
+    const categoryIds = await fulltextCategorySearch(this.prisma, query, limit);
+    if (categoryIds.length === 0) return [];
+
+    return this.prisma.category.findMany({
+      where: { id: { in: categoryIds }, isActive: true },
       select: { id: true, name: true, slug: true },
       take: limit,
       orderBy: { name: 'asc' },
     });
-    return categories;
   }
 
   private async richAutocompleteManufacturers(
     query: string,
     limit: number,
   ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
-    const manufacturers = await this.prisma.manufacturer.findMany({
-      where: {
-        name: { contains: query, mode: 'insensitive' },
-      },
+    const manufacturerIds = await fulltextManufacturerSearch(this.prisma, query, limit);
+    if (manufacturerIds.length === 0) return [];
+
+    return this.prisma.manufacturer.findMany({
+      where: { id: { in: manufacturerIds } },
       select: { id: true, name: true, slug: true, logo: true },
       take: limit,
       orderBy: { name: 'asc' },
     });
-    return manufacturers;
   }
 
   // ──────────────────────────── Fallback Search ────────────────────────────

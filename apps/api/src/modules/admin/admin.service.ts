@@ -8,6 +8,25 @@ import {
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import {
+  fulltextUserSearch,
+  fulltextProductRatingSearch,
+  fulltextUserDisplayNameSearch,
+  fulltextCollectionSearch,
+  fulltextTagSearch,
+  fulltextAttributeGroupSearch,
+  fulltextAttributeSearch,
+  fulltextPaymentSearch,
+  fulltextOrderSearch,
+  fulltextDiscountSearch,
+  fulltextShippingMethodSearch,
+  fulltextShippingCarrierSearch,
+  fulltextShippingZoneSearch,
+  fulltextErrorLogSearch,
+  fulltextSecurityLogSearch,
+  fulltextEmailLogSearch,
+} from '../../common/helpers/fulltext-search';
+import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
@@ -519,10 +538,11 @@ export class AdminService {
     const where: Prisma.UserWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { displayName: { contains: search, mode: 'insensitive' } },
-      ];
+      const userIds = await fulltextUserSearch(this.prisma, search);
+      if (userIds.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: userIds };
     }
 
     if (isSeller !== undefined) {
@@ -826,10 +846,11 @@ export class AdminService {
     const where: Prisma.ProductWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const productIds = await fulltextProductSearch(this.prisma, search);
+      if (productIds.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: productIds };
     }
 
     if (status) {
@@ -3228,11 +3249,17 @@ export class AdminService {
     }
 
     if (query.search) {
-      where.OR = [
-        { providerPaymentId: { contains: query.search, mode: 'insensitive' } },
-        { providerConversationId: { contains: query.search, mode: 'insensitive' } },
-        { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
-      ];
+      const [paymentIds, orderIds] = await Promise.all([
+        fulltextPaymentSearch(this.prisma, query.search),
+        fulltextOrderSearch(this.prisma, query.search),
+      ]);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
+      if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const [payments, total] = await Promise.all([
@@ -3457,11 +3484,17 @@ export class AdminService {
     }
 
     if (query.search) {
-      where.OR = [
-        { providerPaymentId: { contains: query.search, mode: 'insensitive' } },
-        { failureReason: { contains: query.search, mode: 'insensitive' } },
-        { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
-      ];
+      const [paymentIds, orderIds] = await Promise.all([
+        fulltextPaymentSearch(this.prisma, query.search),
+        fulltextOrderSearch(this.prisma, query.search),
+      ]);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
+      if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const [payments, total] = await Promise.all([
@@ -3570,11 +3603,14 @@ export class AdminService {
     };
 
     if (search) {
-      where.OR = [
-        { order: { buyer: { displayName: { contains: search, mode: 'insensitive' } } } },
-        { order: { buyer: { email: { contains: search, mode: 'insensitive' } } } },
-        { id: { contains: search, mode: 'insensitive' } },
-      ];
+      const userIds = await fulltextUserSearch(this.prisma, search);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (userIds.length > 0) conditions.push({ order: { buyerId: { in: userIds } } });
+      if (search.length >= 3) conditions.push({ id: { startsWith: search } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     if (startDate || endDate) {
@@ -5607,10 +5643,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { code: { contains: query.search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextShippingMethodSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const methods = await this.prisma.shippingMethod.findMany({
@@ -5744,10 +5779,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { code: { contains: query.search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextShippingCarrierSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const carriers = await this.prisma.shippingCarrier.findMany({
@@ -5931,7 +5965,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.name = { contains: query.search, mode: 'insensitive' };
+      const ids = await fulltextShippingZoneSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const zones = await this.prisma.shippingZone.findMany({
@@ -6675,7 +6711,11 @@ export class AdminService {
     }
 
     if (search) {
-      where.message = { contains: search, mode: 'insensitive' };
+      const ids = await fulltextErrorLogSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0, stats: [] };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -6741,10 +6781,11 @@ export class AdminService {
     }
 
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { ipAddress: { contains: search } },
-      ];
+      const ids = await fulltextSecurityLogSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -6860,7 +6901,6 @@ export class AdminService {
 
     if (status) where.status = status;
     if (template) where.template = template;
-    if (to) where.to = { contains: to, mode: 'insensitive' };
     if (userId) where.userId = userId;
 
     if (startDate || endDate) {
@@ -6869,11 +6909,13 @@ export class AdminService {
       if (endDate) where.createdAt.lte = new Date(endDate);
     }
 
-    if (search) {
-      where.OR = [
-        { to: { contains: search, mode: 'insensitive' } },
-        { subject: { contains: search, mode: 'insensitive' } },
-      ];
+    const searchTerm = search || to;
+    if (searchTerm) {
+      const ids = await fulltextEmailLogSearch(this.prisma, searchTerm);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -6993,10 +7035,11 @@ export class AdminService {
 
     const where: Prisma.CollectionWhereInput = {};
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextCollectionSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (userId) where.userId = userId;
     if (isPublic !== undefined) where.isPublic = isPublic;
@@ -7332,10 +7375,11 @@ export class AdminService {
     const where: Prisma.TagWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextTagSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7630,10 +7674,11 @@ export class AdminService {
     const where: Prisma.AttributeGroupWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextAttributeGroupSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7813,10 +7858,11 @@ export class AdminService {
 
     if (groupId) where.groupId = groupId;
     if (search) {
-      where.OR = [
-        { value: { contains: search, mode: 'insensitive' } },
-        { displayValue: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextAttributeSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7984,12 +8030,19 @@ export class AdminService {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { review: { contains: search, mode: 'insensitive' } },
-        { user: { displayName: { contains: search, mode: 'insensitive' } } },
-        { product: { title: { contains: search, mode: 'insensitive' } } },
-      ];
+      const [ratingIds, userIds, productIds] = await Promise.all([
+        fulltextProductRatingSearch(this.prisma, search),
+        fulltextUserDisplayNameSearch(this.prisma, search),
+        fulltextProductSearch(this.prisma, search),
+      ]);
+      const conditions: any[] = [];
+      if (ratingIds.length > 0) conditions.push({ id: { in: ratingIds } });
+      if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
+      if (productIds.length > 0) conditions.push({ productId: { in: productIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const orderBy: any = {};

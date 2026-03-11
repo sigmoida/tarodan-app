@@ -1,6 +1,8 @@
-# Product Filtering Architecture
+# Search & Filtering Architecture
 
 ## Overview
+
+**All text search across the application uses `tsvector/tsquery` with GIN indexes. `contains`/ILIKE is never used for search.**
 
 Product listing filters are built on two engines:
 
@@ -8,7 +10,8 @@ Product listing filters are built on two engines:
 - **Fallback**: PostgreSQL via Prisma (tsvector/tsquery full-text, attribute joins, indexed filters)
 
 The shared filter logic lives in `apps/api/src/modules/product/helpers/build-product-where.ts`.
-Full-text search helper: `apps/api/src/modules/product/helpers/fulltext-search.ts`.
+Product full-text helper: `apps/api/src/modules/product/helpers/fulltext-search.ts`.
+Generic full-text helper (all other tables): `apps/api/src/common/helpers/fulltext-search.ts`.
 
 ---
 
@@ -88,9 +91,9 @@ The `products` ES index includes these keyword fields for structured filtering:
 
 ## Key Rules
 
-1. **Never use `contains` on title/description for structured filters** (scale, vehicleType, brand, manufacturer). These must go through attribute joins or relation equality.
+1. **`contains`/ILIKE is never used for text search anywhere in the codebase.** All search uses `tsvector/tsquery` + GIN index. This applies to products, collections, autocomplete, admin panels, discounts, and GraphQL.
 
-2. **Text search (`search` param) is the only filter that searches in title/description text.** In the primary path it uses Elasticsearch. In fallback it uses `tsvector/tsquery` with GIN index (not ILIKE).
+2. **Text search pattern**: Helper returns matching IDs → Prisma hydrates with `id: { in: ids }` + other filters.
 
 3. **Prefer ID-based filters over name-based.** Frontend sends `brandId` / `manufacturerId` / `categoryId` whenever available. Name-based params (`brand`, `manufacturer`) are fallbacks for when the user types in the search bar.
 
@@ -102,12 +105,38 @@ The `products` ES index includes these keyword fields for structured filtering:
 
 ---
 
-## Database Indexes
+## Database Indexes (Full-Text)
+
+| Index | Table | Columns | Purpose |
+|---|---|---|---|
+| `products_fts_idx` | products | title + description | Product search |
+| `products_title_trgm_idx` | products | title (pg_trgm) | Fuzzy/partial match fallback |
+| `collections_fts_idx` | collections | name + description | Collection search |
+| `brands_fts_idx` | brands | name | Brand autocomplete |
+| `categories_fts_idx` | categories | name | Category autocomplete |
+| `manufacturers_fts_idx` | manufacturers | name | Manufacturer autocomplete |
+| `users_display_name_fts_idx` | users | display_name | Collection "search by user" |
+| `users_email_fts_idx` | users | email | Admin user search |
+| `payments_fts_idx` | payments | provider IDs | Admin payment search |
+| `orders_fts_idx` | orders | order_number | Admin order search |
+| `discounts_fts_idx` | discounts | name + code | Discount/coupon search |
+| `tags_fts_idx` | tags | name + description | Admin tag search |
+| `attribute_groups_fts_idx` | attribute_groups | name + description | Admin attr group search |
+| `attributes_fts_idx` | attributes | value + display_value | Admin attribute search |
+| `product_ratings_fts_idx` | product_ratings | title + review | Admin review search |
+| `security_logs_fts_idx` | security_logs | email + ip_address | Admin security log search |
+| `email_logs_fts_idx` | email_logs | to + subject | Admin email log search |
+| `error_logs_fts_idx` | error_logs | message | Admin error log search |
+| `ticket_messages_fts_idx` | ticket_messages | message | Admin support search |
+| `shipping_methods_fts_idx` | shipping_methods | name + code | Admin shipping method search |
+| `shipping_carriers_fts_idx` | shipping_carriers | name + code | Admin shipping carrier search |
+| `shipping_zones_fts_idx` | shipping_zones | name | Admin shipping zone search |
+| `tax_regions_fts_idx` | tax_regions | name | Admin tax region search |
+
+### Other Indexes
 
 | Index | Purpose |
 |---|---|
-| `products_fts_idx` (GIN) | Full-text search on `title + description` |
-| `products_title_trgm_idx` (GIN, pg_trgm) | Trigram similarity on `title` for fuzzy search |
 | `products_status_category_idx` | Composite index for status + category filtering |
 | `products_status_price_idx` | Composite index for status + price range filtering |
 
@@ -117,12 +146,18 @@ The `products` ES index includes these keyword fields for structured filtering:
 
 | File | Role |
 |---|---|
+| `apps/api/src/common/helpers/fulltext-search.ts` | Generic tsvector search helper (all tables) |
 | `apps/api/src/modules/product/helpers/build-product-where.ts` | Shared Prisma where-clause builder |
-| `apps/api/src/modules/product/helpers/fulltext-search.ts` | tsvector/tsquery + trigram search helper |
+| `apps/api/src/modules/product/helpers/fulltext-search.ts` | Product-specific tsvector + trigram search |
 | `apps/api/src/modules/product/dto/product-query.dto.ts` | Filter DTO with validation |
 | `apps/api/src/modules/product/product.service.ts` | `findAll`, `findAllViaElasticsearch`, `findAllViaPostgres` |
-| `apps/api/src/modules/search/search.service.ts` | `searchProducts` (ES), `fallbackSearch` (PG) |
+| `apps/api/src/modules/search/search.service.ts` | `searchProducts` (ES), `fallbackSearch` (PG), autocomplete |
+| `apps/api/src/modules/collection/collection.service.ts` | Collection browse with tsvector fallback |
+| `apps/api/src/modules/discount/discount.service.ts` | Discount listing with tsvector search |
+| `apps/api/src/modules/admin/admin.service.ts` | All admin listings with tsvector search |
+| `apps/api/src/modules/graphql/resolvers/product.resolver.ts` | GraphQL product query with tsvector search |
 | `apps/web/src/app/listings/page.tsx` | Filter state, URL sync, API calls |
 | `apps/web/src/components/SidebarFilters.tsx` | Filter UI (sends IDs when available) |
 | `apps/web/src/components/layout/Navbar.tsx` | Search autocomplete (links include IDs) |
-| `apps/api/prisma/migrations/20260311000000_fulltext_and_vehicle_type/migration.sql` | GIN indexes + vehicle_type attribute group |
+| `apps/api/prisma/migrations/20260311000000_fulltext_and_vehicle_type/migration.sql` | Phase 1: product GIN indexes + vehicle_type |
+| `apps/api/prisma/migrations/20260312000000_fulltext_all_tables/migration.sql` | Phase 2: all remaining table GIN indexes |

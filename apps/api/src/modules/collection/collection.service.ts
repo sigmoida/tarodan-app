@@ -10,6 +10,10 @@ import {
 import { PrismaService } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import {
+  fulltextCollectionSearch,
+  fulltextUserDisplayNameSearch,
+} from '../../common/helpers/fulltext-search';
+import {
   CreateCollectionDto,
   UpdateCollectionDto,
   AddCollectionItemDto,
@@ -523,14 +527,24 @@ export class CollectionService {
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
-      ...(search && search.trim() !== '' ? {
-        OR: [
-          { name: { contains: search.trim(), mode: 'insensitive' } },
-          { description: { contains: search.trim(), mode: 'insensitive' } },
-          { user: { displayName: { contains: search.trim(), mode: 'insensitive' } } },
-        ],
-      } : {}),
     };
+
+    if (search && search.trim() !== '') {
+      const trimmed = search.trim();
+      const [collectionIds, userIds] = await Promise.all([
+        fulltextCollectionSearch(this.prisma, trimmed),
+        fulltextUserDisplayNameSearch(this.prisma, trimmed),
+      ]);
+
+      if (collectionIds.length === 0 && userIds.length === 0) {
+        return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
+      }
+
+      const conditions: Prisma.CollectionWhereInput[] = [];
+      if (collectionIds.length > 0) conditions.push({ id: { in: collectionIds } });
+      if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
+      where.OR = conditions;
+    }
 
     let orderBy: Prisma.CollectionOrderByWithRelationInput;
     let needsInMemorySort = false;
