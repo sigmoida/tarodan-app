@@ -19,7 +19,7 @@ interface ProductCardProduct {
   id: string;
   title: string;
   price: number;
-  images?: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
+  images?: Array<{ id?: string; url?: string; cardUrl?: string; detailUrl?: string; sortOrder?: number }> | string[];
   viewCount?: number;
   likeCount?: number;
   isPreorder?: boolean;
@@ -73,6 +73,7 @@ export default function ProductCard({
               className="object-cover"
               unoptimized
               priority={priority}
+              loading={priority ? 'eager' : 'lazy'}
               onError={handleImgError}
             />
             {tag && (
@@ -136,6 +137,7 @@ export default function ProductCard({
             className="object-cover"
             unoptimized
             priority={priority}
+            loading={priority ? 'eager' : 'lazy'}
             onError={handleImgError}
           />
           <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">

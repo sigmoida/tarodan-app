@@ -271,18 +271,11 @@ export class WishlistService {
   // ==========================================================================
   // HELPER - Resolve product image URL (S3 key -> presigned URL)
   // ==========================================================================
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    // Already a full URL or same-origin path - return as-is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    // S3 key - resolve to presigned URL
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600); // 1 hour
-      } catch (e: any) {
-        this.logger.warn(`Failed to resolve product image presigned URL for key: ${imageUrl} - ${e.message}`);
-        return null;
-      }
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -306,7 +299,7 @@ export class WishlistService {
     const originalPrice = basePrice;
 
     // Resolve product image URL (S3 key -> presigned URL)
-    const resolvedImage = await this.resolveProductImageUrl(product.images?.[0]?.url);
+    const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
 
     return {
       id: item.id,

@@ -34,7 +34,7 @@ interface Listing {
   saleEndDate?: string | null;
   discountPercent?: number | null;
   isOnSale?: boolean;
-  images: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
+  images: Array<{ id?: string; url?: string; cardUrl?: string; detailUrl?: string; sortOrder?: number }> | string[];
   brand?: {
     id: string;
     name: string;
@@ -75,6 +75,8 @@ export default function ListingsPage() {
 
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageLimit = 48;
 
   const [filters, setFilters] = useState({
     search: autoDetectedBrand ? '' : urlSearch,
@@ -101,6 +103,9 @@ export default function ListingsPage() {
     const detectedBrand = newSearch
       ? KNOWN_BRANDS.find(b => b.toLowerCase() === newSearch.toLowerCase()) || ''
       : '';
+    const pageParam = searchParams.get('page');
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    setCurrentPage(page);
 
     setFilters(prev => ({
       ...prev,
@@ -136,9 +141,9 @@ export default function ListingsPage() {
   });
   const resolvedCategoryId = searchParams.get('categoryId') || categoryBySlug?.id;
 
-  const { data: listings = [], isLoading } = useQuery({
-    queryKey: ['listings', filters, resolvedCategoryId ?? ''],
-    queryFn: async (): Promise<Listing[]> => {
+  const { data: listingsData, isLoading } = useQuery({
+    queryKey: ['listings', filters, resolvedCategoryId ?? '', currentPage],
+    queryFn: async () => {
       const urlCategoryId = resolvedCategoryId;
       const conditionMap: Record<string, string> = {
         'Yeni': 'new', 'Mükemmel': 'very_good', 'İyi': 'good', 'Orta': 'fair',
@@ -146,7 +151,7 @@ export default function ListingsPage() {
       const mappedCondition = filters.condition ? conditionMap[filters.condition] || filters.condition : undefined;
 
       const buildListParams = (): Record<string, any> => {
-        const p: Record<string, any> = { limit: 100, page: 1 };
+        const p: Record<string, any> = { limit: pageLimit, page: currentPage };
         if (filters.search) p.search = filters.search;
         if (urlCategoryId) p.categoryId = urlCategoryId;
         if (mappedCondition) p.condition = mappedCondition;
@@ -170,26 +175,30 @@ export default function ListingsPage() {
       const params = buildListParams();
       const response = await listingsApi.getAll(params);
       const raw = response?.data;
-      return Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
+      const listings = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
+      const meta = raw?.meta || { total: listings.length, page: currentPage, limit: pageLimit, totalPages: 1 };
+      return { listings, meta };
     },
     meta: { page: 'listings' },
   });
 
+  const listings = listingsData?.listings ?? [];
+  const pagination = listingsData?.meta ?? { total: 0, page: currentPage, limit: pageLimit, totalPages: 1 };
+
   const clearFilters = () => {
-    // Reset all filter state
     setFilters({
       search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
     });
-    
-    // Remove all filter params from URL (keep only sortBy if it exists)
+    setCurrentPage(1);
+
     const currentParams = new URLSearchParams(searchParams.toString());
     const filterParams = [
       'search', 'brand', 'scale', 'material', 'condition',
       'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
       'limited', 'set', 'category', 'categoryId', 'manufacturer',
-      'manufacturerId', 'vehicleType'
+      'manufacturerId', 'vehicleType', 'page'
     ];
     
     // Check if any filter parameter exists
@@ -219,12 +228,12 @@ export default function ListingsPage() {
   ];
   const getImageUrl = (image: any, index?: number, productTitle?: string): string => {
     const placeholder = LISTING_PLACEHOLDERS[(index ?? 0) % LISTING_PLACEHOLDERS.length];
-    if (!image) return placeholder;
-    let raw = typeof image === 'string' ? image : image.url;
-    if (raw && raw.includes('picsum.photos') && productTitle) {
-      raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+    const url = image?.cardUrl ?? image?.detailUrl ?? (typeof image === 'string' ? image : image?.url);
+    if (url && !url.includes('picsum.photos')) return url;
+    if (url && url.includes('picsum.photos') && productTitle) {
+      return `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
     }
-    return raw || placeholder;
+    return placeholder;
   };
 
   const getGridClass = () => {
@@ -254,7 +263,7 @@ export default function ListingsPage() {
                   <span className="truncate">{filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}</span>
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                  {listings.length} {locale === 'en' ? 'products found' : 'ürün bulundu'}
+                  {pagination.total} {locale === 'en' ? 'products found' : 'ürün bulundu'}
                 </p>
               </div>
               <button
@@ -347,8 +356,7 @@ export default function ListingsPage() {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
                       setFilters(updates);
-                      
-                      // Update URL
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       if (f.k === 'category') {
                         params.delete('category');
@@ -359,6 +367,7 @@ export default function ListingsPage() {
                       } else {
                         params.delete(f.k);
                       }
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -368,9 +377,11 @@ export default function ListingsPage() {
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
                     <button onClick={() => {
                       setFilters({ ...filters, minPrice: '', maxPrice: '' });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('minPrice');
                       params.delete('maxPrice');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -380,8 +391,10 @@ export default function ListingsPage() {
                     {t('product.tradeAvailable')}
                     <button onClick={() => {
                       setFilters({ ...filters, tradeOnly: false });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('tradeOnly');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -391,8 +404,10 @@ export default function ListingsPage() {
                     {t('product.preOrder')}
                     <button onClick={() => {
                       setFilters({ ...filters, preOrder: false });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('preOrder');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -402,8 +417,10 @@ export default function ListingsPage() {
                     {t('product.limitedEdition')}
                     <button onClick={() => {
                       setFilters({ ...filters, limited: false });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('limited');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -413,8 +430,10 @@ export default function ListingsPage() {
                     {t('product.sets')}
                     <button onClick={() => {
                       setFilters({ ...filters, set: false });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('set');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -424,8 +443,10 @@ export default function ListingsPage() {
                     {locale === 'en' ? 'On Sale' : 'İndirimli'}
                     <button onClick={() => {
                       setFilters({ ...filters, discountOnly: false });
+                      setCurrentPage(1);
                       const params = new URLSearchParams(searchParams.toString());
                       params.delete('discountOnly');
+                      params.delete('page');
                       router.replace(`/listings?${params.toString()}`);
                     }} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
@@ -555,6 +576,77 @@ export default function ListingsPage() {
                     </Link>
                   </motion.div>
                 ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white rounded border border-gray-200 px-4 py-4">
+                <div className="text-sm text-gray-600">
+                  {locale === 'en'
+                    ? `Showing ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} products`
+                    : `${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} / ${pagination.total} ürün gösteriliyor`}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newPage = pagination.page - 1;
+                      setCurrentPage(newPage);
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set('page', newPage.toString());
+                      router.replace(`/listings?${params.toString()}`);
+                    }}
+                    disabled={pagination.page === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
+                  >
+                    {locale === 'en' ? 'Previous' : 'Önceki'}
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum: number;
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (pagination.page <= 3) {
+                        pageNum = i + 1;
+                      } else if (pagination.page >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i;
+                      } else {
+                        pageNum = pagination.page - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => {
+                            setCurrentPage(pageNum);
+                            const params = new URLSearchParams(searchParams.toString());
+                            params.set('page', pageNum.toString());
+                            router.replace(`/listings?${params.toString()}`);
+                          }}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                            pagination.page === pageNum
+                              ? 'bg-orange-500 text-white'
+                              : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newPage = pagination.page + 1;
+                      setCurrentPage(newPage);
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set('page', newPage.toString());
+                      router.replace(`/listings?${params.toString()}`);
+                    }}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
+                  >
+                    {locale === 'en' ? 'Next' : 'Sonraki'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

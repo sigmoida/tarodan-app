@@ -238,9 +238,10 @@ export default function SellerProfilePage() {
   };
 
   const getImageUrl = (images: any[]): string => {
-    const placeholder = 'https://placehold.co/400x400/f8fafc/94a3b8?text=';
-    if (!images || images.length === 0) return placeholder + (locale === 'en' ? 'Product' : 'Ürün');
-    return images[0]?.url || images[0] || placeholder;
+    const placeholder = 'https://placehold.co/400x400/f8fafc/94a3b8?text=' + (locale === 'en' ? 'Product' : 'Ürün');
+    if (!images || images.length === 0) return placeholder;
+    const img = images[0];
+    return (img as any)?.cardUrl ?? (img as any)?.detailUrl ?? (img as any)?.url ?? (typeof img === 'string' ? img : null) ?? placeholder;
   };
 
   const getMembershipDuration = () => {

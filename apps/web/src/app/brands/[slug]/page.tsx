@@ -121,7 +121,7 @@ export default function BrandDetailPage() {
     const getImageUrl = (img: any) => {
         if (!img) return 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
         if (typeof img === 'string') return img;
-        return img.url;
+        return img.cardUrl ?? img.detailUrl ?? img.url;
     };
 
     if (brandQuery.isLoading) {

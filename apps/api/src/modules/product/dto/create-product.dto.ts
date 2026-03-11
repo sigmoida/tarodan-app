@@ -11,10 +11,19 @@ import {
   MinLength,
   MaxLength,
   ArrayMaxSize,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ProductCondition } from '@prisma/client';
+
+export class ImageVariantDto {
+  @IsString()
+  cardKey: string;
+
+  @IsString()
+  detailKey: string;
+}
 
 export class CreateProductDto {
   @ApiProperty({
@@ -61,14 +70,15 @@ export class CreateProductDto {
   condition: ProductCondition;
 
   @ApiPropertyOptional({
-    example: ['https://storage.example.com/image1.jpg'],
-    description: 'Array of image URLs',
+    example: [{ cardKey: 'dev/products/product-images/abc/uuid-card.webp', detailKey: 'dev/products/product-images/abc/uuid-detail.webp' }],
+    description: 'Array of image variants (cardKey, detailKey from upload)',
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => ImageVariantDto)
   @ArrayMaxSize(10, { message: 'En fazla 10 resim yüklenebilir' })
-  imageUrls?: string[];
+  images?: Array<{ cardKey: string; detailKey: string }>;
 
   @ApiPropertyOptional({
     example: false,

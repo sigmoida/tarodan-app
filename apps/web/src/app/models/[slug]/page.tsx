@@ -189,7 +189,7 @@ export default function ModelDetailPage() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {products.map((p, i) => {
-                            const img = p.images?.[0]?.url;
+                            const img = (p.images?.[0] as any)?.cardUrl ?? (p.images?.[0] as any)?.detailUrl ?? (p.images?.[0] as any)?.url;
                             const hasDiscount = p.salePrice && p.originalPrice && Number(p.salePrice) < Number(p.originalPrice);
 
                             return (

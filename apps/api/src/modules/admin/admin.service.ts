@@ -64,16 +64,11 @@ export class AdminService {
     private readonly storageService: StorageService,
   ) { }
 
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
-      } catch (e: any) {
-        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
-        return null;
-      }
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -712,7 +707,7 @@ export class AdminService {
       products: await Promise.all(user.products.map(async (p) => ({
         ...p,
         price: Number(p.price),
-        imageUrl: (await this.resolveProductImageUrl(p.images?.[0]?.url)) || null,
+        imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
       }))),
       recentOrders: allOrders,
       recentTrades: allTrades.map((t) => ({
@@ -875,7 +870,7 @@ export class AdminService {
         const hasDiscount = effectivePrice < basePrice;
 
         // Convert S3 key to presigned URL for image
-        const imageUrl = await this.resolveProductImageUrl(p.images[0]?.url);
+        const imageUrl = this.resolveProductImageUrl(p.images[0]?.cardKey);
 
         return {
           ...p,
@@ -964,7 +959,7 @@ export class AdminService {
     const imagesWithPresignedUrls = await Promise.all(
       product.images.map(async (img) => ({
         ...img,
-        url: await this.resolveProductImageUrl(img.url),
+        url: this.resolveProductImageUrl(img.cardKey),
       })),
     );
 
@@ -6990,7 +6985,7 @@ export class AdminService {
         return {
           data: collections.map(c => ({
             id: c.id, name: c.name, slug: c.slug, description: c.description,
-            coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+            coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
             viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
             owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
           })),
@@ -7030,7 +7025,7 @@ export class AdminService {
     return {
       data: collections.map(c => ({
         id: c.id, name: c.name, slug: c.slug, description: c.description,
-        coverImageUrl: c.coverImageUrl, isPublic: c.isPublic, isFeatured: c.isFeatured,
+        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
         viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
         owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
       })),
@@ -7071,7 +7066,7 @@ export class AdminService {
       name: collection.name,
       slug: collection.slug,
       description: collection.description,
-      coverImageUrl: collection.coverImageUrl,
+      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
       isPublic: collection.isPublic,
       isFeatured: collection.isFeatured,
       viewCount: collection.viewCount,
@@ -7088,7 +7083,7 @@ export class AdminService {
           price: Number(item.product.price),
           images: await Promise.all((item.product.images || []).map(async (img: any) => ({
             ...img,
-            url: (await this.resolveProductImageUrl(img.url)) || img.url,
+            url: this.resolveProductImageUrl(img.cardKey),
           }))),
         } : null,
         customTitle: item.customTitle,
@@ -7107,7 +7102,7 @@ export class AdminService {
     description?: string;
     isPublic?: boolean;
     isFeatured?: boolean;
-    coverImageUrl?: string;
+    coverImageKey?: string;
     userId?: string;
   }) {
     const slug = this.generateSlug(dto.name);
@@ -7128,7 +7123,7 @@ export class AdminService {
         description: dto.description,
         isPublic: dto.isPublic ?? true,
         isFeatured: dto.isFeatured ?? false,
-        coverImageUrl: dto.coverImageUrl,
+        coverImageKey: dto.coverImageKey,
       },
       include: {
         user: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -7154,7 +7149,7 @@ export class AdminService {
     description?: string;
     isPublic?: boolean;
     isFeatured?: boolean;
-    coverImageUrl?: string;
+    coverImageKey?: string;
   }) {
     const existing = await this.prisma.collection.findUnique({
       where: { id: collectionId },
@@ -7172,7 +7167,7 @@ export class AdminService {
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.isPublic !== undefined) updateData.isPublic = dto.isPublic;
     if (dto.isFeatured !== undefined) updateData.isFeatured = dto.isFeatured;
-    if (dto.coverImageUrl !== undefined) updateData.coverImageUrl = dto.coverImageUrl;
+    if (dto.coverImageKey !== undefined) updateData.coverImageKey = dto.coverImageKey;
 
     const updated = await this.prisma.collection.update({
       where: { id: collectionId },

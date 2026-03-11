@@ -16,6 +16,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MediaService, UploadOptions, UploadResult } from './media.service';
 import { MembershipService } from '../membership/membership.service';
+import { StorageService } from '../storage/storage.service';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +24,7 @@ export class MediaController {
   constructor(
     private readonly mediaService: MediaService,
     private readonly membershipService: MembershipService,
+    private readonly storageService: StorageService,
   ) {}
 
   @Post('upload')
@@ -75,28 +77,29 @@ export class MediaController {
   @UseInterceptors(FilesInterceptor('images', 15))
   async uploadProductImages(
     @Request() req: any,
-    @UploadedFiles() files: Express.Multer.File[]
-  ): Promise<UploadResult[]> {
+    @UploadedFiles() files: Express.Multer.File[],
+    @Query('productId') productId?: string,
+  ): Promise<Array<{ cardKey: string; detailKey: string; cardUrl: string; detailUrl: string }>> {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
     }
 
-    // Get user's membership tier and max images limit
     const membership = await this.membershipService.getUserMembership(req.user.id);
     const maxImages = membership.tier.maxImagesPerListing;
 
-    // Validate image count
     if (files.length > maxImages) {
       throw new BadRequestException(`En fazla ${maxImages} resim yükleyebilirsiniz`);
     }
 
-    return this.mediaService.uploadMultiple(files, {
-      folder: 'products',
-      resize: { width: 800, height: 800, fit: 'inside' },
-      generateThumbnail: true,
-      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-      maxSize: 10 * 1024 * 1024, // 10MB
-    });
+    const results = await Promise.all(
+      files.map((file) => this.mediaService.uploadProductImageVariants(file, productId)),
+    );
+    return results.map((r) => ({
+      cardKey: r.cardKey,
+      detailKey: r.detailKey,
+      cardUrl: this.storageService.getPublicAssetUrl(r.cardKey),
+      detailUrl: this.storageService.getPublicAssetUrl(r.detailKey),
+    }));
   }
 
   @Post('upload/avatar')

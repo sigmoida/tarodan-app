@@ -32,6 +32,8 @@ interface OptimizedImageProps extends Omit<ImageProps, 'onError'> {
   logContext?: Record<string, unknown>;
   /** Override default sizes when using fill. Improves LCP and reduces bandwidth. */
   sizes?: string;
+  /** Lazy load below-fold images */
+  loading?: 'lazy' | 'eager';
 }
 
 /**
@@ -82,7 +84,11 @@ export default function OptimizedImage({
   const isPlaceholderService =
     typeof safeSrc === 'string' &&
     (safeSrc.includes('placehold.co') || safeSrc.includes('via.placeholder.com') || safeSrc.includes('picsum.photos'));
-  const useUnoptimized = props.unoptimized ?? (isExternalAvatar || isPlaceholderService);
+  // S3 product/collection images: already WebP + cache headers; load directly to avoid Next.js proxy (403 when bucket not public)
+  const isS3ProductOrCollection =
+    typeof safeSrc === 'string' &&
+    (safeSrc.includes('amzn-tarodan.s3.') || (safeSrc.includes('.s3.') && (safeSrc.includes('/products/') || safeSrc.includes('/collections/'))));
+  const useUnoptimized = props.unoptimized ?? (isExternalAvatar || isPlaceholderService || isS3ProductOrCollection);
 
   const [imgSrc, setImgSrc] = useState(safeSrc);
   const [hasError, setHasError] = useState(false);
@@ -161,21 +167,44 @@ export default function OptimizedImage({
       onError={handleError}
       onLoad={handleLoad}
       unoptimized={useUnoptimized}
+      loading={props.loading}
     />
   );
 }
 
+export type ImageUrlSource =
+  | string
+  | { url?: string; cardUrl?: string; detailUrl?: string; id?: string; sortOrder?: number }
+  | null
+  | undefined;
+
 /**
- * Helper function to get image URL from various formats
- * Used across the app for consistent image URL handling
+ * Get image URL from various formats. Supports cardUrl/detailUrl for product images.
+ * @param variant 'card' for card/listing context, 'detail' for gallery/detail context
  */
 export function getOptimizedImageUrl(
-  image: string | { url: string } | { id?: string; url: string; sortOrder?: number } | null | undefined,
+  image: ImageUrlSource,
   placeholder: string = DEFAULT_PLACEHOLDER,
-  productTitle?: string
+  productTitle?: string,
+  variant?: 'card' | 'detail'
 ): string {
   if (!image) return placeholder;
-  let raw = typeof image === 'string' ? image : ('url' in image ? image.url : null);
+  let raw: string | null = null;
+  if (typeof image === 'string') {
+    raw = image;
+  } else if (image && typeof image === 'object') {
+    if (variant === 'detail' && 'detailUrl' in image && image.detailUrl) {
+      raw = image.detailUrl;
+    } else if (variant === 'card' && 'cardUrl' in image && image.cardUrl) {
+      raw = image.cardUrl;
+    } else if ('cardUrl' in image && image.cardUrl) {
+      raw = image.cardUrl;
+    } else if ('detailUrl' in image && image.detailUrl) {
+      raw = image.detailUrl;
+    } else if ('url' in image && image.url) {
+      raw = image.url;
+    }
+  }
   if (raw && raw.includes('picsum.photos') && productTitle) {
     raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
   }

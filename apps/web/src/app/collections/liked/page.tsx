@@ -164,12 +164,16 @@ export default function LikedCollectionsPage() {
                         <div className="grid grid-cols-2 h-full">
                           {collection.items.slice(0, 4).map((item) => (
                             <div key={item.id} className="relative overflow-hidden">
-                              {item.product?.images?.[0]?.url ? (
-                                <OptimizedImage src={item.product.images[0].url} alt={item.product.title} fill className="object-cover"
-                                  fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün" logContext={{ productId: item.product.id, page: 'collections-liked-item' }} />
-                              ) : (
-                                <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ArchiveBoxIcon className="w-4 h-4 text-gray-400" /></div>
-                              )}
+                              {(() => {
+                                const img0 = item.product?.images?.[0];
+                                const url = (img0 as any)?.cardUrl ?? (img0 as any)?.detailUrl ?? (img0 as any)?.url;
+                                return url ? (
+                                  <OptimizedImage src={url} alt={item.product!.title} fill className="object-cover"
+                                    fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün" logContext={{ productId: item.product.id, page: 'collections-liked-item' }} />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ArchiveBoxIcon className="w-4 h-4 text-gray-400" /></div>
+                                );
+                              })()}
                             </div>
                           ))}
                           {collection.items.length < 4 &&

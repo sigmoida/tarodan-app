@@ -558,8 +558,9 @@ export default function CollectionDetailPage() {
 
                     <div className="flex-1 overflow-y-auto mb-4 space-y-1.5">
                       {myProducts.map((product) => {
-                        const imageUrl = product.images?.[0]
-                          ? typeof product.images[0] === 'string' ? product.images[0] : product.images[0].url
+                        const img0 = product.images?.[0];
+                        const imageUrl = img0
+                          ? (typeof img0 === 'string' ? img0 : (img0 as any).cardUrl ?? (img0 as any).detailUrl ?? (img0 as any).url)
                           : 'https://placehold.co/80x80/374151/9ca3af?text=Ürün';
                         const isSelected = selectedProductIds.includes(product.id);
                         return (

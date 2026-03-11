@@ -265,6 +265,95 @@ export class MediaService {
     }
   }
 
+  /**
+   * Upload product image as two variants (card 500x500, detail 1200x1200) in WebP.
+   * Returns S3 keys for direct public URL construction. Skips MediaFile.
+   */
+  async uploadProductImageVariants(
+    file: Express.Multer.File,
+    productId?: string,
+  ): Promise<{ cardKey: string; detailKey: string }> {
+    if (!sharp) {
+      throw new BadRequestException('Image processing (sharp) is not available');
+    }
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('Dosya boyutu çok büyük (max 10MB)');
+    }
+
+    const baseId = uuidv4();
+    const folder = `product-images/${productId || 'temp'}`;
+    const cacheOpts = {
+      contentType: 'image/webp' as const,
+      cacheControl: 'public, max-age=31536000, immutable',
+      skipMediaFile: true,
+    };
+
+    const cardBuffer = await sharp(file.buffer)
+      .resize(500, 500, { fit: 'cover' })
+      .webp({ quality: 85 })
+      .toBuffer();
+
+    const detailBuffer = await sharp(file.buffer)
+      .resize(1200, 1200, { fit: 'inside' })
+      .webp({ quality: 90 })
+      .toBuffer();
+
+    const cardResult = await this.storageService.uploadFile(cardBuffer, {
+      bucket: 'products',
+      folder,
+      filename: `${baseId}-card.webp`,
+      mimeType: 'image/webp',
+      ...cacheOpts,
+    });
+
+    const detailResult = await this.storageService.uploadFile(detailBuffer, {
+      bucket: 'products',
+      folder,
+      filename: `${baseId}-detail.webp`,
+      mimeType: 'image/webp',
+      ...cacheOpts,
+    });
+
+    return { cardKey: cardResult.key, detailKey: detailResult.key };
+  }
+
+  /**
+   * Upload collection cover image (1200x600 WebP). Returns S3 key. Skips MediaFile.
+   */
+  async uploadCollectionCover(file: Express.Multer.File): Promise<{ key: string }> {
+    if (!sharp) {
+      throw new BadRequestException('Image processing (sharp) is not available');
+    }
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('Dosya boyutu çok büyük (max 10MB)');
+    }
+
+    const buffer = await sharp(file.buffer)
+      .resize(1200, 600, { fit: 'cover' })
+      .webp({ quality: 85 })
+      .toBuffer();
+
+    const result = await this.storageService.uploadFile(buffer, {
+      bucket: 'collections',
+      folder: 'covers',
+      filename: `${uuidv4()}.webp`,
+      mimeType: 'image/webp',
+      contentType: 'image/webp',
+      cacheControl: 'public, max-age=31536000, immutable',
+      skipMediaFile: true,
+    });
+
+    return { key: result.key };
+  }
+
   async getFileInfo(key: string, bucket: string = this.defaultBucket): Promise<{ size: number; lastModified: Date; contentType: string }> {
     // S3'te file info için presigned URL ile HEAD request yapabiliriz
     // Veya database'den bilgi alabiliriz

@@ -753,16 +753,11 @@ export class OfferService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
-      } catch (e: any) {
-        this.logger.warn(`Failed to resolve product image presigned URL: ${imageUrl} - ${e.message}`);
-        return null;
-      }
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -795,7 +790,7 @@ export class OfferService {
         id: offer.product.id,
         title: offer.product.title,
         price: Number(offer.product.price),
-        imageUrl: await this.resolveProductImageUrl(offer.product.images?.[0]?.url),
+        imageUrl: this.resolveProductImageUrl(offer.product.images?.[0]?.cardKey),
         status: offer.product.status,
       },
       buyer: offer.buyer,

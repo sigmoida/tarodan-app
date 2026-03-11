@@ -81,7 +81,7 @@ export default function FavoritesPage() {
             id: p.id,
             productId: p.id,
             productTitle: p.title,
-            productImage: p.images?.[0]?.url ?? p.imageUrl,
+            productImage: p.images?.[0]?.cardUrl ?? p.images?.[0]?.detailUrl ?? p.images?.[0]?.url ?? p.imageUrl,
             productPrice: p.price ?? p.sellingPrice,
             productOriginalPrice: p.originalPrice,
             productCondition: p.condition,

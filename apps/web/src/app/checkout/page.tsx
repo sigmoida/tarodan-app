@@ -320,7 +320,7 @@ export default function CheckoutPage() {
         title: product.title,
         price: effectivePrice,
         originalPrice: originalPriceForDisplay != null && originalPriceForDisplay > effectivePrice ? originalPriceForDisplay : undefined,
-        imageUrl: product.images?.[0]?.url || product.images?.[0] || 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
+        imageUrl: product.images?.[0]?.cardUrl ?? product.images?.[0]?.detailUrl ?? product.images?.[0]?.url ?? (typeof product.images?.[0] === 'string' ? product.images[0] : null) ?? 'https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün',
         seller: {
           id: product.sellerId || product.seller?.id,
           displayName: product.seller?.displayName || (locale === 'en' ? 'Seller' : 'Satıcı'),

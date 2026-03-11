@@ -86,10 +86,10 @@ export class ProductService implements OnModuleInit {
 
     // Check image limit based on membership tier
     const limits = await this.membershipService.getUserLimits(sellerId);
-    if (dto.imageUrls && dto.imageUrls.length > limits.maxImages) {
+    if (dto.images && dto.images.length > limits.maxImages) {
       throw new BadRequestException(
         `Üyeliğiniz (${limits.tierName}) ile ilan başına maksimum ${limits.maxImages} görsel yükleyebilirsiniz. ` +
-        `${dto.imageUrls.length} görsel gönderdiniz.`
+        `${dto.images.length} görsel gönderdiniz.`
       );
     }
 
@@ -147,27 +147,6 @@ export class ProductService implements OnModuleInit {
       ? new Date(dto.year, 0, 1)
       : undefined;
 
-    // Process imageUrls: extract S3 keys from presigned URLs or use keys directly
-    const processedImageUrls = dto.imageUrls?.map((urlOrKey) => {
-      // If already a key format (starts with dev/ or prod/), use it directly
-      if (urlOrKey.includes('dev/') || urlOrKey.includes('prod/')) {
-        // Remove query string if present
-        try {
-          const urlObj = new URL(urlOrKey, 'http://dummy.com');
-          return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-        } catch {
-          return urlOrKey; // If URL parse fails, use as-is
-        }
-      }
-      // If presigned URL, extract key
-      const extractedKey = this.extractKeyFromUrl(urlOrKey);
-      if (extractedKey) {
-        return extractedKey;
-      }
-      // Fallback: use original (for backward compatibility with old data)
-      return urlOrKey;
-    });
-
     const product = await this.prisma.product.create({
       data: {
         sellerId,
@@ -184,10 +163,11 @@ export class ProductService implements OnModuleInit {
         brandId: dto.brandId,
         carModelId: dto.carModelId,
         releaseDate,
-        images: processedImageUrls?.length
+        images: dto.images?.length
           ? {
-            create: processedImageUrls.map((key, index) => ({
-              url: key, // Store S3 key instead of presigned URL
+            create: dto.images.map((img, index) => ({
+              cardKey: img.cardKey,
+              detailKey: img.detailKey,
               sortOrder: index,
             })),
           }
@@ -948,38 +928,17 @@ export class ProductService implements OnModuleInit {
     };
 
     // Handle image updates if provided
-    if (dto.imageUrls !== undefined) {
-      // Delete existing images and create new ones
+    if (dto.images !== undefined) {
       await this.prisma.productImage.deleteMany({
         where: { productId: id },
       });
 
-      if (dto.imageUrls.length > 0) {
-        // Process imageUrls: extract S3 keys from presigned URLs or use keys directly
-        const processedImageUrls = dto.imageUrls.map((urlOrKey) => {
-          // If already a key format (starts with dev/ or prod/), use it directly
-          if (urlOrKey.includes('dev/') || urlOrKey.includes('prod/')) {
-            // Remove query string if present
-            try {
-              const urlObj = new URL(urlOrKey, 'http://dummy.com');
-              return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-            } catch {
-              return urlOrKey; // If URL parse fails, use as-is
-            }
-          }
-          // If presigned URL, extract key
-          const extractedKey = this.extractKeyFromUrl(urlOrKey);
-          if (extractedKey) {
-            return extractedKey;
-          }
-          // Fallback: use original (for backward compatibility with old data)
-          return urlOrKey;
-        });
-
+      if (dto.images.length > 0) {
         await this.prisma.productImage.createMany({
-          data: processedImageUrls.map((key, index) => ({
+          data: dto.images.map((img, index) => ({
             productId: id,
-            url: key, // Store S3 key instead of presigned URL
+            cardKey: img.cardKey,
+            detailKey: img.detailKey,
             sortOrder: index,
           })),
         });
@@ -1468,57 +1427,6 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   }
 
   /**
-   * Extract S3 key from presigned URL or return original if not a presigned URL
-   * Example: https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/products/...?X-Amz-Signature=...
-   * Returns: dev/products/...
-   */
-  private extractKeyFromUrl(url: string): string | null {
-    try {
-      // Eğer presigned URL ise (X-Amz-Signature içeriyorsa)
-      if (url.includes('X-Amz-Signature') || url.includes('amzn-tarodan.s3.eu-west-1.amazonaws.com')) {
-        const urlObj = new URL(url);
-        // Path'den key'i extract et: /dev/products/... -> dev/products/...
-        const path = urlObj.pathname;
-        if (path.startsWith('/')) {
-          return path.substring(1); // İlk / karakterini kaldır
-        }
-        return path;
-      }
-      // Eğer zaten key formatındaysa (dev/ veya prod/ ile başlıyorsa)
-      if (url.includes('dev/') || url.includes('prod/')) {
-        // Query string varsa kaldır
-        try {
-          const urlObj = new URL(url, 'http://dummy.com'); // Relative URL için dummy base
-          return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-        } catch {
-          return url; // URL parse edilemezse direkt kullan
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Find MediaFile key by productId as fallback
-   */
-  private async findMediaFileKeyByProductId(productId: string): Promise<string | null> {
-    try {
-      const mediaFile = await this.prisma.mediaFile.findFirst({
-        where: {
-          entityType: 'product',
-          entityId: productId,
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-      return mediaFile?.key || null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
    * Format product response
    */
   private async formatProductResponse(product: any) {
@@ -1610,69 +1518,14 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
       quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null, // null = unlimited stock
-      images: await Promise.all(
-        product.images?.map(async (img: any) => {
-          let s3Key: string | null = null;
-
-          // 1. Eğer zaten S3 key formatındaysa (dev/ veya prod/ ile başlıyorsa ve presigned URL değilse)
-          if (img.url && !img.url.includes('X-Amz-Signature')) {
-            if (img.url.includes('dev/') || img.url.includes('prod/')) {
-              // Query string varsa kaldır
-              try {
-                const urlObj = new URL(img.url, 'http://dummy.com');
-                s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-              } catch {
-                s3Key = img.url; // URL parse edilemezse direkt kullan
-              }
-            }
-          }
-
-          // 2. Eğer presigned URL ise, key'i extract et
-          if (!s3Key && img.url && (img.url.includes('X-Amz-Signature') || img.url.includes('amzn-tarodan.s3'))) {
-            s3Key = this.extractKeyFromUrl(img.url);
-          }
-
-          // 3. Eğer hala key bulamadıysak, MediaFile'dan bul (fallback)
-          if (!s3Key) {
-            s3Key = await this.findMediaFileKeyByProductId(product.id);
-          }
-
-          // 4. Eğer key bulunduysa, presigned URL oluştur
-          if (s3Key) {
-            try {
-              const presignedUrl = await this.storageService.getPresignedDownloadUrl(
-                'products',
-                s3Key,
-                3600 // 1 saat
-              );
-              return {
-                id: img.id,
-                url: presignedUrl,
-                sortOrder: img.sortOrder,
-              };
-            } catch (error) {
-              // Presigned URL oluşturulamazsa (S3 yok/hatalı), orijinal HTTP(S) URL'yi döndür
-              this.logger.warn(`Failed to generate presigned URL for ${s3Key}: ${error}`);
-              const fallback = img.url && (img.url.startsWith('http://') || img.url.startsWith('https://')) ? img.url : null;
-              return { id: img.id, url: fallback, sortOrder: img.sortOrder };
-            }
-          }
-
-          // 5. Fallback: Return URL if valid for browser (http/https veya / ile başlayan same-origin path)
-          //    Raw S3 keys (e.g. "dev/products/...") are NOT valid browser URLs and crash the frontend.
-          const isValidBrowserUrl = img.url && (
-            img.url.startsWith('http://') ||
-            img.url.startsWith('https://') ||
-            img.url.startsWith('/')
-          );
-          const fallbackUrl = isValidBrowserUrl ? img.url : null;
-          return {
-            id: img.id,
-            url: fallbackUrl,
-            sortOrder: img.sortOrder,
-          };
-        }) || []
-      ),
+      images: (product.images || []).map((img: { id: string; cardKey: string; detailKey: string; sortOrder: number }) => ({
+        id: img.id,
+        cardKey: img.cardKey,
+        detailKey: img.detailKey,
+        cardUrl: this.storageService.getPublicAssetUrl(img.cardKey),
+        detailUrl: this.storageService.getPublicAssetUrl(img.detailKey),
+        sortOrder: img.sortOrder,
+      })),
       rating: {
         average: ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null,
         count: ratingStats._count || 0,

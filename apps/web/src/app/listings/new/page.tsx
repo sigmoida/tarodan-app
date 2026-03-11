@@ -113,10 +113,10 @@ export default function NewListingPage() {
     isTradeEnabled: false,
     isSet: false,
     quantity: '' as string | number,
-    imageUrls: [] as string[],
+    images: [] as Array<{ cardKey: string; detailKey: string }>,
   });
   const [uploadingImages, setUploadingImages] = useState(false);
-  // Store preview URLs separately (presigned URLs for display)
+  // Store preview URLs (cardUrl from upload response for display)
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   // Load form data from localStorage on mount
@@ -126,37 +126,38 @@ export default function NewListingPage() {
       try {
         const parsed = JSON.parse(savedFormData);
         // Only restore if we have meaningful data
-        if (parsed.title || parsed.description || parsed.price || parsed.quantity !== undefined || parsed.imageUrls?.length > 0) {
+        if (parsed.title || parsed.description || parsed.price || parsed.quantity !== undefined || parsed.images?.length > 0 || parsed.imageUrls?.length > 0) {
+          const images = parsed.images ?? (parsed.imageUrls?.map((k: string) => (typeof k === 'string' ? { cardKey: k, detailKey: k } : k)) ?? []);
           setFormData(prev => ({
             ...prev,
             ...parsed,
+            images: Array.isArray(images) ? images : [],
             // Ensure quantity is properly handled (empty string for unlimited, number as string)
             quantity: parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
               ? parsed.quantity.toString()
               : '',
           }));
           
-          // Restore preview URLs if available, otherwise fetch presigned URLs for keys
-          if (parsed.imageUrls?.length > 0) {
+          // Restore preview URLs from images (cardKey -> public URL via API or placeholder)
+          if (images?.length > 0) {
             const restorePreviewUrls = async () => {
               const previewUrls: string[] = [];
-              for (const key of parsed.imageUrls) {
-                // If key is S3 key format (starts with dev/ or prod/), get presigned URL
+              for (const img of images) {
+                const key = img?.cardKey ?? img?.detailKey ?? (typeof img === 'string' ? img : null);
                 if (key && (key.includes('dev/') || key.includes('prod/'))) {
                   try {
-                    // Extract bucket and key from full path (e.g., "dev/products/product-images/file.jpg")
                     const parts = key.split('/');
-                    const bucket = parts[1] || 'products'; // Default to products
+                    const bucket = parts[1] || 'products';
                     const keyPath = parts.slice(2).join('/');
                     const response = await api.get(`/storage/presigned/${bucket}/${keyPath}`);
                     previewUrls.push(response.data.url);
-                  } catch (error) {
-                    // If presigned URL fetch fails, use placeholder
+                  } catch {
                     previewUrls.push('https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim');
                   }
+                } else if (typeof img === 'object' && (img as any).cardUrl) {
+                  previewUrls.push((img as any).cardUrl);
                 } else {
-                  // If it's already a URL, use it directly
-                  previewUrls.push(key);
+                  previewUrls.push('https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim');
                 }
               }
               setImagePreviewUrls(previewUrls);
@@ -382,7 +383,7 @@ export default function NewListingPage() {
     if (!files || files.length === 0) return;
 
     const maxImages = limits?.maxImagesPerListing || 3;
-    const currentCount = formData.imageUrls.length;
+    const currentCount = formData.images.length;
     const remainingSlots = maxImages - currentCount;
 
     // Eğer yer yoksa sessizce çık (input zaten disabled olmalı)
@@ -397,22 +398,18 @@ export default function NewListingPage() {
     try {
       const response = await mediaApi.uploadProductImages(filesToUpload);
 
-      // Extract keys for storage (to be saved to database)
-      const uploadedKeys = response.data
-        .map((result: any) => result.key)
-        .filter(Boolean);
-      
-      // Extract presigned URLs for preview
-      const uploadedPreviewUrls = response.data
-        .map((result: any) => result.url || result.key)
-        .filter(Boolean);
+      const uploadedImages = response.data.map((r: { cardKey: string; detailKey: string; cardUrl?: string; detailUrl?: string }) => ({
+        cardKey: r.cardKey,
+        detailKey: r.detailKey,
+      }));
+      const previewUrls = response.data.map((r: { cardUrl?: string; cardKey?: string }) => r.cardUrl || r.cardKey || '').filter(Boolean);
 
       setFormData({
         ...formData,
-        imageUrls: [...formData.imageUrls, ...uploadedKeys],
+        images: [...formData.images, ...uploadedImages],
       });
-      setImagePreviewUrls([...imagePreviewUrls, ...uploadedPreviewUrls]);
-      toast.success(`${uploadedKeys.length} resim başarıyla yüklendi`);
+      setImagePreviewUrls([...imagePreviewUrls, ...previewUrls]);
+      toast.success(`${uploadedImages.length} resim başarıyla yüklendi`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to upload images:', error);
       toast.error(error.response?.data?.message || 'Resim yükleme başarısız');
@@ -421,10 +418,10 @@ export default function NewListingPage() {
     }
   };
 
-  const removeImageUrl = (index: number) => {
+  const removeImage = (index: number) => {
     setFormData({
       ...formData,
-      imageUrls: formData.imageUrls.filter((_, i) => i !== index),
+      images: formData.images.filter((_, i) => i !== index),
     });
     setImagePreviewUrls(imagePreviewUrls.filter((_, i) => i !== index));
   };
@@ -465,7 +462,7 @@ export default function NewListingPage() {
         isPreorder: false,
         isSet: formData.isSet,
         quantity: formData.quantity ? Number(formData.quantity) : undefined, // undefined = unlimited stock
-        imageUrls: formData.imageUrls.length > 0 ? formData.imageUrls : undefined,
+        images: formData.images.length > 0 ? formData.images : undefined,
       };
 
       await listingsApi.create(payload as any);
@@ -850,14 +847,14 @@ export default function NewListingPage() {
             <div className="bg-white rounded border border-gray-100 p-5">
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Görseller</h2>
               <div className="space-y-3">
-                {formData.imageUrls.length < (limits?.maxImagesPerListing || 3) ? (
+                {formData.images.length < (limits?.maxImagesPerListing || 3) ? (
                   <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-200 rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
                     <PhotoIcon className="w-8 h-8 text-gray-400" />
                     <span className="text-sm text-gray-500 font-medium">
                       {locale === 'en' ? 'Click to upload images' : 'Görsel yüklemek için tıklayın'}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {formData.imageUrls.length} / {limits?.maxImagesPerListing || 3} {locale === 'en' ? 'uploaded' : 'yüklendi'}
+                      {formData.images.length} / {limits?.maxImagesPerListing || 3} {locale === 'en' ? 'uploaded' : 'yüklendi'}
                     </span>
                     <input
                       type="file"
@@ -876,10 +873,10 @@ export default function NewListingPage() {
                 {uploadingImages && (
                   <p className="text-sm text-primary-600">Resimler yükleniyor...</p>
                 )}
-                {formData.imageUrls.length > 0 && (
+                {formData.images.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
-                    {formData.imageUrls.map((key, index) => {
-                      const previewUrl = imagePreviewUrls?.[index] || key;
+                    {formData.images.map((img, index) => {
+                      const previewUrl = imagePreviewUrls?.[index] || (typeof img === 'object' ? img?.cardKey : img);
                       return (
                         <div key={index} className="relative group aspect-square">
                           <img
@@ -892,7 +889,7 @@ export default function NewListingPage() {
                           />
                           <button
                             type="button"
-                            onClick={() => removeImageUrl(index)}
+                            onClick={() => removeImage(index)}
                             className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             ×

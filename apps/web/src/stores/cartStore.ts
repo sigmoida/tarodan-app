@@ -215,7 +215,7 @@ export const useCartStore = create<CartState>()(
               productId: product.id,
               title: product.title,
               price: product.salePrice ?? product.price,
-              imageUrl: product.images?.[0]?.url || product.imageUrl || '',
+              imageUrl: product.images?.[0]?.cardUrl ?? product.images?.[0]?.detailUrl ?? product.images?.[0]?.url ?? product.imageUrl ?? '',
               seller: {
                 id: product.sellerId || product.seller?.id || '',
                 displayName: product.sellerName || product.seller?.displayName || product.seller?.name || 'Satıcı',

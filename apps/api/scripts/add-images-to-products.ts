@@ -91,35 +91,55 @@ const loadPhotosFromFolder = (): PhotoFile[] => {
   return photos;
 };
 
-// Upload photo to S3 using StorageService
-const uploadPhotoToS3 = async (
+let sharp: any;
+try {
+  sharp = require('sharp');
+} catch {
+  sharp = null;
+}
+
+const CACHE_OPTS = {
+  contentType: 'image/webp' as const,
+  cacheControl: 'public, max-age=31536000, immutable',
+  skipMediaFile: true,
+};
+
+const uploadProductImageVariants = async (
   storageService: StorageService,
   photo: PhotoFile,
-  bucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets' = 'products',
-  folder: string = 'product-images'
-): Promise<{ key: string } | null> => {
-  try {
-    // Generate unique filename
-    const uniqueId = randomUUID().substring(0, 8);
-    const ext = path.extname(photo.filename);
-    const filename = `${uniqueId}-${photo.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  productId: string,
+): Promise<{ cardKey: string; detailKey: string }> => {
+  if (!sharp) throw new Error('sharp not installed - run pnpm add sharp in apps/api');
+  const baseId = randomUUID();
+  const folder = `product-images/${productId}`;
 
-    // Upload to S3 using StorageService
-    const result = await storageService.uploadFile(
-      photo.buffer,
-      {
-        bucket,
-        folder,
-        filename,
-        mimeType: photo.mimeType,
-      }
-    );
+  const cardBuffer = await sharp(photo.buffer)
+    .resize(500, 500, { fit: 'cover' })
+    .webp({ quality: 85 })
+    .toBuffer();
 
-    return { key: result.key };
-  } catch (error: any) {
-    console.error(`⚠️ Failed to upload photo ${photo.filename} to S3:`, error.message);
-    return null;
-  }
+  const detailBuffer = await sharp(photo.buffer)
+    .resize(1200, 1200, { fit: 'inside' })
+    .webp({ quality: 90 })
+    .toBuffer();
+
+  const cardResult = await storageService.uploadFile(cardBuffer, {
+    bucket: 'products',
+    folder,
+    filename: `${baseId}-card.webp`,
+    mimeType: 'image/webp',
+    ...CACHE_OPTS,
+  });
+
+  const detailResult = await storageService.uploadFile(detailBuffer, {
+    bucket: 'products',
+    folder,
+    filename: `${baseId}-detail.webp`,
+    mimeType: 'image/webp',
+    ...CACHE_OPTS,
+  });
+
+  return { cardKey: cardResult.key, detailKey: detailResult.key };
 };
 
 async function main() {
@@ -140,6 +160,11 @@ async function main() {
     process.exit(1);
   }
 
+  if (!sharp) {
+    console.error('❌ sharp not installed. Run pnpm add sharp in apps/api');
+    process.exit(1);
+  }
+
   // Load photos
   const photos = loadPhotosFromFolder();
   if (photos.length === 0) {
@@ -147,27 +172,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Upload photos to S3
-  console.log(`📤 Uploading ${photos.length} photos to S3...`);
-  const uploadedPhotos: Array<{ key: string; filename: string; photo: PhotoFile }> = [];
-  
-  for (const photo of photos) {
-    const result = await uploadPhotoToS3(storageService, photo);
-    if (result) {
-      uploadedPhotos.push({
-        key: result.key,
-        filename: photo.filename,
-        photo: photo,
-      });
-    }
-  }
-
-  if (uploadedPhotos.length === 0) {
-    console.error('❌ No photos were uploaded. Exiting.');
-    process.exit(1);
-  }
-
-  console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos to S3\n`);
+  console.log(`📤 Photos loaded. Uploading per-product (card + detail variants)\n`);
 
   // Get all products (all statuses)
   const allProducts = await prisma.product.findMany({
@@ -183,50 +188,46 @@ async function main() {
   let skippedCount = 0;
   let roundRobinIndex = 0;
 
-  // Process each product
   for (const product of allProducts) {
-    const hasRealImage = product.images.some(img => 
-      img.url && 
-      !img.url.includes('placeholder') && 
-      !img.url.includes('via.placeholder')
+    const hasRealImage = product.images.some(img =>
+      img.cardKey && (img.cardKey.includes('dev/') || img.cardKey.includes('prod/'))
     );
     const hasAnyImage = product.images.length > 0;
 
     if (hasRealImage) {
-      // Product already has real image, skip
       skippedCount++;
       continue;
     }
 
-    // Select a random photo (round-robin if all used)
-    const selectedPhoto = uploadedPhotos[roundRobinIndex % uploadedPhotos.length];
+    const selectedPhoto = photos[roundRobinIndex % photos.length];
     roundRobinIndex++;
 
     if (hasAnyImage) {
-      // Replace placeholder images
       await prisma.productImage.deleteMany({
-        where: {
-          productId: product.id,
-        },
+        where: { productId: product.id },
       });
       replacedCount++;
     } else {
-      // Add new image
       addedCount++;
     }
 
-    // Store S3 key in the database (presigned URL is generated on-demand by the API)
     try {
+      const { cardKey, detailKey } = await uploadProductImageVariants(
+        storageService,
+        selectedPhoto,
+        product.id,
+      );
       await prisma.productImage.create({
         data: {
           productId: product.id,
-          url: selectedPhoto.key, // S3 key: "dev/products/product-images/abc123.jpg"
+          cardKey,
+          detailKey,
           sortOrder: 0,
         },
       });
     } catch (error: any) {
-      console.error(`⚠️ Failed to create image record for ${selectedPhoto.key}:`, error.message);
-      skippedCount++;
+      console.error(`❌ Failed to upload/create image for product ${product.id}:`, error.message);
+      throw error;
     }
   }
 

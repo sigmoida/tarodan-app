@@ -41,7 +41,7 @@ interface Product {
   salePrice?: number | null;
   isOnSale?: boolean;
   discountPercent?: number | null;
-  images?: Array<{ id?: string; url: string; sortOrder?: number }> | string[];
+  images?: Array<{ id?: string; url?: string; cardUrl?: string; detailUrl?: string; sortOrder?: number }> | string[];
   brand?: string;
   scale?: string;
   isTradeEnabled?: boolean;
@@ -300,13 +300,7 @@ export default function Home() {
   const getImageUrl = (image: any, index?: number, productTitle?: string): string => {
     const demoIdx = (index ?? Math.floor(Math.random() * DEMO_PRODUCT_IMAGES.length)) % DEMO_PRODUCT_IMAGES.length;
     const placeholder = DEMO_PRODUCT_IMAGES[demoIdx];
-    if (!image) return placeholder;
-    let raw = typeof image === 'string' ? image : image.url;
-    if (raw && raw.includes('picsum.photos') && productTitle) {
-      raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
-    }
-    if (raw && isValidImageSrc(raw)) return raw;
-    return placeholder;
+    return getOptimizedImageUrl(image, placeholder, productTitle, 'card');
   };
 
   const getProductTag = (product: Product): string | null => {
