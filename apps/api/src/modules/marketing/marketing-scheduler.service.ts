@@ -9,6 +9,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class MarketingSchedulerService {
@@ -17,6 +18,7 @@ export class MarketingSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly smtpProvider: SmtpProvider,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -69,16 +71,22 @@ export class MarketingSchedulerService {
           price: true,
           images: {
             take: 1,
-            select: { url: true },
+            select: { cardKey: true },
           },
         },
       });
 
-      // Send emails to each user using SmtpProvider (same as invoice system)
+      const baseUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+      const mappedTrending = trendingProducts.map((p) => ({
+        ...p,
+        imageUrl: p.images?.[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
+        productUrl: `${baseUrl}/listings/${p.id}`,
+      }));
+
       for (const user of filteredUsers) {
         try {
-          const htmlContent = this.generateNewsletterHtml(user.displayName, trendingProducts);
-          const textContent = this.generateNewsletterText(user.displayName, trendingProducts);
+          const htmlContent = this.generateNewsletterHtml(user.displayName, mappedTrending);
+          const textContent = this.generateNewsletterText(user.displayName, mappedTrending);
           
           await this.smtpProvider.sendEmail({
             to: user.email,
@@ -151,16 +159,22 @@ export class MarketingSchedulerService {
           price: true,
           images: {
             take: 1,
-            select: { url: true },
+            select: { cardKey: true },
           },
         },
       });
 
-      // Send emails to each user using SmtpProvider (same as invoice system)
+      const baseUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+      const mappedFeatured = featuredProducts.map((p) => ({
+        ...p,
+        imageUrl: p.images?.[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
+        productUrl: `${baseUrl}/listings/${p.id}`,
+      }));
+
       for (const user of filteredUsers) {
         try {
-          const htmlContent = this.generateMonthlyPromotionHtml(user.displayName, featuredProducts);
-          const textContent = this.generateMonthlyPromotionText(user.displayName, featuredProducts);
+          const htmlContent = this.generateMonthlyPromotionHtml(user.displayName, mappedFeatured);
+          const textContent = this.generateMonthlyPromotionText(user.displayName, mappedFeatured);
           
           await this.smtpProvider.sendEmail({
             to: user.email,

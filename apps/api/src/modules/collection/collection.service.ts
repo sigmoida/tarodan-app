@@ -172,7 +172,7 @@ export class CollectionService {
         }
         const arr = imagesByProduct.get(img.productId)!;
         if (arr.length < 1) {
-          arr.push({ url: img.url });
+          arr.push({ url: this.storageService.getPublicAssetUrl(img.cardKey) });
         }
       }
       
@@ -490,7 +490,7 @@ export class CollectionService {
     const orderMap = new Map(ids.map((id, i) => [id, i]));
     collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
-    const noCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
+    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
     if (noCover.length > 0) {
       Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
     }
@@ -575,7 +575,7 @@ export class CollectionService {
       collections = collections.slice((safePage - 1) * safePageSize, safePage * safePageSize);
     }
 
-    const noCover = collections.filter((c) => !c.coverImageUrl && (c._count?.items ?? 0) > 0);
+    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
     if (noCover.length > 0) {
       Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
     }
@@ -1361,7 +1361,7 @@ export class CollectionService {
                         status: true,
                         images: {
                           take: 1,
-                          select: { url: true },
+                          select: { cardKey: true },
                         },
                       },
                     },
@@ -1381,15 +1381,16 @@ export class CollectionService {
 
       const validLikes = likedCollections
         .filter(like => {
-          if (!like.collection) return false;
-          if (!like.collection.isPublic && like.collection.userId !== userId) return false;
+          const col = (like as any).collection;
+          if (!col) return false;
+          if (!col.isPublic && col.userId !== userId) return false;
           return true;
         });
 
       const collections = (await Promise.all(
         validLikes.map(async (like) => {
           try {
-            return await this.mapCollectionToDto(like.collection, true);
+            return await this.mapCollectionToDto((like as any).collection, true);
           } catch (err) {
             this.logger.error('getLikedCollections: error mapping collection');
             return null;

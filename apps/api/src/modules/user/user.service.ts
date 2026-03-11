@@ -1010,7 +1010,7 @@ export class UserService {
         likeCount: true,
         price: true,
         status: true,
-        images: { take: 1, select: { url: true } },
+        images: { take: 1, select: { cardKey: true } },
       },
     });
 
@@ -1205,7 +1205,7 @@ export class UserService {
         favorites: p.likeCount,
         price: Number(p.price),
         status: p.status,
-        imageUrl: p.images[0]?.url,
+        imageUrl: this.resolveProductImageUrl(p.images[0]?.cardKey),
       })),
       dailyViews,
       recentActivity,
@@ -1325,7 +1325,7 @@ export class UserService {
         viewCount: true,
         likeCount: true,
         price: true,
-        images: { take: 1, select: { url: true } },
+        images: { take: 1, select: { cardKey: true } },
       },
     });
 
@@ -1340,7 +1340,7 @@ export class UserService {
         viewCount: true,
         likeCount: true,
         price: true,
-        images: { take: 1, select: { url: true } },
+        images: { take: 1, select: { cardKey: true } },
       },
     });
 
@@ -1382,7 +1382,7 @@ export class UserService {
           viewCount: p.viewCount,
           likeCount: p.likeCount,
           price: Number(p.price),
-          image: p.images[0]?.url,
+          image: this.resolveProductImageUrl(p.images[0]?.cardKey),
         })),
         byLikes: topProductsByLikes.map(p => ({
           id: p.id,
@@ -1390,7 +1390,7 @@ export class UserService {
           viewCount: p.viewCount,
           likeCount: p.likeCount,
           price: Number(p.price),
-          image: p.images[0]?.url,
+          image: this.resolveProductImageUrl(p.images[0]?.cardKey),
         })),
       },
       topCollections: topCollections.map(c => ({
@@ -1829,7 +1829,7 @@ export class UserService {
         name: c.name,
         viewCount: c.viewCount,
         likeCount: c.likeCount,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
+        coverImageUrl: c.coverImageUrl,
         itemCount: c._count?.items || 0,
         previewItems: c.items || [],
       })),
