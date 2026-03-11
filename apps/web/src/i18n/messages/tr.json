@@ -22,6 +22,7 @@
     "all": "Tümü",
     "none": "Hiçbiri",
     "more": "Daha Fazla",
+    "shopping": "Alışveriş",
     "less": "Daha Az",
     "seeAll": "Tümünü Gör",
     "viewDetails": "Detayları Gör",
@@ -707,6 +708,7 @@
   "profile": {
     "profile": "Profil",
     "myProfile": "Profilim",
+    "accountSettings": "Hesap Ayarları",
     "editProfile": "Profili Düzenle",
     "settings": "Ayarlar",
     "displayName": "Görünen Ad",
