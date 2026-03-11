@@ -317,6 +317,7 @@ export const addressesApi = {
   getAll: () => api.get('/users/me/addresses'),
   getOne: (id: string) => api.get(`/users/me/addresses/${id}`),
   create: (data: {
+    title?: string;
     fullName: string;
     phone: string;
     city: string;
@@ -326,6 +327,7 @@ export const addressesApi = {
     isDefault?: boolean;
   }) => api.post('/users/me/addresses', data),
   update: (id: string, data: {
+    title?: string;
     fullName?: string;
     phone?: string;
     city?: string;
