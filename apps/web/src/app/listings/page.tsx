@@ -102,7 +102,7 @@ export default function ListingsPage() {
 
   const searchString = searchParams.toString();
 
-  // Build URL params from current filters (for syncing state -> URL so back button preserves filters)
+  // Build URL params from current filters (single source of truth for URL sync)
   const buildParamsFromFilters = (f: typeof filters, page: number) => {
     const params = new URLSearchParams();
     if (f.search) params.set('search', f.search);
@@ -122,16 +122,14 @@ export default function ListingsPage() {
     if (f.set) params.set('set', 'true');
     if (f.sortBy && f.sortBy !== 'created_desc') params.set('sortBy', f.sortBy);
     if (f.category) params.set('category', f.category);
+    if (f.categoryId) params.set('categoryId', f.categoryId);
     if (f.manufacturer) params.set('manufacturer', f.manufacturer);
     if (f.manufacturerId) params.set('manufacturerId', f.manufacturerId);
-    if (f.vehicleType) params.set('vehicleType', f.vehicleType);
     if (page > 1) params.set('page', page.toString());
-    const categoryId = searchParams.get('categoryId');
-    if (categoryId) params.set('categoryId', categoryId);
     return params;
   };
 
-  // Sync filters + page to URL so that navigating to listing and back preserves filters
+  // Sync filters + page to URL (single source of truth - avoids duplicate router.replace)
   useEffect(() => {
     const nextParams = buildParamsFromFilters(filters, currentPage);
     const nextStr = nextParams.toString();
@@ -139,7 +137,7 @@ export default function ListingsPage() {
       const newUrl = nextStr ? `/listings?${nextStr}` : '/listings';
       router.replace(newUrl);
     }
-  }, [filters, currentPage]);
+  }, [filters, currentPage, searchString]);
 
   useEffect(() => {
     const newSearch = searchParams.get('search') || '';
@@ -242,63 +240,7 @@ export default function ListingsPage() {
   const handleFiltersChange = (nextFilters: typeof filters) => {
     setFilters(nextFilters);
     setCurrentPage(1);
-
-    const params = new URLSearchParams(searchParams.toString());
-
-    const filterKeysToClear = [
-      'search',
-      'brand',
-      'brandId',
-      'carModelId',
-      'carModel',
-      'scale',
-      'material',
-      'condition',
-      'minPrice',
-      'maxPrice',
-      'tradeOnly',
-      'discountOnly',
-      'preOrder',
-      'limited',
-      'set',
-      'category',
-      'categoryId',
-      'manufacturer',
-      'manufacturerId',
-      'sortBy',
-    ];
-
-    filterKeysToClear.forEach((key) => {
-      params.delete(key);
-    });
-
-    if (nextFilters.search) params.set('search', nextFilters.search);
-    if (nextFilters.brand) params.set('brand', nextFilters.brand);
-    if (nextFilters.brandId) params.set('brandId', nextFilters.brandId);
-    if (nextFilters.carModelId) params.set('carModelId', nextFilters.carModelId);
-    if (nextFilters.carModel) params.set('carModel', nextFilters.carModel);
-    if (nextFilters.scale) params.set('scale', nextFilters.scale);
-    if (nextFilters.material) params.set('material', nextFilters.material);
-    if (nextFilters.condition) params.set('condition', nextFilters.condition);
-    if (nextFilters.minPrice) params.set('minPrice', nextFilters.minPrice);
-    if (nextFilters.maxPrice) params.set('maxPrice', nextFilters.maxPrice);
-    if (nextFilters.tradeOnly) params.set('tradeOnly', 'true');
-    if (nextFilters.discountOnly) params.set('discountOnly', 'true');
-    if (nextFilters.preOrder) params.set('preOrder', 'true');
-    if (nextFilters.limited) params.set('limited', 'true');
-    if (nextFilters.set) params.set('set', 'true');
-    if (nextFilters.category) params.set('category', nextFilters.category);
-    if (nextFilters.categoryId) params.set('categoryId', nextFilters.categoryId);
-    if (nextFilters.manufacturer) params.set('manufacturer', nextFilters.manufacturer);
-    if (nextFilters.manufacturerId) params.set('manufacturerId', nextFilters.manufacturerId);
-    if (nextFilters.sortBy) params.set('sortBy', nextFilters.sortBy);
-
-    // Whenever filters (including sort) change, always start from page 1
-    params.set('page', '1');
-
-    const queryString = params.toString();
-    const newUrl = queryString ? `/listings?${queryString}` : '/listings';
-    router.replace(newUrl);
+    // URL sync is handled by useEffect [filters, currentPage]
   };
 
   const clearFilters = () => {
@@ -308,27 +250,7 @@ export default function ListingsPage() {
       sortBy: 'created_desc', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
     });
     setCurrentPage(1);
-
-    const currentParams = new URLSearchParams(searchParams.toString());
-    const filterParams = [
-      'search', 'brand', 'brandId', 'carModelId', 'carModel', 'scale', 'material', 'condition',
-      'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
-      'limited', 'set', 'category', 'categoryId', 'manufacturer',
-      'manufacturerId', 'page'
-    ];
-    
-    // Check if any filter parameter exists
-    const hasAnyFilter = filterParams.some(param => currentParams.has(param));
-    
-    if (hasAnyFilter) {
-      // Build new URL with only sortBy if it exists
-      const newParams = new URLSearchParams();
-      if (currentParams.has('sortBy')) {
-        newParams.set('sortBy', currentParams.get('sortBy')!);
-      }
-      const newUrl = newParams.toString() ? `/listings?${newParams.toString()}` : '/listings';
-      router.replace(newUrl);
-    }
+    // URL sync is handled by useEffect [filters, currentPage]
   };
 
   // Count active filters; paired keys (e.g. manufacturer+manufacturerId) count as 1
@@ -494,8 +416,8 @@ export default function ListingsPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
                 {[
                   { k: 'category', v: filtersForSidebar.category }, { k: 'brand', v: filters.brand },
-                  { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
-                  { k: 'manufacturer', v: filters.manufacturer }
+                  { k: 'carModel', v: filters.carModel }, { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material },
+                  { k: 'condition', v: filters.condition }, { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     {f.k === 'condition' ? formatCondition(f.v, locale) :
@@ -504,104 +426,47 @@ export default function ListingsPage() {
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
-                      if (f.k === 'brand') updates.brandId = '';
-                      setFilters(updates);
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      if (f.k === 'category') {
-                        params.delete('category');
-                        params.delete('categoryId');
-                      } else if (f.k === 'manufacturer') {
-                        params.delete('manufacturer');
-                        params.delete('manufacturerId');
-                      } else if (f.k === 'brand') {
-                        params.delete('brand');
-                        params.delete('brandId');
-                      } else {
-                        params.delete(f.k);
-                      }
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
+                      if (f.k === 'brand') { updates.brandId = ''; updates.carModelId = ''; updates.carModel = ''; }
+                      if (f.k === 'category') updates.categoryId = '';
+                      if (f.k === 'carModel') { updates.carModelId = ''; }
+                      handleFiltersChange(updates);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => {
-                      setFilters({ ...filters, minPrice: '', maxPrice: '' });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('minPrice');
-                      params.delete('maxPrice');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, tradeOnly: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('tradeOnly');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
                     {t('product.preOrder')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, preOrder: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('preOrder');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.limited && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, limited: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('limited');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.set && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
                     {t('product.sets')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, set: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('set');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.discountOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded border border-red-200">
                     {locale === 'en' ? 'On Sale' : 'İndirimli'}
-                    <button onClick={() => {
-                      setFilters({ ...filters, discountOnly: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('discountOnly');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, discountOnly: false })} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>
@@ -749,13 +614,7 @@ export default function ListingsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      const newPage = pagination.page - 1;
-                      setCurrentPage(newPage);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('page', newPage.toString());
-                      router.replace(`/listings?${params.toString()}`);
-                    }}
+                    onClick={() => setCurrentPage(pagination.page - 1)}
                     disabled={pagination.page === 1}
                     className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
                   >
@@ -776,12 +635,7 @@ export default function ListingsPage() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => {
-                            setCurrentPage(pageNum);
-                            const params = new URLSearchParams(searchParams.toString());
-                            params.set('page', pageNum.toString());
-                            router.replace(`/listings?${params.toString()}`);
-                          }}
+                          onClick={() => setCurrentPage(pageNum)}
                           className={`px-3 py-2 rounded-lg text-sm font-medium ${
                             pagination.page === pageNum
                               ? 'bg-orange-500 text-white'
@@ -794,13 +648,7 @@ export default function ListingsPage() {
                     })}
                   </div>
                   <button
-                    onClick={() => {
-                      const newPage = pagination.page + 1;
-                      setCurrentPage(newPage);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('page', newPage.toString());
-                      router.replace(`/listings?${params.toString()}`);
-                    }}
+                    onClick={() => setCurrentPage(pagination.page + 1)}
                     disabled={pagination.page >= pagination.totalPages}
                     className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
                   >
