@@ -84,20 +84,59 @@ export default function ListingsPage() {
     brandId: searchParams.get('brandId') || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
-    condition: '',
-    minPrice: '',
-    maxPrice: '',
-    tradeOnly: false,
+    condition: searchParams.get('condition') || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+    tradeOnly: searchParams.get('tradeOnly') === 'true',
     discountOnly: searchParams.get('discountOnly') === 'true',
     preOrder: searchParams.get('preOrder') === 'true',
     limited: searchParams.get('limited') === 'true',
     set: searchParams.get('set') === 'true',
-    sortBy: 'created_desc',
+    sortBy: searchParams.get('sortBy') || 'created_desc',
     category: searchParams.get('category') || '',
     manufacturer: searchParams.get('manufacturer') || '',
     manufacturerId: searchParams.get('manufacturerId') || '',
     vehicleType: searchParams.get('vehicleType') || '',
   });
+
+  const searchString = searchParams.toString();
+
+  // Build URL params from current filters (for syncing state -> URL so back button preserves filters)
+  const buildParamsFromFilters = (f: typeof filters, page: number) => {
+    const params = new URLSearchParams();
+    if (f.search) params.set('search', f.search);
+    if (f.brand) params.set('brand', f.brand);
+    if (f.brandId) params.set('brandId', f.brandId);
+    if (f.scale) params.set('scale', f.scale);
+    if (f.material) params.set('material', f.material);
+    if (f.condition) params.set('condition', f.condition);
+    if (f.minPrice) params.set('minPrice', f.minPrice);
+    if (f.maxPrice) params.set('maxPrice', f.maxPrice);
+    if (f.tradeOnly) params.set('tradeOnly', 'true');
+    if (f.discountOnly) params.set('discountOnly', 'true');
+    if (f.preOrder) params.set('preOrder', 'true');
+    if (f.limited) params.set('limited', 'true');
+    if (f.set) params.set('set', 'true');
+    if (f.sortBy && f.sortBy !== 'created_desc') params.set('sortBy', f.sortBy);
+    if (f.category) params.set('category', f.category);
+    if (f.manufacturer) params.set('manufacturer', f.manufacturer);
+    if (f.manufacturerId) params.set('manufacturerId', f.manufacturerId);
+    if (f.vehicleType) params.set('vehicleType', f.vehicleType);
+    if (page > 1) params.set('page', page.toString());
+    const categoryId = searchParams.get('categoryId');
+    if (categoryId) params.set('categoryId', categoryId);
+    return params;
+  };
+
+  // Sync filters + page to URL so that navigating to listing and back preserves filters
+  useEffect(() => {
+    const nextParams = buildParamsFromFilters(filters, currentPage);
+    const nextStr = nextParams.toString();
+    if (nextStr !== searchString) {
+      const newUrl = nextStr ? `/listings?${nextStr}` : '/listings';
+      router.replace(newUrl);
+    }
+  }, [filters, currentPage]);
 
   useEffect(() => {
     const newSearch = searchParams.get('search') || '';
@@ -129,7 +168,7 @@ export default function ListingsPage() {
       manufacturerId: searchParams.get('manufacturerId') || '',
       vehicleType: searchParams.get('vehicleType') || '',
     }));
-  }, [searchParams]);
+  }, [searchString]);
 
   const categorySlug = filters.category || searchParams.get('category') || '';
   const { data: categoryBySlug } = useQuery({
@@ -218,8 +257,25 @@ export default function ListingsPage() {
     }
   };
 
-  const activeFilterCount = Object.entries(filters)
-    .filter(([key, value]) => key !== 'sortBy' && value !== '' && value !== false).length;
+  // Sayı, sağdaki filtre chip'leriyle aynı olsun (brand+brandId tek, manufacturer+manufacturerId tek)
+  const activeFilterCount = (() => {
+    let n = 0;
+    if (filters.search) n++;
+    if (filters.brand || filters.brandId) n++;
+    if (filters.scale) n++;
+    if (filters.material) n++;
+    if (filters.condition) n++;
+    if (filters.minPrice || filters.maxPrice) n++;
+    if (filters.tradeOnly) n++;
+    if (filters.discountOnly) n++;
+    if (filters.preOrder) n++;
+    if (filters.limited) n++;
+    if (filters.set) n++;
+    if (filters.category) n++;
+    if (filters.manufacturer || filters.manufacturerId) n++;
+    if (filters.vehicleType) n++;
+    return n;
+  })();
 
   const LISTING_PLACEHOLDERS = [
     'https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels',
@@ -353,7 +409,8 @@ export default function ListingsPage() {
                   { k: 'manufacturer', v: filters.manufacturer }, { k: 'vehicleType', v: filters.vehicleType }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
-                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : 
+                    {f.k === 'condition' ? formatCondition(f.v, locale) :
+                     f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) :
                      f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };

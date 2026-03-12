@@ -39,9 +39,10 @@ export function formatPriceNumber(price: number | string | null | undefined): st
 export function formatCondition(condition: string | null | undefined, locale: string = 'tr'): string {
   if (!condition) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
 
+  // Filtre ve ürün kartında aynı etiketler kullanılsın (Yeni, Yeni Gibi, İyi, Orta)
   const conditionMap: Record<string, { tr: string; en: string }> = {
-    'new': { tr: 'Sıfır', en: 'New' },
-    'like_new': { tr: 'Sıfır Gibi', en: 'Like New' },
+    'new': { tr: 'Yeni', en: 'New' },
+    'like_new': { tr: 'Yeni Gibi', en: 'Like New' },
     'very_good': { tr: 'Çok İyi', en: 'Very Good' },
     'good': { tr: 'İyi', en: 'Good' },
     'fair': { tr: 'Orta', en: 'Fair' },
