@@ -162,6 +162,7 @@ export class ProductService implements OnModuleInit {
         isSet: dto.isSet ?? false,
         brandId: dto.brandId,
         carModelId: dto.carModelId,
+        manufacturerId: dto.manufacturerId,
         releaseDate,
         images: dto.images?.length
           ? {
@@ -225,9 +226,20 @@ export class ProductService implements OnModuleInit {
     const toLink: string[] = [];
 
     if (scale?.trim()) {
-      const scaleNorm = scale.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" or "1/64" -> "164"
+      const scaleTrim = scale.trim();
+      const scaleNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" or "1/64" -> "164"
+      const scaleSlugAlt = scaleTrim.replace(':', '-'); // "1:64" -> "1-64" (seed format)
       const scaleAttr = await this.prisma.attribute.findFirst({
-        where: { group: { slug: 'scale' }, slug: scaleNorm, isActive: true },
+        where: {
+          group: { slug: 'scale', isActive: true },
+          isActive: true,
+          OR: [
+            { slug: scaleNorm },
+            { slug: scaleSlugAlt },
+            { value: scaleTrim },
+            { displayValue: scaleTrim },
+          ],
+        },
         select: { id: true },
       });
       if (scaleAttr) toLink.push(scaleAttr.id);
@@ -288,7 +300,7 @@ export class ProductService implements OnModuleInit {
       condition, brand, brandId, manufacturerId,
       scale, material: materialSlug,
       tradeOnly, discountOnly, preOrder, limited,
-      set: query.set, vehicleType: query.vehicleType,
+      set: query.set,
       minPrice, maxPrice, sortBy, page, limit, carModelId,
     })}`;
 
@@ -355,7 +367,7 @@ export class ProductService implements OnModuleInit {
       search, categoryId, sellerId, condition, brand, scale,
       material: materialSlug, tradeOnly, discountOnly, preOrder,
       limited, set: setFilter, minPrice, maxPrice, sortBy,
-      page = 1, limit = 20, brandId, manufacturerId,
+      page = 1, limit = 20, brandId, manufacturerId, carModelId,
     } = query;
 
     const esOptions = {
@@ -363,6 +375,7 @@ export class ProductService implements OnModuleInit {
       categoryId,
       brandId,
       manufacturerId,
+      carModelId,
       sellerId,
       condition,
       brand,
@@ -374,7 +387,6 @@ export class ProductService implements OnModuleInit {
       preOrder,
       limited,
       set: setFilter,
-      vehicleType: query.vehicleType,
       minPrice,
       maxPrice,
       page,
@@ -480,6 +492,14 @@ export class ProductService implements OnModuleInit {
       case 'title_desc': orderBy = [{ title: 'desc' }]; break;
       case 'view_count_asc': orderBy = [{ viewCount: 'asc' }]; break;
       case 'view_count_desc': orderBy = [{ viewCount: 'desc' }]; break;
+      case 'rating_desc':
+        orderBy = [
+          { averageRating: { sort: 'desc', nulls: 'last' } },
+          { ratingCount: 'desc' },
+          { viewCount: 'desc' },
+          { createdAt: 'desc' },
+        ];
+        break;
       default:
         orderBy = [{ viewCount: 'desc' }, { likeCount: 'desc' }, { createdAt: 'desc' }];
     }
@@ -796,6 +816,9 @@ export class ProductService implements OnModuleInit {
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       brand: dto.brandId ? { connect: { id: dto.brandId } } : (dto.brandId === null ? { disconnect: true } : undefined),
       carModel: dto.carModelId ? { connect: { id: dto.carModelId } } : (dto.carModelId === null ? { disconnect: true } : undefined),
+      manufacturer: dto.manufacturerId !== undefined
+        ? (dto.manufacturerId ? { connect: { id: dto.manufacturerId } } : { disconnect: true })
+        : undefined,
       version: { increment: 1 },
       ...(releaseDateUpdate !== undefined ? { releaseDate: releaseDateUpdate } : {}),
       ...(oldPriceUpdate !== undefined ? { oldPrice: oldPriceUpdate } : {}),
@@ -875,7 +898,7 @@ export class ProductService implements OnModuleInit {
         },
       });
 
-      if (dto.scale !== undefined || dto.attributeIds !== undefined) {
+      if (dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined) {
         const scaleMaterialAttrIds = await this.prisma.attribute.findMany({
           where: { group: { slug: { in: ['scale', 'material'] } } },
           select: { id: true },
@@ -886,6 +909,10 @@ export class ProductService implements OnModuleInit {
           });
         }
         await this.linkProductAttributes(id, dto.scale, dto.attributeIds, dto.material);
+        // Reindex in ES so search/list shows updated scale/material
+        if (this.searchService.isAvailable()) {
+          this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
+        }
       }
 
       // Invalidate cache for this product and product lists
@@ -902,7 +929,24 @@ export class ProductService implements OnModuleInit {
         }
       }
 
-      return await this.formatProductResponse(updated);
+      // Refetch product after attribute linking so response includes updated scale/material
+      const toReturn =
+        dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined
+          ? await this.prisma.product.findUnique({
+              where: { id },
+              include: {
+                images: { orderBy: { sortOrder: 'asc' } },
+                seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+                category: { select: { id: true, name: true, slug: true } },
+                brand: { select: { id: true, name: true, slug: true, logo: true } },
+                manufacturer: { select: { id: true, name: true, slug: true } },
+                carModel: { include: { brand: { select: { slug: true } } } },
+                productAttributes: { include: { attribute: { include: { group: true } } } },
+              },
+            })
+          : updated;
+
+      return await this.formatProductResponse(toReturn ?? updated);
     } catch (error) {
       if (error.code === 'P2025') {
         throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
@@ -1250,13 +1294,24 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
   /**
    * Get attribute display value by group slug (e.g. 'scale' -> '1/64', 'material' -> 'Diecast (Metal)')
+   * Also matches by group name for robustness (e.g. 'Ölçek' for scale).
    */
-  private getAttributeValueByGroup(productAttributes: any[] | undefined, groupSlug: string): string | undefined {
+  private getAttributeValueByGroup(productAttributes: any[] | undefined, groupSlug: string, groupNameFallback?: string): string | undefined {
     if (!productAttributes?.length) return undefined;
     const pa = productAttributes.find(
-      (p: any) => p.attribute?.group?.slug === groupSlug,
+      (p: any) =>
+        p.attribute?.group?.slug === groupSlug ||
+        (groupNameFallback && p.attribute?.group?.name?.toLowerCase() === groupNameFallback.toLowerCase()),
     );
-    return pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    const val = pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    if (val) return val;
+    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18")
+    if (groupSlug === 'scale' && pa?.attribute?.slug && /^\d+$/.test(pa.attribute.slug)) {
+      const s = pa.attribute.slug;
+      if (s.length >= 2) return `1:${s.slice(1)}`;
+      if (s.length === 1) return `1:${s}`;
+    }
+    return undefined;
   }
 
   /**
@@ -1277,10 +1332,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           value: pa.attribute.displayValue || pa.attribute.value,
           group: pa.attribute.group.name,
         }));
+      const scaleFromGroup = this.getAttributeValueByGroup(productAttributes, 'scale', 'Ölçek');
+      const scaleFromAttrs = attributes.find((a) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value;
       return {
         attributes,
-        scale: this.getAttributeValueByGroup(productAttributes, 'scale'),
-        material: this.getAttributeValueByGroup(productAttributes, 'material'),
+        scale: scaleFromGroup || scaleFromAttrs,
+        material: this.getAttributeValueByGroup(productAttributes, 'material', 'Malzeme'),
       };
     } catch (e) {
       this.logger.warn('getAttributesAndDerived failed', e);
@@ -1318,12 +1375,21 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }
     }
 
-    // Get product rating stats
-    const ratingStats = await this.prisma.productRating.aggregate({
-      where: { productId: product.id },
-      _avg: { score: true },
-      _count: true,
-    });
+    // Get product rating stats (use cached columns when available, else aggregate)
+    let ratingAverage: number | null = null;
+    let ratingCount = 0;
+    if (product.averageRating != null && product.ratingCount != null) {
+      ratingAverage = Number(product.averageRating.toFixed(1));
+      ratingCount = product.ratingCount;
+    } else {
+      const ratingStats = await this.prisma.productRating.aggregate({
+        where: { productId: product.id },
+        _avg: { score: true },
+        _count: true,
+      });
+      ratingAverage = ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null;
+      ratingCount = ratingStats._count || 0;
+    }
 
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili)
     const now = new Date();
@@ -1389,8 +1455,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         sortOrder: img.sortOrder,
       })),
       rating: {
-        average: ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null,
-        count: ratingStats._count || 0,
+        average: ratingAverage,
+        count: ratingCount,
       },
       seller: product.seller
         ? {
@@ -1773,18 +1839,25 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       orderBy: { name: 'asc' },
     });
 
-    // 2. Brands
+    // 2. Brands (id, name, slug – same format as manufacturers)
     const brands = await this.prisma.brand.findMany({
       where: { isActive: true },
-      select: { name: true },
+      select: { id: true, name: true, slug: true },
       orderBy: { name: 'asc' },
     });
 
-    // 3. Scales (static) & Manufacturers (from DB)
-    const scales = [
-      '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
-      '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'
-    ];
+    // 3. Scales (from Attribute group "scale") & Manufacturers (from DB)
+    const scaleAttrs = await this.prisma.attribute.findMany({
+      where: {
+        isActive: true,
+        group: { slug: 'scale', isActive: true },
+      },
+      select: { value: true, slug: true, displayValue: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const scales = scaleAttrs.length > 0
+      ? scaleAttrs.map((a) => a.displayValue || a.value)
+      : ['1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'];
 
     const manufacturerRecords = await this.prisma.manufacturer.findMany({
       where: { isActive: true },
@@ -1811,9 +1884,17 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       label: a.displayValue || a.value,
     }));
 
+    // 5. Car models (id, name, slug, brandId – for filter dropdown, brand-specific)
+    const carModels = await this.prisma.carModel.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, brandId: true },
+      orderBy: [{ brandId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+    });
+
     return {
       categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
-      brands: brands.map((b: Pick<Brand, 'name'>) => b.name),
+      brands: brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
+      carModels: carModels.map((m) => ({ id: m.id, name: m.name, slug: m.slug, brandId: m.brandId })),
       scales,
       manufacturers,
       materials: materials.length > 0 ? materials : [

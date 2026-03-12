@@ -73,6 +73,11 @@ interface Listing {
     slug: string;
     logo?: string | null;
   };
+  manufacturer?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
   scale?: string;
   material?: string;
   year?: number;
@@ -1351,7 +1356,9 @@ export default function ListingDetailPage() {
               )}
               <div className="text-center p-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.scale')}</p>
-                <p className="font-semibold text-gray-900">{listing.scale || '—'}</p>
+                <p className="font-semibold text-gray-900">
+                  {listing.scale || listing.attributes?.find((a: any) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value || '—'}
+                </p>
               </div>
               <div className="text-center p-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Material' : 'Malzeme'}</p>
@@ -1359,6 +1366,12 @@ export default function ListingDetailPage() {
                   {listing.material || listing.attributes?.find(a => (a.group === 'material' || a.group === 'Malzeme'))?.value || '—'}
                 </p>
               </div>
+              {listing.manufacturer && (
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Manufacturer' : 'Üretici'}</p>
+                  <p className="font-semibold text-gray-900">{listing.manufacturer.name}</p>
+                </div>
+              )}
               {listing.category && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.category')}</p>

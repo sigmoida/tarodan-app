@@ -13,7 +13,6 @@ export interface ProductFilterParams {
   brand?: string;
   scale?: string;
   material?: string;
-  vehicleType?: string;
   manufacturer?: string;
   manufacturerId?: string;
   carModelId?: string;
@@ -48,7 +47,7 @@ export function buildProductWhere(
 ): Prisma.ProductWhereInput {
   const {
     search, categoryId, sellerId, brandId, condition,
-    brand, scale, material, vehicleType, manufacturer, manufacturerId,
+    brand, scale, material, manufacturer, manufacturerId,
     carModelId, tradeOnly, preOrder, limited,
     set: setFilter, minPrice, maxPrice,
   } = params;
@@ -104,16 +103,23 @@ export function buildProductWhere(
 
   // ── Attribute-based filters (via ProductAttribute join, indexed) ──
 
-  // Scale: match via attribute group "scale" (value or slug)
+  // Scale: match via attribute group "scale" (value, displayValue, or slug)
   if (scale) {
-    const scaleSlug = scale.replace(/\s/g, '').replace(/[:\/]/g, '');
+    const scaleTrim = scale.trim();
+    const scaleSlugNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" -> "164"
+    const scaleSlugAlt = scaleTrim.replace(':', '-'); // "1:64" -> "1-64" (seed format)
     andConditions.push({
       productAttributes: {
         some: {
           attribute: {
             isActive: true,
             group: { slug: 'scale', isActive: true },
-            OR: [{ value: scale }, { slug: scaleSlug }],
+            OR: [
+              { value: scaleTrim },
+              { displayValue: scaleTrim },
+              { slug: scaleSlugNorm },
+              { slug: scaleSlugAlt },
+            ],
           },
         },
       },
@@ -129,21 +135,6 @@ export function buildProductWhere(
             isActive: true,
             group: { slug: 'material', isActive: true },
             slug: material,
-          },
-        },
-      },
-    });
-  }
-
-  // Vehicle type: match via attribute group "vehicle_type" (slug)
-  if (vehicleType) {
-    andConditions.push({
-      productAttributes: {
-        some: {
-          attribute: {
-            isActive: true,
-            group: { slug: 'vehicle_type', isActive: true },
-            slug: vehicleType,
           },
         },
       },

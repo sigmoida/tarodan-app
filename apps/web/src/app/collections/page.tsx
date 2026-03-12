@@ -61,17 +61,18 @@ export default function CollectionsPage() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
-  const [categorySlug, setCategorySlug] = useState(searchParams.get('category') || '');
+  // Kategori filtresini slug yerine doğrudan categoryId üzerinden yönet
+  const [categoryId, setCategoryId] = useState(searchParams.get('categoryId') || '');
 
   useEffect(() => {
-    setCategorySlug(searchParams.get('category') || '');
+    setCategoryId(searchParams.get('categoryId') || '');
   }, [searchParams]);
 
-  const setCategoryFilter = (slug: string) => {
-    setCategorySlug(slug);
+  const setCategoryFilter = (id: string) => {
+    setCategoryId(id);
     const params = new URLSearchParams(searchParams.toString());
-    if (slug) params.set('category', slug);
-    else params.delete('category');
+    if (id) params.set('categoryId', id);
+    else params.delete('categoryId');
     const q = params.toString();
     router.replace(q ? `?${q}` : '/collections', { scroll: false });
   };
@@ -89,14 +90,14 @@ export default function CollectionsPage() {
     [categoriesTree],
   );
 
-  const categoryParam = typeof categorySlug === 'string' ? categorySlug.trim() : '';
+  const categoryParamId = typeof categoryId === 'string' ? categoryId.trim() : '';
   const publicQuery = useQuery({
-    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParam || null],
+    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParamId || null],
     queryFn: async (): Promise<Collection[]> => {
       const params: Record<string, unknown> = {
         sortBy,
         ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-        ...(categoryParam ? { category: categoryParam } : {}),
+        ...(categoryParamId ? { categoryId: categoryParamId } : {}),
       };
       const response = await collectionsApi.browse(params);
       const data = response.data?.collections || response.data?.data || [];
@@ -250,13 +251,13 @@ export default function CollectionsPage() {
           <div className="flex items-center gap-2">
             {activeTab === 'public' && (
               <select
-                value={categorySlug}
+                value={categoryId}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400 min-w-[140px]"
               >
                 <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
                 {flatCategories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             )}
@@ -275,11 +276,11 @@ export default function CollectionsPage() {
         </div>
 
         {/* Results Info */}
-        {(displayedCollections.length > 0 || categoryParam || searchQuery.trim()) && (
+        {(displayedCollections.length > 0 || categoryParamId || searchQuery.trim()) && (
           <p className="text-xs text-gray-500 mb-4">
             {displayedCollections.length} {locale === 'en' ? 'collections found' : 'koleksiyon bulundu'}
-            {categoryParam && flatCategories.find((c) => c.slug === categoryParam) && (
-              <> · {flatCategories.find((c) => c.slug === categoryParam)?.name}</>
+            {categoryParamId && flatCategories.find((c) => c.id === categoryParamId) && (
+              <> · {flatCategories.find((c) => c.id === categoryParamId)?.name}</>
             )}
             {searchQuery.trim() && ` · "${searchQuery}"`}
           </p>

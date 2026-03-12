@@ -1343,6 +1343,101 @@ export class AdminController {
     return this.adminService.deleteBrand(adminId, id);
   }
 
+  // ==================== MANUFACTURER MANAGEMENT ====================
+
+  @Get('manufacturers')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all manufacturers' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of manufacturers' })
+  async getManufacturers() {
+    return this.adminService.getManufacturers();
+  }
+
+  @Post('manufacturers')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new manufacturer' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Manufacturer created' })
+  async createManufacturer(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.createManufacturer(adminId, body);
+  }
+
+  @Patch('manufacturers/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update manufacturer' })
+  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Manufacturer updated' })
+  async updateManufacturer(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.updateManufacturer(adminId, id, body);
+  }
+
+  @Delete('manufacturers/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete manufacturer' })
+  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Manufacturer deleted' })
+  async deleteManufacturer(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteManufacturer(adminId, id);
+  }
+
+  // ==================== CAR MODEL MANAGEMENT ====================
+
+  @Get('car-models')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get all car models' })
+  @ApiQuery({ name: 'brandId', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of car models' })
+  async getCarModels(@Query('brandId') brandId?: string) {
+    return this.adminService.getCarModels(brandId);
+  }
+
+  @Post('car-models')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Create a new car model' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Car model created' })
+  async createCarModel(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.createCarModel(adminId, body);
+  }
+
+  @Patch('car-models/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update car model' })
+  @ApiParam({ name: 'id', description: 'Car Model ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Car model updated' })
+  async updateCarModel(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.adminService.updateCarModel(adminId, id, body);
+  }
+
+  @Delete('car-models/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete car model' })
+  @ApiParam({ name: 'id', description: 'Car Model ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Car model deleted' })
+  async deleteCarModel(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteCarModel(adminId, id);
+  }
+
   // ==================== ADVERTISEMENT MANAGEMENT ====================
 
   @Get('ads')

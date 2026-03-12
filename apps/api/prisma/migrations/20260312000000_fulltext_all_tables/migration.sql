@@ -109,10 +109,10 @@ CREATE INDEX IF NOT EXISTS error_logs_fts_idx
   ON error_logs
   USING GIN (to_tsvector('simple', coalesce(message, '')));
 
--- Ticket messages: message (admin support search)
+-- Ticket messages: content (admin support search)
 CREATE INDEX IF NOT EXISTS ticket_messages_fts_idx
   ON ticket_messages
-  USING GIN (to_tsvector('simple', coalesce(message, '')));
+  USING GIN (to_tsvector('simple', coalesce(content, '')));
 
 -- Refunds (payments with status=refunded are searched by failure_reason)
 -- We reuse payments_fts_idx above. Additionally index orders for order_number (done above).

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import {
     FunnelIcon,
     XMarkIcon,
@@ -9,7 +8,7 @@ import {
     ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi, manufacturersApi, brandsApi } from '@/lib/api';
+import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
 
 interface Category {
     id: string;
@@ -36,43 +35,29 @@ interface SidebarFiltersProps {
     filters: {
         brand: string;
         brandId?: string;
+        carModelId?: string;
+        carModel?: string;
         scale: string;
         material?: string;
         condition: string;
         minPrice: string;
         maxPrice: string;
         tradeOnly: boolean;
+        categoryId?: string;
         category?: string;
         manufacturer?: string;
         manufacturerId?: string;
-        vehicleType?: string;
     };
     onFilterChange: (filters: any) => void;
     activeFilterCount: number;
     onClearFilters: () => void;
 }
 
-// Vehicle type categories are now loaded dynamically from API (see useEffect below)
-
-// Genişletilmiş ölçekler
-const SCALES = [
-    '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
-    '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200',
-];
-
 // Üreticiler - API'den yüklenecek, bu liste sadece fallback
 const MANUFACTURERS_FALLBACK = [
     'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
     'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
     'Spark', 'Schuco', 'Norev', 'Oxford Diecast', 'Greenlight', 'ERTL',
-];
-
-// Malzeme (Material) - slug matches API attribute group "material"
-const MATERIALS: { slug: string; label: string; labelEn: string }[] = [
-    { slug: 'diecast', label: 'Diecast (Metal)', labelEn: 'Diecast (Metal)' },
-    { slug: 'resin', label: 'Resin (Reçine)', labelEn: 'Resin' },
-    { slug: 'composite', label: 'Composite (Kompozit)', labelEn: 'Composite' },
-    { slug: 'plastic', label: 'Plastic (Plastik)', labelEn: 'Plastic' },
 ];
 
 export default function SidebarFilters({
@@ -82,20 +67,20 @@ export default function SidebarFilters({
     onClearFilters,
 }: SidebarFiltersProps) {
     const { t, locale } = useTranslation();
-    const router = useRouter();
-    const searchParams = useSearchParams();
 
     // Fetch categories from API
     const [categories, setCategories] = useState<Category[]>([]);
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-        searchParams.get('categoryId')
-    );
 
     // Fetch manufacturers from API
     const [manufacturerList, setManufacturerList] = useState<ManufacturerItem[]>([]);
     
     // Fetch brands from API
     const [brandList, setBrandList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+
+    // Scales, materials, car models from getFilters API
+    const [scaleList, setScaleList] = useState<string[]>([]);
+    const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+    const [carModelList, setCarModelList] = useState<Array<{ id: string; name: string; slug: string; brandId: string }>>([]);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -120,27 +105,31 @@ export default function SidebarFilters({
         };
         fetchManufacturers();
 
-        const fetchBrands = async () => {
+        const fetchFilters = async () => {
             try {
-                const response = await brandsApi.findAll();
-                const brands = Array.isArray(response.data) ? response.data : response.data.data || [];
-                setBrandList(brands.map((b: any) => ({ id: b.id, name: b.name, slug: b.slug })));
+                const response = await listingsApi.getFilters();
+                const data = response.data as {
+                    scales?: string[];
+                    materials?: Array<{ slug: string; label: string }>;
+                    brands?: Array<{ id: string; name: string; slug: string }>;
+                    carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
+                };
+                if (data.scales?.length) setScaleList(data.scales);
+                if (data.materials?.length) setMaterialList(data.materials);
+                if (data.brands?.length) setBrandList(data.brands);
+                if (data.carModels?.length) setCarModelList(data.carModels);
             } catch (error) {
-                console.error('Failed to fetch brands:', error);
+                console.error('Failed to fetch filters:', error);
             }
         };
-        fetchBrands();
+        fetchFilters();
     }, []);
-
-    // Sync selectedCategoryId with URL
-    useEffect(() => {
-        setSelectedCategoryId(searchParams.get('categoryId'));
-    }, [searchParams]);
 
     // Collapsed state for each section
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
         category: false,
         brand: false,
+        model: false,
         scale: false,
         material: false,
         manufacturer: false,
@@ -152,6 +141,7 @@ export default function SidebarFilters({
     // Search within filters
     const [brandSearch, setBrandSearch] = useState('');
     const [manufacturerSearch, setManufacturerSearch] = useState('');
+    const [modelSearch, setModelSearch] = useState('');
 
     const CONDITIONS = [
         { value: 'new', label: locale === 'en' ? 'New' : 'Yeni' },
@@ -170,9 +160,17 @@ export default function SidebarFilters({
 
     const handleBrandChange = (brandId: string, brandName: string) => {
         if (filters.brandId === brandId) {
-            onFilterChange({ ...filters, brandId: '', brand: '' });
+            onFilterChange({ ...filters, brandId: '', brand: '', carModelId: '', carModel: '' });
         } else {
-            onFilterChange({ ...filters, brandId, brand: brandName });
+            onFilterChange({ ...filters, brandId, brand: brandName, carModelId: '', carModel: '' });
+        }
+    };
+
+    const handleCarModelChange = (carModelId: string, carModelName: string) => {
+        if (filters.carModelId === carModelId) {
+            onFilterChange({ ...filters, carModelId: '', carModel: '' });
+        } else {
+            onFilterChange({ ...filters, carModelId, carModel: carModelName });
         }
     };
 
@@ -207,26 +205,21 @@ export default function SidebarFilters({
 
     // Category change - update URL with categoryId
     const handleCategoryChange = (categoryId: string, categoryName: string) => {
-        const params = new URLSearchParams(searchParams.toString());
-
-        if (selectedCategoryId === categoryId) {
-            // Deselect - remove from URL
-            params.delete('categoryId');
-            setSelectedCategoryId(null);
-            onFilterChange({ ...filters, category: '' });
+        if (filters.categoryId === categoryId) {
+            onFilterChange({ ...filters, categoryId: '', category: '' });
         } else {
-            // Select - add to URL
-            params.set('categoryId', categoryId);
-            setSelectedCategoryId(categoryId);
-            onFilterChange({ ...filters, category: categoryName });
+            onFilterChange({ ...filters, categoryId, category: categoryName });
         }
-
-        router.push(`/listings?${params.toString()}`);
     };
 
     const filteredBrands = brandList.length > 0
         ? brandList.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase()))
         : [];
+
+    const modelsForBrand = carModelList.filter(m =>
+        (!filters.brandId || m.brandId === filters.brandId) &&
+        m.name.toLowerCase().includes(modelSearch.toLowerCase())
+    );
 
     const displayManufacturers = manufacturerList.length > 0
         ? manufacturerList.filter(m => m.name.toLowerCase().includes(manufacturerSearch.toLowerCase()))
@@ -273,7 +266,7 @@ export default function SidebarFilters({
                                 <button
                                     key={cat.id}
                                     onClick={() => handleCategoryChange(cat.id, cat.name)}
-                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${selectedCategoryId === cat.id
+                                    className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${filters.categoryId === cat.id
                                         ? 'bg-orange-100 text-orange-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
@@ -338,6 +331,57 @@ export default function SidebarFilters({
                     )}
                 </div>
 
+                {/* Model */}
+                <div className="py-3 px-4">
+                    <button
+                        onClick={() => toggleSection('model')}
+                        className="flex items-center justify-between w-full text-left"
+                    >
+                        <span className="font-medium text-gray-900">
+                            {locale === 'en' ? 'Model' : 'Model'}
+                        </span>
+                        {collapsedSections.model ? (
+                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                        ) : (
+                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                        )}
+                    </button>
+                    {!collapsedSections.model && (
+                        <div className="mt-3">
+                            <input
+                                type="text"
+                                placeholder={locale === 'en' ? 'Search models...' : 'Model ara...'}
+                                value={modelSearch}
+                                onChange={(e) => setModelSearch(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
+                            />
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                                {modelsForBrand.map((m) => {
+                                    const isSelected = filters.carModelId === m.id;
+                                    return (
+                                        <label
+                                            key={m.id}
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
+                                                ? 'bg-orange-100 text-orange-700'
+                                                : 'text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="carModel"
+                                                checked={isSelected}
+                                                onChange={() => handleCarModelChange(m.id, m.name)}
+                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
+                                            />
+                                            <span className="text-sm">{m.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Ölçek */}
                 <div className="py-3 px-4">
                     <button
@@ -355,7 +399,7 @@ export default function SidebarFilters({
                     </button>
                     {!collapsedSections.scale && (
                         <div className="mt-3 grid grid-cols-3 gap-2">
-                            {SCALES.map((scale) => (
+                            {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                                 <button
                                     key={scale}
                                     onClick={() => handleScaleChange(scale)}
@@ -388,7 +432,12 @@ export default function SidebarFilters({
                     </button>
                     {!collapsedSections.material && (
                         <div className="mt-3 space-y-1">
-                            {MATERIALS.map((m) => (
+                            {(materialList.length > 0 ? materialList : [
+                                { slug: 'diecast', label: 'Diecast (Metal)' },
+                                { slug: 'resin', label: 'Resin (Reçine)' },
+                                { slug: 'composite', label: 'Composite (Kompozit)' },
+                                { slug: 'plastic', label: 'Plastic (Plastik)' },
+                            ]).map((m) => (
                                 <button
                                     key={m.slug}
                                     onClick={() => handleMaterialChange(m.slug)}
@@ -397,7 +446,7 @@ export default function SidebarFilters({
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                 >
-                                    {locale === 'en' ? m.labelEn : m.label}
+                                    {m.label}
                                 </button>
                             ))}
                         </div>

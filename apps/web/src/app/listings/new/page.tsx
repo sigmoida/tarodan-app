@@ -40,36 +40,7 @@ const getConditions = (locale: string) => [
   { value: 'fair', label: locale === 'en' ? 'Fair' : 'Orta' },
 ];
 
-const BRANDS = [
-  'Hot Wheels',
-  'Matchbox',
-  'Majorette',
-  'Tomica',
-  'Minichamps',
-  'AutoArt',
-  'Maisto',
-  'Bburago',
-  'Welly',
-];
-
 const getOtherLabel = (locale: string) => locale === 'en' ? 'Other' : 'Diğer';
-
-const SCALES = [
-  '1:18',
-  '1:24',
-  '1:32',
-  '1:43',
-  '1:64',
-  '1:72',
-  '1:87',
-];
-
-const MATERIALS: { slug: string; label: string; labelEn: string }[] = [
-  { slug: 'diecast', label: 'Diecast (Metal)', labelEn: 'Diecast (Metal)' },
-  { slug: 'resin', label: 'Resin (Reçine)', labelEn: 'Resin' },
-  { slug: 'composite', label: 'Composite (Kompozit)', labelEn: 'Composite' },
-  { slug: 'plastic', label: 'Plastic (Plastik)', labelEn: 'Plastic' },
-];
 
 interface ListingLimits {
   currentCount: number;
@@ -96,6 +67,9 @@ export default function NewListingPage() {
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [scaleList, setScaleList] = useState<string[]>([]);
+  const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+  const [manufacturerList, setManufacturerList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i); // 2025..1950
 
@@ -109,6 +83,7 @@ export default function NewListingPage() {
     carModelId: '',
     scale: '1:64',
     material: '' as string,
+    manufacturerId: '' as string,
     year: '' as string | number,
     isTradeEnabled: false,
     isSet: false,
@@ -299,20 +274,6 @@ export default function NewListingPage() {
     }
   };
 
-  const fetchBrands = async () => {
-    setBrandsLoading(true);
-    try {
-      const response = await api.get('/brands');
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setBrands(data);
-    } catch (error) {
-      console.error('Failed to fetch brands:', error);
-      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
-    } finally {
-      setBrandsLoading(false);
-    }
-  };
-
   const fetchModels = async (brandSlug: string) => {
     setModelsLoading(true);
     setModels([]);
@@ -329,7 +290,28 @@ export default function NewListingPage() {
   };
 
   useEffect(() => {
-    fetchBrands();
+    const fetchFilters = async () => {
+      setBrandsLoading(true);
+      try {
+        const response = await listingsApi.getFilters();
+        const data = response.data as {
+          scales?: string[];
+          materials?: Array<{ slug: string; label: string }>;
+          brands?: Array<{ id: string; name: string; slug: string }>;
+          manufacturers?: Array<{ id: string; name: string; slug: string }>;
+        };
+        if (data.scales?.length) setScaleList(data.scales);
+        if (data.materials?.length) setMaterialList(data.materials);
+        if (data.brands?.length) setBrands(data.brands);
+        if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+        toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
+      } finally {
+        setBrandsLoading(false);
+      }
+    };
+    fetchFilters();
   }, []);
 
   useEffect(() => {
@@ -457,6 +439,7 @@ export default function NewListingPage() {
         carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
         material: formData.material || undefined,
+        manufacturerId: formData.manufacturerId || undefined,
         year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: false,
@@ -703,7 +686,7 @@ export default function NewListingPage() {
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
-                  {SCALES.map((scale) => (
+                  {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
@@ -721,9 +704,32 @@ export default function NewListingPage() {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">{locale === 'en' ? 'Select material' : 'Malzeme seçin'}</option>
-                  {MATERIALS.map((m) => (
+                  {(materialList.length > 0 ? materialList : [
+                    { slug: 'diecast', label: 'Diecast (Metal)' },
+                    { slug: 'resin', label: 'Resin (Reçine)' },
+                    { slug: 'composite', label: 'Composite (Kompozit)' },
+                    { slug: 'plastic', label: 'Plastic (Plastik)' },
+                  ]).map((m) => (
                     <option key={m.slug} value={m.slug}>
-                      {locale === 'en' ? m.labelEn : m.label}
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'en' ? 'Manufacturer' : 'Üretici'}
+                </label>
+                <select
+                  value={formData.manufacturerId}
+                  onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">{locale === 'en' ? 'Select manufacturer' : 'Üretici seçin'}</option>
+                  {manufacturerList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>

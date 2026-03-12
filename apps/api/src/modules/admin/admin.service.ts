@@ -63,6 +63,7 @@ import { SearchService } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
+import { RatingService } from '../rating/rating.service';
 
 @Injectable()
 export class AdminService {
@@ -77,6 +78,7 @@ export class AdminService {
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
+    private readonly ratingService: RatingService,
     @Optional()
     private readonly storageService: StorageService,
   ) { }
@@ -5630,6 +5632,187 @@ export class AdminService {
     return { success: true };
   }
 
+  // ==================== MANUFACTURER MANAGEMENT ====================
+
+  async getManufacturers() {
+    const manufacturers = await this.prisma.manufacturer.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return { data: manufacturers };
+  }
+
+  async createManufacturer(
+    adminId: string,
+    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    const slug = dto.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+
+    const existing = await this.prisma.manufacturer.findFirst({
+      where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }] },
+    });
+    if (existing) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+
+    const manufacturer = await this.prisma.manufacturer.create({
+      data: {
+        name: dto.name,
+        slug,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        country: dto.country,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.createAuditLog(adminId, 'manufacturer_create', 'Manufacturer', manufacturer.id, null, manufacturer);
+    return manufacturer;
+  }
+
+  async updateManufacturer(
+    adminId: string,
+    id: string,
+    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+
+    let slug = existing.slug;
+    if (dto.name && dto.name !== existing.name) {
+      slug = dto.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+      const duplicate = await this.prisma.manufacturer.findFirst({
+        where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }], NOT: { id } },
+      });
+      if (duplicate) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+    }
+
+    const updated = await this.prisma.manufacturer.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        slug: dto.name ? slug : undefined,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        country: dto.country,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+    await this.createAuditLog(adminId, 'manufacturer_update', 'Manufacturer', id, existing, updated);
+    return updated;
+  }
+
+  async deleteManufacturer(adminId: string, id: string) {
+    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+    await this.prisma.manufacturer.delete({ where: { id } });
+    await this.createAuditLog(adminId, 'manufacturer_delete', 'Manufacturer', id, existing, null);
+    return { success: true };
+  }
+
+  // ==================== CAR MODEL MANAGEMENT ====================
+
+  async getCarModels(brandId?: string) {
+    const where = brandId ? { brandId } : {};
+    const models = await this.prisma.carModel.findMany({
+      where,
+      orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
+      include: { brand: { select: { id: true, name: true, slug: true } } },
+    });
+    return { data: models };
+  }
+
+  async createCarModel(
+    adminId: string,
+    dto: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    const brand = await this.prisma.brand.findUnique({ where: { id: dto.brandId } });
+    if (!brand) throw new NotFoundException('Marka bulunamadı');
+
+    const slug =
+      dto.slug ||
+      `${brand.slug}-${dto.name}`
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+
+    const existing = await this.prisma.carModel.findFirst({
+      where: { OR: [{ slug }, { brandId: dto.brandId, name: { equals: dto.name, mode: 'insensitive' } }] },
+    });
+    if (existing) throw new BadRequestException('Bu isimde veya slug ile bir model zaten mevcut');
+
+    const model = await this.prisma.carModel.create({
+      data: {
+        brandId: dto.brandId,
+        name: dto.name,
+        slug,
+        yearStart: dto.yearStart,
+        yearEnd: dto.yearEnd,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.createAuditLog(adminId, 'car_model_create', 'CarModel', model.id, null, model);
+    await this.cache.delPattern('car-models:*');
+    return model;
+  }
+
+  async updateCarModel(
+    adminId: string,
+    id: string,
+    dto: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    const existing = await this.prisma.carModel.findUnique({ where: { id }, include: { brand: true } });
+    if (!existing) throw new NotFoundException('Model bulunamadı');
+
+    let slug = existing.slug;
+    if (dto.slug) slug = dto.slug;
+    else if (dto.name && dto.name !== existing.name) {
+      slug = `${existing.brand.slug}-${dto.name}`
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+    }
+
+    if (slug !== existing.slug) {
+      const duplicate = await this.prisma.carModel.findFirst({ where: { slug, NOT: { id } } });
+      if (duplicate) throw new BadRequestException('Bu slug ile bir model zaten mevcut');
+    }
+
+    const updated = await this.prisma.carModel.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        slug: dto.slug || (dto.name ? slug : undefined),
+        yearStart: dto.yearStart,
+        yearEnd: dto.yearEnd,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+    await this.createAuditLog(adminId, 'car_model_update', 'CarModel', id, existing, updated);
+    await this.cache.delPattern('car-models:*');
+    return updated;
+  }
+
+  async deleteCarModel(adminId: string, id: string) {
+    const existing = await this.prisma.carModel.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Model bulunamadı');
+    await this.prisma.carModel.delete({ where: { id } });
+    await this.createAuditLog(adminId, 'car_model_delete', 'CarModel', id, existing, null);
+    await this.cache.delPattern('car-models:*');
+    return { success: true };
+  }
+
   // ==================== SHIPPING METHODS ====================
 
   /**
@@ -7912,7 +8095,11 @@ export class AdminService {
       throw new NotFoundException('Özellik grubu bulunamadı');
     }
 
-    const slug = this.generateSlug(dto.value);
+    // Scale group: use same slug normalization as product.service linkProductAttributes
+    const slug =
+      group.slug === 'scale'
+        ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
+        : this.generateSlug(dto.value);
 
     // Check for duplicate
     const existing = await this.prisma.attribute.findFirst({
@@ -7964,7 +8151,11 @@ export class AdminService {
     const updateData: Prisma.AttributeUpdateInput = {};
     if (dto.value !== undefined) {
       updateData.value = dto.value;
-      updateData.slug = this.generateSlug(dto.value);
+      const group = await this.prisma.attributeGroup.findUnique({ where: { id: existing.groupId } });
+      updateData.slug =
+        group?.slug === 'scale'
+          ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
+          : this.generateSlug(dto.value);
     }
     if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue;
     if (dto.color !== undefined) updateData.color = dto.color;
@@ -8097,6 +8288,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'review_status_update', 'Rating', reviewId, review, updated);
 
+    await this.ratingService.updateProductRatingStats(review.productId);
+
     return updated;
   }
 
@@ -8123,6 +8316,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'review_reply', 'Rating', reviewId, review, updated);
 
+    await this.ratingService.updateProductRatingStats(review.productId);
+
     return updated;
   }
 
@@ -8143,6 +8338,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'review_delete', 'Rating', reviewId, review, null);
+
+    await this.ratingService.updateProductRatingStats(review.productId);
 
     return { success: true };
   }

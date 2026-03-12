@@ -396,6 +396,8 @@ model Product {
   releaseDate         DateTime?          @map("release_date")
   carModelId          String?            @map("car_model_id")
   manufacturerId      String?            @map("manufacturer_id")
+  averageRating       Decimal?           @map("average_rating") @db.Decimal(3, 2)
+  ratingCount         Int                @default(0) @map("rating_count")
   cartItems           CartItem[]
   collectionItems     CollectionItem[]
   offers              Offer[]
@@ -424,6 +426,7 @@ model Product {
   @@index([isSet])
   @@index([createdAt(sort: Desc)])
   @@index([saleStartDate, saleEndDate])
+  @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
   @@map("products")
 }
 
@@ -746,13 +749,15 @@ model CollectionItem {
   sortOrder         Int        @default(0) @map("sort_order")
   isFeatured        Boolean    @default(false) @map("is_featured")
   addedAt           DateTime   @default(now()) @map("added_at")
-  customBrand       String?    @map("custom_brand")
-  customDescription String?    @map("custom_description")
-  customImageUrl    String?    @map("custom_image_url")
-  customModel       String?    @map("custom_model")
-  customScale       String?    @map("custom_scale")
-  customTitle       String?    @map("custom_title")
-  customYear        Int?       @map("custom_year")
+  customBrand         String?    @map("custom_brand")
+  customDescription   String?    @map("custom_description")
+  customImageUrl      String?    @map("custom_image_url")
+  customModel         String?    @map("custom_model")
+  customScale         String?    @map("custom_scale")
+  customTitle         String?    @map("custom_title")
+  customYear          Int?       @map("custom_year")
+  customManufacturer  String?    @map("custom_manufacturer")
+  customMaterial      String?    @map("custom_material")
   collection        Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   product           Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
 

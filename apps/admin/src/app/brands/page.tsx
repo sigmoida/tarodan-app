@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
+import { Fragment } from 'react';
 import {
     PlusIcon,
     PencilIcon,
@@ -10,8 +11,23 @@ import {
     GlobeAltIcon,
     CheckCircleIcon,
     XCircleIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    TruckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+
+interface CarModel {
+    id: string;
+    name: string;
+    slug: string;
+    brandId: string;
+    yearStart?: number | null;
+    yearEnd?: number | null;
+    sortOrder: number;
+    isActive: boolean;
+    brand?: { id: string; name: string; slug: string };
+}
 
 interface Brand {
     id: string;
@@ -35,12 +51,35 @@ interface BrandFormData {
     isActive: boolean;
 }
 
+interface CarModelFormData {
+    brandId: string;
+    name: string;
+    yearStart: number | '';
+    yearEnd: number | '';
+    sortOrder: number;
+    isActive: boolean;
+}
+
 export default function BrandsPage() {
     const [brands, setBrands] = useState<Brand[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [expandedBrandId, setExpandedBrandId] = useState<string | null>(null);
+    const [modelsForBrand, setModelsForBrand] = useState<CarModel[]>([]);
+    const [modelsLoading, setModelsLoading] = useState(false);
+    const [showModelModal, setShowModelModal] = useState(false);
+    const [editingModel, setEditingModel] = useState<CarModel | null>(null);
+    const [deleteConfirmModel, setDeleteConfirmModel] = useState<string | null>(null);
+    const [modelFormData, setModelFormData] = useState<CarModelFormData>({
+        brandId: '',
+        name: '',
+        yearStart: '',
+        yearEnd: '',
+        sortOrder: 0,
+        isActive: true,
+    });
     const [formData, setFormData] = useState<BrandFormData>({
         name: '',
         logo: '',
@@ -53,6 +92,27 @@ export default function BrandsPage() {
     useEffect(() => {
         loadBrands();
     }, []);
+
+    useEffect(() => {
+        if (expandedBrandId) {
+            loadModelsForBrand(expandedBrandId);
+        } else {
+            setModelsForBrand([]);
+        }
+    }, [expandedBrandId]);
+
+    const loadModelsForBrand = async (brandId: string) => {
+        setModelsLoading(true);
+        try {
+            const response = await adminApi.getCarModels(brandId);
+            setModelsForBrand(response.data.data || response.data || []);
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Modeller yüklenemedi');
+            setModelsForBrand([]);
+        } finally {
+            setModelsLoading(false);
+        }
+    };
 
     const loadBrands = async () => {
         setLoading(true);
@@ -131,6 +191,82 @@ export default function BrandsPage() {
         }
     };
 
+    const toggleExpand = (brandId: string) => {
+        setExpandedBrandId(prev => prev === brandId ? null : brandId);
+    };
+
+    const openModelCreateModal = (brandId: string) => {
+        setEditingModel(null);
+        setModelFormData({
+            brandId,
+            name: '',
+            yearStart: '',
+            yearEnd: '',
+            sortOrder: 0,
+            isActive: true,
+        });
+        setShowModelModal(true);
+    };
+
+    const openModelEditModal = (m: CarModel) => {
+        setEditingModel(m);
+        setModelFormData({
+            brandId: m.brandId,
+            name: m.name,
+            yearStart: m.yearStart ?? '',
+            yearEnd: m.yearEnd ?? '',
+            sortOrder: m.sortOrder,
+            isActive: m.isActive,
+        });
+        setShowModelModal(true);
+    };
+
+    const handleModelSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const payload = {
+                brandId: modelFormData.brandId,
+                name: modelFormData.name,
+                yearStart: modelFormData.yearStart !== '' ? Number(modelFormData.yearStart) : undefined,
+                yearEnd: modelFormData.yearEnd !== '' ? Number(modelFormData.yearEnd) : undefined,
+                sortOrder: modelFormData.sortOrder,
+                isActive: modelFormData.isActive,
+            };
+            if (editingModel) {
+                await adminApi.updateCarModel(editingModel.id, { name: payload.name, yearStart: payload.yearStart, yearEnd: payload.yearEnd, sortOrder: payload.sortOrder, isActive: payload.isActive });
+                toast.success('Model güncellendi');
+            } else {
+                await adminApi.createCarModel(payload);
+                toast.success('Model eklendi');
+            }
+            setShowModelModal(false);
+            if (expandedBrandId) loadModelsForBrand(expandedBrandId);
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'İşlem başarısız');
+        }
+    };
+
+    const handleModelDelete = async (id: string) => {
+        try {
+            await adminApi.deleteCarModel(id);
+            toast.success('Model silindi');
+            setDeleteConfirmModel(null);
+            if (expandedBrandId) loadModelsForBrand(expandedBrandId);
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Silme işlemi başarısız');
+        }
+    };
+
+    const toggleModelStatus = async (m: CarModel) => {
+        try {
+            await adminApi.updateCarModel(m.id, { isActive: !m.isActive });
+            toast.success(m.isActive ? 'Model pasif yapıldı' : 'Model aktif yapıldı');
+            if (expandedBrandId) loadModelsForBrand(expandedBrandId);
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Durum değiştirilemedi');
+        }
+    };
+
     return (
         <AdminLayout>
             <div className="space-y-6">
@@ -184,6 +320,9 @@ export default function BrandsPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Durum
                                     </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Modeller
+                                    </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         İşlemler
                                     </th>
@@ -191,7 +330,8 @@ export default function BrandsPage() {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {brands.map((brand) => (
-                                    <tr key={brand.id} className="hover:bg-gray-50">
+                                    <Fragment key={brand.id}>
+                                    <tr className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 {brand.logo ? (
@@ -250,6 +390,20 @@ export default function BrandsPage() {
                                                 )}
                                             </button>
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <button
+                                                onClick={() => toggleExpand(brand.id)}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                            >
+                                                {expandedBrandId === brand.id ? (
+                                                    <ChevronDownIcon className="w-4 h-4" />
+                                                ) : (
+                                                    <ChevronRightIcon className="w-4 h-4" />
+                                                )}
+                                                <TruckIcon className="w-4 h-4" />
+                                                Modeller
+                                            </button>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
@@ -269,6 +423,80 @@ export default function BrandsPage() {
                                             </div>
                                         </td>
                                     </tr>
+                                    {expandedBrandId === brand.id && (
+                                        <tr key={`${brand.id}-models`}>
+                                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                                                {modelsLoading ? (
+                                                    <div className="flex items-center gap-2 text-gray-500">
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500" />
+                                                        Modeller yükleniyor...
+                                                    </div>
+                                                ) : modelsForBrand.length === 0 ? (
+                                                    <div className="flex items-center gap-4">
+                                                        <p className="text-gray-500">Bu marka için henüz model eklenmemiş</p>
+                                                        <button
+                                                            onClick={() => openModelCreateModal(brand.id)}
+                                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg"
+                                                        >
+                                                            <PlusIcon className="w-4 h-4" />
+                                                            Model Ekle
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-medium text-gray-700">Modeller ({modelsForBrand.length})</span>
+                                                            <button
+                                                                onClick={() => openModelCreateModal(brand.id)}
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg"
+                                                            >
+                                                                <PlusIcon className="w-4 h-4" />
+                                                                Model Ekle
+                                                            </button>
+                                                        </div>
+                                                        <div className="max-h-48 overflow-y-auto">
+                                                            <table className="min-w-full divide-y divide-gray-200">
+                                                                <tbody className="divide-y divide-gray-100">
+                                                                    {modelsForBrand.map((m) => (
+                                                                        <tr key={m.id} className="hover:bg-gray-100">
+                                                                            <td className="py-2 pr-4">
+                                                                                <div>
+                                                                                    <p className="font-medium text-gray-900">{m.name}</p>
+                                                                                    <p className="text-xs text-gray-500">{m.slug}</p>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-2 pr-4 text-sm text-gray-500">
+                                                                                {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
+                                                                            </td>
+                                                                            <td className="py-2">
+                                                                                <button
+                                                                                    onClick={() => toggleModelStatus(m)}
+                                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+                                                                                >
+                                                                                    {m.isActive ? 'Aktif' : 'Pasif'}
+                                                                                </button>
+                                                                            </td>
+                                                                            <td className="py-2 text-right">
+                                                                                <div className="flex items-center justify-end gap-1">
+                                                                                    <button onClick={() => openModelEditModal(m)} className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-200 rounded" title="Düzenle">
+                                                                                        <PencilIcon className="w-4 h-4" />
+                                                                                    </button>
+                                                                                    <button onClick={() => setDeleteConfirmModel(m.id)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Sil">
+                                                                                        <TrashIcon className="w-4 h-4" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -410,6 +638,126 @@ export default function BrandsPage() {
                                         onClick={() => handleDelete(deleteConfirm)}
                                         className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600"
                                     >
+                                        Sil
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Model Add/Edit Modal */}
+                {showModelModal && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto">
+                        <div className="flex min-h-full items-center justify-center p-4">
+                            <div className="fixed inset-0 bg-black/50" onClick={() => setShowModelModal(false)} />
+                            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                    {editingModel ? 'Modeli Düzenle' : 'Yeni Model Ekle'}
+                                </h3>
+                                <form onSubmit={handleModelSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Marka *</label>
+                                        <select
+                                            value={modelFormData.brandId}
+                                            onChange={(e) => setModelFormData({ ...modelFormData, brandId: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            required
+                                            disabled={!!editingModel}
+                                        >
+                                            <option value="">Seçiniz</option>
+                                            {brands.map((b) => (
+                                                <option key={b.id} value={b.id}>{b.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Model Adı *</label>
+                                        <input
+                                            type="text"
+                                            value={modelFormData.name}
+                                            onChange={(e) => setModelFormData({ ...modelFormData, name: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            required
+                                            placeholder="Örn: M4, 911 GT3"
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Yılı</label>
+                                            <input
+                                                type="number"
+                                                value={modelFormData.yearStart}
+                                                onChange={(e) => setModelFormData({ ...modelFormData, yearStart: e.target.value ? parseInt(e.target.value) : '' })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                min="1900"
+                                                max="2100"
+                                                placeholder="2014"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Yılı</label>
+                                            <input
+                                                type="number"
+                                                value={modelFormData.yearEnd}
+                                                onChange={(e) => setModelFormData({ ...modelFormData, yearEnd: e.target.value ? parseInt(e.target.value) : '' })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                min="1900"
+                                                max="2100"
+                                                placeholder="Boş = devam ediyor"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Sıra</label>
+                                            <input
+                                                type="number"
+                                                value={modelFormData.sortOrder}
+                                                onChange={(e) => setModelFormData({ ...modelFormData, sortOrder: parseInt(e.target.value) || 0 })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                min="0"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                                            <select
+                                                value={modelFormData.isActive ? 'true' : 'false'}
+                                                onChange={(e) => setModelFormData({ ...modelFormData, isActive: e.target.value === 'true' })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            >
+                                                <option value="true">Aktif</option>
+                                                <option value="false">Pasif</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-3 pt-4">
+                                        <button type="button" onClick={() => setShowModelModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                                            İptal
+                                        </button>
+                                        <button type="submit" className="px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600">
+                                            {editingModel ? 'Güncelle' : 'Ekle'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Model Delete Confirmation Modal */}
+                {deleteConfirmModel && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto">
+                        <div className="flex min-h-full items-center justify-center p-4">
+                            <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteConfirmModel(null)} />
+                            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Modeli Sil</h3>
+                                <p className="text-gray-600 mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setDeleteConfirmModel(null)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                                        İptal
+                                    </button>
+                                    <button onClick={() => handleModelDelete(deleteConfirmModel)} className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600">
                                         Sil
                                     </button>
                                 </div>

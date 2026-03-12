@@ -233,7 +233,33 @@ export class RatingService {
     await this.cache.del(`products:detail:${dto.productId}`);
     await this.cache.delPattern(`products:list:*`);
 
+    // Update Product.averageRating and Product.ratingCount (triggers ES reindex via Prisma middleware)
+    await this.updateProductRatingStats(dto.productId);
+
     return this.mapProductRatingToDto(rating);
+  }
+
+  /**
+   * Recalculate and update Product.averageRating and Product.ratingCount.
+   * Called after create/delete/update of ProductRating. Prisma middleware emits product.changed for ES sync.
+   */
+  async updateProductRatingStats(productId: string): Promise<void> {
+    const stats = await this.prisma.productRating.aggregate({
+      where: { productId },
+      _avg: { score: true },
+      _count: true,
+    });
+
+    const count = stats._count ?? 0;
+    const avg = stats._avg?.score;
+
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        averageRating: avg != null ? avg : null,
+        ratingCount: count,
+      },
+    });
   }
 
   // ==========================================================================

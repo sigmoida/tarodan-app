@@ -198,6 +198,16 @@ export const adminApi = {
   updateBrand: (id: string, data: any) => api.patch(`/admin/brands/${id}`, data),
   deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
 
+  getManufacturers: () => api.get('/admin/manufacturers'),
+  createManufacturer: (data: any) => api.post('/admin/manufacturers', data),
+  updateManufacturer: (id: string, data: any) => api.patch(`/admin/manufacturers/${id}`, data),
+  deleteManufacturer: (id: string) => api.delete(`/admin/manufacturers/${id}`),
+
+  getCarModels: (brandId?: string) => api.get('/admin/car-models', { params: brandId ? { brandId } : {} }),
+  createCarModel: (data: any) => api.post('/admin/car-models', data),
+  updateCarModel: (id: string, data: any) => api.patch(`/admin/car-models/${id}`, data),
+  deleteCarModel: (id: string) => api.delete(`/admin/car-models/${id}`),
+
   // Advertisements
   getAds: () => api.get('/admin/ads'),
   createAd: (data: any) => api.post('/admin/ads', data),

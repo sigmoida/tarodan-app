@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon, ChevronRightIcon } from '@heroicons/react/24/outline';
@@ -29,6 +30,8 @@ interface Attribute {
 }
 
 export default function AttributesPage() {
+    const searchParams = useSearchParams();
+    const groupIdFromUrl = searchParams.get('groupId');
     const [groups, setGroups] = useState<AttributeGroup[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<AttributeGroup | null>(null);
     const [attributes, setAttributes] = useState<Attribute[]>([]);
@@ -43,6 +46,13 @@ export default function AttributesPage() {
     const [attrForm, setAttrForm] = useState({ value: '', displayValue: '', color: '', sortOrder: 0, isActive: true });
 
     useEffect(() => { loadGroups(); }, []);
+
+    useEffect(() => {
+        if (groups.length > 0 && groupIdFromUrl) {
+            const g = groups.find((gr) => gr.id === groupIdFromUrl);
+            if (g) { setSelectedGroup(g); loadAttributes(g.id); }
+        }
+    }, [groups, groupIdFromUrl]);
 
     const loadGroups = async () => {
         setLoading(true);
@@ -101,7 +111,7 @@ export default function AttributesPage() {
         <AdminLayout>
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <div><h1 className="text-2xl font-bold text-gray-900">Özellikler</h1><p className="text-gray-500">Özellik grupları ve değerleri</p></div>
+                    <div><h1 className="text-2xl font-bold text-gray-900">Ürün Özellikleri</h1><p className="text-gray-500">Özellik grupları ve değerleri</p></div>
                     <button onClick={openGroupCreate} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"><PlusIcon className="w-5 h-5" />Yeni Grup</button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -109,8 +119,8 @@ export default function AttributesPage() {
                     <div className="admin-card p-4">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Gruplar</h3>
                         {loading ? <div className="text-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-t-2 border-primary-500 mx-auto"></div></div>
-                            : groups.length === 0 ? <div className="text-center py-8 text-gray-500">Grup yok</div>
-                                : <div className="space-y-2">{groups.map((g) => (
+                            : groups.filter((g) => g.slug !== 'vehicle_type').length === 0 ? <div className="text-center py-8 text-gray-500">Grup yok</div>
+                                : <div className="space-y-2">{groups.filter((g) => g.slug !== 'vehicle_type').map((g) => (
                                     <div key={g.id} onClick={() => selectGroup(g)} className={`p-3 rounded-lg cursor-pointer flex items-center justify-between ${selectedGroup?.id === g.id ? 'bg-primary-50 border border-primary-600' : 'bg-gray-100 hover:bg-gray-100'}`}>
                                         <div className="flex items-center gap-2"><Squares2X2Icon className="h-5 w-5 text-gray-500" /><span className="text-gray-900">{g.name}</span>{!g.isActive && <span className="px-1.5 text-xs bg-gray-600 text-gray-600 rounded">Pasif</span>}</div>
                                         <div className="flex items-center gap-1">

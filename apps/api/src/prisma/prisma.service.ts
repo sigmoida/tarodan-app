@@ -43,6 +43,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const emitter = this.eventEmitter;
 
     this.$use(async (params, next) => {
+      // For CarModel delete: capture product IDs BEFORE delete (ON DELETE SET NULL clears them)
+      let productIdsToReindex: string[] | undefined;
+      if (params.model === 'CarModel' && params.action === 'delete') {
+        const carModelId = (params.args?.where as any)?.id;
+        if (carModelId) {
+          const products = await (this as any).product.findMany({
+            where: { carModelId },
+            select: { id: true },
+          });
+          productIdsToReindex = products.map((p: any) => p.id);
+        }
+      }
+
       const result = await next(params);
 
       if (!params.model || !WATCHED_WRITE_ACTIONS.includes(params.action)) {
@@ -65,6 +78,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             emitter.emit(event, { entityId: id });
           }
         }
+
+        if (params.model === 'CarModel') {
+          const carModelId = result?.id ?? (params.args?.where as any)?.id;
+          if (carModelId) {
+            if (params.action === 'delete' && productIdsToReindex?.length) {
+              emitter.emit('carModel.deleted', { entityId: carModelId, productIds: productIdsToReindex });
+            } else if (params.action !== 'delete') {
+              emitter.emit('carModel.changed', { entityId: carModelId });
+            }
+          }
+        }
       } catch (err) {
         this.logger.warn(
           `Search sync event emission failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -74,7 +98,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return result;
     });
 
-    this.logger.log('Prisma search-sync middleware registered (Product & Collection)');
+    this.logger.log('Prisma search-sync middleware registered (Product, Collection, CarModel)');
   }
 
   /**
