@@ -72,7 +72,6 @@ export default function ListingsPage() {
   const autoDetectedBrand = urlSearch
     ? KNOWN_BRANDS.find(b => b.toLowerCase() === urlSearch.toLowerCase()) || ''
     : '';
-
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
   const [currentPage, setCurrentPage] = useState(1);
@@ -82,6 +81,8 @@ export default function ListingsPage() {
     search: autoDetectedBrand ? '' : urlSearch,
     brand: searchParams.get('brand') || autoDetectedBrand || '',
     brandId: searchParams.get('brandId') || '',
+    carModelId: searchParams.get('carModelId') || '',
+    carModel: searchParams.get('carModel') || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
     condition: '',
@@ -94,9 +95,9 @@ export default function ListingsPage() {
     set: searchParams.get('set') === 'true',
     sortBy: 'created_desc',
     category: searchParams.get('category') || '',
+    categoryId: searchParams.get('categoryId') || '',
     manufacturer: searchParams.get('manufacturer') || '',
     manufacturerId: searchParams.get('manufacturerId') || '',
-    vehicleType: searchParams.get('vehicleType') || '',
   });
 
   useEffect(() => {
@@ -118,6 +119,8 @@ export default function ListingsPage() {
       set: searchParams.get('set') === 'true',
       brand: searchParams.get('brand') || detectedBrand || '',
       brandId: searchParams.get('brandId') || '',
+      carModelId: searchParams.get('carModelId') || '',
+      carModel: searchParams.get('carModel') || '',
       scale: searchParams.get('scale') || '',
       material: searchParams.get('material') || '',
       condition: searchParams.get('condition') || '',
@@ -125,9 +128,9 @@ export default function ListingsPage() {
       maxPrice: searchParams.get('maxPrice') || '',
       sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
       category: searchParams.get('category') || '',
+      categoryId: searchParams.get('categoryId') || '',
       manufacturer: searchParams.get('manufacturer') || '',
       manufacturerId: searchParams.get('manufacturerId') || '',
-      vehicleType: searchParams.get('vehicleType') || '',
     }));
   }, [searchParams]);
 
@@ -142,6 +145,13 @@ export default function ListingsPage() {
     staleTime: 5 * 60 * 1000,
   });
   const resolvedCategoryId = searchParams.get('categoryId') || categoryBySlug?.id;
+
+  // Filters for sidebar: merge resolved category when coming from slug (navbar)
+  const filtersForSidebar = {
+    ...filters,
+    categoryId: resolvedCategoryId || filters.categoryId,
+    category: (resolvedCategoryId && categoryBySlug?.name) ? categoryBySlug.name : filters.category,
+  };
 
   const { data: listingsData, isLoading } = useQuery({
     queryKey: ['listings', filters, resolvedCategoryId ?? '', currentPage],
@@ -161,6 +171,7 @@ export default function ListingsPage() {
         if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
         if (filters.brandId) p.brandId = filters.brandId;
         else if (filters.brand) p.brand = filters.brand;
+        if (filters.carModelId) p.carModelId = filters.carModelId;
         if (filters.scale) p.scale = filters.scale;
         if (filters.material) p.material = filters.material;
         if (filters.manufacturerId) p.manufacturerId = filters.manufacturerId;
@@ -171,7 +182,6 @@ export default function ListingsPage() {
         if (filters.limited) p.limited = true;
         if (filters.set) p.set = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
-        if (filters.vehicleType) p.vehicleType = filters.vehicleType;
         return p;
       };
 
@@ -188,20 +198,82 @@ export default function ListingsPage() {
   const listings: Listing[] = listingsData?.listings ?? [];
   const pagination = listingsData?.meta ?? { total: 0, page: currentPage, limit: pageLimit, totalPages: 1 };
 
+  const handleFiltersChange = (nextFilters: typeof filters) => {
+    setFilters(nextFilters);
+    setCurrentPage(1);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    const filterKeysToClear = [
+      'search',
+      'brand',
+      'brandId',
+      'carModelId',
+      'carModel',
+      'scale',
+      'material',
+      'condition',
+      'minPrice',
+      'maxPrice',
+      'tradeOnly',
+      'discountOnly',
+      'preOrder',
+      'limited',
+      'set',
+      'category',
+      'categoryId',
+      'manufacturer',
+      'manufacturerId',
+      'sortBy',
+    ];
+
+    filterKeysToClear.forEach((key) => {
+      params.delete(key);
+    });
+
+    if (nextFilters.search) params.set('search', nextFilters.search);
+    if (nextFilters.brand) params.set('brand', nextFilters.brand);
+    if (nextFilters.brandId) params.set('brandId', nextFilters.brandId);
+    if (nextFilters.carModelId) params.set('carModelId', nextFilters.carModelId);
+    if (nextFilters.carModel) params.set('carModel', nextFilters.carModel);
+    if (nextFilters.scale) params.set('scale', nextFilters.scale);
+    if (nextFilters.material) params.set('material', nextFilters.material);
+    if (nextFilters.condition) params.set('condition', nextFilters.condition);
+    if (nextFilters.minPrice) params.set('minPrice', nextFilters.minPrice);
+    if (nextFilters.maxPrice) params.set('maxPrice', nextFilters.maxPrice);
+    if (nextFilters.tradeOnly) params.set('tradeOnly', 'true');
+    if (nextFilters.discountOnly) params.set('discountOnly', 'true');
+    if (nextFilters.preOrder) params.set('preOrder', 'true');
+    if (nextFilters.limited) params.set('limited', 'true');
+    if (nextFilters.set) params.set('set', 'true');
+    if (nextFilters.category) params.set('category', nextFilters.category);
+    if (nextFilters.categoryId) params.set('categoryId', nextFilters.categoryId);
+    if (nextFilters.manufacturer) params.set('manufacturer', nextFilters.manufacturer);
+    if (nextFilters.manufacturerId) params.set('manufacturerId', nextFilters.manufacturerId);
+    if (nextFilters.sortBy) params.set('sortBy', nextFilters.sortBy);
+
+    // Whenever filters (including sort) change, always start from page 1
+    params.set('page', '1');
+
+    const queryString = params.toString();
+    const newUrl = queryString ? `/listings?${queryString}` : '/listings';
+    router.replace(newUrl);
+  };
+
   const clearFilters = () => {
     setFilters({
-      search: '', brand: '', brandId: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      search: '', brand: '', brandId: '', carModelId: '', carModel: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
-      sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
+      sortBy: 'created_desc', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
     });
     setCurrentPage(1);
 
     const currentParams = new URLSearchParams(searchParams.toString());
     const filterParams = [
-      'search', 'brand', 'brandId', 'scale', 'material', 'condition',
+      'search', 'brand', 'brandId', 'carModelId', 'carModel', 'scale', 'material', 'condition',
       'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
       'limited', 'set', 'category', 'categoryId', 'manufacturer',
-      'manufacturerId', 'vehicleType', 'page'
+      'manufacturerId', 'page'
     ];
     
     // Check if any filter parameter exists
@@ -218,8 +290,39 @@ export default function ListingsPage() {
     }
   };
 
-  const activeFilterCount = Object.entries(filters)
-    .filter(([key, value]) => key !== 'sortBy' && value !== '' && value !== false).length;
+  // Count active filters; paired keys (e.g. manufacturer+manufacturerId) count as 1
+  const activeFilterCount = (() => {
+    const pairs: [string, string][] = [
+      ['manufacturer', 'manufacturerId'],
+      ['brand', 'brandId'],
+      ['category', 'categoryId'],
+      ['carModel', 'carModelId'],
+    ];
+    const exclude = new Set(['sortBy']);
+    let count = 0;
+    const counted = new Set<string>();
+    for (const [k, v] of Object.entries(filters)) {
+      if (exclude.has(k) || v === '' || v === false) continue;
+      const pair = pairs.find(([a, b]) => a === k || b === k);
+      if (pair && !counted.has(pair[0] + pair[1])) {
+        const hasEither = filters[pair[0] as keyof typeof filters] || filters[pair[1] as keyof typeof filters];
+        if (hasEither) {
+          count += 1;
+          counted.add(pair[0] + pair[1]);
+        }
+      } else if (!pair) {
+        if (k === 'minPrice' || k === 'maxPrice') {
+          if (!counted.has('price') && (filters.minPrice || filters.maxPrice)) {
+            count += 1;
+            counted.add('price');
+          }
+        } else {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  })();
 
   const LISTING_PLACEHOLDERS = [
     'https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels',
@@ -288,7 +391,7 @@ export default function ListingsPage() {
               />
               <select
                 value={filters.sortBy}
-                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                onChange={(e) => handleFiltersChange({ ...filters, sortBy: e.target.value })}
                 className="px-2.5 py-1.5 border border-gray-200 rounded bg-white text-xs sm:text-sm focus:outline-none focus:border-orange-400 text-gray-700 flex-shrink-0"
               >
                 <option value="created_desc">{t('product.sortNewest')}</option>
@@ -296,6 +399,7 @@ export default function ListingsPage() {
                 <option value="view_count_desc">{t('product.sortPopular')}</option>
                 <option value="price_asc">{t('product.sortPriceLow')}</option>
                 <option value="price_desc">{t('product.sortPriceHigh')}</option>
+                <option value="rating_desc">{locale === 'en' ? 'Highest Rating' : 'En yüksek puan'}</option>
                 <option value="title_asc">A-Z</option>
                 <option value="title_desc">Z-A</option>
               </select>
@@ -308,10 +412,10 @@ export default function ListingsPage() {
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded border border-gray-200">
+            <div className="sticky top-[80px] max-h-[calc(100vh-80px)] overflow-y-auto bg-white rounded border border-gray-200">
               <SidebarFilters
-                filters={filters}
-                onFilterChange={setFilters}
+                filters={filtersForSidebar}
+                onFilterChange={handleFiltersChange}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={clearFilters}
               />
@@ -331,8 +435,8 @@ export default function ListingsPage() {
                 </div>
                 <div className="p-4">
                   <SidebarFilters
-                    filters={filters}
-                    onFilterChange={setFilters}
+                    filters={filtersForSidebar}
+                    onFilterChange={handleFiltersChange}
                     activeFilterCount={activeFilterCount}
                     onClearFilters={clearFilters}
                   />
@@ -348,13 +452,12 @@ export default function ListingsPage() {
               <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200">
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
                 {[
-                  { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
+                  { k: 'category', v: filtersForSidebar.category }, { k: 'brand', v: filters.brand },
                   { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
-                  { k: 'manufacturer', v: filters.manufacturer }, { k: 'vehicleType', v: filters.vehicleType }
+                  { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
-                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : 
-                     f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
+                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
@@ -519,6 +622,13 @@ export default function ListingsPage() {
                             <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
                           </div>
                           <div className="flex items-center gap-3 ml-4">
+                            {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
+                              <div className="flex items-center gap-1">
+                                <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" />
+                                <span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
+                                <span className="text-[11px] text-gray-400">({listing.rating.count})</span>
+                              </div>
+                            )}
                             {isProductOnSaleDisplay(listing) && (
                               <span className="text-xs text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
                             )}

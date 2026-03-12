@@ -133,14 +133,6 @@ export class ProductQueryDto {
   set?: boolean;
 
   @ApiPropertyOptional({
-    example: 'car',
-    description: 'Filter by vehicle type slug (matched via ProductAttribute join in PG, keyword term in ES)',
-  })
-  @IsOptional()
-  @IsString()
-  vehicleType?: string;
-
-  @ApiPropertyOptional({
     example: 100,
     description: 'Minimum price filter',
   })
@@ -163,11 +155,30 @@ export class ProductQueryDto {
   @ApiPropertyOptional({
     example: 'price_asc',
     description: 'Sort order',
-    enum: ['price_asc', 'price_desc', 'created_asc', 'created_desc', 'title_asc', 'title_desc', 'view_count_desc', 'view_count_asc'],
+    enum: [
+      'price_asc',
+      'price_desc',
+      'created_asc',
+      'created_desc',
+      'title_asc',
+      'title_desc',
+      'view_count_desc',
+      'view_count_asc',
+      'rating_desc',
+    ],
   })
   @IsOptional()
   @IsString()
-  sortBy?: 'price_asc' | 'price_desc' | 'created_asc' | 'created_desc' | 'title_asc' | 'title_desc' | 'view_count_desc' | 'view_count_asc';
+  sortBy?:
+    | 'price_asc'
+    | 'price_desc'
+    | 'created_asc'
+    | 'created_desc'
+    | 'title_asc'
+    | 'title_desc'
+    | 'view_count_desc'
+    | 'view_count_asc'
+    | 'rating_desc';
 
   @ApiPropertyOptional({
     example: 1,

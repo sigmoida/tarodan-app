@@ -170,7 +170,7 @@ export class CollectionService {
         }
         const arr = imagesByProduct.get(img.productId)!;
         if (arr.length < 1) {
-          arr.push({ url: this.storageService.getPublicAssetUrl(img.cardKey) });
+          arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
         }
       }
       
@@ -462,11 +462,8 @@ export class CollectionService {
       return this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
     }
 
-    if (esResult && esResult.total === 0) {
-      return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
-    }
-
-    // Prisma fallback
+    // ES returned null (unavailable) or 0 results – fall back to Prisma (source of truth).
+    // ES index can be stale; Prisma ensures correct category filtering.
     return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
   }
 
@@ -1005,6 +1002,8 @@ export class CollectionService {
         customModel: dto.customModel,
         customYear: dto.customYear,
         customScale: dto.customScale,
+        customManufacturer: dto.customManufacturer,
+        customMaterial: dto.customMaterial,
         customImageUrl: imageUrl || dto.customImageUrl,
         sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         isFeatured: dto.isFeatured ?? false,
@@ -1505,6 +1504,8 @@ export class CollectionService {
           customModel: item.customModel,
           customYear: item.customYear,
           customScale: item.customScale,
+          customManufacturer: item.customManufacturer,
+          customMaterial: item.customMaterial,
           customImageUrl: item.customImageUrl,
         };
       }
@@ -1565,6 +1566,8 @@ export class CollectionService {
         customModel: item?.customModel,
         customYear: item?.customYear,
         customScale: item?.customScale,
+        customManufacturer: item?.customManufacturer,
+        customMaterial: item?.customMaterial,
         customImageUrl: item?.customImageUrl,
       };
     }

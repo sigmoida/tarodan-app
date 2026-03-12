@@ -1637,19 +1637,24 @@ async function main() {
     }
   }
 
-  // Create some product ratings
-  for (let i = 0; i < 30; i++) {
+  // Create product ratings for many completed orders (3-5 stars, varied)
+  const maxProductRatings = Math.min(completedOrders.length, 100);
+  for (let i = 0; i < maxProductRatings; i++) {
     const order = completedOrders[i % completedOrders.length];
     if (!order) continue;
-    
+
+    const possibleScores = [3, 4, 5];
+    const score = possibleScores[Math.floor(Math.random() * possibleScores.length)];
+    const titles = ['Mükemmel!', 'Harika ürün', 'Beklentilerimi karşıladı', 'Çok kaliteli', 'Fena değil'];
+
     try {
       await prisma.productRating.create({
         data: {
           productId: order.productId,
           userId: order.buyerId,
           orderId: order.id,
-          score: Math.floor(Math.random() * 2) + 4,
-          title: ['Mükemmel!', 'Harika ürün', 'Beklentilerimi karşıladı', 'Çok kaliteli'][Math.floor(Math.random() * 4)],
+          score,
+          title: titles[Math.floor(Math.random() * titles.length)],
           review: 'Ürün açıklamaya uygun, paketleme çok iyi yapılmış. Satıcıya teşekkürler.',
           isVerifiedPurchase: true,
           helpfulCount: Math.floor(Math.random() * 20),
@@ -1658,6 +1663,22 @@ async function main() {
     } catch (e) {
       // Ignore duplicates
     }
+  }
+
+  // Update Product.averageRating and Product.ratingCount for all products with ratings
+  const productsWithRatings = await prisma.productRating.groupBy({
+    by: ['productId'],
+    _avg: { score: true },
+    _count: true,
+  });
+  for (const row of productsWithRatings) {
+    await prisma.product.update({
+      where: { id: row.productId },
+      data: {
+        averageRating: row._avg.score ?? undefined,
+        ratingCount: row._count,
+      },
+    });
   }
 
   console.log(`✅ Created ratings`);

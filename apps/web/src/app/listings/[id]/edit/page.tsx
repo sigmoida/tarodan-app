@@ -32,15 +32,6 @@ interface CarModel {
   };
 }
 
-const SCALES = ['1:18', '1:24', '1:32', '1:43', '1:64', '1:72', '1:87'];
-
-const MATERIALS: { slug: string; label: string }[] = [
-  { slug: 'diecast', label: 'Diecast (Metal)' },
-  { slug: 'resin', label: 'Resin (Reçine)' },
-  { slug: 'composite', label: 'Composite (Kompozit)' },
-  { slug: 'plastic', label: 'Plastic (Plastik)' },
-];
-
 const CONDITIONS = [
   { value: 'new', label: 'Yeni' },
   { value: 'like_new', label: 'Sıfır Gibi' },
@@ -61,6 +52,9 @@ export default function EditListingPage() {
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [scaleList, setScaleList] = useState<string[]>([]);
+  const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+  const [manufacturerList, setManufacturerList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const currentYear = new Date().getFullYear();
@@ -76,6 +70,7 @@ export default function EditListingPage() {
     carModelId: '',
     scale: '1:64',
     material: '' as string,
+    manufacturerId: '' as string,
     year: '' as string | number,
     isTradeEnabled: false,
     isPreorder: false,
@@ -227,22 +222,29 @@ export default function EditListingPage() {
     }
 
     // Then fetch from API (will merge with localStorage data in fetchListing)
-    // Then fetch from API (will merge with localStorage data in fetchListing)
-    fetchBrands();
+    fetchFilters();
     fetchListing();
     fetchCategories();
     fetchProductDiscounts();
   }, [id, isAuthenticated]);
 
-  const fetchBrands = async () => {
+  const fetchFilters = async () => {
     setBrandsLoading(true);
     try {
-      const response = await api.get('/brands');
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setBrands(data);
+      const response = await listingsApi.getFilters();
+      const data = response.data as {
+        scales?: string[];
+        materials?: Array<{ slug: string; label: string }>;
+        brands?: Array<{ id: string; name: string; slug: string }>;
+        manufacturers?: Array<{ id: string; name: string; slug: string }>;
+      };
+      if (data.scales?.length) setScaleList(data.scales);
+      if (data.materials?.length) setMaterialList(data.materials);
+      if (data.brands?.length) setBrands(data.brands);
+      if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
     } catch (error) {
-      console.error('Failed to fetch brands:', error);
-      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+      toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
     } finally {
       setBrandsLoading(false);
     }
@@ -429,6 +431,9 @@ export default function EditListingPage() {
         const materialFromAttrs = (listing as any).attributes?.find(
           (a: any) => (a.label === 'Malzeme' || a.group === 'Malzeme' || a.group === 'material')
         )?.name;
+        const scaleFromAttrs = (listing as any).attributes?.find(
+          (a: any) => (a.label === 'Ölçek' || a.group === 'Ölçek')
+        )?.value;
         const newFormData = {
           title: savedData?.title || listing.title || prev.title || '',
           description: savedData?.description || listing.description || prev.description || '',
@@ -437,8 +442,9 @@ export default function EditListingPage() {
           condition: savedData?.condition || listing.condition || prev.condition || 'very_good',
           brandId: savedData?.brandId || listing.brand?.id || prev.brandId || '',
           carModelId: savedData?.carModelId || listing.carModel?.id || prev.carModelId || '',
-          scale: savedData?.scale || listing.scale || prev.scale || '1:64',
+          scale: savedData?.scale || listing.scale || scaleFromAttrs || prev.scale || '1:64',
           material: savedData?.material ?? materialFromAttrs ?? (listing as any).material ?? prev.material ?? '',
+          manufacturerId: savedData?.manufacturerId ?? (listing as any).manufacturer?.id ?? prev.manufacturerId ?? '',
           year: savedData?.year ?? (listing as any).year ?? (listing as any).releaseDate ? new Date((listing as any).releaseDate).getFullYear() : prev.year ?? '',
           isTradeEnabled: savedData?.isTradeEnabled !== undefined ? savedData.isTradeEnabled : (listing.isTradeEnabled || listing.trade_available || prev.isTradeEnabled || false),
           isPreorder: savedData?.isPreorder !== undefined ? savedData.isPreorder : ((listing as any).isPreorder ?? prev.isPreorder ?? false),
@@ -597,6 +603,7 @@ export default function EditListingPage() {
         carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
         material: formData.material || undefined,
+        manufacturerId: formData.manufacturerId || undefined,
         year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: formData.isPreorder,
@@ -896,7 +903,7 @@ export default function EditListingPage() {
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
-                  {SCALES.map((scale) => (
+                  {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
@@ -914,9 +921,32 @@ export default function EditListingPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">Malzeme seçin</option>
-                  {MATERIALS.map((m) => (
+                  {(materialList.length > 0 ? materialList : [
+                    { slug: 'diecast', label: 'Diecast (Metal)' },
+                    { slug: 'resin', label: 'Resin (Reçine)' },
+                    { slug: 'composite', label: 'Composite (Kompozit)' },
+                    { slug: 'plastic', label: 'Plastic (Plastik)' },
+                  ]).map((m) => (
                     <option key={m.slug} value={m.slug}>
                       {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Üretici
+                </label>
+                <select
+                  value={formData.manufacturerId}
+                  onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">Üretici seçin</option>
+                  {manufacturerList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>

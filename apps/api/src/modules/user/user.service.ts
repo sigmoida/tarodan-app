@@ -4,6 +4,7 @@ import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/c
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
+import { RatingService } from '../rating/rating.service';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -26,6 +27,7 @@ export class UserService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly ratingService: RatingService,
   ) {}
 
   /**
@@ -363,8 +365,9 @@ export class UserService {
 
     // All checks passed, delete account
     // Use transaction to ensure atomicity
+    let productIdsToRecalc: string[] = [];
     try {
-      await this.prisma.$transaction(async (tx) => {
+      productIdsToRecalc = await this.prisma.$transaction(async (tx) => {
         // 1. Delete authentication tokens
         await tx.refreshToken.deleteMany({ where: { userId } });
         await tx.passwordResetToken.deleteMany({ where: { userId } });
@@ -397,7 +400,12 @@ export class UserService {
         // 7. Delete product likes by user
         await tx.productLike.deleteMany({ where: { userId } });
         
-        // 8. Delete product ratings by user
+        // 8. Delete product ratings by user (productIds collected before delete for recalc)
+        const userProductRatings = await tx.productRating.findMany({
+          where: { userId },
+          select: { productId: true },
+        });
+        const productIdsToRecalc = [...new Set(userProductRatings.map((r) => r.productId))];
         await tx.productRating.deleteMany({ where: { userId } });
         
         // 9. Delete user ratings given and received
@@ -483,9 +491,20 @@ export class UserService {
         
         // 23. Finally, delete the user
         await tx.user.delete({ where: { id: userId } });
+
+        return productIdsToRecalc;
       }, {
         timeout: 60000, // 60 second timeout for large deletions
       });
+
+      // Recalc Product.averageRating/ratingCount for products that had ratings from this user
+      for (const productId of productIdsToRecalc) {
+        try {
+          await this.ratingService.updateProductRatingStats(productId);
+        } catch (e) {
+          this.logger.warn(`Failed to recalc rating stats for product ${productId} after user delete`);
+        }
+      }
 
       this.logger.log(`User account deleted: ${userId}`);
 

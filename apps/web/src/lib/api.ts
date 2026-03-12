@@ -402,6 +402,8 @@ export const collectionsApi = {
       customModel?: string;
       customYear?: number;
       customScale?: string;
+      customManufacturer?: string;
+      customMaterial?: string;
       customImageUrl?: string;
       sortOrder?: number;
       isFeatured?: boolean;
@@ -418,6 +420,8 @@ export const collectionsApi = {
     if (data.customModel) formData.append('customModel', data.customModel);
     if (data.customYear !== undefined) formData.append('customYear', data.customYear.toString());
     if (data.customScale) formData.append('customScale', data.customScale);
+    if (data.customManufacturer) formData.append('customManufacturer', data.customManufacturer);
+    if (data.customMaterial) formData.append('customMaterial', data.customMaterial);
     if (data.customImageUrl) formData.append('customImageUrl', data.customImageUrl);
     if (data.sortOrder !== undefined) formData.append('sortOrder', data.sortOrder.toString());
     if (data.isFeatured !== undefined) formData.append('isFeatured', data.isFeatured.toString());

@@ -20,6 +20,7 @@ import {
   CurrencyDollarIcon,
   CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { userApi, api } from '@/lib/api';
@@ -41,6 +42,7 @@ interface Listing {
   soldPrice?: number;
   buyer?: { id: string; displayName: string };
   orderId?: string;
+  rating?: { average: number | null; count: number };
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -267,12 +269,25 @@ export default function ProfileListingsPage() {
                     
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
                       <span>{new Date(listing.createdAt).toLocaleDateString('tr-TR')}</span>
-                      {listing.viewCount !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <EyeIcon className="w-4 h-4" />
-                          {listing.viewCount}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
+                          <span className="flex items-center gap-1">
+                            <StarIcon className="w-4 h-4 text-yellow-400" />
+                            <span className="text-sm font-semibold text-gray-900">
+                              {listing.rating.average.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              ({listing.rating.count})
+                            </span>
+                          </span>
+                        )}
+                        {listing.viewCount !== undefined && (
+                          <span className="flex items-center gap-1">
+                            <EyeIcon className="w-4 h-4" />
+                            {listing.viewCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {listing.status === 'sold' && (

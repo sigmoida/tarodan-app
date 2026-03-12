@@ -236,7 +236,7 @@ export class CollectionController {
    */
   @Patch(':id')
   async updateCollection(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Request() req: any,
     @Body() dto: UpdateCollectionDto,
   ): Promise<CollectionResponseDto> {
@@ -250,7 +250,7 @@ export class CollectionController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteCollection(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Request() req: any,
   ): Promise<void> {
     return this.collectionService.deleteCollection(id, req.user.id);
@@ -265,7 +265,7 @@ export class CollectionController {
   @Post(':id/items')
   @UseInterceptors(FileInterceptor('image'))
   async addItemToCollection(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Request() req: any,
     @Body() dto: AddCollectionItemDto,
     @UploadedFile() imageFile?: Express.Multer.File,
@@ -301,7 +301,7 @@ export class CollectionController {
   @Delete(':id/items/:itemId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeItemFromCollection(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Request() req: any,
   ): Promise<void> {
@@ -319,7 +319,7 @@ export class CollectionController {
   @Post(':id/reorder')
   @HttpCode(HttpStatus.NO_CONTENT)
   async reorderItems(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Request() req: any,
     @Body() dto: ReorderCollectionItemsDto,
   ): Promise<void> {
@@ -333,7 +333,7 @@ export class CollectionController {
   @Patch(':id/cover')
   @UseInterceptors(FileInterceptor('cover'))
   async updateCollectionCover(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Request() req: any,
     @UploadedFile() coverFile?: Express.Multer.File,
   ): Promise<CollectionResponseDto> {

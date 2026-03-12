@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { collectionsApi, userApi } from '@/lib/api';
+import { collectionsApi, userApi, listingsApi, api } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -53,6 +53,8 @@ interface CollectionItem {
   customModel?: string;
   customYear?: number;
   customScale?: string;
+  customManufacturer?: string;
+  customMaterial?: string;
   customImageUrl?: string;
 }
 
@@ -96,9 +98,59 @@ export default function CollectionDetailPage() {
   const [customModel, setCustomModel] = useState('');
   const [customYear, setCustomYear] = useState<number | ''>('');
   const [customScale, setCustomScale] = useState('');
+  const [customManufacturer, setCustomManufacturer] = useState('');
+  const [customMaterial, setCustomMaterial] = useState('');
   const [customImageFile, setCustomImageFile] = useState<File | null>(null);
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(null);
+  const [scaleOptions, setScaleOptions] = useState<string[]>(['1:18', '1:24', '1:43', '1:64', '1:87']);
+  const [brandList, setBrandList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [modelList, setModelList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [manufacturerList, setManufacturerList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'custom'>('products');
+
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const response = await listingsApi.getFilters();
+        const data = response.data as {
+          scales?: string[];
+          brands?: Array<{ id: string; name: string; slug: string }>;
+          manufacturers?: Array<{ id: string; name: string; slug: string }>;
+          materials?: Array<{ slug: string; label: string }>;
+        };
+        if (data.scales?.length) setScaleOptions(data.scales);
+        if (data.brands?.length) setBrandList(data.brands);
+        if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+        if (data.materials?.length) setMaterialList(data.materials);
+      } catch {
+        // Keep fallback
+      }
+    };
+    fetchFilters();
+  }, []);
+
+  useEffect(() => {
+    if (customBrand) {
+      const selectedBrand = brandList.find((b) => b.name === customBrand);
+      if (selectedBrand) {
+        setModelsLoading(true);
+        api.get(`/car-models?brand=${selectedBrand.slug}`)
+          .then((res) => {
+            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            setModelList(data);
+          })
+          .catch(() => setModelList([]))
+          .finally(() => setModelsLoading(false));
+      } else {
+        setModelList([]);
+      }
+    } else {
+      setCustomModel('');
+      setModelList([]);
+    }
+  }, [customBrand, brandList]);
 
   const collectionQuery = useQuery({
     queryKey: ['collection', collectionIdOrSlug],
@@ -200,11 +252,13 @@ export default function CollectionDetailPage() {
         customModel: customModel.trim() || undefined,
         customYear: customYear ? Number(customYear) : undefined,
         customScale: customScale || undefined,
+        customManufacturer: customManufacturer.trim() || undefined,
+        customMaterial: customMaterial || undefined,
         imageFile: customImageFile || undefined,
       });
       toast.success(t('collection.productsAddedToCollection'));
       setShowAddItemModal(false);
-      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomImageFile(null); setCustomImagePreview(null);
+      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomManufacturer(''); setCustomMaterial(''); setCustomImageFile(null); setCustomImagePreview(null);
       await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to add custom item:', error);
@@ -643,13 +697,24 @@ export default function CollectionDetailPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1 font-medium">Marka</label>
-                      <input type="text" value={customBrand} onChange={(e) => setCustomBrand(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Marka" />
+                      <select value={customBrand} onChange={(e) => { setCustomBrand(e.target.value); setCustomModel(''); }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400">
+                        <option value="">Marka seçin</option>
+                        {brandList.map((b) => (
+                          <option key={b.id} value={b.name}>{b.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1 font-medium">Model</label>
-                      <input type="text" value={customModel} onChange={(e) => setCustomModel(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400" placeholder="Model" />
+                      <select value={customModel} onChange={(e) => setCustomModel(e.target.value)}
+                        disabled={!customBrand || modelsLoading}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400 disabled:opacity-50">
+                        <option value="">{modelsLoading ? 'Yükleniyor...' : 'Model seçin'}</option>
+                        {modelList.map((m) => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -663,11 +728,36 @@ export default function CollectionDetailPage() {
                       <select value={customScale} onChange={(e) => setCustomScale(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400">
                         <option value="">Seçiniz</option>
-                        <option value="1:18">1:18</option>
-                        <option value="1:24">1:24</option>
-                        <option value="1:43">1:43</option>
-                        <option value="1:64">1:64</option>
-                        <option value="1:87">1:87</option>
+                        {scaleOptions.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Üretici</label>
+                      <select value={customManufacturer} onChange={(e) => setCustomManufacturer(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400">
+                        <option value="">Üretici seçin</option>
+                        {manufacturerList.map((m) => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1 font-medium">Malzeme</label>
+                      <select value={customMaterial} onChange={(e) => setCustomMaterial(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-orange-400">
+                        <option value="">Malzeme seçin</option>
+                        {(materialList.length > 0 ? materialList : [
+                          { slug: 'diecast', label: 'Diecast (Metal)' },
+                          { slug: 'resin', label: 'Resin (Reçine)' },
+                          { slug: 'composite', label: 'Composite (Kompozit)' },
+                          { slug: 'plastic', label: 'Plastic (Plastik)' },
+                        ]).map((m) => (
+                          <option key={m.slug} value={m.slug}>{m.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -677,7 +767,7 @@ export default function CollectionDetailPage() {
                   <button
                     onClick={() => {
                       setShowAddItemModal(false);
-                      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomImageFile(null); setCustomImagePreview(null);
+                      setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomManufacturer(''); setCustomMaterial(''); setCustomImageFile(null); setCustomImagePreview(null);
                     }}
                     className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                   >

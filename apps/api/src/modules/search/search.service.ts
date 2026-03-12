@@ -42,6 +42,7 @@ export interface SearchOptions {
   categoryId?: string;
   brandId?: string;
   manufacturerId?: string;
+  carModelId?: string;
   minPrice?: number;
   maxPrice?: number;
   condition?: string;
@@ -54,7 +55,6 @@ export interface SearchOptions {
   preOrder?: boolean;
   limited?: boolean;
   set?: boolean;
-  vehicleType?: string;
   sellerId?: string;
   page?: number;
   pageSize?: number;
@@ -286,6 +286,8 @@ export class SearchService implements OnModuleInit {
               isSet: { type: 'boolean' },
               quantity: { type: 'integer' },
               viewCount: { type: 'integer' },
+              ratingAverage: { type: 'float' },
+              ratingCount: { type: 'integer' },
               createdAt: { type: 'date' },
               updatedAt: { type: 'date' },
             },
@@ -325,6 +327,7 @@ export class SearchService implements OnModuleInit {
       categoryId,
       brandId,
       manufacturerId,
+      carModelId,
       minPrice,
       maxPrice,
       condition,
@@ -337,7 +340,6 @@ export class SearchService implements OnModuleInit {
       preOrder,
       limited,
       set: setFilter,
-      vehicleType,
       sellerId,
       page = 1,
       pageSize = 20,
@@ -363,10 +365,11 @@ export class SearchService implements OnModuleInit {
             { match: { 'brandName.edge_ngram': { query, boost: 1 } } },
             { match: { manufacturerName: { query, boost: 2 } } },
             { match: { 'manufacturerName.edge_ngram': { query, boost: 1 } } },
+            { match: { carModelName: { query, boost: 2 } } },
             {
               multi_match: {
                 query,
-                fields: ['title^3', 'description', 'categoryName^2', 'brandName^2', 'manufacturerName^2'],
+                fields: ['title^3', 'description', 'categoryName^2', 'brandName^2', 'manufacturerName^2', 'carModelName^2'],
                 fuzziness: 2,
                 prefix_length: 1,
                 boost: 1.5,
@@ -391,18 +394,22 @@ export class SearchService implements OnModuleInit {
     if (categoryId) filter.push({ term: { categoryId } });
     if (brandId) filter.push({ term: { brandId } });
     if (manufacturerId) filter.push({ term: { manufacturerId } });
+    if (carModelId) filter.push({ term: { carModelId } });
     if (sellerId) filter.push({ term: { sellerId } });
     if (condition) filter.push({ term: { condition } });
 
     // Scale filter – exact keyword match (e.g. "1:18")
-    // Support both "1:18" (value) and "1-18" (slug) formats for backward compatibility
+    // Support value ("1:18"), slug with hyphen ("1-18"), and slug normalized ("118")
     if (scale) {
-      const scaleSlug = scale.replace(':', '-');
+      const scaleTrim = scale.trim();
+      const scaleSlugHyphen = scaleTrim.replace(':', '-');
+      const scaleSlugNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, '');
       filter.push({
         bool: {
           should: [
-            { term: { scale } }, // Try exact match first (value format: "1:18")
-            { term: { scale: scaleSlug } }, // Fallback to slug format ("1-18")
+            { term: { scale: scaleTrim } },
+            { term: { scale: scaleSlugHyphen } },
+            { term: { scale: scaleSlugNorm } },
           ],
           minimum_should_match: 1,
         },
@@ -434,9 +441,6 @@ export class SearchService implements OnModuleInit {
     if (manufacturer && !manufacturerId) {
       filter.push({ term: { 'manufacturerName.keyword': manufacturer } });
     }
-    if (vehicleType) {
-      filter.push({ term: { vehicleType } });
-    }
 
     // Sorting
     let sort: any[] = [];
@@ -450,6 +454,7 @@ export class SearchService implements OnModuleInit {
       case 'view_count_asc': sort = [{ viewCount: 'asc' }]; break;
       case 'title_asc': sort = [{ 'title.keyword': 'asc' }]; break;
       case 'title_desc': sort = [{ 'title.keyword': 'desc' }]; break;
+      case 'rating_desc': sort = [{ ratingAverage: 'desc' }, { ratingCount: 'desc' }]; break;
       default: sort = query ? [{ _score: 'desc' }] : [{ createdAt: 'desc' }];
     }
 
@@ -588,6 +593,8 @@ export class SearchService implements OnModuleInit {
       imageUrl: product.images?.[0]?.cardKey ? this.storageService.getPublicAssetUrl(product.images[0].cardKey) : undefined,
       scale: scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
       viewCount: product.viewCount || 0,
+      ratingAverage: product.averageRating != null ? parseFloat(product.averageRating.toString()) : 0,
+      ratingCount: product.ratingCount ?? 0,
       material: materialAttr?.attribute?.slug || undefined,
       vehicleType: vehicleTypeAttr?.attribute?.slug || undefined,
       isTradeEnabled: product.isTradeEnabled,
@@ -974,12 +981,12 @@ export class SearchService implements OnModuleInit {
         categoryId: options.categoryId,
         brandId: options.brandId,
         manufacturerId: options.manufacturerId,
+        carModelId: options.carModelId,
         sellerId: options.sellerId,
         condition: options.condition,
         brand: options.brand,
         scale: options.scale,
         material: options.material,
-        vehicleType: options.vehicleType,
         manufacturer: options.manufacturer,
         tradeOnly: options.tradeOnly,
         preOrder: options.preOrder,

@@ -101,6 +101,16 @@ export class AddCollectionItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  customManufacturer?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  customMaterial?: string;
+
+  @IsOptional()
+  @IsString()
   customImageUrl?: string;
 
   @IsOptional()
@@ -140,6 +150,8 @@ export class CollectionItemResponseDto {
   customModel?: string;
   customYear?: number;
   customScale?: string;
+  customManufacturer?: string;
+  customMaterial?: string;
   customImageUrl?: string;
 }
 
