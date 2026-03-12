@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -129,15 +129,22 @@ export default function ListingsPage() {
     return params;
   };
 
-  // Sync filters + page to URL (single source of truth - avoids duplicate router.replace)
+  // Sync filters + page to URL so that navigating to listing and back preserves filters.
+  // Skip the very first run so URL params (e.g. ?search=...) are not wiped before the
+  // URL→state effect below has a chance to populate filters from the URL.
+  const hasSyncedToUrl = useRef(false);
   useEffect(() => {
+    if (!hasSyncedToUrl.current) {
+      hasSyncedToUrl.current = true;
+      return;
+    }
     const nextParams = buildParamsFromFilters(filters, currentPage);
     const nextStr = nextParams.toString();
     if (nextStr !== searchString) {
       const newUrl = nextStr ? `/listings?${nextStr}` : '/listings';
       router.replace(newUrl);
     }
-  }, [filters, currentPage, searchString]);
+  }, [filters, currentPage]);
 
   useEffect(() => {
     const newSearch = searchParams.get('search') || '';
@@ -253,7 +260,11 @@ export default function ListingsPage() {
     // URL sync is handled by useEffect [filters, currentPage]
   };
 
-  // Count active filters; paired keys (e.g. manufacturer+manufacturerId) count as 1
+  // Read search query directly from URL so display is always in sync regardless of state timing
+  const currentSearch = searchParams.get('search') || '';
+
+  // Count active filters; paired keys (e.g. manufacturer+manufacturerId) count as 1.
+  // Uses currentSearch (from URL) so the count is accurate even before state syncs.
   const activeFilterCount = (() => {
     const pairs: [string, string][] = [
       ['manufacturer', 'manufacturerId'],
@@ -261,8 +272,8 @@ export default function ListingsPage() {
       ['category', 'categoryId'],
       ['carModel', 'carModelId'],
     ];
-    const exclude = new Set(['sortBy']);
-    let count = 0;
+    const exclude = new Set(['sortBy', 'search']);
+    let count = currentSearch ? 1 : 0;
     const counted = new Set<string>();
     for (const [k, v] of Object.entries(filters)) {
       if (exclude.has(k) || v === '' || v === false) continue;
@@ -317,8 +328,13 @@ export default function ListingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <h1 className="sr-only">
-        {filters.category ? `${filters.category} Diecast Model Arabalar` :
-          filters.brand ? `${filters.brand} Model Araç Koleksiyonu` : t('product.title')}
+        {currentSearch
+          ? (locale === 'en' ? `Search results for ${currentSearch}` : `${currentSearch} arama sonuçları`)
+          : filters.category
+            ? `${filters.category} Diecast Model Arabalar`
+            : filters.brand
+              ? `${filters.brand} Model Araç Koleksiyonu`
+              : t('product.title')}
       </h1>
 
       {/* Page Header */}
@@ -329,7 +345,11 @@ export default function ListingsPage() {
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
                   <div className="w-1 h-6 bg-orange-500 rounded-sm flex-shrink-0" />
-                  <span className="truncate">{filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}</span>
+                  <span className="truncate">
+                    {currentSearch
+                      ? (locale === 'en' ? `Results for "${currentSearch}"` : `"${currentSearch}" araması`)
+                      : filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
+                  </span>
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                   {pagination.total} {locale === 'en' ? 'products found' : 'ürün bulundu'}
@@ -414,6 +434,25 @@ export default function ListingsPage() {
             {activeFilterCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200">
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
+                {currentSearch && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
+                    {locale === 'en' ? 'Search' : 'Arama'}: &quot;{currentSearch}&quot;
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, search: '' });
+                        setCurrentPage(1);
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('search');
+                        params.delete('page');
+                        router.replace(params.toString() ? `/listings?${params.toString()}` : '/listings');
+                      }}
+                      className="hover:text-orange-900 ml-0.5"
+                      aria-label={locale === 'en' ? 'Remove search' : 'Aramayı kaldır'}
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                )}
                 {[
                   { k: 'category', v: filtersForSidebar.category }, { k: 'brand', v: filters.brand },
                   { k: 'carModel', v: filters.carModel }, { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material },

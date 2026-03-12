@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
@@ -202,6 +202,16 @@ export default function Navbar() {
   useEffect(() => {
     setActiveIndex(-1);
   }, [debouncedQuery]);
+
+  // When on /listings, keep the search input in sync with the URL ?search= param
+  const pathname = usePathname();
+  const navSearchParams = useSearchParams();
+  useEffect(() => {
+    if (pathname === '/listings') {
+      const urlSearch = navSearchParams.get('search') || '';
+      setSearchQuery(urlSearch);
+    }
+  }, [pathname, navSearchParams]);
 
   // Rich autocomplete query
   const richAutoQuery = useQuery({

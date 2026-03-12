@@ -111,12 +111,19 @@ export default function SidebarFilters({
                 const data = response.data as {
                     scales?: string[];
                     materials?: Array<{ slug: string; label: string }>;
-                    brands?: Array<{ id: string; name: string; slug: string }>;
+                    brands?: string[] | Array<{ id: string; name: string; slug: string }>;
                     carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
                 };
                 if (data.scales?.length) setScaleList(data.scales);
                 if (data.materials?.length) setMaterialList(data.materials);
-                if (data.brands?.length) setBrandList(data.brands);
+                if (data.brands?.length) {
+                    const normalized = data.brands.map((b: any) =>
+                        typeof b === 'string'
+                            ? { id: '', name: b, slug: b.toLowerCase().replace(/\s+/g, '-') }
+                            : b
+                    );
+                    setBrandList(normalized);
+                }
                 if (data.carModels?.length) setCarModelList(data.carModels);
             } catch (error) {
                 console.error('Failed to fetch filters:', error);
@@ -159,7 +166,10 @@ export default function SidebarFilters({
     };
 
     const handleBrandChange = (brandId: string, brandName: string) => {
-        if (filters.brandId === brandId) {
+        const isCurrentlySelected = brandId
+            ? filters.brandId === brandId
+            : filters.brand === brandName;
+        if (isCurrentlySelected) {
             onFilterChange({ ...filters, brandId: '', brand: '', carModelId: '', carModel: '' });
         } else {
             onFilterChange({ ...filters, brandId, brand: brandName, carModelId: '', carModel: '' });
