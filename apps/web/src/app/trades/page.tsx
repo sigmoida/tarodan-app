@@ -17,6 +17,7 @@ interface TradeItem {
   productId: string;
   productTitle: string;
   productImage?: string;
+  productImages?: { cardUrl?: string; detailUrl?: string }[];
   side: string;
   quantity: number;
   valueAtTrade: number;
@@ -184,7 +185,8 @@ export default function TradesPage() {
               const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
 
               const getItemImage = (item: TradeItem): string => {
-                return item.productImage || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
+                const url = item.productImages?.[0]?.cardUrl ?? item.productImages?.[0]?.detailUrl ?? item.productImage;
+                return url || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
               };
 
               const calculateTotalValue = (items: TradeItem[]): number => {

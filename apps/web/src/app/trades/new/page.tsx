@@ -19,7 +19,7 @@ interface Product {
   originalPrice?: number | null;
   salePrice?: number | null;
   isOnSale?: boolean;
-  images?: Array<{ url: string } | string>;
+  images?: Array<{ url?: string; cardUrl?: string; detailUrl?: string } | string>;
   isTradeEnabled?: boolean;
   status?: string;
 }
@@ -69,17 +69,16 @@ export default function NewTradePage() {
       router.push(`/login?redirect=/trades/new?listing=${listingId}`);
       return;
     }
-    
-    if (!canTrade) {
+    // Only block when we have resolved limits (avoids false "Premium required" on refresh before checkAuth completes)
+    if (limits !== null && !canTrade) {
       toast.error(t('trade.requiresPremium'));
       router.push('/pricing');
       return;
     }
-    
-    if (listingId) {
+    if (listingId && (limits === null || canTrade)) {
       fetchData();
     }
-  }, [isAuthenticated, canTrade, listingId]);
+  }, [isAuthenticated, limits, canTrade, listingId]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -113,7 +112,11 @@ export default function NewTradePage() {
       return placeholder;
     }
     const img = product.images[0];
-    return typeof img === 'string' ? img : img.url;
+    if (typeof img === 'string') return img;
+    const url = (img as { cardUrl?: string; detailUrl?: string; url?: string }).cardUrl
+      ?? (img as { detailUrl?: string; url?: string }).detailUrl
+      ?? (img as { url?: string }).url;
+    return url || placeholder;
   };
 
   const toggleProduct = (productId: string) => {

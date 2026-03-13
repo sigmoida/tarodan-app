@@ -29,6 +29,7 @@ interface TradeItem {
   productId: string;
   productTitle: string;
   productImage?: string;
+  productImages?: { cardUrl?: string; detailUrl?: string }[];
   side: string;
   quantity: number;
   valueAtTrade: number;
@@ -374,7 +375,7 @@ export default function TradeDetailPage() {
         id: item.productId,
         title: item.productTitle,
         price: item.valueAtTrade, // Use value at trade time
-        images: item.productImage ? (typeof item.productImage === 'string' ? [item.productImage] : [{ url: item.productImage }]) : [],
+        images: item.productImages?.length ? item.productImages : (item.productImage ? [{ cardUrl: item.productImage, detailUrl: item.productImage }] : []),
         status: 'reserved', // These are in a trade, so they're reserved
         isTradeEnabled: true, // They're already in a trade, so they must be trade-enabled
       }));
@@ -414,7 +415,7 @@ export default function TradeDetailPage() {
         id: item.productId,
         title: item.productTitle,
         price: item.valueAtTrade,
-        images: item.productImage ? (typeof item.productImage === 'string' ? [item.productImage] : [{ url: item.productImage }]) : [],
+        images: item.productImages?.length ? item.productImages : (item.productImage ? [{ cardUrl: item.productImage, detailUrl: item.productImage }] : []),
         status: 'reserved',
         isTradeEnabled: true,
       }));
@@ -592,7 +593,8 @@ export default function TradeDetailPage() {
     (!trade.responseDeadline || new Date(trade.responseDeadline) > new Date());
 
   const getItemImage = (item: TradeItem) => {
-    return item.productImage || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
+    const url = item.productImages?.[0]?.cardUrl ?? item.productImages?.[0]?.detailUrl ?? item.productImage;
+    return url || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
   };
 
   const calculateTotalValue = (items: TradeItem[]) => {

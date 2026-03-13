@@ -274,7 +274,7 @@ export class TradeService {
         items: {
           include: {
             product: {
-              select: { id: true, title: true, images: { take: 1 } },
+              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
             },
           },
         },
@@ -356,7 +356,7 @@ export class TradeService {
         items: {
           include: {
             product: {
-              select: { id: true, title: true, images: { take: 1 } },
+              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
             },
           },
         },
@@ -1324,15 +1324,40 @@ export class TradeService {
   }
 
   /**
-   * Resolve product image URL (S3 key -> presigned URL)
+   * Resolve product image URL (S3 key -> public URL). Any non-URL key is treated as S3 key.
    */
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
-      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
-    }
-    return null;
+    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+  }
+
+  private mapTradeItemToDto(item: any): {
+    id: string;
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+    productImages?: { cardUrl: string; detailUrl?: string }[];
+    side: string;
+    quantity: number;
+    valueAtTrade: number;
+  } {
+    const firstImg = item.product?.images?.[0];
+    const cardUrl = firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : undefined;
+    const detailUrl = firstImg?.detailKey ? this.storageService.getPublicAssetUrl(firstImg.detailKey) : undefined;
+    const productImage = this.resolveProductImageUrl(firstImg?.cardKey);
+    const productImages =
+      cardUrl || detailUrl ? [{ cardUrl: cardUrl ?? '', detailUrl }] : undefined;
+    return {
+      id: item.id,
+      productId: item.productId,
+      productTitle: item.product?.title || '',
+      productImage: productImage ?? undefined,
+      productImages,
+      side: item.side,
+      quantity: item.quantity,
+      valueAtTrade: parseFloat(item.valueAtTrade),
+    };
   }
 
   private async mapToResponseDto(trade: any): Promise<TradeResponseDto> {
@@ -1351,28 +1376,12 @@ export class TradeService {
       receiverId: trade.receiverId,
       receiverName: trade.receiver?.displayName || '',
       status: trade.status,
-      initiatorItems: await Promise.all((trade.items || [])
+      initiatorItems: (trade.items || [])
         .filter((item: any) => item.side === 'initiator')
-        .map(async (item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          productTitle: item.product?.title || '',
-          productImage: this.resolveProductImageUrl(item.product?.images?.[0]?.cardKey),
-          side: item.side,
-          quantity: item.quantity,
-          valueAtTrade: parseFloat(item.valueAtTrade),
-        }))),
-      receiverItems: await Promise.all((trade.items || [])
+        .map((item: any) => this.mapTradeItemToDto(item)),
+      receiverItems: (trade.items || [])
         .filter((item: any) => item.side === 'receiver')
-        .map(async (item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          productTitle: item.product?.title || '',
-          productImage: this.resolveProductImageUrl(item.product?.images?.[0]?.cardKey),
-          side: item.side,
-          quantity: item.quantity,
-          valueAtTrade: parseFloat(item.valueAtTrade),
-        }))),
+        .map((item: any) => this.mapTradeItemToDto(item)),
       cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
       cashPayerId: trade.cashPayerId || undefined,
       cashCommission: trade.cashCommission
