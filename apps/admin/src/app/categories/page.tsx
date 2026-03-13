@@ -27,6 +27,7 @@ interface Category {
   sortOrder: number;
   isActive: boolean;
   productCount: number;
+  collectionCount: number;
   createdAt: string;
 }
 
@@ -316,7 +317,7 @@ export default function CategoriesPage() {
                 {!category.isActive && (
                   <span className="px-2 py-0.5 text-xs bg-gray-700 text-gray-500 rounded">Pasif</span>
                 )}
-                <span className="text-xs text-gray-500">({category.productCount} ürün)</span>
+                <span className="text-xs text-gray-500">({category.productCount} ürün, {category.collectionCount} koleksiyon)</span>
               </div>
               {category.description && (
                 <p className="text-xs text-gray-500 mt-1 truncate max-w-md">{category.description}</p>

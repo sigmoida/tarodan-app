@@ -500,14 +500,13 @@ export default function UreticilerPage() {
                     onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
                     className="w-full text-left p-4 sm:p-5 flex items-center gap-4 sm:gap-5"
                   >
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center p-2" style={{ borderRadius: '6px' }}>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
                       <Image
                         src={brand.logoUrl}
                         alt={brand.name}
-                        width={80}
-                        height={60}
-                        className="object-contain max-w-full max-h-full"
-                        style={{ width: 'auto', height: 'auto' }}
+                        fill
+                        className="object-contain p-1"
+                        sizes="80px"
                         unoptimized
                       />
                     </div>

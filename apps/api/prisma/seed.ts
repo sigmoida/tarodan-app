@@ -1292,11 +1292,16 @@ async function main() {
     }
     const coverKey = await uploadCollectionCover(storageService!, coverPath);
 
+    const existingBySlug = await prisma.collection.findFirst({
+      where: { slug: cd.slug, userId: cd.user.id },
+    });
+    const collId = existingBySlug?.id ?? randomUUID();
+
     const collection = await prisma.collection.upsert({
-      where: { id: `collection-${cd.slug}` },
+      where: { id: collId },
       update: { coverImageKey: coverKey, categoryId: catId },
       create: {
-        id: `collection-${cd.slug}`,
+        id: collId,
         userId: cd.user.id,
         categoryId: catId,
         name: cd.name,
@@ -1314,7 +1319,7 @@ async function main() {
 
   // Assign products to matching collections
   for (const coll of collections) {
-    const collDef = collectionDefs.find(d => `collection-${d.slug}` === coll.id)!;
+    const collDef = collectionDefs.find(d => d.slug === coll.slug)!;
     const matchingProducts = collDef.catSlug
       ? products.filter((_, idx) => productData[idx].cat === collDef.catSlug)
       : products.filter(() => Math.random() > 0.7);

@@ -120,6 +120,20 @@ export class SearchController {
   }
 
   @Public()
+  @Get('dev/reindex-collections')
+  async devReindexCollections(): Promise<{ indexed: number; message: string }> {
+    const isDev = this.configService.get('NODE_ENV') === 'development';
+    if (!isDev) {
+      return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
+    }
+    const indexed = await this.searchService.reindexAllCollections();
+    return {
+      indexed,
+      message: `${indexed} koleksiyon Elasticsearch'e index'lendi.`,
+    };
+  }
+
+  @Public()
   @Get('status')
   async getStatus() {
     return this.searchService.getStatus();

@@ -235,74 +235,55 @@ export class CollectionService {
     slug: string,
     viewerId?: string,
   ): Promise<CollectionResponseDto> {
-    // Try exact slug first, then try stripping "collection-" prefix if present
-    const slugsToTry = [slug];
-    if (slug.startsWith('collection-')) {
-      slugsToTry.push(slug.replace('collection-', ''));
-    }
-
-    let collection = null;
-    for (const s of slugsToTry) {
-      const basic = await this.prisma.collection.findFirst({
-        where: { slug: s },
-        select: { id: true },
-      });
-      
-      if (!basic) continue;
-      
-      collection = await this.prisma.collection.findFirst({
-        where: { id: basic.id },
-        include: {
-          user: { select: { id: true, displayName: true } },
-          category: { select: { id: true, name: true, slug: true } },
-          items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  price: true,
-                  status: true,
-                },
+    const collection = await this.prisma.collection.findFirst({
+      where: { slug },
+      include: {
+        user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                price: true,
+                status: true,
               },
             },
-            orderBy: { sortOrder: 'asc' },
           },
+          orderBy: { sortOrder: 'asc' },
         },
-      });
-      
-      if (collection) {
-        // Fetch images separately for each product
-        const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
-        if (productIds.length > 0) {
-          const productImages = await this.prisma.productImage.findMany({
-            where: { productId: { in: productIds } },
-            orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
-          });
-          
-          const imagesByProduct = new Map<string, any[]>();
-          for (const img of productImages) {
-            if (!imagesByProduct.has(img.productId)) {
-              imagesByProduct.set(img.productId, []);
-            }
-            const arr = imagesByProduct.get(img.productId)!;
-            if (arr.length < 1) {
-              arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
-            }
+      },
+    });
+
+    if (collection) {
+      const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
+      if (productIds.length > 0) {
+        const productImages = await this.prisma.productImage.findMany({
+          where: { productId: { in: productIds } },
+          orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+        });
+
+        const imagesByProduct = new Map<string, any[]>();
+        for (const img of productImages) {
+          if (!imagesByProduct.has(img.productId)) {
+            imagesByProduct.set(img.productId, []);
           }
-          
-          // Attach images to products
-          if (collection.items) {
-            for (const item of collection.items) {
-              if (item.product && imagesByProduct.has(item.product.id)) {
-                (item.product as any).images = imagesByProduct.get(item.product.id) || [];
-              } else if (item.product) {
-                (item.product as any).images = [];
-              }
+          const arr = imagesByProduct.get(img.productId)!;
+          if (arr.length < 1) {
+            arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
+          }
+        }
+
+        if (collection.items) {
+          for (const item of collection.items) {
+            if (item.product && imagesByProduct.has(item.product.id)) {
+              (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+            } else if (item.product) {
+              (item.product as any).images = [];
             }
           }
         }
-        break;
       }
     }
 
@@ -459,11 +440,17 @@ export class CollectionService {
     });
 
     if (esResult && esResult.ids.length > 0) {
-      return this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
+      const hydrated = await this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
+      if (hydrated.collections.length === 0 && hydrated.total > 0) {
+        this.logger.warn(
+          `ES returned ${esResult.ids.length} collection IDs but Prisma found 0 – stale index detected, falling back to Prisma`,
+        );
+        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+      }
+      return hydrated;
     }
 
     // ES returned null (unavailable) or 0 results – fall back to Prisma (source of truth).
-    // ES index can be stale; Prisma ensures correct category filtering.
     return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
   }
 

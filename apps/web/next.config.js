@@ -44,6 +44,9 @@ const nextConfig = {
   async headers() {
     return getCacheHeaders();
   },
+  async rewrites() {
+    return [{ source: '/favicon.ico', destination: '/tarodan-logo.jpg' }];
+  },
   images: {
     remotePatterns: [
       {

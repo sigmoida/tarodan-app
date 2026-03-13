@@ -341,14 +341,13 @@ export default function Home() {
                 href={`/listings?brand=${encodeURIComponent(brand.name)}`}
                 className="flex-shrink-0 group"
               >
-                <div className="w-24 h-14 sm:w-28 sm:h-16 bg-white border border-gray-200 hover:border-orange-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm" style={{ borderRadius: '4px' }}>
+                <div className="w-24 h-14 sm:w-28 sm:h-16 bg-white border border-gray-200 hover:border-orange-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative" style={{ borderRadius: '4px' }}>
                   <Image
                     src={brand.logoUrl}
                     alt={brand.name}
-                    width={90}
-                    height={50}
-                    className="object-contain opacity-70 group-hover:opacity-100 transition-opacity max-w-full max-h-full"
-                    style={{ width: 'auto', height: 'auto' }}
+                    fill
+                    className="object-contain opacity-70 group-hover:opacity-100 transition-opacity p-1"
+                    sizes="(max-width: 640px) 96px, 112px"
                     unoptimized
                   />
                 </div>

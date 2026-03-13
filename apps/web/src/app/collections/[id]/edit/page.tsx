@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import OptimizedImage from '@/components/OptimizedImage';
@@ -45,6 +45,7 @@ const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
@@ -194,8 +195,7 @@ export default function EditCollectionPage() {
       
       toast.success(t('collection.collectionUpdated'));
       // Use slug if available, otherwise use ID
-      const redirectPath = collection.slug || collection.id;
-      router.push(`/collections/${redirectPath}`);
+      router.push(`/collections/${collection.id}`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Update collection error:', error);
       toast.error(error.response?.data?.message || t('collection.loadFailed'));
@@ -213,6 +213,9 @@ export default function EditCollectionPage() {
     setIsDeleting(true);
     try {
       await collectionsApi.delete(collection.id);
+      await queryClient.invalidateQueries({ queryKey: ['collections', 'mine'] });
+      await queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.removeQueries({ queryKey: ['collection', collection.id] });
       toast.success(t('collection.collectionDeleted'));
       router.push('/collections');
     } catch (error: any) {

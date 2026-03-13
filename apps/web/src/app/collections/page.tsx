@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -103,6 +103,7 @@ export default function CollectionsPage() {
       const data = response.data?.collections || response.data?.data || [];
       return Array.isArray(data) ? data : [];
     },
+    placeholderData: keepPreviousData,
     meta: { page: 'collections-public' },
   });
   const collections = publicQuery.data ?? [];
@@ -119,7 +120,9 @@ export default function CollectionsPage() {
   });
   const myCollections = myQuery.data ?? [];
 
-  const loading = activeTab === 'public' ? publicQuery.isLoading : myQuery.isLoading;
+  const loading = activeTab === 'public'
+    ? (publicQuery.isLoading && !publicQuery.data)
+    : (myQuery.isLoading && !myQuery.data);
 
   const canCreateCollection = user?.membershipTier !== 'free' || limits?.canCreateCollections;
 
@@ -393,9 +396,10 @@ export default function CollectionsPage() {
         <CreateCollectionModal
           flatCategories={flatCategories}
           onClose={() => setShowCreateModal(false)}
-          onCreated={() => {
+          onCreated={(collectionId) => {
             setShowCreateModal(false);
             queryClient.invalidateQueries({ queryKey: ['collections', 'mine'] });
+            if (collectionId) router.push(`/collections/${collectionId}`);
           }}
         />
       )}
@@ -436,7 +440,7 @@ function CreateCollectionModal({
   flatCategories,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (collectionId?: string) => void;
   flatCategories: { id: string; name: string; slug: string }[];
 }) {
   const [name, setName] = useState('');
@@ -450,13 +454,14 @@ function CreateCollectionModal({
     setLoading(true);
 
     try {
-      await collectionsApi.create({
+      const { data } = await collectionsApi.create({
         name,
         description,
         isPublic,
         ...(categoryId ? { categoryId } : {}),
       });
-      onCreated();
+      const createdId = data?.id;
+      onCreated(createdId);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';

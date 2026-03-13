@@ -4465,7 +4465,7 @@ export class AdminService {
         parent: true,
         children: { orderBy: { sortOrder: 'asc' } },
         _count: {
-          select: { products: true },
+          select: { products: true, collections: true },
         },
       },
       orderBy: { sortOrder: 'asc' },
@@ -4487,6 +4487,7 @@ export class AdminService {
         sortOrder: c.sortOrder,
         isActive: c.isActive,
         productCount: c._count.products,
+        collectionCount: c._count.collections,
         image: c.image,
         createdAt: c.createdAt,
       })),

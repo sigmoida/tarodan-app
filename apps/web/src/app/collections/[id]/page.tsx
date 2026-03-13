@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -109,6 +109,7 @@ export default function CollectionDetailPage() {
   const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'custom'>('products');
+  const slugReplacedRef = useRef(false);
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -155,13 +156,13 @@ export default function CollectionDetailPage() {
   const collectionQuery = useQuery({
     queryKey: ['collection', collectionIdOrSlug],
     queryFn: async (): Promise<Collection> => {
-      let idOrSlug = collectionIdOrSlug;
-      if (idOrSlug.startsWith('collection-')) {
-        idOrSlug = idOrSlug.replace('collection-', '');
+      const idOrSlug = collectionIdOrSlug;
+      if (isUUID(idOrSlug)) {
+        const response = await collectionsApi.getOne(idOrSlug);
+        return response.data.collection || response.data;
       }
-      const response = isUUID(idOrSlug)
-        ? await collectionsApi.getOne(idOrSlug)
-        : await collectionsApi.getBySlug(idOrSlug);
+      // Slug ile API'ye sor
+      const response = await collectionsApi.getBySlug(idOrSlug);
       return response.data.collection || response.data;
     },
     enabled: !!collectionIdOrSlug,
@@ -181,6 +182,26 @@ export default function CollectionDetailPage() {
     if (status === 404) return t('collection.collectionNotFound');
     return t('collection.loadFailed');
   }, [collectionIdOrSlug, collectionQuery.isError, collectionQuery.error, t]);
+
+  // Slug ile gelindiyse adres çubuğunu her zaman id ile güncelle (canonical URL)
+  useEffect(() => {
+    if (!collectionIdOrSlug) return;
+    if (isUUID(collectionIdOrSlug)) {
+      slugReplacedRef.current = false;
+      return;
+    }
+    if (!collection?.id) return;
+    if (slugReplacedRef.current) return;
+    slugReplacedRef.current = true;
+    queryClient.setQueryData(['collection', collection.id], collection);
+    const idPath = `/collections/${collection.id}`;
+    router.replace(idPath, { scroll: false });
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        window.history.replaceState(null, '', idPath);
+      });
+    }
+  }, [collection, collectionIdOrSlug, queryClient, router]);
 
   const handleLike = async () => {
     if (!isAuthenticated) { setShowAuthModal(true); return; }
@@ -440,7 +461,7 @@ export default function CollectionDetailPage() {
               {isOwner && collection && (
                 <div className="flex items-center gap-2 mt-4">
                   <Link
-                    href={`/collections/${collectionIdOrSlug}/edit`}
+                    href={`/collections/${collection?.id ?? collectionIdOrSlug}/edit`}
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                   >
                     {t('collection.edit')}
@@ -803,7 +824,7 @@ export default function CollectionDetailPage() {
         title={t('collection.loginToLike')}
         message={t('collection.loginToLikeMsg')}
         icon={<HeartIcon className="w-10 h-10 text-orange-500" />}
-        redirectPath={`/collections/${collectionIdOrSlug}`}
+        redirectPath={collection?.id ? `/collections/${collection.id}` : `/collections/${collectionIdOrSlug}`}
       />
     </div>
   );

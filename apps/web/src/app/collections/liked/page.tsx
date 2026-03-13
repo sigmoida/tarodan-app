@@ -149,7 +149,7 @@ export default function LikedCollectionsPage() {
                 transition={{ delay: index * 0.02 }}
               >
                 <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
-                  <Link href={`/collections/${collection.slug || collection.id}`}>
+                  <Link href={`/collections/${collection.id}`}>
                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                       {collection.coverImageUrl ? (
                         <OptimizedImage
@@ -191,7 +191,7 @@ export default function LikedCollectionsPage() {
                   </Link>
 
                   <div className="p-2.5 flex-1 flex flex-col">
-                    <Link href={`/collections/${collection.slug || collection.id}`}>
+                    <Link href={`/collections/${collection.id}`}>
                       <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
                     </Link>
                     {collection.description && (
