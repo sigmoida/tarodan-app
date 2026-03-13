@@ -219,10 +219,10 @@ export class OfferService {
   async accept(offerId: string, sellerId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
-      const lockedOffers = await tx.$queryRaw<any[]>`
-        SELECT o.*, o.version as offer_version
-        FROM "Offer" o
-        WHERE o.id = ${offerId}::uuid
+      const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
+        SELECT o.id
+        FROM "offers" o
+        WHERE o.id = ${offerId}
         FOR UPDATE
       `;
 
@@ -230,7 +230,13 @@ export class OfferService {
         throw new NotFoundException('Teklif bulunamadı');
       }
 
-      const offerData = lockedOffers[0];
+      const offerData = await tx.offer.findUnique({
+        where: { id: offerId },
+      });
+
+      if (!offerData) {
+        throw new NotFoundException('Teklif bulunamadı');
+      }
 
       // Only seller can accept
       if (offerData.sellerId !== sellerId) {
@@ -252,21 +258,15 @@ export class OfferService {
         throw new BadRequestException('Bu teklifin süresi dolmuş');
       }
 
-      // Lock product row with FOR UPDATE
-      const lockedProducts = await tx.$queryRaw<any[]>`
-        SELECT p.*
-        FROM "Product" p
-        WHERE p.id = ${offerData.productId}::uuid
-        FOR UPDATE
-      `;
+      // Check product is still available
+      const productData = await tx.product.findUnique({
+        where: { id: offerData.productId },
+      });
 
-      if (!lockedProducts || lockedProducts.length === 0) {
+      if (!productData) {
         throw new NotFoundException('Ürün bulunamadı');
       }
 
-      const productData = lockedProducts[0];
-
-      // Check product is still available
       if (productData.status !== ProductStatus.active) {
         throw new BadRequestException('Ürün artık satışta değil');
       }
@@ -275,7 +275,7 @@ export class OfferService {
       const acceptedOffer = await tx.offer.update({
         where: {
           id: offerId,
-          version: offerData.offer_version,
+          version: offerData.version,
         },
         data: {
           status: OfferStatus.accepted,
