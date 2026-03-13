@@ -6,9 +6,11 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon, TagIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { listingsApi, api, userApi, mediaApi, discountsApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import { SimpleDropdown } from '@/components/SimpleDropdown';
 
 interface Category {
   id: string;
@@ -45,6 +47,7 @@ export default function EditListingPage() {
   const router = useRouter();
   const id = params.id as string;
   const { locale } = useTranslation();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -242,8 +245,20 @@ export default function EditListingPage() {
       if (data.materials?.length) setMaterialList(data.materials);
       if (data.brands?.length) setBrands(data.brands);
       if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+      if (!data.brands?.length) {
+        const brandsRes = await brandsApi.findAll();
+        const raw = brandsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+        if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+      }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+      try {
+        const brandsRes = await brandsApi.findAll();
+        const raw = brandsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+        if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+      } catch (_) {}
       toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
     } finally {
       setBrandsLoading(false);
@@ -434,10 +449,14 @@ export default function EditListingPage() {
         const scaleFromAttrs = (listing as any).attributes?.find(
           (a: any) => (a.label === 'Ölçek' || a.group === 'Ölçek')
         )?.value;
+        const hasActiveSale = (listing as any).oldPrice != null && Number((listing as any).oldPrice) > Number(listing.price);
+        const displayPrice = hasActiveSale
+          ? String(Number((listing as any).oldPrice))
+          : (listing.price?.toString() || '');
         const newFormData = {
           title: savedData?.title || listing.title || prev.title || '',
           description: savedData?.description || listing.description || prev.description || '',
-          price: savedData?.price || listing.price?.toString() || prev.price || '',
+          price: savedData?.price || displayPrice || prev.price || '',
           categoryId: savedData?.categoryId || listing.categoryId || listing.category?.id || prev.categoryId || '',
           condition: savedData?.condition || listing.condition || prev.condition || 'very_good',
           brandId: savedData?.brandId || listing.brand?.id || prev.brandId || '',
@@ -474,12 +493,16 @@ export default function EditListingPage() {
       const sale = onSale ? Number(listing.price) : (listing.salePrice != null ? Number(listing.salePrice) : null);
       const start = listing.saleStartDate ? (typeof listing.saleStartDate === 'string' ? listing.saleStartDate.split('T')[0] : new Date(listing.saleStartDate).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
       const end = listing.saleEndDate ? (typeof listing.saleEndDate === 'string' ? listing.saleEndDate.split('T')[0] : new Date(listing.saleEndDate).toISOString().split('T')[0]) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const saleActive = orig != null && sale != null && sale > 0 && orig > sale;
       setSaleData({
         originalPrice: orig != null ? String(orig) : '',
-        salePrice: sale != null ? String(sale) : '',
+        salePrice: saleActive ? String(sale) : '',
         saleStartDate: start,
         saleEndDate: end,
       });
+      if (saleActive) {
+        setShowDiscountSection(true);
+      }
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch listing:', error);
       toast.error(error.response?.data?.message || 'İlan yüklenemedi');
@@ -590,9 +613,13 @@ export default function EditListingPage() {
 
     setIsLoading(true);
     try {
-      const orig = saleData.originalPrice ? Number(saleData.originalPrice) : Number(formData.price);
+      const formPrice = Number(formData.price);
+      const orig = saleData.originalPrice ? Number(saleData.originalPrice) : formPrice;
       const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
-      const hasSale = sale > 0 && orig > sale;
+      // Use whichever is higher between formData.price and saleData.originalPrice as the "original"
+      const effectiveOrig = Math.max(orig, formPrice);
+      // A sale is valid only when salePrice > 0, effectively lower than the listed price, and distinct from it
+      const hasSale = sale > 0 && effectiveOrig > sale && sale !== formPrice;
       const payload: Record<string, unknown> = {
         title: formData.title,
         description: formData.description || undefined,
@@ -614,7 +641,7 @@ export default function EditListingPage() {
       };
       // Sale/discount fields: send to backend so listing shows updated price
       if (hasSale) {
-        payload.originalPrice = orig;
+        payload.originalPrice = effectiveOrig;
         payload.salePrice = sale;
         payload.saleStartDate = saleData.saleStartDate ? new Date(saleData.saleStartDate).toISOString() : null;
         payload.saleEndDate = saleData.saleEndDate ? new Date(saleData.saleEndDate).toISOString() : null;
@@ -629,6 +656,10 @@ export default function EditListingPage() {
 
       await listingsApi.update(id, payload as any);
       toast.success('İlanınız güncellendi!');
+
+      queryClient.invalidateQueries({ queryKey: ['listing', id] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-listings'] });
 
       // Clear saved form data after successful submission
       // Only clear if we're actually navigating away (not just refreshing)
@@ -841,58 +872,35 @@ export default function EditListingPage() {
 
             {/* Brand & Scale */}
             <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Marka
-                </label>
-                <select
-                  value={formData.brandId}
-                  onChange={(e) => {
-                    const newBrandId = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      brandId: newBrandId,
-                      carModelId: ''
-                    }));
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={brandsLoading}
-                >
-                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Marka"
+                value={formData.brandId}
+                onValueChange={(newBrandId) =>
+                  setFormData((prev) => ({ ...prev, brandId: newBrandId, carModelId: '' }))
+                }
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
+                disabled={brandsLoading}
+                triggerClassName="py-3 rounded-xl border-gray-300"
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Model
-                </label>
-                <select
-                  value={formData.carModelId}
-                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || modelsLoading}
-                >
-                  <option value="">
-                    {!formData.brandId
-                      ? 'Önce marka seçin'
-                      : modelsLoading
-                        ? 'Yükleniyor...'
-                        : models.length === 0
-                          ? 'Bu markaya ait model yok'
-                          : 'Model Seçin'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Model"
+                value={formData.carModelId}
+                onValueChange={(carModelId) => setFormData({ ...formData, carModelId })}
+                options={models.map((m) => ({ value: m.id, label: m.name }))}
+                placeholder={
+                  !formData.brandId
+                    ? 'Önce marka seçin'
+                    : modelsLoading
+                      ? 'Yükleniyor...'
+                      : models.length === 0
+                        ? 'Bu markaya ait model yok'
+                        : 'Model Seçin'
+                }
+                disabled={!formData.brandId || modelsLoading}
+                triggerClassName="py-3 rounded-xl border-gray-300"
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

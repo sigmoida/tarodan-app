@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   Inject,
   forwardRef,
   Logger,
@@ -147,71 +148,103 @@ export class ProductService implements OnModuleInit {
       ? new Date(dto.year, 0, 1)
       : undefined;
 
-    const product = await this.prisma.product.create({
-      data: {
-        sellerId,
-        categoryId: dto.categoryId,
-        title: dto.title,
-        description: dto.description,
-        price: dto.price,
-        condition: dto.condition,
-        status: ProductStatus.pending, // Needs admin approval
-        quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
-        isTradeEnabled: dto.isTradeEnabled || false,
-        isPreorder: dto.isPreorder ?? false,
-        isSet: dto.isSet ?? false,
-        brandId: dto.brandId,
-        carModelId: dto.carModelId,
-        manufacturerId: dto.manufacturerId,
-        releaseDate,
-        images: dto.images?.length
-          ? {
-            create: dto.images.map((img, index) => ({
-              cardKey: img.cardKey,
-              detailKey: img.detailKey,
-              sortOrder: index,
-            })),
-          }
-          : undefined,
-      },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            sellerType: true,
+    // Normalize optional UUIDs: empty string causes Prisma FK error → use undefined
+    const brandId = dto.brandId?.trim() || undefined;
+    const carModelId = dto.carModelId?.trim() || undefined;
+    const manufacturerId = dto.manufacturerId?.trim() || undefined;
+
+    try {
+      const product = await this.prisma.product.create({
+        data: {
+          sellerId,
+          categoryId: dto.categoryId,
+          title: dto.title,
+          description: dto.description,
+          price: dto.price,
+          condition: dto.condition,
+          status: ProductStatus.pending, // Needs admin approval
+          quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
+          isTradeEnabled: dto.isTradeEnabled || false,
+          isPreorder: dto.isPreorder ?? false,
+          isSet: dto.isSet ?? false,
+          brandId,
+          carModelId,
+          manufacturerId,
+          releaseDate,
+          images: dto.images?.length
+            ? {
+              create: dto.images.map((img, index) => ({
+                cardKey: img.cardKey,
+                detailKey: img.detailKey,
+                sortOrder: index,
+              })),
+            }
+            : undefined,
+        },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' } },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              sellerType: true,
+            },
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
           },
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+      });
+
+      // Link scale and material (attributes) so they show on detail and in filters
+      await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
+
+      // Invalidate product list cache
+      await this.cache.delPattern('products:list:*');
+
+      const productWithAttrs = await this.prisma.product.findUnique({
+        where: { id: product.id },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' } },
+          seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+          category: { select: { id: true, name: true, slug: true } },
+          brand: { select: { id: true, name: true, slug: true } },
+          carModel: { select: { id: true, name: true, slug: true } },
+          productAttributes: { include: { attribute: { include: { group: true } } } },
         },
-      },
-    });
+      });
 
-    // Link scale and material (attributes) so they show on detail and in filters
-    await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
-
-    // Invalidate product list cache
-    await this.cache.delPattern('products:list:*');
-
-    const productWithAttrs = await this.prisma.product.findUnique({
-      where: { id: product.id },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        brand: { select: { id: true, name: true, slug: true } },
-        carModel: { select: { id: true, name: true, slug: true } },
-        productAttributes: { include: { attribute: { include: { group: true } } } },
-      },
-    });
-    return await this.formatProductResponse(productWithAttrs);
+      if (!productWithAttrs) {
+        throw new BadRequestException('Ürün oluşturuldu ancak yüklenemedi. Lütfen tekrar deneyin.');
+      }
+      return await this.formatProductResponse(productWithAttrs);
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === 'P2003') {
+        throw new BadRequestException(
+          'Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.'
+        );
+      }
+      if (code === 'P2002') {
+        throw new BadRequestException('Bu ürün zaten mevcut veya benzersiz alan çakışması var.');
+      }
+      // Zaten HTTP exception ise (400, 403 vb.) aynen fırlat
+      if (err?.status && err?.status >= 400 && err?.status < 500) {
+        throw err;
+      }
+      // Diğer hataları logla ve 500 döndür (mesajda development'ta detay göster)
+      this.logger.error('Product create failed', err?.stack || err?.message || err);
+      const message =
+        process.env.NODE_ENV === 'development' && err?.message
+          ? `İlan oluşturulamadı: ${err.message}`
+          : 'İlan oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.';
+      throw new InternalServerErrorException(message);
+    }
   }
 
   /**
@@ -766,8 +799,10 @@ export class ProductService implements OnModuleInit {
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; indirim uygulanınca price = indirimli, oldPrice = önceki; indirim bitince price = oldPrice
     const currentPrice = Number(product.price);
     const currentOldPrice = product.oldPrice != null ? Number(product.oldPrice) : null;
-    const isSettingSale = dto.salePrice != null && Number(dto.salePrice) > 0;
-    const isClearingSale = dto.salePrice === null || dto.salePrice === undefined; // Açık null = indirimi kaldır
+    // class-transformer @Type(() => Number) converts null → 0, so treat 0 as "no sale" too
+    const rawSalePrice = dto.salePrice;
+    const isSettingSale = rawSalePrice != null && Number(rawSalePrice) > 0;
+    const isClearingSale = rawSalePrice === null || rawSalePrice === undefined || Number(rawSalePrice) === 0;
 
     let priceUpdate: number | undefined;
     let oldPriceUpdate: number | null | undefined;
@@ -785,15 +820,21 @@ export class ProductService implements OnModuleInit {
       saleEndDateUpdate = dto.saleEndDate != null && dto.saleEndDate !== '' ? new Date(dto.saleEndDate as string) : undefined;
       legacyOriginalPrice = originalNum;
       legacySalePrice = salePriceNum;
-    } else if (isClearingSale && (dto.salePrice === null || dto.originalPrice === null)) {
-      priceUpdate = currentOldPrice ?? currentPrice;
+    } else if (isClearingSale) {
+      priceUpdate = dto.price !== undefined ? Number(dto.price) : (currentOldPrice ?? currentPrice);
       oldPriceUpdate = null;
       saleStartDateUpdate = null;
       saleEndDateUpdate = null;
       legacyOriginalPrice = null;
       legacySalePrice = null;
     } else {
+      // Not setting a sale: update normal price and clear any previous sale so old price does not stick as "indirimli"
       if (dto.price !== undefined) priceUpdate = Number(dto.price);
+      oldPriceUpdate = null;
+      legacyOriginalPrice = null;
+      legacySalePrice = null;
+      saleStartDateUpdate = null;
+      saleEndDateUpdate = null;
       if (dto.saleStartDate !== undefined) saleStartDateUpdate = dto.saleStartDate == null ? null : new Date(dto.saleStartDate);
       if (dto.saleEndDate !== undefined) saleEndDateUpdate = dto.saleEndDate == null ? null : new Date(dto.saleEndDate);
     }
@@ -803,10 +844,16 @@ export class ProductService implements OnModuleInit {
         ? (dto.year >= 1900 && dto.year <= 2100 ? new Date(dto.year, 0, 1) : null)
         : undefined;
 
+    // When client sends dto.price and we're not setting a sale, always apply it so price updates are never dropped
+    const effectivePrice =
+      dto.price !== undefined && !isSettingSale
+        ? Number(dto.price)
+        : (priceUpdate !== undefined ? priceUpdate : dto.price);
+
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
-      ...(priceUpdate !== undefined ? { price: priceUpdate } : { price: dto.price }),
+      ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
       status: dto.status,
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
@@ -848,7 +895,7 @@ export class ProductService implements OnModuleInit {
 
     // Check if price changed (for wishlist notifications) – compare previous selling price with new one
     const prevSellingPrice = Number(product.price);
-    const newSellingPrice = priceUpdate !== undefined ? priceUpdate : (dto.price !== undefined ? Number(dto.price) : prevSellingPrice);
+    const newSellingPrice = effectivePrice !== undefined ? effectivePrice : prevSellingPrice;
     const priceChanged = prevSellingPrice !== newSellingPrice;
 
     // Update with optimistic locking

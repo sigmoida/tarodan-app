@@ -1,8 +1,13 @@
 import axios from 'axios';
 
-// Use relative URL to go through Next.js rewrite proxy (avoids CORS)
+// Tarayıcıda doğrudan API'ye git (3001); proxy bazen 500 veriyor. Sunucu tarafında /api (rewrite) kullanılır.
+const baseURL =
+  typeof window !== 'undefined'
+    ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api`
+    : '/api';
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },

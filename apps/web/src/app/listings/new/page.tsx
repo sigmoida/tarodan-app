@@ -6,9 +6,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api, mediaApi } from '@/lib/api';
+import { listingsApi, api, mediaApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { SimpleDropdown } from '@/components/SimpleDropdown';
 
 interface Category {
   id: string;
@@ -304,8 +305,20 @@ export default function NewListingPage() {
         if (data.materials?.length) setMaterialList(data.materials);
         if (data.brands?.length) setBrands(data.brands);
         if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+        if (!data.brands?.length) {
+          const brandsRes = await brandsApi.findAll();
+          const raw = brandsRes.data;
+          const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+          if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+        }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+        try {
+          const brandsRes = await brandsApi.findAll();
+          const raw = brandsRes.data;
+          const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+          if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+        } catch (_) {}
         toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
       } finally {
         setBrandsLoading(false);
@@ -624,58 +637,33 @@ export default function NewListingPage() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Marka
-                </label>
-                <select
-                  value={formData.brandId}
-                  onChange={(e) => {
-                    const newBrandId = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      brandId: newBrandId,
-                      carModelId: ''
-                    }));
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={brandsLoading}
-                >
-                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Marka"
+                value={formData.brandId}
+                onValueChange={(newBrandId) =>
+                  setFormData((prev) => ({ ...prev, brandId: newBrandId, carModelId: '' }))
+                }
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
+                disabled={brandsLoading}
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model
-                </label>
-                <select
-                  value={formData.carModelId}
-                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || modelsLoading}
-                >
-                  <option value="">
-                    {!formData.brandId
-                      ? 'Önce marka seçin'
-                      : modelsLoading
-                        ? 'Yükleniyor...'
-                        : models.length === 0
-                          ? 'Bu markaya ait model yok'
-                          : 'Model Seçin'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Model"
+                value={formData.carModelId}
+                onValueChange={(carModelId) => setFormData({ ...formData, carModelId })}
+                options={models.map((m) => ({ value: m.id, label: m.name }))}
+                placeholder={
+                  !formData.brandId
+                    ? 'Önce marka seçin'
+                    : modelsLoading
+                      ? 'Yükleniyor...'
+                      : models.length === 0
+                        ? 'Bu markaya ait model yok'
+                        : 'Model Seçin'
+                }
+                disabled={!formData.brandId || modelsLoading}
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
