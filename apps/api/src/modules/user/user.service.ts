@@ -716,9 +716,8 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Get seller stats
-    // Count only active listings (exclude inactive, draft, and pending for public profile)
-    const [totalListings, totalSales, totalTrades, ratings] = await Promise.all([
+    // Get seller stats + followers count
+    const [totalListings, totalSales, totalTrades, ratings, followersCount] = await Promise.all([
       this.prisma.product.count({ 
         where: { 
           sellerId: userId, 
@@ -737,6 +736,7 @@ export class UserService {
         _avg: { score: true },
         _count: true,
       }),
+      this.prisma.userFollow.count({ where: { followingId: userId } }),
     ]);
 
     // Resolve avatar URL (S3 key → presigned URL)
@@ -745,6 +745,7 @@ export class UserService {
     return {
       ...user,
       avatarUrl: resolvedAvatarUrl,
+      followersCount,
       stats: {
         totalListings,
         totalSales,

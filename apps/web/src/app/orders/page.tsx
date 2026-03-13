@@ -67,6 +67,7 @@ export default function OrdersPage() {
   const { t, locale } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const addToCart = useCartStore((s) => s.addToCart);
+  const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
   const [downloadingInvoiceOrderId, setDownloadingInvoiceOrderId] = useState<string | null>(null);
 
@@ -102,11 +103,15 @@ export default function OrdersPage() {
   const [submittingShipping, setSubmittingShipping] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=/orders');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', filter],
@@ -263,8 +268,18 @@ export default function OrdersPage() {
     }
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  const showPlaceholder = !mounted || authLoading || !isAuthenticated;
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

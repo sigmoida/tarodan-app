@@ -86,10 +86,15 @@ export default function ProfilePage() {
   const pathname = usePathname();
   const { t } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, user, logout, refreshUserData } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ offers: 0, trades: 0 });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -105,16 +110,16 @@ export default function ProfilePage() {
   const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=/profile');
       return;
     }
     if (user) {
       setProfileFromAuthStore();
     }
     loadProfile();
-  }, [isAuthenticated, authLoading]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   // Refresh profile when pathname changes (e.g., returning from edit/delete page)
   useEffect(() => {
@@ -274,8 +279,18 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  const showPlaceholder = !mounted || authLoading || !isAuthenticated;
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {t('common.loading') || 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const tierColors = {
     free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
@@ -304,7 +319,7 @@ export default function ProfilePage() {
         { icon: TagIcon, label: t('order.myOrders'), href: '/orders', desc: 'Sipariş geçmişiniz' },
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
         { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', desc: 'Favori ürünleriniz' },
-        { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz', badge: pendingCounts.trades },
+        { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz' },
         { icon: SparklesIcon, label: t('membership.title'), href: '/profile/membership', desc: 'Üyelik planınızı yönetin' },
       ],
     },

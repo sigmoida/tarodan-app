@@ -62,15 +62,21 @@ export default function OffersPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=/offers');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [mounted, isAuthenticated, router]);
 
   const offersQuery = useQuery({
     queryKey: ['offers', activeTab],
@@ -193,8 +199,17 @@ export default function OffersPage() {
   const acceptedCount = offers.filter(o => o.status === 'accepted').length;
   const totalValue = offers.reduce((sum, o) => sum + o.amount, 0);
 
-  if (!isAuthenticated) {
-    return null;
+  const showPlaceholder = !mounted || !isAuthenticated;
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

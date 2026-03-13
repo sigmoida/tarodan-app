@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ import { wishlistApi, listingsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useTranslation } from '@/i18n';
+import { formatCondition } from '@/lib/format';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface WishlistItem {
@@ -34,7 +35,12 @@ export default function FavoritesPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToCart } = useCartStore();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const sharedIds = useMemo(() => {
     const ids = searchParams.get('ids');
@@ -45,12 +51,12 @@ export default function FavoritesPage() {
   const isSharedView = sharedIds !== null && sharedIds.length > 0;
 
   useEffect(() => {
-    if (authLoading || isSharedView) return;
+    if (!mounted || authLoading || isSharedView) return;
     if (!isAuthenticated) {
       toast.error(t('favorites.loginRequired'));
       router.push('/login?redirect=/favorites');
     }
-  }, [isAuthenticated, authLoading, isSharedView, router, t]);
+  }, [mounted, isAuthenticated, authLoading, isSharedView, router, t]);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -132,12 +138,17 @@ export default function FavoritesPage() {
     return productImage;
   };
 
-  if (!isSharedView && authLoading) {
-    return <AuthLoadingScreen />;
-  }
-
-  if (!isSharedView && !isAuthenticated) {
-    return null;
+  const showPlaceholder = !isSharedView && (!mounted || authLoading || !isAuthenticated);
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -257,7 +268,7 @@ export default function FavoritesPage() {
                       </div>
                       {item.productCondition && (
                         <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden sm:inline">
-                          {item.productCondition}
+                          {formatCondition(item.productCondition, locale)}
                         </span>
                       )}
                     </div>

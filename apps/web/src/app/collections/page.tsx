@@ -39,6 +39,8 @@ interface Collection {
 
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
+const PUBLIC_PAGE_SIZE = 24;
+
 function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
   const out: { id: string; name: string; slug: string }[] = [];
   for (const c of tree) {
@@ -91,23 +93,33 @@ export default function CollectionsPage() {
   );
 
   const categoryParamId = typeof categoryId === 'string' ? categoryId.trim() : '';
+  // page/pageSize göndermiyoruz; API varsayılanı (ilk sayfa, 20 kayıt) kullanılsın. Gönderince sadece 1 sonuç dönme hatası oluşuyordu.
   const publicQuery = useQuery({
     queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParamId || null],
-    queryFn: async (): Promise<Collection[]> => {
+    queryFn: async (): Promise<{ collections: Collection[]; total: number; page: number; pageSize: number }> => {
       const params: Record<string, unknown> = {
         sortBy,
         ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
         ...(categoryParamId ? { categoryId: categoryParamId } : {}),
       };
       const response = await collectionsApi.browse(params);
-      const data = response.data?.collections || response.data?.data || [];
-      return Array.isArray(data) ? data : [];
+      const collections = response.data?.collections || response.data?.data || [];
+      const total = response.data?.total ?? (Array.isArray(collections) ? collections.length : 0);
+      const page = response.data?.page ?? 1;
+      const pageSize = response.data?.pageSize ?? PUBLIC_PAGE_SIZE;
+      return {
+        collections: Array.isArray(collections) ? collections : [],
+        total: typeof total === 'number' ? total : 0,
+        page: typeof page === 'number' ? page : 1,
+        pageSize: typeof pageSize === 'number' ? pageSize : PUBLIC_PAGE_SIZE,
+      };
     },
     placeholderData: keepPreviousData,
     meta: { page: 'collections-public' },
   });
-  const collections = publicQuery.data ?? [];
-
+  const publicData = publicQuery.data;
+  const collections = publicData?.collections ?? [];
+  const publicTotal = publicData?.total ?? 0;
   const myQuery = useQuery({
     queryKey: ['collections', 'mine'],
     queryFn: async (): Promise<Collection[]> => {
@@ -281,7 +293,9 @@ export default function CollectionsPage() {
         {/* Results Info */}
         {(displayedCollections.length > 0 || categoryParamId || searchQuery.trim()) && (
           <p className="text-xs text-gray-500 mb-4">
-            {displayedCollections.length} {locale === 'en' ? 'collections found' : 'koleksiyon bulundu'}
+            {activeTab === 'public'
+              ? `${publicTotal} ${locale === 'en' ? 'collections' : 'koleksiyon'}`
+              : `${displayedCollections.length} ${locale === 'en' ? 'collections' : 'koleksiyon'}`}
             {categoryParamId && flatCategories.find((c) => c.id === categoryParamId) && (
               <> · {flatCategories.find((c) => c.id === categoryParamId)?.name}</>
             )}
@@ -389,7 +403,8 @@ export default function CollectionsPage() {
             ))}
           </div>
         )}
-      </div>
+
+        </div>
 
       {/* Create Collection Modal */}
       {showCreateModal && (

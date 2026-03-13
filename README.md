@@ -12,6 +12,16 @@ Tarodan, koleksiyoner kalitesinde diecast model arabalarin alim-satim ve takasin
 | **API** | http://localhost:3001 | NestJS backend API |
 | **Admin** | http://localhost:3002 | Yonetim paneli |
 
+### Cursor icinde localhost testi
+
+Google Chrome'da localhost acilmiyorsa veya Cursor icinden test etmek istiyorsaniz:
+
+1. **Command Palette** acin: `Ctrl+Shift+P` (Windows/Linux) veya `Cmd+Shift+P` (Mac)
+2. **"Simple Browser: Show"** yazin ve secin
+3. Adres cubuguna `http://localhost:3000` yazip Enter'a basin
+
+Web uygulamasi Cursor'un dahili tarayicisinda acilir; cikis/giris sonrasi sayfa testleri buradan yapilabilir.
+
 ---
 
 ## Hizli Baslangic

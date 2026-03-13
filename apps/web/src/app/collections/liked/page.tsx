@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -23,7 +23,9 @@ interface Collection {
   likeCount: number;
   itemCount: number;
   createdAt: string;
-  user: {
+  userId?: string;
+  userName?: string;
+  user?: {
     id: string;
     displayName: string;
     avatarUrl?: string;
@@ -41,12 +43,19 @@ interface Collection {
 export default function LikedCollectionsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); }
-  }, [isAuthenticated, router]);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated) {
+      router.push('/login?redirect=/collections/liked');
+    }
+  }, [mounted, isAuthenticated, router]);
 
   const likedQuery = useQuery({
     queryKey: ['collections-liked'],
@@ -85,7 +94,18 @@ export default function LikedCollectionsPage() {
     }
   };
 
-  if (!isAuthenticated) return null;
+  const showPlaceholder = !mounted || !isAuthenticated;
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,8 +219,8 @@ export default function LikedCollectionsPage() {
                     )}
 
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <UserAvatar displayName={collection.user?.displayName} size="xs" className="!w-4 !h-4 !text-[8px]" />
-                      <span className="text-[10px] text-gray-400">{collection.user?.displayName || t('collection.anonymous')}</span>
+                      <UserAvatar displayName={collection.userName || collection.user?.displayName} size="xs" className="!w-4 !h-4 !text-[8px]" />
+                      <span className="text-[10px] text-gray-400">{collection.userName || collection.user?.displayName || t('collection.anonymous')}</span>
                     </div>
 
                     <div className="mt-auto pt-2 flex items-center justify-between">

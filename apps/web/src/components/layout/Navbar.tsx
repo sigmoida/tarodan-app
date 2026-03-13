@@ -838,7 +838,7 @@ export default function Navbar() {
                         </Link>
                         {NAV_LINKS.filter((l) => !['/listings', '/ureticiler', '/collections'].includes(l.href)).map((link) => {
                           const isGuestTrades = link.href === '/trades' && !showAuthUI;
-                          const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
+                          const showTradesBadge = false; // Takaslar yanında badge gösterme
                           return (
                             <Link
                               key={link.href}

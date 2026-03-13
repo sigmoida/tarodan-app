@@ -2412,13 +2412,13 @@ export class PaymentService {
       where: {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
-        productId: { not: null },
       },
       select: { id: true, productId: true, orderNumber: true },
     });
 
     let released = 0;
     for (const order of expiredOrders) {
+      if (!order.productId) continue; // productId yoksa atla (Prisma'da not: null hataya yol açıyor)
       try {
         await this.prisma.$transaction([
           this.prisma.order.update({
@@ -2426,7 +2426,7 @@ export class PaymentService {
             data: { status: OrderStatus.cancelled },
           }),
           this.prisma.product.update({
-            where: { id: order.productId! },
+            where: { id: order.productId },
             data: { status: ProductStatus.active },
           }),
         ]);
