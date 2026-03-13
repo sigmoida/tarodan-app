@@ -12,7 +12,7 @@ import {
   CheckBadgeIcon,
 } from '@heroicons/react/24/solid';
 import { ChevronLeftIcon, ChevronRightIcon, TagIcon } from '@heroicons/react/24/outline';
-import { api, listingsApi } from '@/lib/api';
+import { api, listingsApi, manufacturersApi } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
@@ -257,6 +257,34 @@ export default function Home() {
   });
   const companyOfWeek = apiCompanyOfWeek ?? DEMO_COMPANY;
 
+  const { data: apiManufacturers = [] } = useQuery({
+    queryKey: ['home', 'manufacturers'],
+    queryFn: async () => {
+      const res = await manufacturersApi.findAll();
+      const raw = res.data;
+      const data = Array.isArray(raw) ? raw : (raw?.data ?? []);
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
+    meta: { page: 'home', section: 'manufacturers' },
+  });
+
+  const apiNamesSet = new Set((apiManufacturers as any[]).map((m: any) => m.name?.toLowerCase?.() || ''));
+  const fallbackBrands = BRANDS.filter(b => !apiNamesSet.has(b.name.toLowerCase()));
+  const marqueeItems = [
+    ...(apiManufacturers as any[]).map((m: any) => {
+      const fromBrands = BRANDS.find(b => b.name.toLowerCase() === (m.name || '').toLowerCase());
+      return {
+        name: m.name,
+        logoUrl: m.logo || fromBrands?.logoUrl || '',
+        desc: m.description ?? fromBrands?.desc ?? '',
+      };
+    }),
+    ...fallbackBrands,
+  ];
+  const marqueeItemsToShow = marqueeItems.length > 0 ? marqueeItems : BRANDS;
+
   const featuredCollectorToShow: FeaturedCollector | null =
     featuredCollector ?? (topCollections.length > 0 ? topCollections[0] : DEMO_FEATURED_COLLECTOR);
 
@@ -335,21 +363,25 @@ export default function Home() {
       <section className="py-4">
         <div className="relative w-full overflow-hidden">
           <div className="brands-marquee-track flex flex-nowrap items-center gap-6 px-2 sm:px-3">
-            {[...BRANDS, ...BRANDS].map((brand, i) => (
+            {[...marqueeItemsToShow, ...marqueeItemsToShow].map((brand, i) => (
               <Link
                 key={`${brand.name}-${i}`}
-                href={`/listings?brand=${encodeURIComponent(brand.name)}`}
+                href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
                 className="flex-shrink-0 group"
               >
                 <div className="w-24 h-14 sm:w-28 sm:h-16 bg-white border border-gray-200 hover:border-orange-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative" style={{ borderRadius: '4px' }}>
-                  <Image
-                    src={brand.logoUrl}
-                    alt={brand.name}
-                    fill
-                    className="object-contain opacity-70 group-hover:opacity-100 transition-opacity p-1"
-                    sizes="(max-width: 640px) 96px, 112px"
-                    unoptimized
-                  />
+                  {brand.logoUrl ? (
+                    <Image
+                      src={brand.logoUrl}
+                      alt={brand.name}
+                      fill
+                      className="object-contain opacity-70 group-hover:opacity-100 transition-opacity p-1"
+                      sizes="(max-width: 640px) 96px, 112px"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="text-xs font-semibold text-gray-500 group-hover:text-orange-600 transition-colors text-center leading-tight">{brand.name}</span>
+                  )}
                 </div>
               </Link>
             ))}

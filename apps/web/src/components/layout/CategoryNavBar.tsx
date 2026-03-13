@@ -100,8 +100,9 @@ export default function CategoryNavBar() {
         const fetchManufacturers = async () => {
             try {
                 const response = await manufacturersApi.findAll();
-                const items = Array.isArray(response.data) ? response.data : response.data.data || [];
-                setManufacturers(items);
+                const raw = response.data;
+                const items = Array.isArray(raw) ? raw : (raw?.data ?? []);
+                setManufacturers(Array.isArray(items) ? items : []);
             } catch (error) {
                 console.error('Failed to fetch manufacturers:', error);
             }

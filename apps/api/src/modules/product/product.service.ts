@@ -1733,23 +1733,30 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       throw new NotFoundException('Ürün bulunamadı');
     }
 
-    // Skip counting views from product owner (kendi ürününü görüntüleme sayılmaz)
     if (userId && product.sellerId === userId) {
       return { viewCount: product.viewCount };
     }
 
-    // Bot protection: Skip counting for bots
     if (this.isBot(userAgent)) {
       return { viewCount: product.viewCount };
     }
 
-    // Her görüntülemede sayacı artır
+    const identifier = userId || clientIp || 'unknown';
+    const rateLimitKey = `viewCount:${productId}:${identifier}`;
+    try {
+      const { allowed } = await this.cache.checkRateLimit(rateLimitKey, 1, 1800);
+      if (!allowed) {
+        return { viewCount: product.viewCount };
+      }
+    } catch {
+      // Redis down - fall through and count the view
+    }
+
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
       data: { viewCount: { increment: 1 } },
     });
 
-    // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
     await this.cache.delPattern('products:list:*');
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,18 +12,19 @@ import {
   Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { manufacturersApi } from '@/lib/api';
 
-// Göz atma menüsü: Markalar, Ölçek, Üretici (kategoriler = listings + sidebar filtreleri)
+const FALLBACK_MANUFACTURERS = [
+  'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
+  'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
+];
+
 const CATEGORY_MENU = {
   tr: {
     newArrivals: { label: 'Yeni Gelenler', icon: SparklesIcon, href: '/listings?sortBy=created_desc' },
     brands: {
       label: 'Üreticiler',
       icon: FireIcon,
-      items: [
-        'Audi', 'Alfa Romeo', 'BMW', 'Ferrari', 'Ford', 'Lamborghini',
-        'Mercedes-Benz', 'Porsche', 'Toyota', 'Volkswagen', 'Chevrolet', 'Dodge',
-      ],
     },
     scales: {
       label: 'Ölçek',
@@ -35,10 +36,6 @@ const CATEGORY_MENU = {
     manufacturers: {
       label: 'Üretici',
       icon: TruckIcon,
-      items: [
-        'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
-        'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
-      ],
     },
   },
   en: {
@@ -46,10 +43,6 @@ const CATEGORY_MENU = {
     brands: {
       label: 'Brands',
       icon: FireIcon,
-      items: [
-        'Audi', 'Alfa Romeo', 'BMW', 'Ferrari', 'Ford', 'Lamborghini',
-        'Mercedes-Benz', 'Porsche', 'Toyota', 'Volkswagen', 'Chevrolet', 'Dodge',
-      ],
     },
     scales: {
       label: 'Scale',
@@ -61,10 +54,6 @@ const CATEGORY_MENU = {
     manufacturers: {
       label: 'Manufacturer',
       icon: TruckIcon,
-      items: [
-        'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
-        'AUTOart', 'Minichamps', 'Kyosho', 'CMC', 'GT Spirit', 'Almost Real',
-      ],
     },
   },
 };
@@ -75,6 +64,16 @@ export default function CategoryMegaMenu() {
   const { locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<MenuSection>(null);
+  const [manufacturerNames, setManufacturerNames] = useState<string[]>(FALLBACK_MANUFACTURERS);
+
+  useEffect(() => {
+    manufacturersApi.findAll().then(res => {
+      const raw = res.data;
+      const data = Array.isArray(raw) ? raw : (raw?.data ?? []);
+      const names = (Array.isArray(data) ? data : []).map((m: any) => m.name);
+      if (names.length > 0) setManufacturerNames(names);
+    }).catch(() => {});
+  }, []);
 
   const menu = CATEGORY_MENU[locale as 'tr' | 'en'];
 
@@ -217,7 +216,7 @@ export default function CategoryMegaMenu() {
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.manufacturers.label}</h3>
                       <div className="grid grid-cols-3 lg:grid-cols-4 gap-2">
-                        {menu.manufacturers.items.map((manufacturer) => (
+                        {manufacturerNames.map((manufacturer) => (
                           <Link
                             key={manufacturer}
                             href={`/listings?manufacturer=${encodeURIComponent(manufacturer)}`}

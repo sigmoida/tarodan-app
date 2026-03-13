@@ -227,7 +227,10 @@ async function main() {
   console.log(`✅ Created ${categories.length} categories (vehicle types only)`);
 
   // ==========================================================================
-  // 1b. Create Manufacturers
+  // 1b. Create Manufacturers (diecast brands: Hot Wheels, Tomica, etc.)
+  // Logo is left null in seed so: (1) re-running seed does not overwrite
+  // admin-uploaded S3 logos; (2) fresh clone gets repo logos via frontend
+  // BRANDS fallback (apps/web/public/photos/logolar/).
   // ==========================================================================
   console.log('Creating manufacturers...');
 

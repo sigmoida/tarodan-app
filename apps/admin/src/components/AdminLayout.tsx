@@ -111,6 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               width={120}
               height={40}
               className="object-contain"
+              style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '40px' }}
               priority
             />
             <span className="ml-2 text-xs text-gray-500 font-medium">Admin</span>
@@ -187,6 +188,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 width={100}
                 height={32}
                 className="object-contain"
+                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '32px' }}
               />
               <span className="ml-2 text-sm text-gray-500">Admin Panel</span>
             </div>

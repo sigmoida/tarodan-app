@@ -5639,7 +5639,12 @@ export class AdminService {
     const manufacturers = await this.prisma.manufacturer.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
-    return { data: manufacturers };
+    return {
+      data: manufacturers.map(m => ({
+        ...m,
+        logo: this.resolveProductImageUrl(m.logo),
+      })),
+    };
   }
 
   async createManufacturer(

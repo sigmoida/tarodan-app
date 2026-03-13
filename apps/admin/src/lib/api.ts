@@ -202,6 +202,13 @@ export const adminApi = {
   createManufacturer: (data: any) => api.post('/admin/manufacturers', data),
   updateManufacturer: (id: string, data: any) => api.patch(`/admin/manufacturers/${id}`, data),
   deleteManufacturer: (id: string) => api.delete(`/admin/manufacturers/${id}`),
+  uploadManufacturerLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ url: string; key: string }>('/admin/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 
   getCarModels: (brandId?: string) => api.get('/admin/car-models', { params: brandId ? { brandId } : {} }),
   createCarModel: (data: any) => api.post('/admin/car-models', data),

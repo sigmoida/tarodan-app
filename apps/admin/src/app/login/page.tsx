@@ -85,6 +85,7 @@ export default function LoginPage() {
             width={200}
             height={65}
             className="mx-auto object-contain"
+            style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '65px' }}
             priority
           />
           <p className="text-gray-500 mt-2">Admin Panel</p>

@@ -102,7 +102,11 @@ export default function ListingsPage() {
 
   const searchString = searchParams.toString();
 
-  // Build URL params from current filters (single source of truth for URL sync)
+  const normalizeParams = (p: URLSearchParams): string => {
+    const sorted = new URLSearchParams([...p.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+    return sorted.toString();
+  };
+
   const buildParamsFromFilters = (f: typeof filters, page: number) => {
     const params = new URLSearchParams();
     if (f.search) params.set('search', f.search);
@@ -129,9 +133,6 @@ export default function ListingsPage() {
     return params;
   };
 
-  // Sync filters + page to URL so that navigating to listing and back preserves filters.
-  // Skip the very first run so URL params (e.g. ?search=...) are not wiped before the
-  // URL→state effect below has a chance to populate filters from the URL.
   const hasSyncedToUrl = useRef(false);
   useEffect(() => {
     if (!hasSyncedToUrl.current) {
@@ -139,8 +140,9 @@ export default function ListingsPage() {
       return;
     }
     const nextParams = buildParamsFromFilters(filters, currentPage);
-    const nextStr = nextParams.toString();
-    if (nextStr !== searchString) {
+    const currentParams = new URLSearchParams(searchString);
+    if (normalizeParams(nextParams) !== normalizeParams(currentParams)) {
+      const nextStr = nextParams.toString();
       const newUrl = nextStr ? `/listings?${nextStr}` : '/listings';
       router.replace(newUrl);
     }
@@ -155,29 +157,33 @@ export default function ListingsPage() {
     const page = pageParam ? parseInt(pageParam, 10) : 1;
     setCurrentPage(page);
 
-    setFilters(prev => ({
-      ...prev,
-      search: detectedBrand ? '' : newSearch,
-      tradeOnly: searchParams.get('tradeOnly') === 'true',
-      discountOnly: searchParams.get('discountOnly') === 'true',
-      preOrder: searchParams.get('preOrder') === 'true',
-      limited: searchParams.get('limited') === 'true',
-      set: searchParams.get('set') === 'true',
-      brand: searchParams.get('brand') || detectedBrand || '',
-      brandId: searchParams.get('brandId') || '',
-      carModelId: searchParams.get('carModelId') || '',
-      carModel: searchParams.get('carModel') || '',
-      scale: searchParams.get('scale') || '',
-      material: searchParams.get('material') || '',
-      condition: searchParams.get('condition') || '',
-      minPrice: searchParams.get('minPrice') || '',
-      maxPrice: searchParams.get('maxPrice') || '',
-      sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
-      category: searchParams.get('category') || '',
-      categoryId: searchParams.get('categoryId') || '',
-      manufacturer: searchParams.get('manufacturer') || '',
-      manufacturerId: searchParams.get('manufacturerId') || '',
-    }));
+    setFilters(prev => {
+      const next = {
+        ...prev,
+        search: detectedBrand ? '' : newSearch,
+        tradeOnly: searchParams.get('tradeOnly') === 'true',
+        discountOnly: searchParams.get('discountOnly') === 'true',
+        preOrder: searchParams.get('preOrder') === 'true',
+        limited: searchParams.get('limited') === 'true',
+        set: searchParams.get('set') === 'true',
+        brand: searchParams.get('brand') || detectedBrand || '',
+        brandId: searchParams.get('brandId') || '',
+        carModelId: searchParams.get('carModelId') || '',
+        carModel: searchParams.get('carModel') || '',
+        scale: searchParams.get('scale') || '',
+        material: searchParams.get('material') || '',
+        condition: searchParams.get('condition') || '',
+        minPrice: searchParams.get('minPrice') || '',
+        maxPrice: searchParams.get('maxPrice') || '',
+        sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
+        category: searchParams.get('category') || '',
+        categoryId: searchParams.get('categoryId') || '',
+        manufacturer: searchParams.get('manufacturer') || '',
+        manufacturerId: searchParams.get('manufacturerId') || '',
+      };
+      const changed = (Object.keys(next) as (keyof typeof next)[]).some(k => prev[k] !== next[k]);
+      return changed ? next : prev;
+    });
   }, [searchString]);
 
   const categorySlug = filters.category || searchParams.get('category') || '';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import {
@@ -10,6 +10,7 @@ import {
   GlobeAltIcon,
   CheckCircleIcon,
   XCircleIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -43,6 +44,9 @@ export default function ManufacturersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingManufacturer, setEditingManufacturer] = useState<Manufacturer | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ManufacturerFormData>({
     name: '',
     logo: '',
@@ -72,6 +76,7 @@ export default function ManufacturersPage() {
 
   const openCreateModal = () => {
     setEditingManufacturer(null);
+    setLogoPreview(null);
     setFormData({
       name: '',
       logo: '',
@@ -86,6 +91,7 @@ export default function ManufacturersPage() {
 
   const openEditModal = (m: Manufacturer) => {
     setEditingManufacturer(m);
+    setLogoPreview(m.logo || null);
     setFormData({
       name: m.name,
       logo: m.logo || '',
@@ -96,6 +102,32 @@ export default function ManufacturersPage() {
       isActive: m.isActive,
     });
     setShowModal(true);
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir resim dosyası seçin');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dosya boyutu 5MB\'dan küçük olmalı');
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const res = await adminApi.uploadManufacturerLogo(file);
+      const uploadedUrl = res.data.url || res.data.key;
+      setFormData(prev => ({ ...prev, logo: uploadedUrl }));
+      setLogoPreview(URL.createObjectURL(file));
+      toast.success('Logo yüklendi');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Logo yüklenemedi');
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -256,14 +288,44 @@ export default function ManufacturersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
                     <input
-                      type="url"
-                      value={formData.logo}
-                      onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="https://example.com/logo.png"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleLogoUpload}
+                      className="hidden"
                     />
+                    <div className="flex items-center gap-3">
+                      {(logoPreview || formData.logo) ? (
+                        <img
+                          src={logoPreview || formData.logo}
+                          alt="Logo"
+                          className="w-16 h-16 rounded-lg object-contain bg-gray-100 border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
+                          <PhotoIcon className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {uploadingLogo ? 'Yükleniyor...' : (logoPreview || formData.logo) ? 'Değiştir' : 'Logo Yükle'}
+                      </button>
+                      {formData.logo && (
+                        <button
+                          type="button"
+                          onClick={() => { setFormData({ ...formData, logo: '' }); setLogoPreview(null); }}
+                          className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                        >
+                          Kaldır
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
