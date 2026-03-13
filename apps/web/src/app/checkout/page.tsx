@@ -1179,7 +1179,7 @@ export default function CheckoutPage() {
                         />
                         <div className="flex gap-2">
                           <button onClick={handleAddAddress} className="btn-primary">
-                            {t('checkout.addressSaved')}
+                            {t('common.save')}
                           </button>
                           <button
                             onClick={() => setShowAddressForm(false)}

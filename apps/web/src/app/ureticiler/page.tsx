@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { useAuthStore } from '@/stores/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MagnifyingGlassIcon, ChevronRightIcon, GlobeAltIcon, CalendarIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
@@ -277,6 +278,7 @@ const SCALE_GROUPS = [
 
 export default function UreticilerPage() {
   const { t, locale } = useTranslation();
+  const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedScale, setSelectedScale] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -634,7 +636,7 @@ export default function UreticilerPage() {
                             </div>
                             <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
                               <span className="font-bold text-gray-900">Aktif İlan:</span>
-                              <span className="text-orange-600 font-semibold">{getProductCount(brand.slug)}</span>
+                              <span className="text-orange-600 font-semibold">{brand.productCount ?? 0}</span>
                             </div>
                           </div>
                         </div>
@@ -697,33 +699,35 @@ export default function UreticilerPage() {
         </div>
       </div>
 
-      {/* CTA */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
-        <div className="bg-orange-50 border border-orange-100 p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
-          <div className="relative z-10">
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-3">Koleksiyonunuzu Başlatın</h2>
-            <p className="text-gray-600 mb-6 max-w-lg mx-auto text-sm sm:text-base">
-              Favori markalarınızdan binlerce diecast model arasından seçim yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <Link
-                href="/listings"
-                className="px-6 py-2.5 bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors"
-                style={{ borderRadius: '4px' }}
-              >
-                İlanları Keşfet
-              </Link>
-              <Link
-                href="/register"
-                className="px-6 py-2.5 bg-white text-gray-700 text-sm font-bold hover:bg-gray-50 transition-colors border border-gray-200"
-                style={{ borderRadius: '4px' }}
-              >
-                Üye Ol
-              </Link>
+      {/* CTA - sadece giriş yapmamış kullanıcılara göster */}
+      {!isAuthenticated && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+          <div className="bg-orange-50 border border-orange-100 p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
+            <div className="relative z-10">
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-3">Koleksiyonunuzu Başlatın</h2>
+              <p className="text-gray-600 mb-6 max-w-lg mx-auto text-sm sm:text-base">
+                Favori markalarınızdan binlerce diecast model arasından seçim yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <Link
+                  href="/listings"
+                  className="px-6 py-2.5 bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors"
+                  style={{ borderRadius: '4px' }}
+                >
+                  İlanları Keşfet
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-6 py-2.5 bg-white text-gray-700 text-sm font-bold hover:bg-gray-50 transition-colors border border-gray-200"
+                  style={{ borderRadius: '4px' }}
+                >
+                  Üye Ol
+                </Link>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

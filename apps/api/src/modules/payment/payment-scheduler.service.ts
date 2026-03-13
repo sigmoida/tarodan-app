@@ -13,20 +13,23 @@ export class PaymentSchedulerService {
   constructor(private readonly paymentService: PaymentService) {}
 
   /**
-   * Run every 5 minutes to check for expired payments
-   * Cancels pending payments older than 15 minutes
+   * Run every 5 minutes: release expired order reservations (10 min), then cancel expired payments.
    */
   @Cron('*/5 * * * *') // Every 5 minutes
   async handleExpiredPayments() {
-    this.logger.log('Checking for expired payments...');
+    this.logger.log('Checking for expired reservations and payments...');
 
     try {
+      const released = await this.paymentService.releaseExpiredOrderReservations();
+      if (released.count > 0) {
+        this.logger.log(`Released ${released.count} expired order reservation(s)`);
+      }
       const result = await this.paymentService.cancelExpiredPayments();
       if (result.count > 0) {
         this.logger.log(`Cancelled ${result.count} expired payment(s)`);
       }
     } catch (error: any) {
-      this.logger.error(`Error cancelling expired payments: ${error.message}`, error.stack);
+      this.logger.error(`Error in expired payments job: ${error.message}`, error.stack);
     }
   }
 

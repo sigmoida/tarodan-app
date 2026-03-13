@@ -159,6 +159,18 @@ export default function CategoryNavBar() {
         };
     }, []);
 
+    // Scroll yapılınca dropdown kapat; aksi halde fixed panel nav'dan ayrı kalıp beyaz alan kalıyor
+    useEffect(() => {
+        const handleScroll = () => {
+            if (activeDropdown) {
+                if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                setActiveDropdown(null);
+            }
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [activeDropdown]);
+
     const dropdownPortal = typeof document !== 'undefined' ? createPortal(
         <AnimatePresence>
             {activeDropdown === 'scales' && (

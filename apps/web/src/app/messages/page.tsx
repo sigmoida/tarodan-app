@@ -96,13 +96,23 @@ export default function MessagesPage() {
   const { t, locale } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [newMessage, setNewMessage] = useState('');
+  /** Taslak sohbet bazında: sohbet değişince yazı/resim eski sohbette kalır */
+  const [draftsByThreadId, setDraftsByThreadId] = useState<Record<string, { text: string; urls: string[] }>>({});
   const [sending, setSending] = useState(false);
-  const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const [threadsExpanded, setThreadsExpanded] = useState(false);
-  const [attachedUrls, setAttachedUrls] = useState<string[]>([]);
   const [attaching, setAttaching] = useState(false);
+
+  const currentDraft = selectedThread
+    ? (draftsByThreadId[selectedThread.id] ?? { text: '', urls: [] })
+    : { text: '', urls: [] };
+  const newMessage = currentDraft.text;
+  const attachedUrls = currentDraft.urls;
+  const contentWarning =
+    currentDraft.text.length > 5
+      ? (checkContentFilter(currentDraft.text, locale).warning ?? null)
+      : null;
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -111,11 +121,15 @@ export default function MessagesPage() {
   const productId = searchParams.get('listing');
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated) {
       router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [mounted, isAuthenticated, router]);
 
   const messageSettingsQuery = useQuery({
     queryKey: ['message-settings'],
@@ -213,13 +227,16 @@ export default function MessagesPage() {
 
     if (existingThread) {
       setSelectedThread(existingThread);
-      // Pre-fill message with product reference
-      if (productTitle && !newMessage) {
-        setNewMessage(locale === 'en' 
+      if (productTitle) {
+        const prefilled = locale === 'en'
           ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
-          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
+        setDraftsByThreadId((prev) => {
+          const existing = prev[existingThread.id];
+          if (existing?.text) return prev;
+          return { ...prev, [existingThread.id]: { text: prefilled, urls: existing?.urls ?? [] } };
+        });
       }
-      // Clear URL params without triggering a reload
       window.history.replaceState({}, '', '/messages');
       return;
     }
@@ -251,13 +268,12 @@ export default function MessagesPage() {
 
       await queryClient.invalidateQueries({ queryKey: ['message-threads'] });
       setSelectedThread(transformedThread);
-      
       if (productTitle) {
-        setNewMessage(locale === 'en'
+        const prefilled = locale === 'en'
           ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
-          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+          : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
+        setDraftsByThreadId((prev) => ({ ...prev, [transformedThread.id]: { text: prefilled, urls: [] } }));
       }
-      
       window.history.replaceState({}, '', '/messages');
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to create thread:', error);
@@ -268,7 +284,8 @@ export default function MessagesPage() {
         if (existingThread) {
           setSelectedThread(existingThread);
           if (productTitle) {
-            setNewMessage(`Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`);
+            const prefilled = `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
+            setDraftsByThreadId((prev) => ({ ...prev, [existingThread.id]: { text: prefilled, urls: [] } }));
           }
         }
       } else {
@@ -300,20 +317,16 @@ export default function MessagesPage() {
   // Eğer manuel refresh gerekiyorsa queryClient.invalidateQueries kullanılmalı
 
   const handleMessageChange = (text: string) => {
-    setNewMessage(text);
-    
-    // Check content filter on input
-    if (text.length > 5) {
-      const filterResult = checkContentFilter(text, locale);
-      setContentWarning(filterResult.warning || null);
-    } else {
-      setContentWarning(null);
-    }
+    if (!selectedThread) return;
+    setDraftsByThreadId((prev) => ({
+      ...prev,
+      [selectedThread.id]: { ...(prev[selectedThread.id] ?? { text: '', urls: [] }), text },
+    }));
   };
 
   const handleAttachImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files?.length || attaching) return;
+    if (!files?.length || attaching || !selectedThread) return;
     const file = files[0];
     if (!file.type.startsWith('image/')) {
       toast.error(locale === 'en' ? 'Please select an image file' : 'Lütfen bir resim dosyası seçin');
@@ -323,7 +336,15 @@ export default function MessagesPage() {
     try {
       const res = await mediaApi.uploadMessageImage(file);
       const url = res.data?.url;
-      if (url) setAttachedUrls((prev) => [...prev, url]);
+      if (url) {
+        setDraftsByThreadId((prev) => ({
+          ...prev,
+          [selectedThread.id]: {
+            ...(prev[selectedThread.id] ?? { text: '', urls: [] }),
+            urls: [...(prev[selectedThread.id]?.urls ?? []), url],
+          },
+        }));
+      }
     } catch (err) {
       toast.error(locale === 'en' ? 'Failed to upload image' : 'Resim yüklenemedi');
     } finally {
@@ -370,9 +391,11 @@ export default function MessagesPage() {
         toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
       }
 
-      setNewMessage('');
-      setContentWarning(null);
-      setAttachedUrls([]);
+      setDraftsByThreadId((prev) => {
+        const next = { ...prev };
+        delete next[selectedThread.id];
+        return next;
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['messages', selectedThread.id] }),
         queryClient.invalidateQueries({ queryKey: ['message-threads'] }),
@@ -392,8 +415,18 @@ export default function MessagesPage() {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  // Avoid hydration mismatch: render same placeholder until mounted, then auth/query data can differ.
+  const showPlaceholder = !mounted || !isAuthenticated;
+  if (showPlaceholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -574,7 +607,16 @@ export default function MessagesPage() {
                           <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
                           <button
                             type="button"
-                            onClick={() => setAttachedUrls((prev) => prev.filter((_, j) => j !== i))}
+                            onClick={() => {
+                              if (!selectedThread) return;
+                              setDraftsByThreadId((prev) => ({
+                                ...prev,
+                                [selectedThread.id]: {
+                                  ...(prev[selectedThread.id] ?? { text: '', urls: [] }),
+                                  urls: (prev[selectedThread.id]?.urls ?? []).filter((_, j) => j !== i),
+                                },
+                              }));
+                            }}
                             className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
                           >
                             ×

@@ -31,7 +31,8 @@
     "prisma:studio": "prisma studio",
     "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
     "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
-    "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts"
+    "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",
+    "release-reserved": "ts-node -r tsconfig-paths/register scripts/release-reserved-products.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.490.0",

@@ -426,7 +426,34 @@ export class OrderService {
         throw new NotFoundException('Ürün bulunamadı');
       }
 
-      // Validate product is available
+      // Aynı alıcının bu ürün için bekleyen (ödeme yapılmamış) siparişi varsa onu döndür, yeni sipariş açma
+      const existingOrder = await tx.order.findFirst({
+        where: {
+          productId: dto.productId,
+          buyerId,
+          status: OrderStatus.pending_payment,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existingOrder) {
+        const numTotal = Number(existingOrder.totalAmount);
+        const numSubtotal = Number(existingOrder.subtotal);
+        const numDiscount = Number(existingOrder.discountAmount || 0);
+        return {
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          totalAmount: numTotal,
+          subtotal: numSubtotal,
+          discountAmount: numDiscount,
+          appliedCouponCode: (existingOrder.discountCode as string) ?? undefined,
+          productId: dto.productId,
+          paymentUrl: '',
+          provider: 'iyzico',
+          existingOrder: true,
+        };
+      }
+
+      // Ürün satışta değilse (sold, inactive vb.) hata ver
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
@@ -574,20 +601,10 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Reserve product immediately (status = RESERVED) and decrease quantity
-      const updateData: any = { status: ProductStatus.reserved };
-      
-      // Decrease quantity if it's not null (null means unlimited stock)
-      if (product.quantity !== null) {
-        if (product.quantity <= 0) {
-          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
-        }
-        updateData.quantity = { decrement: 1 };
-      }
-      
+      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
       await tx.product.update({
         where: { id: dto.productId },
-        data: updateData,
+        data: { status: ProductStatus.reserved },
       });
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
@@ -855,7 +872,7 @@ export class OrderService {
         commissionResult,
       );
 
-      // Reserve product (status = RESERVED) - will be set to SOLD after payment is completed
+      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
       await tx.product.update({
         where: { id: offer.productId },
         data: { status: ProductStatus.reserved },
@@ -1094,20 +1111,10 @@ export class OrderService {
         commissionResult,
       );
 
-      // Update product status to reserved and decrease quantity
-      const updateData: any = { status: ProductStatus.reserved };
-      
-      // Decrease quantity if it's not null (null means unlimited stock)
-      if (product.quantity !== null) {
-        if (product.quantity <= 0) {
-          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
-        }
-        updateData.quantity = { decrement: 1 };
-      }
-      
+      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
       await tx.product.update({
         where: { id: dto.productId },
-        data: updateData,
+        data: { status: ProductStatus.reserved },
       });
 
       return {

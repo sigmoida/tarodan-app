@@ -1341,8 +1341,7 @@ export class PaymentService {
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
       } else {
-        // Regular product order - update product status to SOLD
-        // Note: quantity was already decremented when order was created
+        // Regular product order - update product status to SOLD and decrement stock (stock is only decremented on payment success, not at order creation)
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
         });
@@ -1351,13 +1350,17 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
-        // Update product status to SOLD
-        // If stock is 0, set product to inactive instead
+        // Stok ödeme anında düşer; sipariş oluşturulurken düşülmez (ürün ödenene kadar listede kalsın)
         const updateData: any = {
-          status: product.quantity !== null && product.quantity === 0
-            ? ProductStatus.inactive
-            : ProductStatus.sold
+          status: ProductStatus.sold,
         };
+        if (product.quantity !== null) {
+          updateData.quantity = { decrement: 1 };
+          // Tek adet kaldıysa satıştan sonra 0 olur, ilanı inactive yap
+          if (product.quantity <= 1) {
+            updateData.status = ProductStatus.inactive;
+          }
+        }
 
         await tx.product.update({
           where: { id: payment.order.productId },
@@ -1540,6 +1543,33 @@ export class PaymentService {
   }
 
   /**
+   * Ödeme başarısız/iptal olduğunda ürünü tekrar satışa aç (reserved -> active), siparişi iptal et.
+   */
+  private async releaseProductForFailedPayment(orderId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, productId: true },
+      });
+      if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
+
+      await this.prisma.$transaction([
+        this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.cancelled },
+        }),
+        this.prisma.product.update({
+          where: { id: order.productId },
+          data: { status: ProductStatus.active },
+        }),
+      ]);
+      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released to active after payment failure`);
+    } catch (error: any) {
+      this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
+    }
+  }
+
+  /**
    * Process failed payment
    */
   private async processFailedPayment(payment: any, reason: string) {
@@ -1552,6 +1582,9 @@ export class PaymentService {
         failureReason: reason,
       },
     });
+
+    // Siparişi iptal et ve ürünü tekrar satışa aç (ilanlar listesinde görünsün)
+    await this.releaseProductForFailedPayment(payment.orderId);
 
     // Log payment failure
     await this.logPaymentAction('failed', payment.id, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
@@ -1723,6 +1756,9 @@ export class PaymentService {
         failureReason: 'Kullanıcı tarafından iptal edildi',
       },
     });
+
+    // Siparişi iptal et ve ürünü tekrar satışa aç
+    await this.releaseProductForFailedPayment(payment.orderId);
 
     this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
 
@@ -2361,12 +2397,68 @@ export class PaymentService {
   }
 
   /**
+   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 10) içinde ödenmezse
+   * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
+   */
+  async releaseExpiredOrderReservations(): Promise<{ count: number }> {
+    const timeoutMinutes = parseInt(
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      10,
+    );
+    const cutoff = new Date();
+    cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
+
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.pending_payment,
+        createdAt: { lt: cutoff },
+        productId: { not: null },
+      },
+      select: { id: true, productId: true, orderNumber: true },
+    });
+
+    let released = 0;
+    for (const order of expiredOrders) {
+      try {
+        await this.prisma.$transaction([
+          this.prisma.order.update({
+            where: { id: order.id },
+            data: { status: OrderStatus.cancelled },
+          }),
+          this.prisma.product.update({
+            where: { id: order.productId! },
+            data: { status: ProductStatus.active },
+          }),
+        ]);
+        const pendingPayment = await this.prisma.payment.findFirst({
+          where: { orderId: order.id, status: PaymentStatus.pending },
+          select: { id: true },
+        });
+        if (pendingPayment) {
+          await this.prisma.payment.update({
+            where: { id: pendingPayment.id },
+            data: {
+              status: PaymentStatus.failed,
+              failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
+            },
+          });
+        }
+        released++;
+        this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
+      } catch (error: any) {
+        this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
+      }
+    }
+    return { count: released };
+  }
+
+  /**
    * Cancel expired pending payments
    * Called by scheduler to automatically cancel payments older than timeout period
    */
   async cancelExpiredPayments() {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '15',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
       10,
     );
     const timeoutDate = new Date();
@@ -2401,6 +2493,9 @@ export class PaymentService {
             failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
           },
         });
+
+        // Siparişi iptal et ve ürünü tekrar satışa aç
+        await this.releaseProductForFailedPayment(payment.orderId);
 
         // Emit payment.failed event
         try {
