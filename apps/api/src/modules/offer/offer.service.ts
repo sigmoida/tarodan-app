@@ -779,6 +779,24 @@ export class OfferService {
       timeRemaining = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
 
+    const firstImage = (offer.product.images && offer.product.images[0]) || null;
+    const imageUrl = this.resolveProductImageUrl(firstImage?.cardKey);
+
+    const images =
+      firstImage && firstImage.cardKey
+        ? [
+            {
+              cardKey: firstImage.cardKey,
+              detailKey: firstImage.detailKey,
+              cardUrl: this.storageService.getPublicAssetUrl(firstImage.cardKey),
+              detailUrl: firstImage.detailKey
+                ? this.storageService.getPublicAssetUrl(firstImage.detailKey)
+                : undefined,
+              sortOrder: firstImage.sortOrder,
+            },
+          ]
+        : [];
+
     return {
       id: offer.id,
       amount: Number(offer.amount),
@@ -790,7 +808,8 @@ export class OfferService {
         id: offer.product.id,
         title: offer.product.title,
         price: Number(offer.product.price),
-        imageUrl: this.resolveProductImageUrl(offer.product.images?.[0]?.cardKey),
+        imageUrl: imageUrl || undefined,
+        images,
         status: offer.product.status,
       },
       buyer: offer.buyer,

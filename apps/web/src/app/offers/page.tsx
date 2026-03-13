@@ -42,7 +42,8 @@ interface Offer {
     originalPrice?: number | null;
     salePrice?: number | null;
     isOnSale?: boolean;
-    images: { url: string }[];
+    imageUrl?: string;
+    images?: { cardUrl?: string; detailUrl?: string; url?: string }[];
   };
   buyer?: {
     id: string;
@@ -353,20 +354,28 @@ export default function OffersPage() {
                         href={`/listings/${offer.product.id}`}
                         className="relative w-full md:w-48 h-48 md:h-auto flex-shrink-0 group"
                       >
-                        {offer.product.images?.[0] ? (
-                          <OptimizedImage
-                            src={(offer.product.images[0] as any).cardUrl ?? (offer.product.images[0] as any).detailUrl ?? (offer.product.images[0] as any).url ?? offer.product.images[0]}
-                            alt={offer.product.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
-                            logContext={{ productId: offer.product.id, page: 'offers' }}
-                          />
-                        ) : (
+                        {(() => {
+                          const img0 = offer.product.images?.[0] as any;
+                          const src =
+                            img0?.cardUrl ??
+                            img0?.detailUrl ??
+                            img0?.url ??
+                            offer.product.imageUrl;
+                          return src ? (
+                            <OptimizedImage
+                              src={src}
+                              alt={offer.product.title}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-300"
+                              fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                              logContext={{ productId: offer.product.id, page: 'offers' }}
+                            />
+                          ) : (
                           <div className="w-full h-full bg-orange-100 flex items-center justify-center">
                             <TagIcon className="w-10 h-10 text-orange-400" />
                           </div>
-                        )}
+                          );
+                        })()}
                         {/* Discount Badge */}
                         {discount > 0 && (
                           <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
