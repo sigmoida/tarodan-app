@@ -444,6 +444,12 @@ export class PaymentService {
    * Supports saved cards (cardToken) or new card entry
    */
   async processDirectPayment(dto: DirectPaymentDto, userId: string, req?: Request) {
+    // Optional CVV-based bypass for testing:
+    // - CVV "000" => force success (no gateway call)
+    // - CVV "001" => force failure (no gateway call)
+    const cvvBypassFlag = this.configService.get('PAYMENT_CVV_BYPASS_ENABLED');
+    const isCvvBypassEnabled = cvvBypassFlag !== 'false' && cvvBypassFlag !== '0';
+
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
       include: {
@@ -511,6 +517,104 @@ export class PaymentService {
       address,
       zipCode: shippingAddress?.zipCode || '34000',
     };
+
+    // ==========================================================================
+    // CVV BYPASS (test helper)
+    // ==========================================================================
+    if (isCvvBypassEnabled && dto.card?.cvc) {
+      const cvv = String(dto.card.cvc).trim();
+
+      // Success bypass: CVV === "000"
+      if (cvv === '000') {
+        // Reload payment with order relations required by processSuccessfulPayment
+        const paymentWithOrder = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          include: {
+            order: {
+              include: {
+                buyer: true,
+                seller: true,
+                product: true,
+              },
+            },
+          },
+        });
+
+        if (!paymentWithOrder) {
+          throw new NotFoundException('Ödeme bulunamadı');
+        }
+
+        await this.processSuccessfulPayment(paymentWithOrder, 'TEST_CVV_000');
+
+        const frontendUrl =
+          this.configService.get('FRONTEND_URL') ||
+          (this.configService.get('NODE_ENV') === 'production'
+            ? 'https://tarodan.com'
+            : 'http://localhost:3000');
+
+        const guestParam = isGuestOrder ? '&guest=true' : '';
+        const successUrl = `${frontendUrl}/payment/success?orderId=${order.id}&paymentId=${paymentWithOrder.id}${guestParam}&debug=cvv-000-bypass`;
+
+        const html = `
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${successUrl}" />
+    <title>Ödeme Başarılı</title>
+  </head>
+  <body>
+    <p>Ödemeniz test modu (CVV 000) ile başarılı kabul edildi. Yönlendiriliyorsunuz...</p>
+    <script>window.location.href = ${JSON.stringify(successUrl)};</script>
+  </body>
+</html>`;
+
+        return {
+          status: 'success',
+          htmlContent: Buffer.from(html).toString('base64'),
+          isBase64: true,
+          paymentId: paymentWithOrder.id,
+        };
+      }
+
+      // Failure bypass: CVV === "001"
+      if (cvv === '001') {
+        await this.processFailedPayment(payment, 'TEST_CVV_001');
+
+        const frontendUrl =
+          this.configService.get('FRONTEND_URL') ||
+          (this.configService.get('NODE_ENV') === 'production'
+            ? 'https://tarodan.com'
+            : 'http://localhost:3000');
+
+        const guestParam = isGuestOrder ? '&guest=true' : '';
+        const failUrl = `${frontendUrl}/payment/fail?paymentId=${payment.id}&orderId=${order.id}${guestParam}&error=${encodeURIComponent(
+          'TEST_CVV_001',
+        )}&debug=cvv-001-bypass`;
+
+        const html = `
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${failUrl}" />
+    <title>Ödeme Başarısız</title>
+  </head>
+  <body>
+    <p>Ödemeniz test modu (CVV 001) ile başarısız kabul edildi. Yönlendiriliyorsunuz...</p>
+    <script>window.location.href = ${JSON.stringify(failUrl)};</script>
+  </body>
+</html>`;
+
+        return {
+          status: 'error',
+          htmlContent: Buffer.from(html).toString('base64'),
+          isBase64: true,
+          paymentId: payment.id,
+          message: 'TEST_CVV_001',
+        };
+      }
+    }
 
     // Callback URL: bank/iyzico POSTs here after 3DS. Must be backend so we can call complete3DSecure and redirect.
     const apiBaseUrl = this.configService.get('API_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://api.tarodan.com' : 'http://localhost:3001');
