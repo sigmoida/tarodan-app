@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import CategoryNavBar from './CategoryNavBar';
 
-const HIDDEN_PATHS = ['/profile', '/login', '/register', '/checkout', '/settings', '/messages', '/guvenli-takas', '/orders', '/favorites', '/trades', '/offers', '/seller', '/collections', '/support'];
+const HIDDEN_PATHS = ['/profile', '/login', '/register', '/checkout', '/settings', '/messages', '/guvenli-takas', '/orders', '/favorites', '/trades', '/offers', '/seller', '/collections', '/support', '/forgot-password', '/reset-password', '/verify-email'];
 
 export default function CategoryNavBarWrapper() {
   const pathname = usePathname();

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { 
   CheckCircleIcon, 
@@ -71,14 +72,12 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
-        <Link href="/" className="inline-flex items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
-          </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+        <Link href="/" className="inline-flex items-center gap-2 group">
+          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+          <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
             Tarodan
           </span>
         </Link>
@@ -89,14 +88,14 @@ function VerifyEmailContent() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-md"
         >
           {status === 'loading' && (
-            <div className="bg-white rounded-3xl shadow-xl shadow-orange-500/10 p-8 md:p-10 border border-gray-100 text-center">
+            <div className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center">
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-full flex items-center justify-center">
-                  <ArrowPathIcon className="w-10 h-10 text-orange-600 animate-spin" />
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-full flex items-center justify-center">
+                  <ArrowPathIcon className="w-10 h-10 text-primary-600 animate-spin" />
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">
@@ -112,6 +111,7 @@ function VerifyEmailContent() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
               className="bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
@@ -126,7 +126,7 @@ function VerifyEmailContent() {
               </div>
 
               <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                {locale === 'tr' ? 'E-posta Doğrulandı! 🎉' : 'Email Verified! 🎉'}
+                {locale === 'tr' ? 'E-posta Doğrulandı!' : 'Email Verified!'}
               </h2>
               
               <p className="text-gray-500 mb-8">
@@ -137,7 +137,7 @@ function VerifyEmailContent() {
 
               <Link
                 href="/login"
-                className="block w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25"
+                className="block w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
               >
                 {locale === 'tr' ? 'Giriş Yap' : 'Login Now'}
               </Link>
@@ -148,6 +148,7 @@ function VerifyEmailContent() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
               className="bg-white rounded-3xl shadow-xl shadow-red-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
@@ -166,7 +167,7 @@ function VerifyEmailContent() {
 
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <p className="text-sm text-amber-800">
-                  💡 {locale === 'tr' 
+                  {locale === 'tr' 
                     ? 'Bağlantının süresi dolmuş olabilir. Yeni bir doğrulama e-postası isteyebilirsiniz.' 
                     : 'The link may have expired. You can request a new verification email.'}
                 </p>
@@ -178,13 +179,13 @@ function VerifyEmailContent() {
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
                   required
                 />
                 <button
                   type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2"
                 >
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
@@ -202,14 +203,14 @@ function VerifyEmailContent() {
               <div className="space-y-3">
                 <Link
                   href="/login"
-                  className="block w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+                  className="block w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Giriş Sayfasına Git' : 'Go to Login'}
                 </Link>
                 
                 <Link
                   href="/register"
-                  className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                  className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Yeniden Kayıt Ol' : 'Register Again'}
                 </Link>
@@ -221,11 +222,12 @@ function VerifyEmailContent() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-3xl shadow-xl shadow-orange-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl flex items-center justify-center">
-                  <EnvelopeIcon className="w-10 h-10 text-orange-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-2xl flex items-center justify-center">
+                  <EnvelopeIcon className="w-10 h-10 text-primary-600" />
                 </div>
               </div>
 
@@ -241,7 +243,7 @@ function VerifyEmailContent() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
                 <p className="text-sm text-blue-800">
-                  📬 {locale === 'tr' 
+                  {locale === 'tr' 
                     ? 'E-postanızı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin veya yeni doğrulama e-postası isteyin.' 
                     : "Can't find the email? Check your spam/junk folder or request a new verification email."}
                 </p>
@@ -253,13 +255,13 @@ function VerifyEmailContent() {
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
                   required
                 />
                 <button
                   type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2"
                 >
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
@@ -277,7 +279,7 @@ function VerifyEmailContent() {
               <div className="space-y-3">
                 <Link
                   href="/login"
-                  className="block w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+                  className="block w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Giriş Sayfasına Git' : 'Go to Login'}
                 </Link>
@@ -300,8 +302,8 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     }>
       <VerifyEmailContent />

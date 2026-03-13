@@ -109,14 +109,37 @@ export default function LoginPage() {
     }
   };
 
+  const stagger = {
+    container: {
+      hidden: { opacity: 0 },
+      show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+      },
+    },
+    item: {
+      hidden: { opacity: 0, y: 10 },
+      show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } },
+    },
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left - Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-white">
+      <div className="flex-1 flex flex-col bg-white">
+        <div className="px-6 pt-6">
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
+              Tarodan
+            </span>
+          </Link>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-[400px]"
         >
           <div className="mb-8">
@@ -132,6 +155,7 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 mb-6"
             >
               <div className="flex gap-3 mb-3">
@@ -147,7 +171,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleResendVerification}
                   disabled={isResending}
-                  className="w-full py-2.5 bg-amber-200 hover:bg-amber-300 text-amber-900 font-semibold text-sm rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full py-2.5 bg-amber-200 hover:bg-amber-300 text-amber-900 font-semibold text-sm rounded-lg transition-all duration-200 ease-premium disabled:opacity-50"
                 >
                   {isResending 
                     ? (locale === 'en' ? 'Sending...' : 'Gönderiliyor...') 
@@ -155,7 +179,7 @@ export default function LoginPage() {
                 </button>
                 <Link
                   href="/verify-email"
-                  className="block w-full py-2 text-center text-sm text-amber-800 hover:text-amber-900 underline"
+                  className="block w-full py-2 text-center text-sm text-amber-800 hover:text-amber-900 underline transition-colors duration-200"
                 >
                   {locale === 'en' ? 'Go to verification page' : 'Doğrulama sayfasına git'}
                 </Link>
@@ -163,101 +187,120 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <div className="border border-gray-200 bg-white p-7" style={{ borderRadius: '8px' }}>
+          <div className="border border-gray-200 bg-white rounded-xl p-7">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSubmit();
               }}
-              className="space-y-5"
             >
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t('auth.email')}
-                </label>
-                <div className="relative">
-                  <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
-                    style={{ borderRadius: '6px' }}
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t('auth.password')}
-                </label>
-                <div className="relative">
-                  <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
-                    style={{ borderRadius: '6px' }}
-                    autoComplete="current-password"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSubmit();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="w-[18px] h-[18px]" />
-                    ) : (
-                      <EyeIcon className="w-[18px] h-[18px]" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 border-gray-300 text-orange-500 focus:ring-orange-500"
-                    style={{ borderRadius: '3px' }}
-                  />
-                  <span className="text-sm text-gray-600">{t('auth.rememberMe')}</span>
-                </label>
-                <Link href="/forgot-password" className="text-sm font-medium text-orange-600 hover:text-orange-700">
-                  {t('auth.forgotPassword')}
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 active:bg-orange-700 transition-colors disabled:opacity-60"
-                style={{ borderRadius: '6px' }}
+              <motion.div
+                variants={stagger.container}
+                initial="hidden"
+                animate="show"
+                className="space-y-5"
               >
-                {isLoading 
-                  ? (locale === 'en' ? 'Signing in...' : 'Giriş yapılıyor...') 
-                  : t('common.login')}
-              </button>
+                <motion.div variants={stagger.item}>
+                  <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {t('auth.email')}
+                  </label>
+                  <div className="relative">
+                    <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+                    <input
+                      id="login-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
+                      autoComplete="email"
+                    />
+                  </div>
+                </motion.div>
+
+                <motion.div variants={stagger.item}>
+                  <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {t('auth.password')}
+                  </label>
+                  <div className="relative">
+                    <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
+                      autoComplete="current-password"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSubmit();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="w-[18px] h-[18px]" />
+                      ) : (
+                        <EyeIcon className="w-[18px] h-[18px]" />
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+
+                <motion.div variants={stagger.item} className="flex items-center justify-between">
+                  <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      id="login-remember"
+                      type="checkbox"
+                      className="w-4 h-4 rounded-sm border-gray-300 text-primary-500 focus:ring-primary-500 transition-colors duration-200"
+                    />
+                    <span className="text-sm text-gray-600">{t('auth.rememberMe')}</span>
+                  </label>
+                  <Link href="/forgot-password" className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors duration-200">
+                    {t('auth.forgotPassword')}
+                  </Link>
+                </motion.div>
+
+                <motion.div variants={stagger.item}>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2"
+                  >
+                    {isLoading && (
+                      <svg className="animate-spin h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                    {isLoading 
+                      ? (locale === 'en' ? 'Signing in...' : 'Giriş yapılıyor...') 
+                      : t('common.login')}
+                  </button>
+                </motion.div>
+              </motion.div>
             </form>
           </div>
 
-          <p className="text-center mt-6 text-sm text-gray-500">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            className="text-center mt-6 text-sm text-gray-500"
+          >
             {t('auth.noAccount')}{' '}
-            <Link href="/register" className="font-semibold text-orange-600 hover:text-orange-700">
+            <Link href="/register" className="font-semibold text-primary-600 hover:text-primary-700 transition-colors duration-200">
               {t('common.register')}
             </Link>
-          </p>
+          </motion.p>
         </motion.div>
+        </div>
       </div>
 
       {/* Right - Image panel */}
@@ -274,7 +317,7 @@ export default function LoginPage() {
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.4 }}
+            transition={{ delay: 0.3, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           >
             <h2 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">
               {locale === 'en' 
