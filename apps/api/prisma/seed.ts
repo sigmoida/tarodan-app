@@ -899,6 +899,13 @@ async function main() {
 
   console.log(`✅ Created ${tierAssignments.length} user memberships`);
 
+  // Users who can trade (premium/business only) – used so only their products get isTradeEnabled
+  const canTradeUserIds = new Set(
+    tierAssignments
+      .filter(ta => ta.tierId === premiumTier.id || ta.tierId === businessTier.id)
+      .map(ta => ta.userId),
+  );
+
   // ==========================================================================
   // 8. Create Addresses
   // ==========================================================================
@@ -1122,6 +1129,9 @@ async function main() {
     const slugBase = d.img.replace('product-', '').replace('.png', '');
     const slug = `${slugBase}-${i}`;
 
+    // Only premium/business sellers can have trade-enabled products (app rule: takas için premium gerekli)
+    const isTradeEnabled = canTradeUserIds.has(seller.id) && (i % 3 !== 2);
+
     const product = await prisma.product.upsert({
       where: { slug },
       create: {
@@ -1136,7 +1146,7 @@ async function main() {
         price,
         condition: d.cond,
         status,
-        isTradeEnabled: i % 3 !== 2,
+        isTradeEnabled,
         isSet: d.isSet ?? false,
         isLimited: d.isLimited ?? false,
         isPreorder: d.isPreorder ?? false,
@@ -1155,7 +1165,7 @@ async function main() {
         price,
         condition: d.cond,
         status,
-        isTradeEnabled: i % 3 !== 2,
+        isTradeEnabled,
         isSet: d.isSet ?? false,
         isLimited: d.isLimited ?? false,
         isPreorder: d.isPreorder ?? false,
