@@ -67,6 +67,7 @@ export default function OrdersPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const addToCart = useCartStore((s) => s.addToCart);
   const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
   const [statusFilter, setStatusFilter] = useState<'active' | 'cancelled'>('active');
   const [downloadingInvoiceOrderId, setDownloadingInvoiceOrderId] = useState<string | null>(null);
@@ -101,9 +102,6 @@ export default function OrdersPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [submittingShipping, setSubmittingShipping] = useState(false);
-
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!mounted || authLoading) return;
