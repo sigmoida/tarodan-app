@@ -216,7 +216,58 @@ export default function CheckoutPage() {
         seller: { id: item.seller.id, displayName: item.seller.displayName },
       }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
-  const grandTotal = Math.max(0, subtotal + shippingCost);
+
+  // Quote from backend (includes shipping + platform fee). When available, use for summary and button total.
+  const [quote, setQuote] = useState<{
+    pricing: {
+      subtotal: number;
+      shippingAmount: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      commissionAmount: number;
+      totalAmount: number;
+      sellerNetAmount: number;
+    };
+  } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState(false);
+
+  useEffect(() => {
+    if (checkoutItems.length === 0) {
+      setQuote(null);
+      setQuoteError(false);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    setQuoteError(false);
+    ordersApi
+      .getQuote({
+        items: checkoutItems.map((item) => ({ productId: item.productId, quantity: 1 })),
+      })
+      .then((res) => {
+        if (!cancelled && res.data?.pricing) {
+          setQuote({ pricing: res.data.pricing });
+        } else if (!cancelled && res.data) {
+          setQuote(res.data as any);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQuoteError(true);
+          setQuote(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutItems.length, checkoutItems.map((i) => i.productId).join(',')]);
+
+  const displayTotal = quote?.pricing?.totalAmount ?? Math.max(0, subtotal + shippingCost);
+  const grandTotal = displayTotal;
 
 
   useEffect(() => {
@@ -1745,14 +1796,18 @@ export default function CheckoutPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
-                  <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                  <span className="font-medium">
+                    {(quote?.pricing?.subtotal ?? subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
                   <span className="font-medium">
-                    {shippingLoading ? (
+                    {quoteLoading || (shippingLoading && !quote) ? (
                       <span className="text-gray-400">Hesaplanıyor...</span>
+                    ) : quote?.pricing?.shippingAmount != null ? (
+                      `${Number(quote.pricing.shippingAmount).toFixed(2)} TL`
                     ) : shippingCost > 0 ? (
                       `${shippingCost.toFixed(2)} TL`
                     ) : (
@@ -1761,12 +1816,20 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
+                {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">{locale === 'en' ? 'Platform fee' : 'Platform ücreti'}</span>
+                    <span className="font-medium">
+                      {Number(quote!.pricing.buyerFeeAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                    </span>
+                  </div>
+                )}
 
                 <hr />
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="font-bold text-primary-500">
-                    {shippingLoading ? (
+                    {(quoteLoading || (shippingLoading && !quote)) ? (
                       <span className="text-gray-400">...</span>
                     ) : (
                       `${grandTotal.toFixed(2)} TL`

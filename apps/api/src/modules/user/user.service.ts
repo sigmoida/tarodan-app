@@ -732,7 +732,7 @@ export class UserService {
         } 
       }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId },
+        where: { receiverId: userId, status: 'approved' },
         _avg: { score: true },
         _count: true,
       }),
@@ -1902,7 +1902,7 @@ export class UserService {
             where: { sellerId: seller.id, status: 'completed' },
           }),
           this.prisma.rating.aggregate({
-            where: { receiverId: seller.id },
+            where: { receiverId: seller.id, status: 'approved' },
             _avg: { score: true },
             _count: true,
           }),

@@ -6,7 +6,7 @@ import { Resolver, Query, Args, ID, Context } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { UserType, PublicUserType, UserStatsType } from '../types/user.type';
 import { PrismaService } from '../../../prisma';
-import { ProductStatus, OrderStatus, TradeStatus } from '@prisma/client';
+import { ProductStatus, OrderStatus, TradeStatus, RatingStatus } from '@prisma/client';
 
 @Resolver(() => UserType)
 export class UserResolver {
@@ -23,13 +23,13 @@ export class UserResolver {
             NOT: { id: { startsWith: 'membership-' } },
           },
         },
-        receivedRatings: true,
+        receivedRatings: { where: { status: RatingStatus.approved } },
       },
     });
 
     if (!user) return null;
 
-    // Calculate average rating
+    // Calculate average rating (only approved)
     const avgRating = user.receivedRatings.length > 0
       ? user.receivedRatings.reduce((sum, r) => sum + r.score, 0) / user.receivedRatings.length
       : null;
@@ -74,7 +74,7 @@ export class UserResolver {
           status: TradeStatus.completed,
         },
       }),
-      this.prisma.rating.findMany({ where: { receiverId: id } }),
+      this.prisma.rating.findMany({ where: { receiverId: id, status: RatingStatus.approved } }),
     ]);
 
     const avgRating = ratings.length > 0
@@ -109,7 +109,7 @@ export class UserResolver {
             NOT: { id: { startsWith: 'membership-' } },
           },
         },
-        receivedRatings: true,
+        receivedRatings: { where: { status: RatingStatus.approved } },
       },
       orderBy: {
         sellerOrders: {

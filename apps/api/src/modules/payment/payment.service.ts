@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto, DirectPaymentDto, CreditCardDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
@@ -1366,15 +1367,13 @@ export class PaymentService {
         }
 
         // Stok ödeme anında düşer; sipariş oluşturulurken düşülmez (ürün ödenene kadar listede kalsın)
+        const newQuantity =
+          product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
-          status: ProductStatus.sold,
+          status: getProductStatusFromQuantity(newQuantity),
         };
         if (product.quantity !== null) {
           updateData.quantity = { decrement: 1 };
-          // Tek adet kaldıysa satıştan sonra 0 olur, ilanı inactive yap
-          if (product.quantity <= 1) {
-            updateData.status = ProductStatus.inactive;
-          }
         }
 
         await tx.product.update({
@@ -2107,6 +2106,11 @@ export class PaymentService {
             buyerId: true,
             sellerId: true,
             shippingAddress: true,
+            totalAmount: true,
+            shippingCost: true,
+            buyerFeeAmount: true,
+            sellerFeeAmount: true,
+            commissionAmount: true,
           },
         },
       },
@@ -2137,6 +2141,24 @@ export class PaymentService {
       (this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1') &&
       payment.status === PaymentStatus.pending;
 
+    const totalAmount = Number(payment.order.totalAmount ?? 0);
+    const shippingCost = Number(payment.order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(payment.order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(payment.order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(payment.order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
     return {
       id: payment.id,
       orderId: payment.orderId,
@@ -2144,6 +2166,7 @@ export class PaymentService {
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
+      pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       ...(useBypass && { useBypass: true }),
@@ -2227,6 +2250,24 @@ export class PaymentService {
       throw new ForbiddenException('Bu ödemeyi görüntüleme yetkiniz yok');
     }
 
+    const totalAmount = Number(payment.order.totalAmount ?? 0);
+    const shippingCost = Number(payment.order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(payment.order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(payment.order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(payment.order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
     return {
       id: payment.id,
       orderId: payment.orderId,
@@ -2235,6 +2276,7 @@ export class PaymentService {
       provider: payment.provider,
       status: payment.status,
       providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
+      pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     };

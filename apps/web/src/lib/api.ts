@@ -258,6 +258,15 @@ export const ordersApi = {
     api.patch(`/orders/${id}/shipping-address`, data),
   trackGuest: (data: { orderNumber: string; email: string }) =>
     api.post('/orders/guest/track', data),
+  /** Checkout quote (pricing breakdown). Use for order summary; same logic as order create. */
+  getQuote: (data: { items: Array<{ productId: string; quantity?: number }> }) =>
+    api.post('/orders/quote', data),
+  /** Commission preview for one amount/category (listing form). */
+  getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
+    api.get('/orders/commission-preview', { params }),
+  /** Batch commission preview for multiple items (e.g. ilanlarım list). */
+  getCommissionPreviewBatch: (items: Array<{ amount: number; categoryId?: string | null }>) =>
+    api.post('/orders/commission-preview-batch', { items }),
 };
 
 // Payments

@@ -287,7 +287,6 @@ model Category {
   sortOrder       Int              @default(0) @map("sort_order")
   isActive        Boolean          @default(true) @map("is_active")
   createdAt       DateTime         @default(now()) @map("created_at")
-  image           String?          @map("image")
   parent          Category?        @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children        Category[]       @relation("CategoryHierarchy")
   commissionRules CommissionRule[]
@@ -650,21 +649,23 @@ model ContentFilter {
 }
 
 model Rating {
-  id         String   @id @default(uuid())
-  giverId    String   @map("giver_id")
-  receiverId String   @map("receiver_id")
-  orderId    String?  @map("order_id")
-  tradeId    String?  @map("trade_id")
+  id         String       @id @default(uuid())
+  giverId    String       @map("giver_id")
+  receiverId String       @map("receiver_id")
+  orderId    String?      @map("order_id")
+  tradeId    String?      @map("trade_id")
   score      Int
   comment    String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  giver      User     @relation("RatingGiver", fields: [giverId], references: [id])
-  receiver   User     @relation("RatingReceiver", fields: [receiverId], references: [id])
+  status     RatingStatus @default(pending)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  giver      User         @relation("RatingGiver", fields: [giverId], references: [id])
+  receiver   User         @relation("RatingReceiver", fields: [receiverId], references: [id])
 
   @@unique([giverId, orderId])
   @@unique([giverId, tradeId])
   @@index([receiverId])
+  @@index([status])
   @@map("ratings")
 }
 

@@ -103,7 +103,7 @@ export default function ListingsPage() {
   const searchString = searchParams.toString();
 
   const normalizeParams = (p: URLSearchParams): string => {
-    const sorted = new URLSearchParams([...p.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+    const sorted = new URLSearchParams(Array.from(p.entries()).sort((a, b) => a[0].localeCompare(b[0])));
     return sorted.toString();
   };
 

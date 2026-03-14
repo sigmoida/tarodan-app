@@ -8,7 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
-import { OrderStatus, TradeStatus } from '@prisma/client';
+import { OrderStatus, RatingStatus, TradeStatus } from '@prisma/client';
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -156,6 +156,7 @@ export class RatingService {
         tradeId: dto.tradeId,
         score: dto.score,
         comment: dto.comment,
+        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
       },
       include: {
         giver: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -237,6 +238,7 @@ export class RatingService {
         review: dto.review,
         images: dto.images || [],
         isVerifiedPurchase: true,
+        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
       },
       include: {
         product: { select: { id: true, title: true } },
@@ -260,7 +262,7 @@ export class RatingService {
    */
   async updateProductRatingStats(productId: string): Promise<void> {
     const stats = await this.prisma.productRating.aggregate({
-      where: { productId, status: 'approved' },
+      where: { productId, status: RatingStatus.approved },
       _avg: { score: true },
       _count: true,
     });
@@ -291,7 +293,7 @@ export class RatingService {
     
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
-        where: { receiverId: userId },
+        where: { receiverId: userId, status: RatingStatus.approved },
         select: {
           id: true,
           giverId: true,
@@ -308,7 +310,7 @@ export class RatingService {
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.rating.count({ where: { receiverId: userId } }),
+      this.prisma.rating.count({ where: { receiverId: userId, status: RatingStatus.approved } }),
     ]);
 
     const resolvedRatings = await Promise.all(
@@ -340,7 +342,7 @@ export class RatingService {
     
     const [ratings, total] = await Promise.all([
       this.prisma.productRating.findMany({
-        where: { productId, status: 'approved' },
+        where: { productId, status: RatingStatus.approved },
         include: {
           product: { select: { id: true, title: true } },
           user: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -349,7 +351,7 @@ export class RatingService {
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.productRating.count({ where: { productId, status: 'approved' } }),
+      this.prisma.productRating.count({ where: { productId, status: RatingStatus.approved } }),
     ]);
 
     const resolvedRatings = await Promise.all(
@@ -372,7 +374,7 @@ export class RatingService {
   // ==========================================================================
   async getUserRatingStats(userId: string): Promise<UserRatingStatsDto> {
     const ratings = await this.prisma.rating.findMany({
-      where: { receiverId: userId },
+      where: { receiverId: userId, status: RatingStatus.approved },
       select: { score: true },
     });
 
@@ -400,7 +402,7 @@ export class RatingService {
   // ==========================================================================
   async getProductRatingStats(productId: string): Promise<ProductRatingStatsDto> {
     const ratings = await this.prisma.productRating.findMany({
-      where: { productId, status: 'approved' },
+      where: { productId, status: RatingStatus.approved },
       select: { score: true },
     });
 
@@ -427,8 +429,15 @@ export class RatingService {
   // MARK HELPFUL
   // ==========================================================================
   async markProductRatingHelpful(ratingId: string): Promise<ProductRatingResponseDto> {
-    const rating = await this.prisma.productRating.update({
+    const existing = await this.prisma.productRating.findUnique({
       where: { id: ratingId },
+      select: { status: true },
+    });
+    if (!existing || existing.status !== RatingStatus.approved) {
+      throw new NotFoundException('Yorum bulunamadı');
+    }
+    const rating = await this.prisma.productRating.update({
+      where: { id: ratingId, status: RatingStatus.approved },
       data: { helpfulCount: { increment: 1 } },
       include: {
         product: { select: { id: true, title: true } },

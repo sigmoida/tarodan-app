@@ -661,6 +661,7 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
@@ -722,6 +723,7 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
@@ -805,6 +807,7 @@ export class OfferService {
         imageUrl: imageUrl || undefined,
         images,
         status: offer.product.status,
+        categoryId: offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
       buyer: offer.buyer ? {
         ...offer.buyer,

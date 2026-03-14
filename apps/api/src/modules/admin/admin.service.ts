@@ -56,6 +56,7 @@ import {
   RatingStatus,
 } from './dto';
 import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
@@ -1789,11 +1790,32 @@ export class AdminService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
+    const totalAmount = Number(order.totalAmount);
+    const shippingCost = Number(order.shippingCost);
+    const commissionAmount = Number(order.commissionAmount);
+    const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
+    const subtotal = order.subtotal != null ? Number(order.subtotal) : totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = subtotal - sellerFeeAmount;
+
     return {
       ...order,
-      totalAmount: Number(order.totalAmount),
-      commissionAmount: Number(order.commissionAmount),
-      shippingCost: Number(order.shippingCost),
+      totalAmount,
+      commissionAmount,
+      shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      subtotal,
+      sellerNetAmount,
+      pricing: {
+        subtotal,
+        shippingAmount: shippingCost,
+        buyerFeeAmount,
+        sellerFeeAmount,
+        commissionAmount,
+        totalAmount,
+        sellerNetAmount,
+      },
       product: {
         ...order.product,
         price: Number(order.product.price),
@@ -1835,24 +1857,17 @@ export class AdminService {
       throw new BadRequestException('Geçersiz sipariş durumu');
     }
 
-    // If order is being marked as completed, mark product as sold
+    // If order is being marked as completed, update product status based on remaining quantity
     if (dto.status === OrderStatus.completed && order.productId) {
       const product = await this.prisma.product.findUnique({
         where: { id: order.productId },
       });
 
-      if (product && product.status !== ProductStatus.sold) {
-        // Update product status to SOLD
-        // If stock is 0, set product to inactive instead
-        const updateData: any = {
-          status: product.quantity !== null && product.quantity === 0
-            ? ProductStatus.inactive
-            : ProductStatus.sold
-        };
-
+      if (product) {
+        const newStatus = getProductStatusFromQuantity(product.quantity);
         await this.prisma.product.update({
           where: { id: order.productId },
-          data: updateData,
+          data: { status: newStatus },
         });
 
         // Invalidate cache
@@ -2861,6 +2876,17 @@ export class AdminService {
     newValue: any,
   ) {
     try {
+      // Resolve adminUserId: @CurrentUser('id') returns User.id, but AuditLog expects AdminUser.id
+      const adminUser = await this.prisma.adminUser.findFirst({
+        where: { userId: adminUserId, isActive: true },
+        select: { id: true },
+      });
+      if (!adminUser) {
+        this.logger.warn(`Admin user not found for userId ${adminUserId}, skipping audit log`);
+        return Promise.resolve();
+      }
+      const resolvedAdminUserId = adminUser.id;
+
       // Serialize values to ensure they can be stored as JSON
       const serializeValue = (value: any) => {
         if (value === null || value === undefined) {
@@ -2888,7 +2914,7 @@ export class AdminService {
 
       return await this.prisma.auditLog.create({
         data: {
-          adminUserId,
+          adminUserId: resolvedAdminUserId,
           action,
           entityType,
           entityId,
@@ -4502,7 +4528,6 @@ export class AdminService {
         isActive: c.isActive,
         productCount: c._count.products,
         collectionCount: c._count.collections,
-        image: c.image,
         createdAt: c.createdAt,
       })),
     };
@@ -4514,7 +4539,6 @@ export class AdminService {
   async createCategory(adminId: string, dto: {
     name: string;
     description?: string;
-    image?: string;
     parentId?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -4551,7 +4575,6 @@ export class AdminService {
         name: dto.name,
         slug,
         description: dto.description || null,
-        image: dto.image || null,
         parentId: dto.parentId || null, // Empty string becomes null (root category)
         sortOrder: dto.sortOrder || 0,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
@@ -4570,7 +4593,6 @@ export class AdminService {
   async updateCategory(adminId: string, categoryId: string, dto: {
     name?: string;
     description?: string;
-    image?: string;
     parentId?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -4631,7 +4653,6 @@ export class AdminService {
         name: dto.name,
         slug,
         description: dto.description !== undefined ? (dto.description || null) : undefined,
-        image: dto.image !== undefined ? (dto.image || null) : undefined,
         parentId: dto.parentId !== undefined ? (dto.parentId || null) : undefined, // Empty string becomes null
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
@@ -8355,10 +8376,11 @@ export class AdminService {
   /**
    * Get seller (user) ratings for admin panel
    */
-  async getUserRatings(query: { page?: number; limit?: number; search?: string }) {
+  async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
     const p = Number(query.page) || 1;
     const lim = Number(query.limit) || 20;
     const search = query.search;
+    const status = query.status;
     const where: any = {};
 
     if (search) {
@@ -8367,6 +8389,9 @@ export class AdminService {
         { receiver: { displayName: { contains: search, mode: 'insensitive' } } },
         { comment: { contains: search, mode: 'insensitive' } },
       ];
+    }
+    if (status && ['pending', 'approved', 'rejected', 'spam'].includes(status)) {
+      where.status = status;
     }
 
     const [total, ratings] = await Promise.all([
@@ -8387,6 +8412,21 @@ export class AdminService {
       data: ratings,
       meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
     };
+  }
+
+  /**
+   * Update seller (user) rating status (approve/reject)
+   */
+  async updateUserRatingStatus(adminId: string, ratingId: string, status: RatingStatus) {
+    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
+    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
+    const previous = { ...rating };
+    await this.prisma.rating.update({
+      where: { id: ratingId },
+      data: { status },
+    });
+    await this.createAuditLog(adminId, 'user_rating_status_update', 'Rating', ratingId, previous, { status });
+    return { success: true };
   }
 
   /**

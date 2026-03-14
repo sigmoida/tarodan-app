@@ -17,6 +17,18 @@ interface OrderDetail {
   totalAmount: number;
   amount: number;
   commissionAmount: number;
+  shippingCost?: number;
+  buyerFeeAmount?: number;
+  sellerFeeAmount?: number;
+  pricing?: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
   createdAt: string;
   updatedAt: string;
   product: {
@@ -380,9 +392,9 @@ export default function OrderDetailPage() {
                     <strong>{locale === 'en' ? 'Last error:' : 'Son hata:'}</strong> {order.payment.failureReason}
                   </p>
                 )}
-                {order.product?.slug ? (
+                {order.product?.id ? (
                   <Link
-                    href={`/listings/${order.product.slug}`}
+                    href={`/listings/${order.product.id}`}
                     className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
                   >
                     <CreditCardIcon className="w-5 h-5" />
@@ -444,12 +456,30 @@ export default function OrderDetailPage() {
               <div className="space-y-3">
                 <div className="flex justify-between text-gray-600">
                   <span>{locale === 'en' ? 'Product Amount' : 'Ürün Tutarı'}</span>
-                  <span>₺{orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                  <span>₺{(order.pricing?.subtotal ?? (orderAmount - (order.pricing?.shippingAmount ?? order.shippingCost ?? 0) - (order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0))).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>{locale === 'en' ? 'Shipping' : 'Kargo'}</span>
-                  <span>{locale === 'en' ? 'Free' : 'Ücretsiz'}</span>
+                  <span>{(order.pricing?.shippingAmount ?? order.shippingCost ?? 0) > 0 ? `₺${Number(order.pricing?.shippingAmount ?? order.shippingCost ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (locale === 'en' ? 'Free' : 'Ücretsiz')}</span>
                 </div>
+                {((order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0) > 0) && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>{locale === 'en' ? 'Platform fee' : 'Platform ücreti'}</span>
+                    <span>₺{Number(order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {order.isSeller && ((order.pricing?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0) > 0 || (order.pricing?.sellerNetAmount != null)) && (
+                  <>
+                    <div className="flex justify-between text-gray-600">
+                      <span>{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}</span>
+                      <span>₺{Number(order.pricing?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-green-700 font-medium">
+                      <span>{locale === 'en' ? 'Net to you' : 'Net kazanç'}</span>
+                      <span>₺{Number(order.pricing?.sellerNetAmount ?? (order.pricing?.subtotal ?? orderAmount) - (order.pricing?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
                 <div className="border-t pt-3 flex justify-between font-semibold text-lg">
                   <span>{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="text-primary-500">

@@ -23,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { useAuthStore } from '@/stores/authStore';
-import { api } from '@/lib/api';
+import { api, ordersApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -44,6 +44,7 @@ interface Offer {
     isOnSale?: boolean;
     imageUrl?: string;
     images?: { cardUrl?: string; detailUrl?: string; url?: string }[];
+    categoryId?: string | null;
   };
   buyer?: {
     id: string;
@@ -65,6 +66,7 @@ export default function OffersPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [estimatedNetByOfferId, setEstimatedNetByOfferId] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setMounted(true);
@@ -94,6 +96,32 @@ export default function OffersPage() {
   const error = offersQuery.isError ? (locale === 'en' ? 'Failed to load offers' : 'Teklifler yüklenirken bir hata oluştu') : null;
 
   const invalidateOffers = () => queryClient.invalidateQueries({ queryKey: ['offers'] });
+
+  const pendingReceivedOffers = activeTab === 'received' ? offers.filter((o) => o.status === 'pending') : [];
+  useEffect(() => {
+    if (pendingReceivedOffers.length === 0) {
+      setEstimatedNetByOfferId({});
+      return;
+    }
+    ordersApi
+      .getCommissionPreviewBatch(
+        pendingReceivedOffers.map((o) => ({
+          amount: Number(o.amount),
+          categoryId: o.product?.categoryId ?? null,
+        })),
+      )
+      .then((res) => {
+        if (res.data?.results && Array.isArray(res.data.results)) {
+          const map: Record<string, number> = {};
+          pendingReceivedOffers.forEach((o, i) => {
+            const r = res.data.results[i];
+            if (r != null && typeof r.sellerNetAmount === 'number') map[o.id] = r.sellerNetAmount;
+          });
+          setEstimatedNetByOfferId(map);
+        }
+      })
+      .catch(() => setEstimatedNetByOfferId({}));
+  }, [activeTab, pendingReceivedOffers.length, pendingReceivedOffers.map((o) => `${o.id}-${o.amount}-${o.product?.categoryId}`).join(',')]);
 
   const handleAccept = async (offerId: string) => {
     setActionLoading(offerId);
@@ -429,6 +457,11 @@ export default function OffersPage() {
                             <p className="text-lg sm:text-2xl font-bold text-orange-600">
                               ₺{offer.amount.toLocaleString('tr-TR')}
                             </p>
+                            {activeTab === 'received' && offer.status === 'pending' && estimatedNetByOfferId[offer.id] != null && (
+                              <p className="text-xs text-green-600 mt-1">
+                                {locale === 'en' ? 'Est. net to you' : 'Tahmini net kazanç'}: ₺{Number(estimatedNetByOfferId[offer.id]).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
                           </div>
 
                           {otherUser && (
