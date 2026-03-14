@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -44,9 +44,12 @@ export default function LikedCollectionsPage() {
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); }
-  }, [isAuthenticated, router]);
+    if (mounted && !isAuthenticated) { router.push('/login'); }
+  }, [mounted, isAuthenticated, router]);
 
   const likedQuery = useQuery({
     queryKey: ['collections-liked'],
@@ -85,8 +88,6 @@ export default function LikedCollectionsPage() {
     }
   };
 
-  if (!isAuthenticated) return null;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Page Header */}
@@ -109,7 +110,7 @@ export default function LikedCollectionsPage() {
       </div>
 
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
-        {loading ? (
+        {(!mounted || !isAuthenticated || loading) ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">

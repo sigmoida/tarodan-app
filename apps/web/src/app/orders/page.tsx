@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { api, ratingsApi } from '@/lib/api';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
@@ -101,12 +100,15 @@ export default function OrdersPage() {
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [submittingShipping, setSubmittingShipping] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', filter],
@@ -263,9 +265,6 @@ export default function OrdersPage() {
     }
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
-
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -287,7 +286,7 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {loading ? (
+        {(!mounted || authLoading || !isAuthenticated || loading) ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
           </div>

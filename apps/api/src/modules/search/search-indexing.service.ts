@@ -64,7 +64,10 @@ export class SearchIndexingService {
     await this.searchQueue.add('reindex-all-collections', {
       type: 'reindex-all',
       entityType: 'collection',
-    } as SearchJobData, { attempts: 1 });
+    } as SearchJobData, {
+      attempts: 1,
+      jobId: 'reindex-all-collections-singleton',
+    });
     this.logger.log('Queued full collection reindex');
   }
 }

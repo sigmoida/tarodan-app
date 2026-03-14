@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -18,7 +18,6 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 const PENDING_ORDER_STATUSES = ['paid', 'preparing'];
 
@@ -27,12 +26,15 @@ export default function SellerDashboardPage() {
   const { t } = useTranslation();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/seller/dashboard');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const statsQuery = useQuery({
     queryKey: ['users', 'me', 'stats'],
@@ -72,10 +74,7 @@ export default function SellerDashboardPage() {
   const soldCount = listingStats?.counts?.sold ?? stats?.soldProductsCount ?? 0;
   const totalRevenue = stats?.totalRevenue ?? 0;
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
-
-  const isLoading = statsQuery.isLoading || listingStatsQuery.isLoading;
+  const isLoading = !mounted || authLoading || !isAuthenticated || statsQuery.isLoading || listingStatsQuery.isLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">

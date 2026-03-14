@@ -31,7 +31,6 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import UserAvatar from '@/components/UserAvatar';
 
 interface MembershipTier {
@@ -91,6 +90,9 @@ export default function ProfilePage() {
   const prevPathnameRef = useRef<string | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ offers: 0, trades: 0 });
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
     queryFn: async () => {
@@ -105,7 +107,7 @@ export default function ProfilePage() {
   const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -114,7 +116,7 @@ export default function ProfilePage() {
       setProfileFromAuthStore();
     }
     loadProfile();
-  }, [isAuthenticated, authLoading]);
+  }, [mounted, isAuthenticated, authLoading]);
 
   // Refresh profile when pathname changes (e.g., returning from edit/delete page)
   useEffect(() => {
@@ -274,8 +276,28 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!mounted || authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-orange-500 pt-8 pb-24">
+          <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 -mt-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded p-5 shadow-sm border border-gray-100 animate-pulse">
+                <div className="h-12 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const tierColors = {
     free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
