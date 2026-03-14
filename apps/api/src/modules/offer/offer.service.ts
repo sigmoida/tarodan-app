@@ -308,12 +308,6 @@ export class OfferService {
         },
       });
 
-      // Reserve the product
-      await tx.product.update({
-        where: { id: offerData.productId },
-        data: { status: ProductStatus.reserved },
-      });
-
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 

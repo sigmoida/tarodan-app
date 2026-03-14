@@ -10,15 +10,21 @@ export class RetryPaymentResponseDto {
   @ApiProperty({ example: 'uuid-new-payment-id' })
   newPaymentId: string;
 
-  @ApiProperty({ example: 'https://www.iyzipay.com/payment/...' })
-  paymentUrl: string;
+  @ApiPropertyOptional({ example: 'uuid-order-id' })
+  orderId?: string;
+
+  @ApiPropertyOptional({ example: 'https://paytr.com/...' })
+  paymentUrl?: string;
 
   @ApiPropertyOptional({ example: '<script>...</script>' })
   paymentHtml?: string;
 
-  @ApiProperty({ example: 'iyzico' })
+  @ApiProperty({ example: 'paytr' })
   provider: string;
 
   @ApiProperty({ example: 300 })
   expiresIn: number;
+
+  @ApiPropertyOptional({ example: true })
+  useBypass?: boolean;
 }

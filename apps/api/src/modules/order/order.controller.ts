@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -30,6 +31,7 @@ import {
   GuestOrderTrackDto,
   DirectBuyDto,
   DirectBuyResponseDto,
+  SetShippingAddressDto,
 } from './dto';
 
 @ApiTags('orders')
@@ -180,6 +182,23 @@ export class OrderController {
     @CurrentUser('id') userId: string,
   ): Promise<OrderResponseDto> {
     return this.orderService.findOne(id, userId);
+  }
+
+  /**
+   * PATCH /orders/:id/shipping-address - Set shipping address on pending_payment order (buyer, e.g. offer-accepted)
+   */
+  @Patch(':id/shipping-address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set shipping address on order (buyer, pending_payment only)' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Order with updated address', type: OrderResponseDto })
+  async setShippingAddress(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: SetShippingAddressDto,
+  ): Promise<OrderResponseDto> {
+    return this.orderService.setShippingAddress(id, userId, dto);
   }
 
   /**

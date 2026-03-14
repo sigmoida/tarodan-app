@@ -448,7 +448,7 @@ export class OrderService {
           appliedCouponCode: (existingOrder.discountCode as string) ?? undefined,
           productId: dto.productId,
           paymentUrl: '',
-          provider: 'iyzico',
+          provider: 'paytr',
           existingOrder: true,
         };
       }
@@ -722,7 +722,7 @@ export class OrderService {
         appliedCouponCode: appliedCouponCode ?? undefined,
         productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
-        provider: 'iyzico', // Default provider
+        provider: 'paytr', // Default provider
       };
     });
 
@@ -1210,8 +1210,11 @@ export class OrderService {
       where.OR = [{ buyerId: userId }, { sellerId: userId }];
     }
 
+    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
     if (status) {
       where.status = status;
+    } else {
+      where.status = { not: OrderStatus.cancelled };
     }
 
     const total = await this.prisma.order.count({ where });
@@ -1288,6 +1291,39 @@ export class OrderService {
     }
 
     return await this.formatOrderResponse(order, userId);
+  }
+
+  /**
+   * Set shipping address on an existing order (buyer only, pending_payment).
+   * Used when completing payment for offer-accepted orders that had no address at creation.
+   */
+  async setShippingAddress(
+    orderId: string,
+    userId: string,
+    dto: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: { include: { images: { take: 1 } } }, buyer: true, seller: true, shipment: true, payment: true },
+    });
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.buyerId !== userId) throw new ForbiddenException('Bu siparişe adres ekleme yetkiniz yok');
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException('Sadece ödeme bekleyen siparişlere adres eklenebilir');
+    }
+    const shippingAddress = {
+      fullName: dto.fullName.trim(),
+      phone: dto.phone.trim(),
+      city: dto.city.trim(),
+      district: dto.district.trim(),
+      address: dto.address.trim(),
+      zipCode: dto.zipCode?.trim() || null,
+    };
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { shippingAddress: shippingAddress as any },
+    });
+    return this.formatOrderResponse({ ...order, shippingAddress }, userId);
   }
 
   /**

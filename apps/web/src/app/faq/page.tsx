@@ -37,7 +37,7 @@ const FAQ_CATEGORIES = [
       },
       {
         question: 'Hangi ödeme yöntemlerini kabul ediyorsunuz?',
-        answer: 'Kredi kartı, banka kartı ve sanal kart ile ödeme yapabilirsiniz. Ödemelerimiz Iyzico altyapısı ile güvenle işlenmektedir.',
+        answer: 'Kredi kartı, banka kartı ve sanal kart ile ödeme yapabilirsiniz. Ödemelerimiz PayTR altyapısı ile güvenle işlenmektedir.',
       },
       {
         question: 'Siparişimi nasıl takip edebilirim?',
@@ -155,7 +155,7 @@ export default function FAQPage() {
       icon: '🛒',
       faqs: [
         { question: 'How can I buy a product?', answer: 'Find the product you want, click "Add to Cart" or "Buy Now". Enter your address on the payment page and complete your payment securely.' },
-        { question: 'What payment methods do you accept?', answer: 'You can pay with credit card, debit card, and virtual card. Our payments are processed securely through Iyzico.' },
+        { question: 'What payment methods do you accept?', answer: 'You can pay with credit card, debit card, and virtual card. Our payments are processed securely through PayTR.' },
         { question: 'How can I track my order?', answer: 'You can track all your orders and shipping status by going to the "My Orders" page in your profile.' },
         { question: 'Is there free shipping?', answer: 'Yes! Orders of ₺500 and above qualify for free shipping. For orders below this amount, the standard shipping fee is ₺29.99.' },
       ],

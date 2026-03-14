@@ -1195,7 +1195,7 @@
       "title": "Payment Options",
       "subtitle": "Accepted payment methods and security",
       "accepted": "Accepted Methods",
-      "acceptedDesc": "You can pay securely with credit card, debit card, or virtual card. Payments are processed via iyzico.",
+      "acceptedDesc": "You can pay securely with credit card, debit card, or virtual card. Payments are processed via PayTR.",
       "security": "Security",
       "securityDesc": "Your card details are encrypted with 256-bit SSL. We do not store your full card number on our payment page.",
       "installments": "Installments",

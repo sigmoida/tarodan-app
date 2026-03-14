@@ -194,22 +194,28 @@ export class PaymentService {
     let paymentHtml: string | undefined;
     const clientIp = this.getClientIp(req);
 
-    // For Iyzico, use Direct API flow (no Hosted Checkout)
-    // Frontend will show CreditCardForm and call processDirect
+    // İyzico kaldırıldı – sadece PayTR kullanılıyor
     if (dto.provider === PaymentProvider.iyzico) {
-      // Don't initialize Hosted Checkout - just return paymentId
-      // Frontend will handle the card input and call /payments/process-direct
-      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      dto.provider = PaymentProvider.paytr;
+    }
+
+    // Ödeme bypass (test): PayTR çağrılmaz; tek kart başarılı, diğerleri başarısız
+    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+    if (paymentBypass) {
       return {
         paymentId: payment.id,
-        orderId: order.id,
+        orderId: dto.orderId,
         amount: Number(order.totalAmount),
+        paymentUrl: undefined,
+        paymentHtml: undefined,
         provider: dto.provider,
-        // No paymentUrl - frontend will show CreditCardForm
-        expiresIn: 600, // 10 minutes
+        expiresIn: 300,
+        useBypass: true,
       };
-    } else {
-      // PayTR - use existing flow
+    }
+
+    // PayTR flow
+    {
       const result = await this.initializePayTRPayment(payment, order, clientIp);
       return {
         paymentId: payment.id,
@@ -375,6 +381,9 @@ export class PaymentService {
   private async initializePayTRPayment(payment: any, order: any, clientIp: string) {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
+    // PayTR merchant_oid sadece harf ve rakam kabul ediyor (tire vb. kabul etmiyor)
+    const merchantOid = String(order.orderNumber || order.id).replace(/-/g, '');
+
     try {
       // Get shipping address from order
       const shippingAddress = order.shippingAddress as any;
@@ -407,7 +416,7 @@ export class PaymentService {
       // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
       const isMembershipOrder = order.productId?.startsWith?.('membership-');
       const result = await this.paytrService.processOrderPayment(
-        order.id,
+        merchantOid,
         Number(order.totalAmount),
         buyer,
         basketItems,
@@ -415,12 +424,12 @@ export class PaymentService {
         isMembershipOrder ? 'type=membership' : undefined,
       );
 
-      // Update payment with provider reference
+      // Update payment with provider reference (callback merchant_oid ile eşleşmesi için aynı değer)
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
           providerPaymentId: result.token,
-          providerConversationId: order.id,
+          providerConversationId: merchantOid,
         },
       });
 
@@ -432,7 +441,13 @@ export class PaymentService {
     } catch (error: any) {
       this.logger.error(`PayTR initialization error: ${error.message}`, error.stack);
 
-      // Don't fallback - throw error so user knows payment failed
+      // Ödeme hiç başlamadı ama sipariş oluştuğu için ürün rezerve kaldı – hemen serbest bırak (stoktan düşmesin)
+      try {
+        await this.processFailedPayment(payment, error?.message || 'PayTR ödeme başlatılamadı');
+      } catch (releaseErr: any) {
+        this.logger.warn(`Release product after PayTR init error failed: ${releaseErr?.message}`);
+      }
+
       throw new BadRequestException(
         error.message || 'PayTR ödeme başlatılamadı',
       );
@@ -1655,8 +1670,39 @@ export class PaymentService {
       throw new BadRequestException('Sadece başarısız ödemeler tekrar denenebilir');
     }
 
-    // Verify order is still in pending_payment status
-    if (payment.order.status !== OrderStatus.pending_payment) {
+    const order = payment.order;
+    const wasCancelled = order.status === OrderStatus.cancelled;
+
+    // Sipariş iptal edilmişse (ödeme başarısız sonrası): ürün hâlâ aktifse siparişi yeniden açıp rezerve et
+    if (wasCancelled && order.productId) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+      });
+      if (!product || product.status !== ProductStatus.active) {
+        throw new BadRequestException(
+          'Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.',
+        );
+      }
+      await this.prisma.$transaction([
+        this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.pending_payment },
+        }),
+        this.prisma.product.update({
+          where: { id: order.productId },
+          data: { status: ProductStatus.reserved },
+        }),
+      ]);
+      // Reload order with relations for payment init
+      (payment as any).order = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        include: {
+          buyer: true,
+          seller: true,
+          product: true,
+        },
+      });
+    } else if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException('Sipariş durumu ödeme tekrarına uygun değil');
     }
 
@@ -1686,6 +1732,22 @@ export class PaymentService {
       newPaymentId: newPayment.id,
       userId,
     });
+
+    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+    if (paymentBypass) {
+      this.logger.log(`Payment ${paymentId} retried (bypass), new payment ${newPayment.id}`);
+      return {
+        success: true,
+        paymentId: payment.id,
+        newPaymentId: newPayment.id,
+        orderId: payment.orderId,
+        paymentUrl: undefined,
+        paymentHtml: undefined,
+        provider: payment.provider,
+        expiresIn: 300,
+        useBypass: true,
+      };
+    }
 
     // Generate payment URL based on provider
     let paymentUrl: string;
@@ -1793,6 +1855,23 @@ export class PaymentService {
       paymentId: payment.id,
       message: 'Ödeme başarıyla iptal edildi',
     };
+  }
+
+  /**
+   * Kullanıcı ödeme fail sayfasına geldiğinde çağrılır. PayTR callback bazen ulaşmayabiliyor;
+   * bu endpoint ile ürün rezervasyonu hemen serbest bırakılır (ilan tekrar listelerde görünür).
+   * Sadece status=pending ise işlem yapılır; idempotent.
+   */
+  async confirmFailedFromClient(paymentId: string): Promise<{ released: boolean }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { order: { select: { id: true } } },
+    });
+    if (!payment || payment.status !== PaymentStatus.pending) {
+      return { released: false };
+    }
+    await this.processFailedPayment(payment, 'Fail sayfasından onay - rezervasyon serbest bırakıldı');
+    return { released: true };
   }
 
   /**
@@ -2054,6 +2133,10 @@ export class PaymentService {
       }
     }
 
+    const useBypass =
+      (this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1') &&
+      payment.status === PaymentStatus.pending;
+
     return {
       id: payment.id,
       orderId: payment.orderId,
@@ -2063,7 +2146,46 @@ export class PaymentService {
       provider: payment.provider,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
+      ...(useBypass && { useBypass: true }),
     };
+  }
+
+  /**
+   * Test bypass: belirtilen kart numarası başarılı, diğerleri başarısız (PAYMENT_BYPASS=true iken)
+   */
+  async bypassComplete(paymentId: string, cardNumber: string): Promise<{ success: boolean }> {
+    if (this.configService.get('PAYMENT_BYPASS') !== 'true' && this.configService.get('PAYMENT_BYPASS') !== '1') {
+      throw new BadRequestException('Bypass modu kapalı');
+    }
+
+    const normalized = cardNumber.replace(/\D/g, '');
+    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '4508345678901234').replace(/\D/g, '');
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) throw new NotFoundException('Ödeme bulunamadı');
+    if (payment.status !== PaymentStatus.pending) {
+      return { success: payment.status === PaymentStatus.completed };
+    }
+
+    if (normalized === successCard) {
+      await this.processSuccessfulPayment(payment, payment.order.orderNumber || payment.orderId);
+      return { success: true };
+    }
+
+    await this.processFailedPayment(payment, 'Test kartı geçersiz (bypass: sadece belirlenen kart başarılı)');
+    return { success: false };
   }
 
   /**

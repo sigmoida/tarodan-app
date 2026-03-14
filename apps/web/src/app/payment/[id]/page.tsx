@@ -50,14 +50,24 @@ export default function PaymentPage() {
 
       setPayment(paymentData);
 
+      // Bypass modu: bu sayfada form yok; checkout’a yönlendir, ödeme orada yapılsın
+      if (paymentData.useBypass && paymentData.orderId) {
+        router.replace(`/checkout?orderId=${paymentData.orderId}`);
+        return;
+      }
+      if (paymentData.useBypass) {
+        router.replace('/orders');
+        return;
+      }
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
-      } else if (paymentData.paymentUrl) {
-        // For Iyzico, we stay on page to show custom form (Direct API)
-        // Only redirect if provider is NOT iyzico (fallback) or if legacy checkout
-        if (paymentData.provider !== 'iyzico') {
-          window.location.href = paymentData.paymentUrl;
+      } else if (paymentData.paymentUrl && !paymentData.useBypass) {
+        const url = paymentData.paymentUrl;
+        if (url.includes('/payment/') && url.includes(paymentId)) {
+          // Aynı sayfaya yönlendirilmiş (bypass); redirect etme
+        } else {
+          window.location.href = url;
         }
       }
     } catch (error: any) {
@@ -156,7 +166,7 @@ export default function PaymentPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Ödeme</h1>
           <p className="text-gray-600">
-            {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'} ile güvenli ödeme
+            PayTR ile güvenli ödeme
           </p>
         </div>
 
@@ -192,7 +202,7 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Payment Content */}
+        {/* Payment Content – bypass bu sayfada yok, checkout’a yönlendirildi */}
         {paymentHtml ? (
           // PayTR iframe
           <motion.div
@@ -224,7 +234,7 @@ export default function PaymentPage() {
                 if (html) {
                   setPaymentHtml(html);
                 } else {
-                  handlePaymentComplete(); // If no HTML (direct success without 3D?), poll.
+                  handlePaymentComplete();
                 }
               }}
               onCancel={() => router.back()}

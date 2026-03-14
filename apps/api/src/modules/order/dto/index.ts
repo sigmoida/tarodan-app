@@ -4,3 +4,4 @@ export * from './update-order-status.dto';
 export * from './order-response.dto';
 export * from './guest-checkout.dto';
 export * from './direct-buy.dto';
+export * from './set-shipping-address.dto';

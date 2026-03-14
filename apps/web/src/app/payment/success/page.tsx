@@ -208,7 +208,7 @@ export default function PaymentSuccessPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
                   <span className="font-semibold">
-                    {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'}
+                    PayTR
                   </span>
                 </div>
                 {payment.providerTransactionId && (

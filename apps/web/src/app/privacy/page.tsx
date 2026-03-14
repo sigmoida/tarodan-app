@@ -72,7 +72,7 @@ export default function PrivacyPage() {
           <h2>5. Verilerin Paylaşımı</h2>
           <h3>5.1 Verilerinizi Paylaştığımız Taraflar</h3>
           <ul>
-            <li><strong>Ödeme Sağlayıcıları:</strong> Iyzico, ödeme işlemleri için</li>
+            <li><strong>Ödeme Sağlayıcıları:</strong> PayTR, ödeme işlemleri için</li>
             <li><strong>Kargo Şirketleri:</strong> Aras Kargo, teslimat için</li>
             <li><strong>Bulut Hizmeti Sağlayıcıları:</strong> Veri depolama için</li>
             <li><strong>Analitik Hizmetler:</strong> Platform analizi için</li>

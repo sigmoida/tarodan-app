@@ -254,6 +254,8 @@ export const ordersApi = {
     api.post(`/orders/${id}/cancel`, { reason }),
   confirm: (id: string | number) =>
     api.post(`/orders/${id}/confirm`),
+  setShippingAddress: (id: string | number, data: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string }) =>
+    api.patch(`/orders/${id}/shipping-address`, data),
   trackGuest: (data: { orderNumber: string; email: string }) =>
     api.post('/orders/guest/track', data),
 };
@@ -280,6 +282,12 @@ export const paymentsApi = {
   }) => api.get('/payments/me', { params }),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
+  /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
+  confirmFailed: (paymentId: string) =>
+    api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
+  /** Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true) */
+  bypassComplete: (paymentId: string, cardNumber: string) =>
+    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>

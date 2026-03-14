@@ -29,7 +29,20 @@ API_URL=http://localhost:3001
   - Iyzico: https://merchant.iyzipay.com (Sandbox hesabı)
   - PayTR: https://www.paytr.com (Test hesabı)
 
-### 2. Servislerin Çalıştığından Emin Olun
+### 2. Ödeme Bypass (Test – PayTR olmadan)
+
+PayTR bağlamadan test için `apps/api/.env` içine ekleyin:
+
+```env
+PAYMENT_BYPASS=true
+PAYMENT_BYPASS_SUCCESS_CARD=4508345678901234
+```
+
+- **Başarılı kart:** Sadece `4508345678901234` (veya `PAYMENT_BYPASS_SUCCESS_CARD` ile belirlediğiniz) başarılı sayılır.
+- **Diğer kartlar:** Başarısız sayılır; ürün rezervden çıkar.
+- Ödeme sayfasında “Test ödeme (bypass)” formu çıkar; kart numarasını yazıp “Ödemeyi tamamla” derseniz sonuç anında döner.
+
+### 3. Servislerin Çalıştığından Emin Olun
 
 ```bash
 # Backend API (Port 3001)
@@ -43,7 +56,7 @@ pnpm dev
 # Database ve Redis çalışıyor olmalı
 ```
 
-### 3. Test Kullanıcısı Hazırlayın
+### 4. Test Kullanıcısı Hazırlayın
 
 - Bir test kullanıcısı ile giriş yapın (örn: `deniz@demo.com` / `Demo123!`)
 - En az bir adres ekleyin (`/profile/addresses`)
@@ -211,11 +224,18 @@ Taksit: 2, 3, 6, 9, 12
 
 ### PayTR Test Kartları
 
-PayTR test kartları için PayTR test panelinden alın. Genellikle:
-- Başarılı: `4508 3456 7890 1234`
-- Başarısız: `4508 3456 7890 1235`
+**Test modunda** (`PAYTR_TEST_MODE=true`) PayTR iframe açıldığında aşağıdaki test kartlarını kullanın.
+Resmi listeyi PayTR panelinden alabilirsiniz; yaygın örnekler:
 
-**Not:** PayTR test kartları PayTR test hesabınızdan alınmalıdır.
+| Sonuç       | Kart No (boşluksuz)     | Son Kullanma | CVV  | Kart Sahibi  |
+|------------|--------------------------|--------------|------|---------------|
+| Başarılı   | `4508345678901234`       | 12/30        | 000  | Test User     |
+| Başarısız  | `4508345678901235`       | 12/30        | 000  | Test User     |
+
+- Kart numarasını **aralıksız** girin (örn. `4508345678901234`).
+- **Başarılı ödeme** için: Yukarıdaki başarılı kart + geçerli son kullanma (ileri tarih) + CVV (örn. 000).
+- `apps/api/.env` içinde `PAYTR_TEST_MODE=true` ve geçerli `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT` olmalı.
+- `merchant_oid` hatası alıyorsanız: Backend artık sipariş numarasını tire olmadan gönderiyor (örn. `ORD2026000032`); API’yi güncelleyip tekrar deneyin.
 
 ---
 

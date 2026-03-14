@@ -69,6 +69,7 @@ export default function OrdersPage() {
   const addToCart = useCartStore((s) => s.addToCart);
   const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'cancelled'>('active');
   const [downloadingInvoiceOrderId, setDownloadingInvoiceOrderId] = useState<string | null>(null);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -114,10 +115,13 @@ export default function OrdersPage() {
   }, [mounted, isAuthenticated, authLoading, router]);
 
   const ordersQuery = useQuery({
-    queryKey: ['orders', filter],
+    queryKey: ['orders', filter, statusFilter],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get('/orders', {
-        params: { role: filter === 'all' ? undefined : filter },
+        params: {
+          role: filter === 'all' ? undefined : filter,
+          status: statusFilter === 'cancelled' ? 'cancelled' : undefined,
+        },
       });
       return response.data.orders || response.data.data || [];
     },
@@ -284,9 +288,9 @@ export default function OrdersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t('order.myOrders')}</h1>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {(['buyer', 'seller', 'all'] as const).map((f) => (
               <button
                 key={f}
@@ -299,6 +303,21 @@ export default function OrdersPage() {
                 {f === 'buyer' ? t('profile.totalPurchases') : f === 'seller' ? t('profile.totalSales') : t('common.all')}
               </button>
             ))}
+            <span className="text-gray-400 mx-1">|</span>
+            <button
+              onClick={() => setStatusFilter('active')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'active'
+                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {locale === 'en' ? 'Active' : 'Aktif'}
+            </button>
+            <button
+              onClick={() => setStatusFilter('cancelled')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'cancelled'
+                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {locale === 'en' ? 'Cancelled' : 'İptal edilenler'}
+            </button>
           </div>
         </div>
 

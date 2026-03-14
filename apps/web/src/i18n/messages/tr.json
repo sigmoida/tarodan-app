@@ -1193,7 +1193,7 @@
       "title": "Ödeme Seçenekleri",
       "subtitle": "Kabul ettiğimiz ödeme yöntemleri ve güvenlik",
       "accepted": "Kabul Edilen Yöntemler",
-      "acceptedDesc": "Kredi kartı, banka kartı ve sanal kart ile güvenli ödeme yapabilirsiniz. Ödemeler iyzico altyapısı ile işlenir.",
+      "acceptedDesc": "Kredi kartı, banka kartı ve sanal kart ile güvenli ödeme yapabilirsiniz. Ödemeler PayTR altyapısı ile işlenir.",
       "security": "Güvenlik",
       "securityDesc": "Kart bilgileriniz 256-bit SSL ile şifrelenir. Ödeme sayfamızda kart numaranız bizde saklanmaz.",
       "installments": "Taksit",
