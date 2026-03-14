@@ -18,8 +18,10 @@ export class MessageThreadResponseDto {
   id: string;
   participant1Id: string;
   participant1Name: string;
+  participant1AvatarUrl?: string;
   participant2Id: string;
   participant2Name: string;
+  participant2AvatarUrl?: string;
   productId?: string;
   productTitle?: string;
   productImage?: string;
