@@ -147,10 +147,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
         },
       });
@@ -288,10 +288,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
         },
       });
@@ -408,10 +408,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -508,10 +508,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -555,10 +555,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -632,10 +632,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -664,10 +664,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -725,10 +725,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -806,10 +806,29 @@ export class OfferService {
         images,
         status: offer.product.status,
       },
-      buyer: offer.buyer,
-      seller: offer.seller,
+      buyer: offer.buyer ? {
+        ...offer.buyer,
+        avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
+      } : offer.buyer,
+      seller: offer.seller ? {
+        ...offer.seller,
+        avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
+      } : offer.seller,
       createdAt: offer.createdAt,
       updatedAt: offer.updatedAt,
     };
+  }
+
+  private async resolveOfferAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 }

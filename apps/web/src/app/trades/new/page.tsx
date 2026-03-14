@@ -41,9 +41,9 @@ export default function NewTradePage() {
   
   // Check canTrade: prefer limits, fallback to membership tier
   // If limits is not loaded yet, check membership tier directly
-  const canTrade = limits 
-    ? limits.canTrade 
-    : (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  const canTrade = limits
+    ? limits.canTrade
+    : (user?.membershipTier === 'basic' || user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && isAuthenticated && user) {

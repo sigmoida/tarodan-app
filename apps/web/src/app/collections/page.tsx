@@ -431,9 +431,9 @@ export default function CollectionsPage() {
             <div className="w-14 h-14 bg-orange-50 rounded flex items-center justify-center mx-auto mb-4">
               <FolderPlusIcon className="w-7 h-7 text-orange-500" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Premium Üyelik Gerekli</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Üyelik Yükseltme Gerekli</h2>
             <p className="text-gray-500 text-sm mb-5">
-              Koleksiyon oluşturma özelliği sadece Premium ve üzeri üyelikler için aktiftir.
+              Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowPremiumModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors text-sm">

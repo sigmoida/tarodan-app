@@ -990,7 +990,7 @@ export default function EditListingPage() {
                 <p className="text-sm text-gray-600">
                   {limits?.canTrade
                     ? 'Bu ürünü takas için de açık tutar'
-                    : 'Takas özelliği Premium üyelik gerektirir'}
+                    : 'Takas özelliği Temel veya üstü üyelik gerektirir'}
                 </p>
               </div>
               {limits?.canTrade ? (

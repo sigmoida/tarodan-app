@@ -755,7 +755,7 @@ export default function NewListingPage() {
                 <p className="text-sm text-gray-600">
                   {limits?.canTrade
                     ? (locale === 'en' ? 'Also makes this product available for trade' : 'Bu ürünü takas için de açık tutar')
-                    : (locale === 'en' ? 'Trade feature requires Premium membership' : 'Takas özelliği Premium üyelik gerektirir')}
+                    : (locale === 'en' ? 'Trade feature requires Basic or higher membership' : 'Takas özelliği Temel veya üstü üyelik gerektirir')}
                 </p>
               </div>
               {limits?.canTrade ? (

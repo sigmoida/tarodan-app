@@ -817,8 +817,12 @@ export default function Navbar() {
                         {/* Profil - en üstte, profesyonel */}
                         <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="block px-4 py-3 hover:bg-orange-50/50 transition-colors">
                           <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
-                              {(user?.displayName || user?.email || '?').charAt(0).toUpperCase()}
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+                              {user?.avatarUrl && (user.avatarUrl.startsWith('http') || user.avatarUrl.startsWith('/')) ? (
+                                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                (user?.displayName || user?.email || '?').charAt(0).toUpperCase()
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>

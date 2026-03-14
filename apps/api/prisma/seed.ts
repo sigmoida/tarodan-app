@@ -228,44 +228,53 @@ async function main() {
 
   // ==========================================================================
   // 1b. Create Manufacturers (diecast brands: Hot Wheels, Tomica, etc.)
-  // Logo is left null in seed so: (1) re-running seed does not overwrite
-  // admin-uploaded S3 logos; (2) fresh clone gets repo logos via frontend
-  // BRANDS fallback (apps/web/public/photos/logolar/).
+  // Logo paths point to apps/web/public/photos/logolar/.
+  // Logos are only set on CREATE, not UPDATE, so re-running seed
+  // does not overwrite admin-uploaded S3 logos.
   // ==========================================================================
   console.log('Creating manufacturers...');
 
   const manufacturerData = [
-    { name: 'Hot Wheels', slug: 'hot-wheels', country: 'ABD', description: 'Mattel tarafından üretilen diecast model araba markası' },
-    { name: 'Matchbox', slug: 'matchbox', country: 'İngiltere', description: 'Lesney Products tarafından başlatılan diecast model markası' },
-    { name: 'Majorette', slug: 'majorette', country: 'Fransa', description: 'Fransız diecast model araba üreticisi' },
-    { name: 'Tomica', slug: 'tomica', country: 'Japonya', description: 'Takara Tomy tarafından üretilen Japon diecast model markası' },
-    { name: 'Bburago', slug: 'bburago', country: 'İtalya', description: 'İtalyan diecast model araba üreticisi' },
-    { name: 'Maisto', slug: 'maisto', country: 'ABD', description: 'Amerikan diecast model araba üreticisi' },
-    { name: 'AUTOart', slug: 'autoart', country: 'Hong Kong', description: 'Yüksek kaliteli koleksiyon diecast model üreticisi' },
-    { name: 'Minichamps', slug: 'minichamps', country: 'Almanya', description: 'Alman model araba üreticisi, özellikle F1 modelleri' },
-    { name: 'Kyosho', slug: 'kyosho', country: 'Japonya', description: 'Japon model araba ve RC araç üreticisi' },
-    { name: 'CMC', slug: 'cmc', country: 'Almanya', description: 'Premium koleksiyon modelleri üreticisi' },
-    { name: 'GT Spirit', slug: 'gt-spirit', country: 'Fransa', description: 'Resin model araba üreticisi' },
-    { name: 'Almost Real', slug: 'almost-real', country: 'Çin', description: 'Yüksek detaylı diecast model üreticisi' },
-    { name: 'Spark', slug: 'spark', country: 'Çin', description: 'Resin model araba üreticisi, yarış modelleri' },
-    { name: 'Schuco', slug: 'schuco', country: 'Almanya', description: 'Alman model araba üreticisi' },
-    { name: 'Norev', slug: 'norev', country: 'Fransa', description: 'Fransız diecast model üreticisi' },
-    { name: 'Oxford Diecast', slug: 'oxford-diecast', country: 'İngiltere', description: 'İngiliz diecast model üreticisi' },
-    { name: 'Greenlight', slug: 'greenlight', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
-    { name: 'ERTL', slug: 'ertl', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
-    { name: 'Tamiya', slug: 'tamiya', country: 'Japonya', description: 'Japon model kit ve diecast üreticisi' },
-    { name: 'Welly', slug: 'welly', country: 'Hong Kong', description: 'Diecast model araba üreticisi' },
+    { name: 'Hot Wheels', slug: 'hot-wheels', country: 'ABD', description: 'Mattel tarafından üretilen diecast model araba markası', logo: '/photos/logolar/2158430f294b152f30824d6bb1ac7bf9.jpg' },
+    { name: 'Matchbox', slug: 'matchbox', country: 'İngiltere', description: 'Lesney Products tarafından başlatılan diecast model markası', logo: '/photos/logolar/images.png' },
+    { name: 'Majorette', slug: 'majorette', country: 'Fransa', description: 'Fransız diecast model araba üreticisi', logo: '/photos/logolar/majorette-logo-png_seeklogo-492958.png' },
+    { name: 'Tomica', slug: 'tomica', country: 'Japonya', description: 'Takara Tomy tarafından üretilen Japon diecast model markası', logo: '/photos/logolar/Tomica_brand_textlogo.png' },
+    { name: 'Bburago', slug: 'bburago', country: 'İtalya', description: 'İtalyan diecast model araba üreticisi', logo: '/photos/logolar/Bburago_Logo.png' },
+    { name: 'Maisto', slug: 'maisto', country: 'ABD', description: 'Amerikan diecast model araba üreticisi', logo: '/photos/logolar/maisto-logo.png' },
+    { name: 'AUTOart', slug: 'autoart', country: 'Hong Kong', description: 'Yüksek kaliteli koleksiyon diecast model üreticisi', logo: '/photos/logolar/download.png' },
+    { name: 'Minichamps', slug: 'minichamps', country: 'Almanya', description: 'Alman model araba üreticisi, özellikle F1 modelleri', logo: '/photos/logolar/minichamps_logo.png' },
+    { name: 'Kyosho', slug: 'kyosho', country: 'Japonya', description: 'Japon model araba ve RC araç üreticisi', logo: '/photos/logolar/Kyosho_corp_logo.png' },
+    { name: 'CMC', slug: 'cmc', country: 'Almanya', description: 'Premium koleksiyon modelleri üreticisi', logo: '/photos/logolar/cmc_logo-640x320.jpg' },
+    { name: 'GT Spirit', slug: 'gt-spirit', country: 'Fransa', description: 'Resin model araba üreticisi', logo: '/photos/logolar/GT-Spirit-Logo.webp' },
+    { name: 'Almost Real', slug: 'almost-real', country: 'Çin', description: 'Yüksek detaylı diecast model üreticisi', logo: null },
+    { name: 'Spark', slug: 'spark', country: 'Çin', description: 'Resin model araba üreticisi, yarış modelleri', logo: null },
+    { name: 'Schuco', slug: 'schuco', country: 'Almanya', description: 'Alman model araba üreticisi', logo: '/photos/logolar/logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg' },
+    { name: 'Norev', slug: 'norev', country: 'Fransa', description: 'Fransız diecast model üreticisi', logo: '/photos/logolar/5bc0b46797d85-thumbnail.jpg' },
+    { name: 'Oxford Diecast', slug: 'oxford-diecast', country: 'İngiltere', description: 'İngiliz diecast model üreticisi', logo: null },
+    { name: 'Greenlight', slug: 'greenlight', country: 'ABD', description: 'Amerikan diecast model üreticisi', logo: '/photos/logolar/Greenlight_collectibles_logo.png' },
+    { name: 'ERTL', slug: 'ertl', country: 'ABD', description: 'Amerikan diecast model üreticisi', logo: null },
+    { name: 'Tamiya', slug: 'tamiya', country: 'Japonya', description: 'Japon model kit ve diecast üreticisi', logo: '/photos/logolar/tamiya-logo-png_seeklogo-324507.png' },
+    { name: 'Welly', slug: 'welly', country: 'Hong Kong', description: 'Diecast model araba üreticisi', logo: null },
+    { name: 'MINI GT', slug: 'mini-gt', country: 'Hong Kong', description: 'TSM tarafından üretilen 1:64 ölçek diecast model markası', logo: '/photos/logolar/mini-gt-logo-png_seeklogo-523421.png' },
   ];
 
-  const manufacturers = await Promise.all(
-    manufacturerData.map((m, i) =>
-      prisma.manufacturer.upsert({
-        where: { slug: m.slug },
-        update: { name: m.name, country: m.country, description: m.description },
-        create: { ...m, sortOrder: i + 1 },
-      })
-    )
-  );
+  const manufacturers: any[] = [];
+  for (let i = 0; i < manufacturerData.length; i++) {
+    const m = manufacturerData[i];
+    const existing = await prisma.manufacturer.findUnique({ where: { slug: m.slug }, select: { logo: true } });
+    // Use repo logo when: no existing logo, or existing is S3 URL (so deployment/clone gets consistent logos from repo)
+    const isRepoPath = (v: string | null) => v != null && (v.startsWith('/photos/logolar') || v.startsWith('/'));
+    const useSeedLogo = m.logo != null && (!existing?.logo || (existing.logo && !isRepoPath(existing.logo)));
+    const result = await prisma.manufacturer.upsert({
+      where: { slug: m.slug },
+      update: {
+        name: m.name, country: m.country, description: m.description,
+        ...(useSeedLogo ? { logo: m.logo } : {}),
+      },
+      create: { name: m.name, slug: m.slug, country: m.country, description: m.description, logo: m.logo, sortOrder: i + 1 },
+    });
+    manufacturers.push(result);
+  }
 
   console.log(`✅ Created ${manufacturers.length} manufacturers`);
 
@@ -886,7 +895,12 @@ async function main() {
   for (const ta of tierAssignments) {
     await prisma.userMembership.upsert({
       where: { userId: ta.userId },
-      update: {},
+      update: {
+        tierId: ta.tierId,
+        status: SubscriptionStatus.active,
+        currentPeriodStart: now,
+        currentPeriodEnd: oneYearLater,
+      },
       create: {
         userId: ta.userId,
         tierId: ta.tierId,
@@ -899,10 +913,10 @@ async function main() {
 
   console.log(`✅ Created ${tierAssignments.length} user memberships`);
 
-  // Users who can trade (premium/business only) – used so only their products get isTradeEnabled
+  // Users who can trade (basic/premium/business) – basic also has canTrade: true
   const canTradeUserIds = new Set(
     tierAssignments
-      .filter(ta => ta.tierId === premiumTier.id || ta.tierId === businessTier.id)
+      .filter(ta => ta.tierId === basicTier.id || ta.tierId === premiumTier.id || ta.tierId === businessTier.id)
       .map(ta => ta.userId),
   );
 

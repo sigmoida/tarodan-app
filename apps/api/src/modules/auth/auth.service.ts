@@ -16,6 +16,7 @@ import { JwtPayload } from './interfaces';
 import { SellerType } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +28,21 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
     private readonly cacheService: CacheService,
+    private readonly storageService: StorageService,
   ) { }
+
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 
   /**
    * Register a new user
@@ -446,12 +461,15 @@ export class AuthService {
         }
       }
 
+      const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+
       return {
         user: {
           id: user.id,
           email: user.email,
           phone: user.phone ?? undefined,
           displayName: user.displayName,
+          avatarUrl: resolvedAvatarUrl,
           isVerified: user.isVerified,
           isSeller: user.isSeller,
           sellerType: user.sellerType ?? undefined,

@@ -98,7 +98,7 @@ export default function MembershipPage() {
         const membershipResponse = await api.get('/membership/me');
         const membership = membershipResponse.data;
         
-        if (membership && (membership.tier?.type === 'premium' || membership.tier?.type === 'business')) {
+        if (membership && (membership.tier?.type === 'basic' || membership.tier?.type === 'premium' || membership.tier?.type === 'business')) {
           setMembershipDetails({
             currentPeriodStart: membership.currentPeriodStart,
             currentPeriodEnd: membership.currentPeriodEnd,
@@ -124,11 +124,11 @@ export default function MembershipPage() {
   }, [isAuthenticated, user]);
 
   const getListingLimitText = (tierId: string) => {
-    const limit = tierId === 'free' 
-      ? listingLimits.free_listing_limit ?? 5
-      : tierId === 'premium'
-      ? listingLimits.premium_listing_limit ?? -1
-      : listingLimits.business_listing_limit ?? 1000;
+    let limit: number;
+    if (tierId === 'free') limit = listingLimits.free_listing_limit ?? 10;
+    else if (tierId === 'basic') limit = 50;
+    else if (tierId === 'premium') limit = listingLimits.premium_listing_limit ?? 200;
+    else limit = listingLimits.business_listing_limit ?? 1000;
     
     if (limit === -1) {
       return `${t('membership.unlimited')} ${t('membership.listingsLimit')}`;
@@ -159,6 +159,23 @@ export default function MembershipPage() {
         color: 'gray',
       },
       {
+        id: 'basic',
+        name: 'Temel',
+        price: 49,
+        period: t('membership.perMonth'),
+        description: 'Koleksiyoncular için başlangıç',
+        features: [
+          { text: getListingLimitText('basic'), included: true },
+          { text: '6 resim/ilan', included: true },
+          { text: t('nav.trades'), included: true },
+          { text: t('collection.collections'), included: true },
+          { text: t('membership.noAds'), included: false },
+          { text: '2 öne çıkan ilan', included: true },
+        ],
+        popular: false,
+        color: 'blue',
+      },
+      {
         id: 'premium',
         name: t('membership.premium'),
         price: membershipPrices.premium_monthly_price ?? 99,
@@ -166,11 +183,11 @@ export default function MembershipPage() {
         description: t('membership.mostPopular'),
         features: [
           { text: getListingLimitText('premium'), included: true },
-          { text: '15 resim/ilan', included: true },
+          { text: '10 resim/ilan', included: true },
           { text: t('nav.trades'), included: true },
           { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
           { text: t('membership.noAds'), included: true },
-          { text: '3 öne çıkan ilan', included: true },
+          { text: '10 öne çıkan ilan', included: true },
         ],
         popular: true,
         color: 'purple',

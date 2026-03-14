@@ -9,7 +9,6 @@ import {
   TrashIcon,
   ChevronRightIcon,
   ChevronDownIcon,
-  ArrowsUpDownIcon,
   PhotoIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -23,8 +22,7 @@ interface Category {
   image?: string;
   parentId?: string;
   parent?: { id: string; name: string };
-  children: Array<Category>; // Recursive type
-  sortOrder: number;
+  children: Array<Category>;
   isActive: boolean;
   productCount: number;
   collectionCount: number;
@@ -36,7 +34,6 @@ interface CategoryFormData {
   description: string;
   image: string;
   parentId: string;
-  sortOrder: number;
   isActive: boolean;
 }
 
@@ -53,12 +50,10 @@ export default function CategoriesPage() {
     description: '',
     image: '',
     parentId: '',
-    sortOrder: 0,
     isActive: true,
   });
 
-  // DnD State
-  const [draggedId, setDraggedId] = useState<string | null>(null);
+  
 
   useEffect(() => {
     loadCategories();
@@ -114,7 +109,7 @@ export default function CategoriesPage() {
         });
         // Sort
         const sortNodes = (nodes: Category[]) => {
-          nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+          nodes.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
           nodes.forEach(n => sortNodes(n.children));
         };
         sortNodes(roots);
@@ -138,7 +133,6 @@ export default function CategoriesPage() {
       description: '',
       image: '',
       parentId: '',
-      sortOrder: 0,
       isActive: true,
     });
     setShowModal(true);
@@ -151,7 +145,6 @@ export default function CategoriesPage() {
       description: category.description || '',
       image: category.image || '',
       parentId: category.parentId || '',
-      sortOrder: category.sortOrder,
       isActive: category.isActive,
     });
     setShowModal(true);
@@ -216,74 +209,17 @@ export default function CategoriesPage() {
     setExpandedCategories(newExpanded);
   };
 
-  // DnD Handlers
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    // Firefox requires this
-    e.dataTransfer.setData('text/plain', id);
-    // Add class or style to drag image if needed
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetCategory: Category) => {
-    e.preventDefault();
-    if (!draggedId || draggedId === targetCategory.id) return;
-
-    const sourceId = draggedId;
-    setDraggedId(null);
-
-    // Find source category object from flat list
-    const sourceCategory = flatCategories.find(c => c.id === sourceId);
-    if (!sourceCategory) return;
-
-    // Check if they are siblings (same parent)
-    if (sourceCategory.parentId !== targetCategory.parentId) {
-      toast.error('Sadece aynı seviyedeki kategorileri sıralayabilirsiniz.');
-      return;
-    }
-
-    // Swap logic: We want to put Source BEFORE or AFTER Target? 
-    // Simplified: Swap sortOrders for now.
-    // Better: Assign target's sortOrder to Source, and re-index others? No, that's heavy.
-    // Swap is safest for 1-to-1 interaction without bulk update.
-
-    try {
-      await Promise.all([
-        adminApi.updateCategory(sourceId, { sortOrder: targetCategory.sortOrder }),
-        adminApi.updateCategory(targetCategory.id, { sortOrder: sourceCategory.sortOrder })
-      ]);
-      toast.success('Sıralama güncellendi');
-      loadCategories();
-    } catch (error) {
-      toast.error('Sıralama güncellenemedi');
-    }
-  };
-
-
   const renderCategory = (category: Category, level: number = 0) => {
     const hasChildren = category.children && category.children.length > 0;
     const isExpanded = expandedCategories.has(category.id);
-    const isDragging = draggedId === category.id;
 
     return (
       <div key={category.id} className="border-b border-gray-200 last:border-b-0">
         <div
-          draggable
-          onDragStart={(e) => handleDragStart(e, category.id)}
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, category)}
-          className={`flex items-center justify-between p-4 hover:bg-gray-100/50 transition-colors cursor-move ${isDragging ? 'opacity-50 bg-gray-100' : ''}`}
+          className="flex items-center justify-between p-4 hover:bg-gray-100/50 transition-colors"
           style={{ paddingLeft: `${level * 24 + 16}px` }}
         >
           <div className="flex items-center gap-3 flex-1">
-            <div className="text-gray-600">
-              <ArrowsUpDownIcon className="w-4 h-4" />
-            </div>
             {hasChildren ? (
               <button
                 onClick={(e) => {
@@ -326,7 +262,6 @@ export default function CategoriesPage() {
           </div>
 
           <div className="flex items-center gap-2 ml-4">
-            <span className="text-xs text-gray-600 font-mono mr-2">#{category.sortOrder}</span>
             <button
               onClick={() => openEditModal(category)}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
@@ -458,18 +393,6 @@ export default function CategoriesPage() {
                       </option>
                     ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
-                  Sıralama (Küçükten büyüğe)
-                </label>
-                <input
-                  type="number"
-                  value={formData.sortOrder}
-                  onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                  className="input-dark w-full"
-                />
               </div>
 
               <div className="flex items-center gap-2 pt-2">

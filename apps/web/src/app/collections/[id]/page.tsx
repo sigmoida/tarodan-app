@@ -209,7 +209,10 @@ export default function CollectionDetailPage() {
     try {
       await collectionsApi.like(collection.id);
       toast.success(isLiked ? t('collection.unliked') : t('collection.liked'));
-      await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] }),
+        queryClient.invalidateQueries({ queryKey: ['collections-liked'] }),
+      ]);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || t('collection.likeFailed');
       if (error?.response?.status === 404) toast.error(t('collection.collectionNotFound'));

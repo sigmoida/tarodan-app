@@ -101,7 +101,7 @@ export default function ProfilePage() {
       const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
       return Array.isArray(items) ? items : [];
     },
-    enabled: !!isAuthenticated,
+    enabled: !authLoading && !!isAuthenticated,
     meta: { page: 'profile-wishlist-count' },
   });
   const wishlistCount = wishlistQuery.data?.length ?? 0;
@@ -155,7 +155,8 @@ export default function ProfilePage() {
     const tierType = user.membershipTier || 'free';
     const tierDefaults: Record<string, MembershipTier> = {
       free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-      premium: { type: 'premium', name: 'Premium', maxFreeListings: -1, maxTotalListings: -1, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 3, commissionDiscount: 1, isAdFree: true },
+      basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
+      premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
       business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
     };
     
@@ -371,7 +372,7 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar: initials only (Trendyol-style) */}
               <div className="relative flex-shrink-0">
-                <UserAvatar displayName={profile.displayName} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
+                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
               </div>
               
               {/* User Info */}

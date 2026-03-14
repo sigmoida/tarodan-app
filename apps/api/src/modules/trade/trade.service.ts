@@ -133,14 +133,6 @@ export class TradeService {
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
-    const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
-    if (!receiverCanTrade.allowed) {
-      this.logger.warn('Trade create failed: receiver cannot trade');
-      throw new BadRequestException(
-        receiverCanTrade.reason || 'Takas teklifi gönderilemiyor. Alıcı kullanıcı takas özelliğine sahip değil.',
-      );
-    }
-
     // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
     const initiatorProducts = await this.prisma.product.findMany({
       where: {
@@ -170,6 +162,45 @@ export class TradeService {
       throw new BadRequestException(
         'Talep edilen bazı ürünler takasa uygun değil',
       );
+    }
+
+    // Only check initiator's offered products — same product can't be offered in multiple active trades.
+    // Receiver's product can be the target of multiple offers; the receiver chooses which to accept.
+    const initiatorProductIds = dto.initiatorItems.map((i) => i.productId);
+    const activeStatuses = [
+      TradeStatus.pending,
+      TradeStatus.accepted,
+      TradeStatus.initiator_shipped,
+      TradeStatus.receiver_shipped,
+      TradeStatus.both_shipped,
+      TradeStatus.initiator_received,
+      TradeStatus.receiver_received,
+    ];
+    if (initiatorProductIds.length > 0) {
+      const existingTradeItems = await this.prisma.tradeItem.findMany({
+        where: {
+          productId: { in: initiatorProductIds },
+          side: 'initiator',
+          trade: { status: { in: activeStatuses } },
+        },
+      });
+      if (existingTradeItems.length > 0) {
+        throw new BadRequestException(
+          'Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.',
+        );
+      }
+    }
+
+    // Validate stock: product.quantity >= item.quantity (null quantity means unlimited)
+    const allProducts = [...initiatorProducts, ...receiverProducts];
+    const allItems = [...dto.initiatorItems, ...dto.receiverItems];
+    for (const item of allItems) {
+      const product = allProducts.find((p) => p.id === item.productId);
+      if (product && product.quantity !== null && product.quantity < item.quantity) {
+        throw new BadRequestException(
+          `"${product.title}" için yeterli stok yok (mevcut: ${product.quantity}, talep: ${item.quantity})`,
+        );
+      }
     }
 
     // Get trade deadlines from platform settings
@@ -398,7 +429,7 @@ export class TradeService {
     const receiverCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!receiverCanTrade.allowed) {
       throw new BadRequestException(
-        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Premium üyeliğinizi yenileyin.',
+        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.',
       );
     }
 
@@ -433,13 +464,14 @@ export class TradeService {
     shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
 
     await this.prisma.$transaction(async (tx) => {
-      // Reserve receiver's products too
-      const receiverItems = await tx.tradeItem.findMany({
-        where: { tradeId, side: 'receiver' },
+      // Reserve both sides' products
+      const tradeItems = await tx.tradeItem.findMany({
+        where: { tradeId },
       });
 
+      const allProductIds = tradeItems.map((i) => i.productId);
       await tx.product.updateMany({
-        where: { id: { in: receiverItems.map((i) => i.productId) } },
+        where: { id: { in: allProductIds } },
         data: { status: ProductStatus.reserved },
       });
 
@@ -516,15 +548,14 @@ export class TradeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Release initiator's products
-      const initiatorItems = await tx.tradeItem.findMany({
-        where: { tradeId, side: 'initiator' },
-      });
-
-      await tx.product.updateMany({
-        where: { id: { in: initiatorItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
+      // Release all products (both sides) back to active
+      const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+      if (allItems.length > 0) {
+        await tx.product.updateMany({
+          where: { id: { in: allItems.map((i) => i.productId) } },
+          data: { status: ProductStatus.active },
+        });
+      }
 
       // Update trade
       await tx.trade.update({
@@ -601,7 +632,7 @@ export class TradeService {
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
-        'Karşı teklif göndermek için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+        'Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
       );
     }
 
@@ -869,7 +900,7 @@ export class TradeService {
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
-        'Trade işlemlerini yapmak için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
       );
     }
 
@@ -1059,16 +1090,18 @@ export class TradeService {
           where: { id: { in: productIds } },
         });
 
-        // Update each product individually to handle stock properly
-        // CRITICAL: When trade is completed, products should be marked as inactive
-        // (not sold) so they disappear from listings
         for (const product of products) {
+          const tradeItem = allItems.find((i) => i.productId === product.id);
+          const tradedQty = tradeItem?.quantity ?? 1;
           const updateData: any = { status: ProductStatus.inactive };
-          
-          // Decrease quantity if it's not null (null means unlimited stock)
+
           if (product.quantity !== null && product.quantity > 0) {
-            const newQuantity = product.quantity - 1;
+            const newQuantity = Math.max(0, product.quantity - tradedQty);
             updateData.quantity = newQuantity;
+            // If stock remains, keep product active so it stays in listings
+            if (newQuantity > 0) {
+              updateData.status = ProductStatus.active;
+            }
           }
 
           await tx.product.update({

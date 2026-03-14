@@ -318,7 +318,7 @@ export default function SellerProfilePage() {
               className="relative flex-shrink-0"
             >
               <div className="relative">
-                <UserAvatar displayName={seller.displayName} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-white/20 backdrop-blur-sm text-white shadow-2xl ring-4 ring-white/30" />
+                <UserAvatar displayName={seller.displayName} avatarUrl={seller.avatarUrl} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-white/20 backdrop-blur-sm text-white shadow-2xl ring-4 ring-white/30" />
                 {seller.isVerified && (
                   <div className="absolute -bottom-3 -right-3 bg-white rounded-xl p-2 shadow-lg">
                     <CheckBadgeSolidIcon className="w-7 h-7 text-green-500" />
@@ -629,7 +629,7 @@ export default function SellerProfilePage() {
                           <div className="flex items-start gap-4">
                             {/* Reviewer Avatar */}
                             <div className="flex-shrink-0">
-                              <UserAvatar displayName={reviewerName} size="sm" className="!w-11 !h-11 rounded-xl shadow-sm" />
+                              <UserAvatar displayName={reviewerName} avatarUrl={review.giver?.avatarUrl} size="sm" className="!w-11 !h-11 rounded-xl shadow-sm" />
                             </div>
                             
                             {/* Review Content */}

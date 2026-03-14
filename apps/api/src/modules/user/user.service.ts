@@ -893,7 +893,17 @@ export class UserService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return { following };
+    const resolved = await Promise.all(
+      following.map(async (f: any) => ({
+        ...f,
+        following: f.following ? {
+          ...f.following,
+          avatarUrl: await this.resolveAvatarUrl(f.following.avatarUrl),
+        } : f.following,
+      })),
+    );
+
+    return { following: resolved };
   }
 
   // ==========================================================================

@@ -2584,4 +2584,26 @@ export class AdminController {
   ) {
     return this.adminService.deleteReview(adminId, id);
   }
+
+  // ==================== SELLER (USER) RATINGS ====================
+
+  @Get('user-ratings')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all seller/user ratings' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of user ratings' })
+  async getUserRatings(@Query() query: { page?: number; limit?: number; search?: string }) {
+    return this.adminService.getUserRatings(query);
+  }
+
+  @Delete('user-ratings/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a seller/user rating' })
+  @ApiParam({ name: 'id', description: 'User Rating ID' })
+  async deleteUserRating(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteUserRating(adminId, id);
+  }
 }

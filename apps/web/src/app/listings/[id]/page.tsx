@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { motion } from 'framer-motion';
 import {
   ArrowsRightLeftIcon,
@@ -130,7 +131,7 @@ export default function ListingDetailPage() {
   const { isAuthenticated, user, limits } = useAuthStore();
 
   // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
-  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'basic' || user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -1441,9 +1442,12 @@ export default function ListingDetailPage() {
                 <div className="flex items-center gap-4">
                   {isAuthenticated ? (
                     <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
-                        <UserIcon className="w-6 h-6 text-gray-400" />
-                      </div>
+                      <UserAvatar
+                        displayName={listing.seller.displayName}
+                        avatarUrl={(listing.seller as any).avatarUrl}
+                        size="md"
+                        className="hover:ring-2 hover:ring-orange-500 transition-all"
+                      />
                     </Link>
                   ) : (
                     <button
@@ -1457,9 +1461,12 @@ export default function ListingDetailPage() {
                       }}
                       className="flex-shrink-0"
                     >
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
-                        <UserIcon className="w-6 h-6 text-gray-400" />
-                      </div>
+                      <UserAvatar
+                        displayName={listing.seller.displayName}
+                        avatarUrl={(listing.seller as any).avatarUrl}
+                        size="md"
+                        className="hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer"
+                      />
                     </button>
                   )}
                   <div className="flex-1">
@@ -1764,11 +1771,11 @@ export default function ListingDetailPage() {
                   className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-orange-600 font-semibold">
-                        {(review.userName || review.user?.displayName)?.[0]?.toUpperCase() || '?'}
-                      </span>
-                    </div>
+                    <UserAvatar
+                      displayName={review.userName || review.user?.displayName}
+                      avatarUrl={review.user?.avatarUrl}
+                      size="sm"
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">

@@ -29,8 +29,8 @@ export default function SavedSearchesPage() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get limit based on membership
-  const searchLimit = user?.membershipTier === 'free' ? 5 : 
+  const searchLimit = user?.membershipTier === 'free' ? 5 :
+                      user?.membershipTier === 'basic' ? 10 :
                       user?.membershipTier === 'premium' ? 20 : 50;
 
   useEffect(() => {

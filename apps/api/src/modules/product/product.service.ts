@@ -211,7 +211,7 @@ export class ProductService implements OnModuleInit {
         where: { id: product.id },
         include: {
           images: { orderBy: { sortOrder: 'asc' } },
-          seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+          seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
           category: { select: { id: true, name: true, slug: true } },
           brand: { select: { id: true, name: true, slug: true } },
           carModel: { select: { id: true, name: true, slug: true } },
@@ -375,7 +375,7 @@ export class ProductService implements OnModuleInit {
       take: limit,
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
@@ -545,7 +545,7 @@ export class ProductService implements OnModuleInit {
       take: limit,
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
@@ -983,7 +983,7 @@ export class ProductService implements OnModuleInit {
               where: { id },
               include: {
                 images: { orderBy: { sortOrder: 'asc' } },
-                seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+                seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
                 category: { select: { id: true, name: true, slug: true } },
                 brand: { select: { id: true, name: true, slug: true, logo: true } },
                 manufacturer: { select: { id: true, name: true, slug: true } },
@@ -1392,6 +1392,19 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     }
   }
 
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   /**
    * Format product response
    */
@@ -1511,6 +1524,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           displayName: product.seller.displayName,
           isVerified: product.seller.isVerified,
           sellerType: product.seller.sellerType,
+          avatarUrl: await this.resolveAvatarUrl((product.seller as any).avatarUrl),
           listings_count: sellerListingsCount,
           productsCount: sellerListingsCount,
           rating: sellerRating,

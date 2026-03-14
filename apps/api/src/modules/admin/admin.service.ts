@@ -86,8 +86,9 @@ export class AdminService {
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
-      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+    // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
+    if (this.storageService) {
+      return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -1223,9 +1224,18 @@ export class AdminService {
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
+    const { search, status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
 
     const where: Prisma.OrderWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { buyer: { displayName: { contains: search, mode: 'insensitive' } } },
+        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
+        { product: { title: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
 
     if (status) {
       where.status = status;
@@ -1787,6 +1797,10 @@ export class AdminService {
       product: {
         ...order.product,
         price: Number(order.product.price),
+        images: (order.product.images || []).map((img: any) => ({
+          ...img,
+          url: this.resolveProductImageUrl(img.cardKey) || this.resolveProductImageUrl(img.url) || img.url,
+        })),
       },
       offer: order.offer ? {
         ...order.offer,
@@ -4463,12 +4477,12 @@ export class AdminService {
     const categories = await this.prisma.category.findMany({
       include: {
         parent: true,
-        children: { orderBy: { sortOrder: 'asc' } },
+        children: { orderBy: { name: 'asc' } },
         _count: {
           select: { products: true, collections: true },
         },
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { name: 'asc' },
     });
 
     return {
@@ -5465,7 +5479,7 @@ export class AdminService {
    */
   async getBrands() {
     const brands = await this.prisma.brand.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: { name: 'asc' },
     });
 
     return {
@@ -5637,7 +5651,7 @@ export class AdminService {
 
   async getManufacturers() {
     const manufacturers = await this.prisma.manufacturer.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: { name: 'asc' },
     });
     return {
       data: manufacturers.map(m => ({
@@ -8263,8 +8277,19 @@ export class AdminService {
       }),
     ]);
 
+    const resolvedReviews = reviews.map((review: any) => ({
+      ...review,
+      product: review.product ? {
+        ...review.product,
+        images: (review.product.images || []).map((img: any) => ({
+          ...img,
+          url: this.resolveProductImageUrl(img.cardKey) || this.resolveProductImageUrl(img.url) || img.url,
+        })),
+      } : review.product,
+    }));
+
     return {
-      data: reviews,
+      data: resolvedReviews,
       meta: {
         total,
         page,
@@ -8325,6 +8350,54 @@ export class AdminService {
     await this.ratingService.updateProductRatingStats(review.productId);
 
     return updated;
+  }
+
+  /**
+   * Get seller (user) ratings for admin panel
+   */
+  async getUserRatings(query: { page?: number; limit?: number; search?: string }) {
+    const p = Number(query.page) || 1;
+    const lim = Number(query.limit) || 20;
+    const search = query.search;
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { giver: { displayName: { contains: search, mode: 'insensitive' } } },
+        { receiver: { displayName: { contains: search, mode: 'insensitive' } } },
+        { comment: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, ratings] = await Promise.all([
+      this.prisma.rating.count({ where }),
+      this.prisma.rating.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (p - 1) * lim,
+        take: lim,
+        include: {
+          giver: { select: { id: true, displayName: true, email: true } },
+          receiver: { select: { id: true, displayName: true, email: true } },
+        },
+      }),
+    ]);
+
+    return {
+      data: ratings,
+      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
+    };
+  }
+
+  /**
+   * Delete a seller (user) rating
+   */
+  async deleteUserRating(adminId: string, ratingId: string) {
+    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
+    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
+    await this.prisma.rating.delete({ where: { id: ratingId } });
+    await this.createAuditLog(adminId, 'user_rating_delete', 'Rating', ratingId, rating, null);
+    return { success: true };
   }
 
   /**

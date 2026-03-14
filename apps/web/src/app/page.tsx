@@ -371,13 +371,15 @@ export default function Home() {
               >
                 <div className="w-24 h-14 sm:w-28 sm:h-16 bg-white border border-gray-200 hover:border-orange-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative" style={{ borderRadius: '4px' }}>
                   {brand.logoUrl ? (
-                    <Image
+                    <OptimizedImage
                       src={brand.logoUrl}
                       alt={brand.name}
                       fill
                       className="object-contain opacity-70 group-hover:opacity-100 transition-opacity p-1"
                       sizes="(max-width: 640px) 96px, 112px"
                       unoptimized
+                      fallbackSrc={`https://placehold.co/112x64/ffffff/9ca3af?text=${encodeURIComponent(brand.name)}`}
+                      logContext={{ page: 'home-marquee', brand: brand.name }}
                     />
                   ) : (
                     <span className="text-xs font-semibold text-gray-500 group-hover:text-orange-600 transition-colors text-center leading-tight">{brand.name}</span>
@@ -550,7 +552,7 @@ export default function Home() {
                         <div className="bg-surface-alt rounded p-5">
                           <div className="flex flex-col md:flex-row md:items-center gap-5">
                             <div className="flex items-center gap-4 md:w-1/3">
-                              <UserAvatar displayName={collection.user?.displayName} size="md" />
+                              <UserAvatar displayName={collection.user?.displayName} avatarUrl={collection.user?.avatarUrl} size="md" />
                               <div className="min-w-0">
                                 <h3 className="text-sm font-bold text-heading flex items-center gap-1.5">
                                   {collection.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
@@ -622,7 +624,7 @@ export default function Home() {
                     </h2>
                   </div>
                   <div className="flex items-start gap-4 mb-4">
-                    <UserAvatar displayName={featuredCollectorToShow.user?.displayName} size="lg" />
+                    <UserAvatar displayName={featuredCollectorToShow.user?.displayName} avatarUrl={featuredCollectorToShow.user?.avatarUrl} size="lg" />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
                         {featuredCollectorToShow.user?.displayName || (locale === 'en' ? 'Collector' : 'Koleksiyoner')}
@@ -682,7 +684,7 @@ export default function Home() {
                     </h2>
                   </div>
                   <div className="flex items-start gap-4 mb-4">
-                    <UserAvatar displayName={companyOfWeek.displayName} companyName={companyOfWeek.companyName} size="lg" className="border-2 border-gray-100" />
+                    <UserAvatar displayName={companyOfWeek.displayName} companyName={companyOfWeek.companyName} avatarUrl={companyOfWeek.avatarUrl} size="lg" className="border-2 border-gray-100" />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
                         {companyOfWeek.companyName || companyOfWeek.displayName}

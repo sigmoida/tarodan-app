@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
@@ -16,6 +16,7 @@ interface Order {
   commission: number;
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
+  product?: { id: string; title: string };
   createdAt: string;
   itemCount: number;
 }
@@ -47,6 +48,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -61,6 +63,16 @@ export default function OrdersPage() {
   const [userSearch, setUserSearch] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Debounce order search (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Load users for dropdown
   const loadUsers = useCallback(async (searchTerm: string) => {
@@ -87,6 +99,17 @@ export default function OrdersPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [userSearch, loadUsers]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync URL with state
   useEffect(() => {
@@ -127,7 +150,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-  }, [page, status, selectedUserId, userRole, productId]);
+  }, [page, status, selectedUserId, userRole, productId, debouncedSearch]);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -136,7 +159,7 @@ export default function OrdersPage() {
         page,
         limit: 20,
         status: status === 'all' ? undefined : status,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         userId: selectedUserId || undefined,
         userRole: selectedUserId && userRole ? userRole : undefined,
         productId,
@@ -151,6 +174,7 @@ export default function OrdersPage() {
         commission: Number(o.commissionAmount || 0),
         buyer: o.buyer || { id: '', displayName: 'Alıcı' },
         seller: o.seller || { id: '', displayName: 'Satıcı' },
+        product: o.product || undefined,
         createdAt: o.createdAt,
         itemCount: o.items?.length || 1,
       })));
@@ -209,8 +233,10 @@ export default function OrdersPage() {
       completed: 'Tamamlandı',
       cancelled: 'İptal',
     };
-    return <span className={`badge ${colors[status]}`}>{labels[status]}</span>;
+    return <span className={`badge ${colors[status] || 'badge-info'}`}>{labels[status] || status}</span>;
   };
+
+  const totalPages = Math.max(1, Math.ceil(total / 20));
 
   return (
     <AdminLayout>
@@ -228,28 +254,43 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Sipariş no ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="admin-input pl-10"
-            />
+        {/* Filters */}
+        <div className="flex flex-col gap-3">
+          {/* Row 1: Search + Status */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none shrink-0" />
+              <input
+                type="text"
+                placeholder="Sipariş no, kullanıcı veya ürün ara..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="admin-input admin-input-with-icon-left"
+              />
+            </div>
+            <select
+              value={status}
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+              className="admin-input w-full sm:w-48"
+            >
+              {statusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-          
-          {/* User Filter */}
-          <div className="w-full sm:w-64 space-y-2">
+
+          {/* Row 2: User filter */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => handleUserRoleChange(userRole === 'buyer' ? '' : 'buyer')}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   userRole === 'buyer'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                    : 'bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                 }`}
               >
                 Alıcı
@@ -257,17 +298,17 @@ export default function OrdersPage() {
               <button
                 type="button"
                 onClick={() => handleUserRoleChange(userRole === 'seller' ? '' : 'seller')}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   userRole === 'seller'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                    : 'bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                 }`}
               >
                 Satıcı
               </button>
             </div>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+            <div className="relative flex-1 w-full sm:max-w-xs" ref={dropdownRef}>
+              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none shrink-0" />
               <input
                 type="text"
                 placeholder="Kullanıcı ara..."
@@ -277,53 +318,42 @@ export default function OrdersPage() {
                   setShowUserDropdown(true);
                 }}
                 onFocus={() => setShowUserDropdown(true)}
-                className="admin-input pl-10 pr-10 w-full"
+                className="admin-input admin-input-with-icon-left-sm pr-9"
               />
-            {selectedUserId && (
-              <button
-                onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
-              >
-                <XCircleIcon className="h-5 w-5" />
-              </button>
-            )}
-            
+              {selectedUserId && (
+                <button
+                  onClick={clearUserFilter}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <XCircleIcon className="h-4 w-4" />
+                </button>
+              )}
+
               {showUserDropdown && userSearch.length >= 2 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {loadingUsers ? (
-                    <div className="p-3 text-center text-gray-500">Aranıyor...</div>
+                    <div className="p-3 text-center text-gray-500 text-sm">Aranıyor...</div>
                   ) : users.length > 0 ? (
                     users.map((user) => (
                       <button
                         key={user.id}
                         onClick={() => handleSelectUser(user)}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-900"
                       >
-                        <div className="font-medium">{user.displayName}</div>
+                        <div className="font-medium text-sm">{user.displayName}</div>
                         <div className="text-xs text-gray-500">{user.email}</div>
                       </button>
                     ))
                   ) : (
-                    <div className="p-3 text-center text-gray-500">Kullanıcı bulunamadı</div>
+                    <div className="p-3 text-center text-gray-500 text-sm">Kullanıcı bulunamadı</div>
                   )}
                 </div>
               )}
             </div>
           </div>
-          
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="admin-input w-full sm:w-48"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
         </div>
 
+        {/* Table */}
         <div className="admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="admin-table">
@@ -334,36 +364,42 @@ export default function OrdersPage() {
                   <th>Alıcı</th>
                   <th>Satıcı</th>
                   <th>Ürün</th>
-                  <th>Tutar</th>
-                  <th>Komisyon</th>
+                  <th className="text-right">Tutar</th>
+                  <th className="text-right">Komisyon</th>
                   <th>Tarih</th>
-                  <th>İşlemler</th>
+                  <th className="text-center">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8">
+                    <td colSpan={9} className="text-center py-12">
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-gray-500">
-                      Sipariş bulunamadı
+                    <td colSpan={9} className="text-center py-12 text-gray-400">
+                      {debouncedSearch || status !== 'all' || selectedUserId
+                        ? 'Filtreye uygun sipariş bulunamadı'
+                        : 'Henüz sipariş yok'}
                     </td>
                   </tr>
                 ) : (
                   orders.map((order) => (
-                    <tr key={order.id}>
-                      <td className="font-mono text-sm">{order.orderNumber}</td>
+                    <tr key={order.id} className="group hover:bg-gray-50/50">
+                      <td>
+                        <Link href={`/orders/${order.id}`} className="font-mono text-sm text-primary-600 hover:underline">
+                          {order.orderNumber}
+                        </Link>
+                      </td>
                       <td>
                         {editingOrderId === order.id ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <select
                               value={newStatus}
                               onChange={(e) => setNewStatus(e.target.value)}
-                              className="admin-input py-1 px-2 text-sm w-36"
+                              className="admin-input py-1 px-2 text-xs w-32"
                               disabled={updatingStatus}
                             >
                               <option value="pending_payment">Ödeme Bekliyor</option>
@@ -377,7 +413,7 @@ export default function OrdersPage() {
                             <button
                               onClick={() => updateOrderStatus(order.id)}
                               disabled={updatingStatus}
-                              className="p-1 text-green-700 hover:text-green-300 hover:bg-green-50 rounded"
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
                               title="Kaydet"
                             >
                               <CheckIcon className="h-4 w-4" />
@@ -385,29 +421,22 @@ export default function OrdersPage() {
                             <button
                               onClick={cancelEditing}
                               disabled={updatingStatus}
-                              className="p-1 text-red-600 hover:text-red-300 hover:bg-red-50 rounded"
+                              className="p-1 text-red-500 hover:bg-red-50 rounded"
                               title="İptal"
                             >
                               <XMarkIcon className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             {getStatusBadge(order.status)}
-                            <button
-                              onClick={() => startEditing(order)}
-                              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Durumu Değiştir"
-                            >
-                              <PencilIcon className="h-3 w-3" />
-                            </button>
                           </div>
                         )}
                       </td>
                       <td>
                         <Link
                           href={`/users/${order.buyer.id}`}
-                          className="text-gray-900 hover:text-primary-600"
+                          className="text-sm text-gray-900 hover:text-primary-600"
                         >
                           {order.buyer.displayName}
                         </Link>
@@ -415,35 +444,41 @@ export default function OrdersPage() {
                       <td>
                         <Link
                           href={`/users/${order.seller.id}`}
-                          className="text-gray-900 hover:text-primary-600"
+                          className="text-sm text-gray-900 hover:text-primary-600"
                         >
                           {order.seller.displayName}
                         </Link>
                       </td>
-                      <td>{order.itemCount} adet</td>
-                      <td className="text-primary-600 font-medium">
-                        ₺{order.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="text-green-700">
-                        ₺{order.commission.toLocaleString()}
-                      </td>
-                      <td className="whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</td>
                       <td>
-                        <div className="flex gap-1">
+                        <span className="text-sm text-gray-700 truncate block max-w-[180px]" title={order.product?.title}>
+                          {order.product?.title || `${order.itemCount} adet`}
+                        </span>
+                      </td>
+                      <td className="text-right text-primary-600 font-medium text-sm tabular-nums">
+                        ₺{order.totalAmount.toLocaleString('tr-TR')}
+                      </td>
+                      <td className="text-right text-green-600 text-sm tabular-nums">
+                        ₺{order.commission.toLocaleString('tr-TR')}
+                      </td>
+                      <td className="whitespace-nowrap text-sm text-gray-500">
+                        {new Date(order.createdAt).toLocaleDateString('tr-TR')}
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => startEditing(order)}
-                            className="p-2 text-blue-700 hover:text-blue-300 hover:bg-blue-50 rounded-lg"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                             title="Durumu Değiştir"
                           >
-                            <PencilIcon className="h-5 w-5" />
+                            <PencilIcon className="h-4 w-4" />
                           </button>
-                            <Link
-                              href={`/orders/${order.id}`}
-                              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                              title="Detay"
-                            >
-                              <EyeIcon className="h-5 w-5" />
-                            </Link>
+                          <Link
+                            href={`/orders/${order.id}`}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            title="Detay"
+                          >
+                            <EyeIcon className="h-4 w-4" />
+                          </Link>
                         </div>
                       </td>
                     </tr>
@@ -454,25 +489,30 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Sayfa {page} / {Math.ceil(total / 20)}</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Önceki
-            </button>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= Math.ceil(total / 20)}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Sonraki
-            </button>
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Sayfa {page} / {totalPages} ({total} sonuç)
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Önceki
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= totalPages}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Sonraki
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </AdminLayout>
   );

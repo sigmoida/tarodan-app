@@ -24,7 +24,6 @@ interface CarModel {
     brandId: string;
     yearStart?: number | null;
     yearEnd?: number | null;
-    sortOrder: number;
     isActive: boolean;
     brand?: { id: string; name: string; slug: string };
 }
@@ -36,7 +35,6 @@ interface Brand {
     logo?: string;
     description?: string;
     website?: string;
-    sortOrder: number;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -47,7 +45,6 @@ interface BrandFormData {
     logo: string;
     description: string;
     website: string;
-    sortOrder: number;
     isActive: boolean;
 }
 
@@ -56,7 +53,6 @@ interface CarModelFormData {
     name: string;
     yearStart: number | '';
     yearEnd: number | '';
-    sortOrder: number;
     isActive: boolean;
 }
 
@@ -77,7 +73,6 @@ export default function BrandsPage() {
         name: '',
         yearStart: '',
         yearEnd: '',
-        sortOrder: 0,
         isActive: true,
     });
     const [formData, setFormData] = useState<BrandFormData>({
@@ -85,7 +80,6 @@ export default function BrandsPage() {
         logo: '',
         description: '',
         website: '',
-        sortOrder: 0,
         isActive: true,
     });
 
@@ -134,7 +128,6 @@ export default function BrandsPage() {
             logo: '',
             description: '',
             website: '',
-            sortOrder: 0,
             isActive: true,
         });
         setShowModal(true);
@@ -147,7 +140,6 @@ export default function BrandsPage() {
             logo: brand.logo || '',
             description: brand.description || '',
             website: brand.website || '',
-            sortOrder: brand.sortOrder,
             isActive: brand.isActive,
         });
         setShowModal(true);
@@ -202,7 +194,6 @@ export default function BrandsPage() {
             name: '',
             yearStart: '',
             yearEnd: '',
-            sortOrder: 0,
             isActive: true,
         });
         setShowModelModal(true);
@@ -215,7 +206,6 @@ export default function BrandsPage() {
             name: m.name,
             yearStart: m.yearStart ?? '',
             yearEnd: m.yearEnd ?? '',
-            sortOrder: m.sortOrder,
             isActive: m.isActive,
         });
         setShowModelModal(true);
@@ -229,11 +219,10 @@ export default function BrandsPage() {
                 name: modelFormData.name,
                 yearStart: modelFormData.yearStart !== '' ? Number(modelFormData.yearStart) : undefined,
                 yearEnd: modelFormData.yearEnd !== '' ? Number(modelFormData.yearEnd) : undefined,
-                sortOrder: modelFormData.sortOrder,
                 isActive: modelFormData.isActive,
             };
             if (editingModel) {
-                await adminApi.updateCarModel(editingModel.id, { name: payload.name, yearStart: payload.yearStart, yearEnd: payload.yearEnd, sortOrder: payload.sortOrder, isActive: payload.isActive });
+                await adminApi.updateCarModel(editingModel.id, { name: payload.name, yearStart: payload.yearStart, yearEnd: payload.yearEnd, isActive: payload.isActive });
                 toast.success('Model güncellendi');
             } else {
                 await adminApi.createCarModel(payload);
@@ -315,9 +304,6 @@ export default function BrandsPage() {
                                         Website
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Sıra
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Durum
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -365,9 +351,6 @@ export default function BrandsPage() {
                                             ) : (
                                                 <span className="text-gray-500 text-sm">-</span>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {brand.sortOrder}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <button
@@ -425,7 +408,7 @@ export default function BrandsPage() {
                                     </tr>
                                     {expandedBrandId === brand.id && (
                                         <tr key={`${brand.id}-models`}>
-                                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                                            <td colSpan={5} className="px-6 py-4 bg-gray-50">
                                                 {modelsLoading ? (
                                                     <div className="flex items-center gap-2 text-gray-500">
                                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500" />
@@ -566,32 +549,18 @@ export default function BrandsPage() {
                                         />
                                     </div>
 
-                                    <div className="flex gap-4">
-                                        <div className="flex-1">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Sıra
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={formData.sortOrder}
-                                                onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                min="0"
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Durum
-                                            </label>
-                                            <select
-                                                value={formData.isActive ? 'true' : 'false'}
-                                                onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                            >
-                                                <option value="true">Aktif</option>
-                                                <option value="false">Pasif</option>
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Durum
+                                        </label>
+                                        <select
+                                            value={formData.isActive ? 'true' : 'false'}
+                                            onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        >
+                                            <option value="true">Aktif</option>
+                                            <option value="false">Pasif</option>
+                                        </select>
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-4">
@@ -708,28 +677,16 @@ export default function BrandsPage() {
                                             />
                                         </div>
                                     </div>
-                                    <div className="flex gap-4">
-                                        <div className="flex-1">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Sıra</label>
-                                            <input
-                                                type="number"
-                                                value={modelFormData.sortOrder}
-                                                onChange={(e) => setModelFormData({ ...modelFormData, sortOrder: parseInt(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                min="0"
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                                            <select
-                                                value={modelFormData.isActive ? 'true' : 'false'}
-                                                onChange={(e) => setModelFormData({ ...modelFormData, isActive: e.target.value === 'true' })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                            >
-                                                <option value="true">Aktif</option>
-                                                <option value="false">Pasif</option>
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                                        <select
+                                            value={modelFormData.isActive ? 'true' : 'false'}
+                                            onChange={(e) => setModelFormData({ ...modelFormData, isActive: e.target.value === 'true' })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        >
+                                            <option value="true">Aktif</option>
+                                            <option value="false">Pasif</option>
+                                        </select>
                                     </div>
                                     <div className="flex justify-end gap-3 pt-4">
                                         <button type="button" onClick={() => setShowModelModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">

@@ -22,7 +22,6 @@ interface Manufacturer {
   description?: string;
   website?: string;
   country?: string;
-  sortOrder: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -34,7 +33,6 @@ interface ManufacturerFormData {
   description: string;
   website: string;
   country: string;
-  sortOrder: number;
   isActive: boolean;
 }
 
@@ -53,7 +51,6 @@ export default function ManufacturersPage() {
     description: '',
     website: '',
     country: '',
-    sortOrder: 0,
     isActive: true,
   });
 
@@ -83,7 +80,6 @@ export default function ManufacturersPage() {
       description: '',
       website: '',
       country: '',
-      sortOrder: 0,
       isActive: true,
     });
     setShowModal(true);
@@ -98,7 +94,6 @@ export default function ManufacturersPage() {
       description: m.description || '',
       website: m.website || '',
       country: m.country || '',
-      sortOrder: m.sortOrder,
       isActive: m.isActive,
     });
     setShowModal(true);
@@ -207,7 +202,6 @@ export default function ManufacturersPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Üretici</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ülke</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Website</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sıra</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
                 </tr>
@@ -241,7 +235,6 @@ export default function ManufacturersPage() {
                         <span className="text-gray-500 text-sm">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{m.sortOrder}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => toggleStatus(m)}
@@ -357,28 +350,16 @@ export default function ManufacturersPage() {
                       placeholder="Üretici hakkında kısa açıklama"
                     />
                   </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Sıra</label>
-                      <input
-                        type="number"
-                        value={formData.sortOrder}
-                        onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        min="0"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                      <select
-                        value={formData.isActive ? 'true' : 'false'}
-                        onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      >
-                        <option value="true">Aktif</option>
-                        <option value="false">Pasif</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                    <select
+                      value={formData.isActive ? 'true' : 'false'}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="true">Aktif</option>
+                      <option value="false">Pasif</option>
+                    </select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">

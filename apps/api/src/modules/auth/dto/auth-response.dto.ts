@@ -38,6 +38,9 @@ export class UserResponseDto {
   @ApiProperty({ example: 'John Doe' })
   displayName: string;
 
+  @ApiProperty({ example: 'https://example.com/avatar.jpg', required: false })
+  avatarUrl?: string | null;
+
   @ApiProperty({ example: true })
   isVerified: boolean;
 

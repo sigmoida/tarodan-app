@@ -19,7 +19,6 @@ interface CarModel {
   brandId: string;
   yearStart?: number | null;
   yearEnd?: number | null;
-  sortOrder: number;
   isActive: boolean;
   brand: Brand;
 }
@@ -29,7 +28,6 @@ interface CarModelFormData {
   name: string;
   yearStart: number | '';
   yearEnd: number | '';
-  sortOrder: number;
   isActive: boolean;
 }
 
@@ -46,7 +44,6 @@ export default function CarModelsPage() {
     name: '',
     yearStart: '',
     yearEnd: '',
-    sortOrder: 0,
     isActive: true,
   });
 
@@ -88,7 +85,6 @@ export default function CarModelsPage() {
       name: '',
       yearStart: '',
       yearEnd: '',
-      sortOrder: 0,
       isActive: true,
     });
     setShowModal(true);
@@ -101,7 +97,6 @@ export default function CarModelsPage() {
       name: m.name,
       yearStart: m.yearStart ?? '',
       yearEnd: m.yearEnd ?? '',
-      sortOrder: m.sortOrder,
       isActive: m.isActive,
     });
     setShowModal(true);
@@ -115,11 +110,10 @@ export default function CarModelsPage() {
         name: formData.name,
         yearStart: formData.yearStart !== '' ? Number(formData.yearStart) : undefined,
         yearEnd: formData.yearEnd !== '' ? Number(formData.yearEnd) : undefined,
-        sortOrder: formData.sortOrder,
         isActive: formData.isActive,
       };
       if (editingModel) {
-        await adminApi.updateCarModel(editingModel.id, { name: payload.name, yearStart: payload.yearStart, yearEnd: payload.yearEnd, sortOrder: payload.sortOrder, isActive: payload.isActive });
+        await adminApi.updateCarModel(editingModel.id, { name: payload.name, yearStart: payload.yearStart, yearEnd: payload.yearEnd, isActive: payload.isActive });
         toast.success('Model güncellendi');
       } else {
         await adminApi.createCarModel(payload);
@@ -302,28 +296,16 @@ export default function CarModelsPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Sıra</label>
-                      <input
-                        type="number"
-                        value={formData.sortOrder}
-                        onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        min="0"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                      <select
-                        value={formData.isActive ? 'true' : 'false'}
-                        onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      >
-                        <option value="true">Aktif</option>
-                        <option value="false">Pasif</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                    <select
+                      value={formData.isActive ? 'true' : 'false'}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="true">Aktif</option>
+                      <option value="false">Pasif</option>
+                    </select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">

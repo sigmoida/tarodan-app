@@ -207,7 +207,7 @@ export default function EditProfilePage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center p-2">
-                    <UserAvatar displayName={user?.displayName} size="xl" className="!w-full !h-full !text-4xl text-white/90 bg-white/20" />
+                    <UserAvatar displayName={user?.displayName} avatarUrl={user?.avatarUrl} size="xl" className="!w-full !h-full !text-4xl text-white/90 bg-white/20" />
                   </div>
                 )}
               </div>

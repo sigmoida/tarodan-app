@@ -155,7 +155,7 @@ export default function MessagesPage() {
           otherUser: {
             id: isParticipant1 ? t.participant2Id : t.participant1Id,
             displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
-            avatarUrl: null,
+            avatarUrl: isParticipant1 ? (t.participant2AvatarUrl || null) : (t.participant1AvatarUrl || null),
           },
           lastMessage: t.lastMessage ? {
             ...t.lastMessage,
@@ -466,7 +466,7 @@ export default function MessagesPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
-                        <UserAvatar displayName={thread.otherUser?.displayName} size="sm" className="!w-11 !h-11" />
+                        <UserAvatar displayName={thread.otherUser?.displayName} avatarUrl={thread.otherUser?.avatarUrl} size="sm" className="!w-11 !h-11" />
                         {thread.unreadCount > 0 && (
                           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-500 rounded-full border-2 border-white" />
                         )}
@@ -523,9 +523,7 @@ export default function MessagesPage() {
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                  {(selectedThread.otherUser?.displayName || '?').charAt(0).toUpperCase()}
-                </div>
+                <UserAvatar displayName={selectedThread.otherUser?.displayName} avatarUrl={selectedThread.otherUser?.avatarUrl} size="sm" className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">
                     {selectedThread.otherUser?.displayName || 'Kullanıcı'}

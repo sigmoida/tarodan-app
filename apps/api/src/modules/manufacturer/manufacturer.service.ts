@@ -13,7 +13,20 @@ export class ManufacturerService {
 
   private resolveLogoUrl(logo: string | null | undefined): string | null {
     if (!logo) return null;
-    if (logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('/')) return logo;
+    if (logo.startsWith('/')) return logo;
+
+    // If stored value is a presigned S3 URL, extract the key and use permanent public URL
+    if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      try {
+        const url = new URL(logo);
+        const pathKey = url.pathname.substring(1);
+        if (pathKey.startsWith('dev/') || pathKey.startsWith('prod/')) {
+          return this.storageService.getPublicAssetUrl(pathKey) || logo;
+        }
+      } catch { /* not a valid URL, return as-is */ }
+      return logo;
+    }
+
     if (logo.includes('dev/') || logo.includes('prod/')) {
       return this.storageService.getPublicAssetUrl(logo) || null;
     }

@@ -44,16 +44,15 @@ export default function LikedCollectionsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
 
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (mounted && !isAuthenticated) {
-      router.push('/login?redirect=/collections/liked');
-    }
-  }, [mounted, isAuthenticated, router]);
+    if (!mounted || authLoading) return;
+    if (!isAuthenticated) { router.push('/login?redirect=/collections/liked'); }
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const likedQuery = useQuery({
     queryKey: ['collections-liked'],
@@ -62,7 +61,8 @@ export default function LikedCollectionsPage() {
       const data = response.data;
       return data?.collections || data?.data || (Array.isArray(data) ? data : []);
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
+    refetchOnMount: 'always',
     meta: { page: 'collections-liked' },
     retry: (failureCount, error: any) => {
       if (error?.response?.status === 401) return false;
@@ -217,8 +217,8 @@ export default function LikedCollectionsPage() {
                     )}
 
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <UserAvatar displayName={collection.userName || collection.user?.displayName} size="xs" className="!w-4 !h-4 !text-[8px]" />
-                      <span className="text-[10px] text-gray-400">{collection.userName || collection.user?.displayName || t('collection.anonymous')}</span>
+                      <UserAvatar displayName={collection.user?.displayName || collection.userName} avatarUrl={collection.user?.avatarUrl} size="xs" className="!w-4 !h-4 !text-[8px]" />
+                      <span className="text-[10px] text-gray-400">{collection.user?.displayName || collection.userName || t('collection.anonymous')}</span>
                     </div>
 
                     <div className="mt-auto pt-2 flex items-center justify-between">

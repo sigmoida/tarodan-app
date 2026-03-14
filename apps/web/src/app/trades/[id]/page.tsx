@@ -143,7 +143,7 @@ export default function TradeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const tradeId = params.id as string;
   const STATUS_CONFIG = getStatusConfig(locale);
@@ -165,12 +165,12 @@ export default function TradeDetailPage() {
   const [shipCarrier, setShipCarrier] = useState('aras');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       toast.error(locale === 'en' ? 'Please login to view trade details' : 'Takas detaylarını görmek için giriş yapmalısınız');
       router.push(`/login?redirect=/trades/${tradeId}`);
-      return;
     }
-  }, [isAuthenticated, locale, router, tradeId]);
+  }, [isAuthenticated, authLoading, locale, router, tradeId]);
 
   const tradeQuery = useQuery({
     queryKey: ['trade', tradeId],
@@ -178,7 +178,7 @@ export default function TradeDetailPage() {
       const response = await tradesApi.getOne(tradeId);
       return response.data.trade || response.data;
     },
-    enabled: !!tradeId && isAuthenticated,
+    enabled: !!tradeId && !authLoading && isAuthenticated,
     meta: { page: 'trade-detail' },
     retry: false,
   });

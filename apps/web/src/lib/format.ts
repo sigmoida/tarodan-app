@@ -165,6 +165,12 @@ export function formatTradeStatus(status: string | null | undefined, locale: str
     'in_progress': { tr: 'Devam Ediyor', en: 'In Progress' },
     'shipping': { tr: 'Kargo Aşamasında', en: 'Shipping' },
     'awaiting_confirmation': { tr: 'Onay Bekleniyor', en: 'Awaiting Confirmation' },
+    'initiator_shipped': { tr: 'Gönderen Kargoya Verdi', en: 'Initiator Shipped' },
+    'receiver_shipped': { tr: 'Alıcı Kargoya Verdi', en: 'Receiver Shipped' },
+    'both_shipped': { tr: 'Her İki Taraf Kargoda', en: 'Both Shipped' },
+    'initiator_received': { tr: 'Gönderen Teslim Aldı', en: 'Initiator Received' },
+    'receiver_received': { tr: 'Alıcı Teslim Aldı', en: 'Receiver Received' },
+    'disputed': { tr: 'Anlaşmazlık', en: 'Disputed' },
   };
 
   const normalized = status.toLowerCase().trim();
