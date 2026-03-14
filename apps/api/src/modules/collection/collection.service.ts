@@ -28,6 +28,7 @@ import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
 import { StorageService } from '../storage/storage.service';
 import { SearchService } from '../search/search.service';
+import { SearchIndexingService } from '../search/search-indexing.service';
 import * as https from 'https';
 import * as http from 'http';
 import { v4 as uuidv4 } from 'uuid';
@@ -52,6 +53,7 @@ export class CollectionService {
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,
     private readonly searchService: SearchService,
+    private readonly searchIndexing: SearchIndexingService,
   ) {}
 
   // ==========================================================================
@@ -440,11 +442,23 @@ export class CollectionService {
     });
 
     if (esResult && esResult.ids.length > 0) {
-      const hydrated = await this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
-      if (hydrated.collections.length === 0 && hydrated.total > 0) {
+      const validIds = esResult.ids.filter((id): id is string => id != null && id !== '');
+      const expectedCount = Math.min(esResult.total, safePageSize);
+
+      if (validIds.length < expectedCount * 0.5) {
         this.logger.warn(
-          `ES returned ${esResult.ids.length} collection IDs but Prisma found 0 – stale index detected, falling back to Prisma`,
+          `ES returned ${validIds.length} valid IDs but expected ~${expectedCount} (total=${esResult.total}) – falling back to Prisma and triggering reindex`,
         );
+        this.searchIndexing.queueReindexAllCollections().catch(() => {});
+        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+      }
+
+      const hydrated = await this.hydrateCollections(validIds, esResult.total, safePage, safePageSize);
+      if (hydrated.collections.length < validIds.length * 0.5) {
+        this.logger.warn(
+          `ES returned ${validIds.length} IDs but Prisma hydrated only ${hydrated.collections.length} – stale index, falling back to Prisma`,
+        );
+        this.searchIndexing.queueReindexAllCollections().catch(() => {});
         return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
       }
       return hydrated;

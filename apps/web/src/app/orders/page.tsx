@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { api, ratingsApi } from '@/lib/api';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
@@ -103,9 +102,8 @@ export default function OrdersPage() {
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [submittingShipping, setSubmittingShipping] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!mounted || authLoading) return;
@@ -272,8 +270,7 @@ export default function OrdersPage() {
     }
   };
 
-  const showPlaceholder = !mounted || authLoading || !isAuthenticated;
-  if (showPlaceholder) {
+  if (!mounted || authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
@@ -284,6 +281,7 @@ export default function OrdersPage() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -321,7 +319,7 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {loading ? (
+        {(!mounted || authLoading || !isAuthenticated || loading) ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
           </div>

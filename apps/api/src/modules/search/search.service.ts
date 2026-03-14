@@ -85,6 +85,7 @@ export class SearchService implements OnModuleInit {
   private readonly PRODUCTS_INDEX = 'products';
   private readonly COLLECTIONS_INDEX = 'collections';
   private esAvailable = false;
+  private reindexingCollections = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -1266,10 +1267,31 @@ export class SearchService implements OnModuleInit {
         this.prisma.collection.count({ where: { isPublic: true } }),
       ]);
       const esCount = esRes?.count ?? 0;
-      if (esCount === 0 && dbCount > 0) {
-        this.logger.log(`Collections index empty, ${dbCount} public collections in DB – reindexing...`);
+      if (dbCount > 0 && (esCount === 0 || esCount < dbCount * 0.5)) {
+        this.logger.log(`Collections index out of sync: ES=${esCount}, DB=${dbCount} – reindexing...`);
         const indexed = await this.reindexAllCollections();
         this.logger.log(`Collections reindex complete: ${indexed} indexed.`);
+      } else if (dbCount > 0 && esCount > 0) {
+        const sample = await this.client.search({
+          index: this.COLLECTIONS_INDEX,
+          size: 5,
+          _source: ['id'],
+        });
+        const sampleIds = sample.hits.hits
+          .map((h: any) => h._source?.id as string)
+          .filter(Boolean);
+        if (sampleIds.length > 0) {
+          const found = await this.prisma.collection.count({
+            where: { id: { in: sampleIds } },
+          });
+          if (found < sampleIds.length * 0.5) {
+            this.logger.log(
+              `Collections index has stale IDs (${found}/${sampleIds.length} valid) – reindexing...`,
+            );
+            const indexed = await this.reindexAllCollections();
+            this.logger.log(`Collections reindex complete: ${indexed} indexed.`);
+          }
+        }
       }
     } catch (err) {
       this.logger.warn('syncCollectionsIndexIfEmpty failed', err instanceof Error ? err.message : String(err));
@@ -1332,38 +1354,81 @@ export class SearchService implements OnModuleInit {
 
   async reindexAllCollections(): Promise<number> {
     if (!this.esAvailable) return 0;
-    await this.prisma.searchIndex.upsert({
-      where: { indexName: this.COLLECTIONS_INDEX },
-      update: { status: 'rebuilding' },
-      create: { indexName: this.COLLECTIONS_INDEX, status: 'rebuilding', settings: {} },
-    });
+    if (this.reindexingCollections) {
+      this.logger.warn('Collections reindex already in progress, skipping');
+      return 0;
+    }
+    this.reindexingCollections = true;
     try {
+      await this.prisma.searchIndex.upsert({
+        where: { indexName: this.COLLECTIONS_INDEX },
+        update: { status: 'rebuilding' },
+        create: { indexName: this.COLLECTIONS_INDEX, status: 'rebuilding', settings: {} },
+      });
+
       const collections = await this.prisma.collection.findMany({
         include: this.collectionInclude,
       });
-      const exists = await this.client.indices.exists({ index: this.COLLECTIONS_INDEX });
-      if (exists) await this.client.indices.delete({ index: this.COLLECTIONS_INDEX });
+
       await this.ensureCollectionsIndexExists();
+
+      let indexed = 0;
       if (collections.length > 0) {
         const operations = collections.flatMap((c) => [
           { index: { _index: this.COLLECTIONS_INDEX, _id: c.id } },
           this.buildCollectionDocument(c),
         ]);
-        await this.client.bulk({ refresh: true, operations });
+        const bulkResp = await this.client.bulk({ refresh: true, operations });
+
+        if (bulkResp.errors) {
+          const failed = (bulkResp.items ?? []).filter((item: any) => item.index?.error);
+          this.logger.error(`Collections bulk indexing had ${failed.length} failures`);
+          for (const f of failed.slice(0, 5)) {
+            this.logger.error(`  Failed doc ${(f as any).index?._id}: ${JSON.stringify((f as any).index?.error)}`);
+          }
+          indexed = collections.length - failed.length;
+        } else {
+          indexed = collections.length;
+        }
       }
+
+      // Remove orphaned ES documents that no longer exist in the DB
+      const collectionIds = new Set(collections.map((c) => c.id));
+      try {
+        const allEsDocs = await this.client.search({
+          index: this.COLLECTIONS_INDEX,
+          size: 10000,
+          _source: false,
+        });
+        const orphanIds = allEsDocs.hits.hits
+          .map((h: any) => h._id as string)
+          .filter((id) => !collectionIds.has(id));
+        if (orphanIds.length > 0) {
+          const deleteOps = orphanIds.flatMap((id) => [
+            { delete: { _index: this.COLLECTIONS_INDEX, _id: id } },
+          ]);
+          await this.client.bulk({ refresh: true, operations: deleteOps });
+          this.logger.log(`Removed ${orphanIds.length} orphaned docs from collections index`);
+        }
+      } catch (orphanErr) {
+        this.logger.warn('Failed to clean orphaned collection docs from ES');
+      }
+
       await this.prisma.searchIndex.update({
         where: { indexName: this.COLLECTIONS_INDEX },
-        data: { status: 'active', documentCount: collections.length, lastSyncedAt: new Date() },
+        data: { status: 'active', documentCount: indexed, lastSyncedAt: new Date() },
       });
-      this.logger.log(`Reindexed ${collections.length} collections`);
-      return collections.length;
+      this.logger.log(`Reindexed ${indexed} collections (non-destructive)`);
+      return indexed;
     } catch (error) {
       this.logger.error('Collections reindex error');
       await this.prisma.searchIndex.update({
         where: { indexName: this.COLLECTIONS_INDEX },
         data: { status: 'error' },
-      });
+      }).catch(() => {});
       throw new InternalServerErrorException('Collections reindex failed');
+    } finally {
+      this.reindexingCollections = false;
     }
   }
 

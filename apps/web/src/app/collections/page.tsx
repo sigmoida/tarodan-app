@@ -58,17 +58,18 @@ export default function CollectionsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
-  // Kategori filtresini slug yerine doğrudan categoryId üzerinden yönet
-  const [categoryId, setCategoryId] = useState(searchParams.get('categoryId') || '');
+  const [categoryId, setCategoryId] = useState('');
 
   useEffect(() => {
     setCategoryId(searchParams.get('categoryId') || '');
-  }, [searchParams]);
+  }, [searchParams, mounted]);
 
   const setCategoryFilter = (id: string) => {
     setCategoryId(id);
@@ -201,7 +202,7 @@ export default function CollectionsPage() {
               <p className="text-sm text-gray-500 mt-0.5">{t('footer.description')}</p>
             </div>
             <div className="flex items-center gap-2">
-              {isAuthenticated && limits?.canCreateCollections && (
+              {mounted && isAuthenticated && limits?.canCreateCollections && (
                 <button
                   onClick={handleCreateClick}
                   className="px-4 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
@@ -210,7 +211,7 @@ export default function CollectionsPage() {
                   {t('collection.createCollection')}
                 </button>
               )}
-              {isAuthenticated && !limits?.canCreateCollections && (
+              {mounted && isAuthenticated && !limits?.canCreateCollections && (
                 <Link
                   href="/pricing"
                   className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
@@ -225,7 +226,7 @@ export default function CollectionsPage() {
 
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
         {/* Tabs */}
-        {isAuthenticated && (
+        {mounted && isAuthenticated && (
           <div className="flex gap-1 mb-5 bg-gray-100 rounded p-0.5 w-fit">
             <button
               onClick={() => { setActiveTab('public'); setSearchQuery(''); }}

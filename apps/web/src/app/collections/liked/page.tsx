@@ -47,9 +47,7 @@ export default function LikedCollectionsPage() {
   const { isAuthenticated, user } = useAuthStore();
   const { t, locale } = useTranslation();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (mounted && !isAuthenticated) {
@@ -94,8 +92,7 @@ export default function LikedCollectionsPage() {
     }
   };
 
-  const showPlaceholder = !mounted || !isAuthenticated;
-  if (showPlaceholder) {
+  if (!mounted || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
@@ -106,6 +103,7 @@ export default function LikedCollectionsPage() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,7 +127,7 @@ export default function LikedCollectionsPage() {
       </div>
 
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
-        {loading ? (
+        {(!mounted || !isAuthenticated || loading) ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
