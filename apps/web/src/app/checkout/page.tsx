@@ -1551,7 +1551,7 @@ export default function CheckoutPage() {
                             const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
                             setCardNumber(formatted);
                           }}
-                          placeholder="4508 3456 7890 1234"
+                          placeholder="0000 0000 0000 0000"
                           className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
                         />
                       </div>

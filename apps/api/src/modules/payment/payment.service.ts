@@ -2392,7 +2392,7 @@ export class PaymentService {
     }
 
     const normalized = cardNumber.replace(/\D/g, '');
-    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '4508345678901234').replace(/\D/g, '');
+    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '0000000000000000').replace(/\D/g, '');
 
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },

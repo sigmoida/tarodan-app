@@ -35,10 +35,10 @@ PayTR bağlamadan test için `apps/api/.env` içine ekleyin:
 
 ```env
 PAYMENT_BYPASS=true
-PAYMENT_BYPASS_SUCCESS_CARD=4508345678901234
+PAYMENT_BYPASS_SUCCESS_CARD=0000000000000000
 ```
 
-- **Başarılı kart:** Sadece `4508345678901234` (veya `PAYMENT_BYPASS_SUCCESS_CARD` ile belirlediğiniz) başarılı sayılır.
+- **Başarılı kart:** Sadece `0000000000000000` (16 sıfır, veya `PAYMENT_BYPASS_SUCCESS_CARD` ile belirlediğiniz) başarılı sayılır.
 - **Diğer kartlar:** Başarısız sayılır; ürün rezervden çıkar.
 - Ödeme sayfasında “Test ödeme (bypass)” formu çıkar; kart numarasını yazıp “Ödemeyi tamamla” derseniz sonuç anında döner.
 
@@ -229,10 +229,10 @@ Resmi listeyi PayTR panelinden alabilirsiniz; yaygın örnekler:
 
 | Sonuç       | Kart No (boşluksuz)     | Son Kullanma | CVV  | Kart Sahibi  |
 |------------|--------------------------|--------------|------|---------------|
-| Başarılı   | `4508345678901234`       | 12/30        | 000  | Test User     |
-| Başarısız  | `4508345678901235`       | 12/30        | 000  | Test User     |
+| Başarılı   | `0000000000000000` (16 sıfır) | 12/30        | 000  | Test User     |
+| Başarısız  | `4508345678901235` vb.        | 12/30        | 000  | Test User     |
 
-- Kart numarasını **aralıksız** girin (örn. `4508345678901234`).
+- Kart numarasını **aralıksız** girin (başarılı test kartı: `0000000000000000`).
 - **Başarılı ödeme** için: Yukarıdaki başarılı kart + geçerli son kullanma (ileri tarih) + CVV (örn. 000).
 - `apps/api/.env` içinde `PAYTR_TEST_MODE=true` ve geçerli `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT` olmalı.
 - `merchant_oid` hatası alıyorsanız: Backend artık sipariş numarasını tire olmadan gönderiyor (örn. `ORD2026000032`); API’yi güncelleyip tekrar deneyin.
