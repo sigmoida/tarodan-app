@@ -39,17 +39,20 @@ interface PaymentMethod {
 
 const tierColors: Record<string, string> = {
   free: 'bg-gray-100 text-gray-800',
+  basic: 'bg-blue-100 text-blue-800',
   premium: 'bg-purple-100 text-purple-800',
   business: 'bg-amber-100 text-amber-800',
 };
 
 const tierNames: Record<string, string> = {
   free: 'Ücretsiz Üyelik',
+  basic: 'Temel Üyelik',
   premium: 'Premium Üyelik',
   business: 'Business Üyelik',
 };
 
 const tierPrices: Record<string, number> = {
+  basic: 49,
   premium: 99,
   business: 299,
 };
@@ -126,13 +129,16 @@ export default function MembershipManagePage() {
 
   const getFeaturesByTier = (tier: string): string[] => {
     if (tier === 'free') {
-      return ['5 ilan hakkı', 'Temel arama', 'Favorilere ekleme', 'Mesajlaşma'];
+      return ['10 ilan hakkı', '3 resim/ilan', 'Temel arama', 'Favorilere ekleme', 'Mesajlaşma'];
+    }
+    if (tier === 'basic') {
+      return ['50 aktif ilan', '6 resim/ilan', 'Takas özelliği', 'Koleksiyon oluşturma', '2 öne çıkan ilan'];
     }
     if (tier === 'premium') {
-      return ['Sınırsız aktif ilan', '15 resim/ilan', 'Takas özelliği', 'Sınırsız koleksiyon (Digital Garage)', 'Reklamsız deneyim', '3 öne çıkan ilan'];
+      return ['200 aktif ilan', '10 resim/ilan', 'Takas özelliği', 'Koleksiyon oluşturma', 'Reklamsız deneyim', '10 öne çıkan ilan'];
     }
     if (tier === 'business') {
-      return ['Tüm Premium özellikler', 'Kurumsal profil', 'Toplu ilan yönetimi', 'API erişimi', 'Özel destek', 'Reklam indirimi'];
+      return ['1000 aktif ilan', '15 resim/ilan', 'Tüm Premium özellikler', 'Kurumsal profil', 'Toplu ilan yönetimi', 'API erişimi', 'Özel destek', '50 öne çıkan ilan'];
     }
     return [];
   };

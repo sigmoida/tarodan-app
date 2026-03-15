@@ -6,6 +6,7 @@ import { Resolver, Query, Args, Int, ID } from '@nestjs/graphql';
 import { ProductType, PaginatedProductsType } from '../types/product.type';
 import { PrismaService } from '../../../prisma';
 import { ProductStatus, ProductCondition } from '@prisma/client';
+import { fulltextProductSearch } from '../../product/helpers/fulltext-search';
 
 @Resolver(() => ProductType)
 export class ProductResolver {
@@ -63,10 +64,11 @@ export class ProductResolver {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const fulltextIds = await fulltextProductSearch(this.prisma, search, limit * page);
+      if (fulltextIds.length === 0) {
+        return { items: [], total: 0, page, limit, totalPages: 0, hasNext: false, hasPrev: false };
+      }
+      where.id = { in: fulltextIds };
     }
 
     const [products, total] = await Promise.all([

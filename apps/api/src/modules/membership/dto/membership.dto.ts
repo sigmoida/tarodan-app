@@ -175,7 +175,10 @@ export class UserMembershipResponseDto {
   currentPeriodEnd: Date;
   cancelledAt?: Date;
   createdAt: Date;
-  
+  /** Ödeme beklerken (past_due) yükseltilmek istenen plan adı */
+  pendingTierName?: string;
+  /** Ödeme bekleniyor – üyelik sayfasında "satın alınmış" gibi gösterme */
+  pendingPayment?: boolean;
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;

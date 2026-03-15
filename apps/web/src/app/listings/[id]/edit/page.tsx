@@ -6,9 +6,11 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon, TagIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api, userApi, mediaApi, discountsApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { listingsApi, api, userApi, mediaApi, discountsApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import { SimpleDropdown } from '@/components/SimpleDropdown';
 
 interface Category {
   id: string;
@@ -32,15 +34,6 @@ interface CarModel {
   };
 }
 
-const SCALES = ['1:18', '1:24', '1:32', '1:43', '1:64', '1:72', '1:87'];
-
-const MATERIALS: { slug: string; label: string }[] = [
-  { slug: 'diecast', label: 'Diecast (Metal)' },
-  { slug: 'resin', label: 'Resin (Reçine)' },
-  { slug: 'composite', label: 'Composite (Kompozit)' },
-  { slug: 'plastic', label: 'Plastic (Plastik)' },
-];
-
 const CONDITIONS = [
   { value: 'new', label: 'Yeni' },
   { value: 'like_new', label: 'Sıfır Gibi' },
@@ -54,6 +47,7 @@ export default function EditListingPage() {
   const router = useRouter();
   const id = params.id as string;
   const { locale } = useTranslation();
+  const queryClient = useQueryClient();
   const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -61,6 +55,9 @@ export default function EditListingPage() {
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [scaleList, setScaleList] = useState<string[]>([]);
+  const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+  const [manufacturerList, setManufacturerList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const currentYear = new Date().getFullYear();
@@ -76,6 +73,7 @@ export default function EditListingPage() {
     carModelId: '',
     scale: '1:64',
     material: '' as string,
+    manufacturerId: '' as string,
     year: '' as string | number,
     isTradeEnabled: false,
     isPreorder: false,
@@ -90,6 +88,8 @@ export default function EditListingPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [productDiscounts, setProductDiscounts] = useState<any[]>([]);
+  const [commissionPreview, setCommissionPreview] = useState<{ sellerFeeAmount: number; sellerNetAmount: number } | null>(null);
+  const [commissionPreviewLoading, setCommissionPreviewLoading] = useState(false);
   const [saleData, setSaleData] = useState({
     originalPrice: '',
     salePrice: '',
@@ -227,22 +227,41 @@ export default function EditListingPage() {
     }
 
     // Then fetch from API (will merge with localStorage data in fetchListing)
-    // Then fetch from API (will merge with localStorage data in fetchListing)
-    fetchBrands();
+    fetchFilters();
     fetchListing();
     fetchCategories();
     fetchProductDiscounts();
   }, [id, isAuthenticated]);
 
-  const fetchBrands = async () => {
+  const fetchFilters = async () => {
     setBrandsLoading(true);
     try {
-      const response = await api.get('/brands');
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setBrands(data);
+      const response = await listingsApi.getFilters();
+      const data = response.data as {
+        scales?: string[];
+        materials?: Array<{ slug: string; label: string }>;
+        brands?: Array<{ id: string; name: string; slug: string }>;
+        manufacturers?: Array<{ id: string; name: string; slug: string }>;
+      };
+      if (data.scales?.length) setScaleList(data.scales);
+      if (data.materials?.length) setMaterialList(data.materials);
+      if (data.brands?.length) setBrands(data.brands);
+      if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+      if (!data.brands?.length) {
+        const brandsRes = await brandsApi.findAll();
+        const raw = brandsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+        if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+      }
     } catch (error) {
-      console.error('Failed to fetch brands:', error);
-      toast.error('Markalar yüklenemedi');
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+      try {
+        const brandsRes = await brandsApi.findAll();
+        const raw = brandsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+        if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+      } catch (_) {}
+      toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
     } finally {
       setBrandsLoading(false);
     }
@@ -277,6 +296,38 @@ export default function EditListingPage() {
       setModels([]);
     }
   }, [formData.brandId, brands]);
+
+  // Commission preview when price/category change
+  useEffect(() => {
+    const amount = Number(formData.price);
+    if (Number.isNaN(amount) || amount < 0) {
+      setCommissionPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setCommissionPreviewLoading(true);
+    api
+      .get('/orders/commission-preview', {
+        params: { amount: formData.price, categoryId: formData.categoryId || undefined },
+      })
+      .then((res) => {
+        if (!cancelled && res.data) {
+          setCommissionPreview({
+            sellerFeeAmount: Number(res.data.sellerFeeAmount ?? 0),
+            sellerNetAmount: Number(res.data.sellerNetAmount ?? 0),
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCommissionPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCommissionPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.price, formData.categoryId]);
 
   const fetchProductDiscounts = async () => {
     try {
@@ -429,16 +480,24 @@ export default function EditListingPage() {
         const materialFromAttrs = (listing as any).attributes?.find(
           (a: any) => (a.label === 'Malzeme' || a.group === 'Malzeme' || a.group === 'material')
         )?.name;
+        const scaleFromAttrs = (listing as any).attributes?.find(
+          (a: any) => (a.label === 'Ölçek' || a.group === 'Ölçek')
+        )?.value;
+        const hasActiveSale = (listing as any).oldPrice != null && Number((listing as any).oldPrice) > Number(listing.price);
+        const displayPrice = hasActiveSale
+          ? String(Number((listing as any).oldPrice))
+          : (listing.price?.toString() || '');
         const newFormData = {
           title: savedData?.title || listing.title || prev.title || '',
           description: savedData?.description || listing.description || prev.description || '',
-          price: savedData?.price || listing.price?.toString() || prev.price || '',
+          price: savedData?.price || displayPrice || prev.price || '',
           categoryId: savedData?.categoryId || listing.categoryId || listing.category?.id || prev.categoryId || '',
           condition: savedData?.condition || listing.condition || prev.condition || 'very_good',
           brandId: savedData?.brandId || listing.brand?.id || prev.brandId || '',
           carModelId: savedData?.carModelId || listing.carModel?.id || prev.carModelId || '',
-          scale: savedData?.scale || listing.scale || prev.scale || '1:64',
+          scale: savedData?.scale || listing.scale || scaleFromAttrs || prev.scale || '1:64',
           material: savedData?.material ?? materialFromAttrs ?? (listing as any).material ?? prev.material ?? '',
+          manufacturerId: savedData?.manufacturerId ?? (listing as any).manufacturer?.id ?? prev.manufacturerId ?? '',
           year: savedData?.year ?? (listing as any).year ?? (listing as any).releaseDate ? new Date((listing as any).releaseDate).getFullYear() : prev.year ?? '',
           isTradeEnabled: savedData?.isTradeEnabled !== undefined ? savedData.isTradeEnabled : (listing.isTradeEnabled || listing.trade_available || prev.isTradeEnabled || false),
           isPreorder: savedData?.isPreorder !== undefined ? savedData.isPreorder : ((listing as any).isPreorder ?? prev.isPreorder ?? false),
@@ -468,12 +527,16 @@ export default function EditListingPage() {
       const sale = onSale ? Number(listing.price) : (listing.salePrice != null ? Number(listing.salePrice) : null);
       const start = listing.saleStartDate ? (typeof listing.saleStartDate === 'string' ? listing.saleStartDate.split('T')[0] : new Date(listing.saleStartDate).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
       const end = listing.saleEndDate ? (typeof listing.saleEndDate === 'string' ? listing.saleEndDate.split('T')[0] : new Date(listing.saleEndDate).toISOString().split('T')[0]) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const saleActive = orig != null && sale != null && sale > 0 && orig > sale;
       setSaleData({
         originalPrice: orig != null ? String(orig) : '',
-        salePrice: sale != null ? String(sale) : '',
+        salePrice: saleActive ? String(sale) : '',
         saleStartDate: start,
         saleEndDate: end,
       });
+      if (saleActive) {
+        setShowDiscountSection(true);
+      }
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch listing:', error);
       toast.error(error.response?.data?.message || 'İlan yüklenemedi');
@@ -551,6 +614,14 @@ export default function EditListingPage() {
   const [reactivateQuantity, setReactivateQuantity] = useState('1');
   const [reactivating, setReactivating] = useState(false);
 
+  // Sync reactivateQuantity with actual product quantity when sold/inactive (so "Yeniden Satışa Aç" shows real stock)
+  useEffect(() => {
+    if ((formData.status === 'sold' || formData.status === 'inactive') && formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '') {
+      const qty = String(formData.quantity);
+      setReactivateQuantity(qty);
+    }
+  }, [formData.status, formData.quantity]);
+
   const handleReactivate = async () => {
     const qty = Number(reactivateQuantity);
     if (!qty || qty < 1) {
@@ -584,9 +655,13 @@ export default function EditListingPage() {
 
     setIsLoading(true);
     try {
-      const orig = saleData.originalPrice ? Number(saleData.originalPrice) : Number(formData.price);
+      const formPrice = Number(formData.price);
+      const orig = saleData.originalPrice ? Number(saleData.originalPrice) : formPrice;
       const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
-      const hasSale = sale > 0 && orig > sale;
+      // Use whichever is higher between formData.price and saleData.originalPrice as the "original"
+      const effectiveOrig = Math.max(orig, formPrice);
+      // A sale is valid only when salePrice > 0, effectively lower than the listed price, and distinct from it
+      const hasSale = sale > 0 && effectiveOrig > sale && sale !== formPrice;
       const payload: Record<string, unknown> = {
         title: formData.title,
         description: formData.description || undefined,
@@ -597,6 +672,7 @@ export default function EditListingPage() {
         carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
         material: formData.material || undefined,
+        manufacturerId: formData.manufacturerId || undefined,
         year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: formData.isPreorder,
@@ -607,7 +683,7 @@ export default function EditListingPage() {
       };
       // Sale/discount fields: send to backend so listing shows updated price
       if (hasSale) {
-        payload.originalPrice = orig;
+        payload.originalPrice = effectiveOrig;
         payload.salePrice = sale;
         payload.saleStartDate = saleData.saleStartDate ? new Date(saleData.saleStartDate).toISOString() : null;
         payload.saleEndDate = saleData.saleEndDate ? new Date(saleData.saleEndDate).toISOString() : null;
@@ -622,6 +698,10 @@ export default function EditListingPage() {
 
       await listingsApi.update(id, payload as any);
       toast.success('İlanınız güncellendi!');
+
+      queryClient.invalidateQueries({ queryKey: ['listing', id] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-listings'] });
 
       // Clear saved form data after successful submission
       // Only clear if we're actually navigating away (not just refreshing)
@@ -834,58 +914,35 @@ export default function EditListingPage() {
 
             {/* Brand & Scale */}
             <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Marka
-                </label>
-                <select
-                  value={formData.brandId}
-                  onChange={(e) => {
-                    const newBrandId = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      brandId: newBrandId,
-                      carModelId: ''
-                    }));
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={brandsLoading}
-                >
-                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Marka"
+                value={formData.brandId}
+                onValueChange={(newBrandId) =>
+                  setFormData((prev) => ({ ...prev, brandId: newBrandId, carModelId: '' }))
+                }
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
+                disabled={brandsLoading}
+                triggerClassName="py-3 rounded-xl border-gray-300"
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Model
-                </label>
-                <select
-                  value={formData.carModelId}
-                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || modelsLoading}
-                >
-                  <option value="">
-                    {!formData.brandId
-                      ? 'Önce marka seçin'
-                      : modelsLoading
-                        ? 'Yükleniyor...'
-                        : models.length === 0
-                          ? 'Bu markaya ait model yok'
-                          : 'Model Seçin'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Model"
+                value={formData.carModelId}
+                onValueChange={(carModelId) => setFormData({ ...formData, carModelId })}
+                options={models.map((m) => ({ value: m.id, label: m.name }))}
+                placeholder={
+                  !formData.brandId
+                    ? 'Önce marka seçin'
+                    : modelsLoading
+                      ? 'Yükleniyor...'
+                      : models.length === 0
+                        ? 'Bu markaya ait model yok'
+                        : 'Model Seçin'
+                }
+                disabled={!formData.brandId || modelsLoading}
+                triggerClassName="py-3 rounded-xl border-gray-300"
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -896,7 +953,7 @@ export default function EditListingPage() {
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
-                  {SCALES.map((scale) => (
+                  {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
@@ -914,9 +971,32 @@ export default function EditListingPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">Malzeme seçin</option>
-                  {MATERIALS.map((m) => (
+                  {(materialList.length > 0 ? materialList : [
+                    { slug: 'diecast', label: 'Diecast (Metal)' },
+                    { slug: 'resin', label: 'Resin (Reçine)' },
+                    { slug: 'composite', label: 'Composite (Kompozit)' },
+                    { slug: 'plastic', label: 'Plastic (Plastik)' },
+                  ]).map((m) => (
                     <option key={m.slug} value={m.slug}>
                       {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Üretici
+                </label>
+                <select
+                  value={formData.manufacturerId}
+                  onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">Üretici seçin</option>
+                  {manufacturerList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
@@ -952,7 +1032,7 @@ export default function EditListingPage() {
                 <p className="text-sm text-gray-600">
                   {limits?.canTrade
                     ? 'Bu ürünü takas için de açık tutar'
-                    : 'Takas özelliği Premium üyelik gerektirir'}
+                    : 'Takas özelliği Temel veya üstü üyelik gerektirir'}
                 </p>
               </div>
               {limits?.canTrade ? (
@@ -1050,6 +1130,19 @@ export default function EditListingPage() {
                 />
               </div>
             </div>
+            {(commissionPreviewLoading || commissionPreview) && (
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
+                <p className="text-gray-600 font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
+                {commissionPreviewLoading ? (
+                  <span className="text-gray-400">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
+                ) : commissionPreview ? (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-green-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             {/* Discount Section */}
             <div className="border border-gray-200 rounded-xl overflow-hidden">

@@ -25,6 +25,7 @@ export class SearchController {
     @Query('categoryId') categoryId?: string,
     @Query('brandId') brandId?: string,
     @Query('manufacturerId') manufacturerId?: string,
+    @Query('carModelId') carModelId?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('condition') condition?: string,
@@ -37,7 +38,6 @@ export class SearchController {
     @Query('preOrder') preOrder?: string,
     @Query('limited') limited?: string,
     @Query('set') setFilter?: string,
-    @Query('vehicleType') vehicleType?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('sortBy') sortBy?: string,
@@ -47,6 +47,7 @@ export class SearchController {
       categoryId,
       brandId,
       manufacturerId,
+      carModelId,
       minPrice: minPrice ? parseFloat(minPrice) : undefined,
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
       condition,
@@ -59,7 +60,6 @@ export class SearchController {
       preOrder: preOrder === 'true',
       limited: limited === 'true',
       set: setFilter === 'true',
-      vehicleType,
       page: page ? parseInt(page) : 1,
       pageSize: pageSize ? parseInt(pageSize) : 20,
       sortBy,
@@ -116,6 +116,20 @@ export class SearchController {
     return {
       indexed,
       message: `${indexed} ürün Elasticsearch'e index'lendi.`,
+    };
+  }
+
+  @Public()
+  @Get('dev/reindex-collections')
+  async devReindexCollections(): Promise<{ indexed: number; message: string }> {
+    const isDev = this.configService.get('NODE_ENV') === 'development';
+    if (!isDev) {
+      return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
+    }
+    const indexed = await this.searchService.reindexAllCollections();
+    return {
+      indexed,
+      message: `${indexed} koleksiyon Elasticsearch'e index'lendi.`,
     };
   }
 

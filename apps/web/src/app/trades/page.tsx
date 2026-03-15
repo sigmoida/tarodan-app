@@ -17,6 +17,7 @@ interface TradeItem {
   productId: string;
   productTitle: string;
   productImage?: string;
+  productImages?: { cardUrl?: string; detailUrl?: string }[];
   side: string;
   quantity: number;
   valueAtTrade: number;
@@ -42,47 +43,48 @@ interface Trade {
 export default function TradesPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
     pending: { label: t('trade.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
     accepted: { label: t('trade.statusAccepted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
     rejected: { label: t('trade.statusRejected'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
-    initiator_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    receiver_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    both_shipped: { label: t('order.statusShipped'), color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    initiator_shipped: { label: locale === 'en' ? 'Initiator Shipped' : 'Gönderen Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    receiver_shipped: { label: locale === 'en' ? 'Receiver Shipped' : 'Alıcı Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
+    both_shipped: { label: locale === 'en' ? 'Both Shipped' : 'Her İkisi Kargoda', color: 'bg-indigo-100 text-indigo-800', icon: TruckIcon },
+    initiator_received: { label: locale === 'en' ? 'Initiator Received' : 'Gönderen Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
+    receiver_received: { label: locale === 'en' ? 'Receiver Received' : 'Alıcı Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
     completed: { label: t('trade.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
     cancelled: { label: t('trade.statusCancelled'), color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
-    disputed: { label: t('common.error'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+    disputed: { label: locale === 'en' ? 'Disputed' : 'Anlaşmazlık', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
   };
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/trades');
-      return;
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   const tradesQuery = useQuery({
     queryKey: ['trades', statusFilter],
     queryFn: async (): Promise<Trade[]> => {
-      const response = await api.get('/trades');
-      let allTrades = response.data.data || response.data.trades || [];
-      if (statusFilter) {
-        if (statusFilter === 'shipped') {
-          allTrades = allTrades.filter((trade: Trade) =>
-            trade.status === 'initiator_shipped' ||
-            trade.status === 'receiver_shipped' ||
-            trade.status === 'both_shipped'
-          );
-        } else {
-          allTrades = allTrades.filter((trade: Trade) => trade.status === statusFilter);
-        }
+      const params: Record<string, string> = { pageSize: '100' };
+      if (statusFilter && statusFilter !== 'shipped') {
+        params.status = statusFilter;
       }
-      return allTrades;
+      const response = await api.get('/trades', { params });
+      let trades = response.data.data || response.data.trades || [];
+      // Client-side grouping for 'shipped' since it spans multiple statuses
+      if (statusFilter === 'shipped') {
+        trades = trades.filter((trade: Trade) =>
+          ['initiator_shipped', 'receiver_shipped', 'both_shipped'].includes(trade.status)
+        );
+      }
+      return trades;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'trades' },
   });
   const trades = tradesQuery.data ?? [];
@@ -184,7 +186,8 @@ export default function TradesPage() {
               const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
 
               const getItemImage = (item: TradeItem): string => {
-                return item.productImage || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
+                const url = item.productImages?.[0]?.cardUrl ?? item.productImages?.[0]?.detailUrl ?? item.productImage;
+                return url || 'https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün';
               };
 
               const calculateTotalValue = (items: TradeItem[]): number => {

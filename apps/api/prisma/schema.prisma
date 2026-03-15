@@ -287,7 +287,6 @@ model Category {
   sortOrder       Int              @default(0) @map("sort_order")
   isActive        Boolean          @default(true) @map("is_active")
   createdAt       DateTime         @default(now()) @map("created_at")
-  image           String?          @map("image")
   parent          Category?        @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children        Category[]       @relation("CategoryHierarchy")
   commissionRules CommissionRule[]
@@ -380,6 +379,7 @@ model Product {
   popularityScore     Int?               @map("popularity_score")
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
+  reservedQuantity    Int?               @default(0) @map("reserved_quantity")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
   originalPrice       Decimal?           @map("original_price") @db.Decimal(10, 2)
@@ -396,6 +396,8 @@ model Product {
   releaseDate         DateTime?          @map("release_date")
   carModelId          String?            @map("car_model_id")
   manufacturerId      String?            @map("manufacturer_id")
+  averageRating       Decimal?           @map("average_rating") @db.Decimal(3, 2)
+  ratingCount         Int                @default(0) @map("rating_count")
   cartItems           CartItem[]
   collectionItems     CollectionItem[]
   offers              Offer[]
@@ -424,6 +426,7 @@ model Product {
   @@index([isSet])
   @@index([createdAt(sort: Desc)])
   @@index([saleStartDate, saleEndDate])
+  @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
   @@map("products")
 }
 
@@ -557,6 +560,7 @@ model TradeCashPayment {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   trade             Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  payment           Payment?
 
   @@map("trade_cash_payments")
 }
@@ -647,21 +651,23 @@ model ContentFilter {
 }
 
 model Rating {
-  id         String   @id @default(uuid())
-  giverId    String   @map("giver_id")
-  receiverId String   @map("receiver_id")
-  orderId    String?  @map("order_id")
-  tradeId    String?  @map("trade_id")
+  id         String       @id @default(uuid())
+  giverId    String       @map("giver_id")
+  receiverId String       @map("receiver_id")
+  orderId    String?      @map("order_id")
+  tradeId    String?      @map("trade_id")
   score      Int
   comment    String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  giver      User     @relation("RatingGiver", fields: [giverId], references: [id])
-  receiver   User     @relation("RatingReceiver", fields: [receiverId], references: [id])
+  status     RatingStatus @default(pending)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  giver      User         @relation("RatingGiver", fields: [giverId], references: [id])
+  receiver   User         @relation("RatingReceiver", fields: [receiverId], references: [id])
 
   @@unique([giverId, orderId])
   @@unique([giverId, tradeId])
   @@index([receiverId])
+  @@index([status])
   @@map("ratings")
 }
 
@@ -746,13 +752,15 @@ model CollectionItem {
   sortOrder         Int        @default(0) @map("sort_order")
   isFeatured        Boolean    @default(false) @map("is_featured")
   addedAt           DateTime   @default(now()) @map("added_at")
-  customBrand       String?    @map("custom_brand")
-  customDescription String?    @map("custom_description")
-  customImageUrl    String?    @map("custom_image_url")
-  customModel       String?    @map("custom_model")
-  customScale       String?    @map("custom_scale")
-  customTitle       String?    @map("custom_title")
-  customYear        Int?       @map("custom_year")
+  customBrand         String?    @map("custom_brand")
+  customDescription   String?    @map("custom_description")
+  customImageUrl      String?    @map("custom_image_url")
+  customModel         String?    @map("custom_model")
+  customScale         String?    @map("custom_scale")
+  customTitle         String?    @map("custom_title")
+  customYear          Int?       @map("custom_year")
+  customManufacturer  String?    @map("custom_manufacturer")
+  customMaterial      String?    @map("custom_material")
   collection        Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   product           Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -903,6 +911,7 @@ model Offer {
   buyerId   String      @map("buyer_id")
   sellerId  String      @map("seller_id")
   amount    Decimal     @db.Decimal(10, 2)
+  message   String?
   status    OfferStatus @default(pending)
   expiresAt DateTime    @map("expires_at")
   createdAt DateTime    @default(now()) @map("created_at")
@@ -955,22 +964,24 @@ model Order {
 }
 
 model Payment {
-  id                     String        @id @default(uuid())
-  orderId                String        @unique @map("order_id")
+  id                     String            @id @default(uuid())
+  orderId                String?           @unique @map("order_id")
+  tradeCashPaymentId     String?           @unique @map("trade_cash_payment_id")
   provider               String
-  providerPaymentId      String?       @map("provider_payment_id")
-  providerConversationId String?       @map("provider_conversation_id")
-  amount                 Decimal       @db.Decimal(10, 2)
-  currency               String        @default("TRY")
-  installmentCount       Int           @default(1) @map("installment_count")
-  status                 PaymentStatus @default(pending)
-  failureReason          String?       @map("failure_reason")
+  providerPaymentId      String?           @map("provider_payment_id")
+  providerConversationId String?           @map("provider_conversation_id")
+  amount                 Decimal           @db.Decimal(10, 2)
+  currency               String            @default("TRY")
+  installmentCount       Int               @default(1) @map("installment_count")
+  status                 PaymentStatus     @default(pending)
+  failureReason          String?           @map("failure_reason")
   metadata               Json?
-  paidAt                 DateTime?     @map("paid_at")
-  createdAt              DateTime      @default(now()) @map("created_at")
-  updatedAt              DateTime      @updatedAt @map("updated_at")
+  paidAt                 DateTime?         @map("paid_at")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHold            PaymentHold?
-  order                  Order         @relation(fields: [orderId], references: [id])
+  order                  Order?            @relation(fields: [orderId], references: [id])
+  tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
   @@map("payments")
 }

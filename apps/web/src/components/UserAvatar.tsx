@@ -1,9 +1,7 @@
 'use client';
 
-/**
- * Trendyol-style user identity: initials only, no avatar image.
- * Use everywhere we need to show a user (profile, seller, messages, etc.).
- */
+import { useState, useEffect } from 'react';
+
 function getInitials(displayName: string | null | undefined, companyName?: string | null): string {
   if (companyName?.trim()) {
     const parts = companyName.trim().split(/\s+/);
@@ -16,12 +14,17 @@ function getInitials(displayName: string | null | undefined, companyName?: strin
   return displayName.trim().slice(0, 2).toUpperCase();
 }
 
+function isValidUrl(src: unknown): boolean {
+  if (!src || typeof src !== 'string') return false;
+  return src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:');
+}
+
 export interface UserAvatarProps {
   displayName?: string | null;
   companyName?: string | null;
+  avatarUrl?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  /** Optional: ring/border utility */
   ring?: boolean;
 }
 
@@ -36,10 +39,14 @@ const sizeClasses = {
 export default function UserAvatar({
   displayName,
   companyName,
+  avatarUrl,
   size = 'md',
   className = '',
   ring = false,
 }: UserAvatarProps) {
+  const [imgError, setImgError] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const initials = getInitials(displayName, companyName);
   const isCompany = Boolean(companyName?.trim());
   const base =
@@ -48,13 +55,23 @@ export default function UserAvatar({
     ? 'bg-orange-500/20 text-orange-600'
     : 'bg-primary-500 text-white';
   const ringClass = ring ? 'ring-4 ring-white/30' : '';
+  const showImage = mounted && isValidUrl(avatarUrl) && !imgError;
 
   return (
     <div
-      className={`${sizeClasses[size]} ${base} ${bg} ${ringClass} ${className}`}
+      className={`${sizeClasses[size]} ${base} ${showImage ? '' : bg} ${ringClass} ${className}`}
       title={displayName || companyName || undefined}
     >
-      {isCompany && !displayName ? '🏢' : initials}
+      {showImage ? (
+        <img
+          src={avatarUrl!}
+          alt={displayName || companyName || 'Avatar'}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        isCompany && !displayName ? '🏢' : initials
+      )}
     </div>
   );
 }

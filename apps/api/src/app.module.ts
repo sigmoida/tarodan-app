@@ -79,6 +79,7 @@ import { TaxModule } from './modules/tax';
 // Static pages (public GET /api/pages/:slug)
 import { PagesModule } from './modules/pages';
 
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor';
 
 @Module({
@@ -96,6 +97,9 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
         limit: 100, // 100 requests per minute
       },
     ]),
+
+    // Event bus (Prisma → ES sync, etc.)
+    EventEmitterModule.forRoot(),
 
     // Database
     PrismaModule,

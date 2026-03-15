@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -23,7 +23,9 @@ interface Collection {
   likeCount: number;
   itemCount: number;
   createdAt: string;
-  user: {
+  userId?: string;
+  userName?: string;
+  user?: {
     id: string;
     displayName: string;
     avatarUrl?: string;
@@ -41,12 +43,16 @@ interface Collection {
 export default function LikedCollectionsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
 
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); }
-  }, [isAuthenticated, router]);
+    if (!mounted || authLoading) return;
+    if (!isAuthenticated) { router.push('/login?redirect=/collections/liked'); }
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const likedQuery = useQuery({
     queryKey: ['collections-liked'],
@@ -55,7 +61,8 @@ export default function LikedCollectionsPage() {
       const data = response.data;
       return data?.collections || data?.data || (Array.isArray(data) ? data : []);
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
+    refetchOnMount: 'always',
     meta: { page: 'collections-liked' },
     retry: (failureCount, error: any) => {
       if (error?.response?.status === 401) return false;
@@ -85,7 +92,18 @@ export default function LikedCollectionsPage() {
     }
   };
 
-  if (!isAuthenticated) return null;
+  if (!mounted || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,7 +127,7 @@ export default function LikedCollectionsPage() {
       </div>
 
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
-        {loading ? (
+        {(!mounted || !isAuthenticated || loading) ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
@@ -149,7 +167,7 @@ export default function LikedCollectionsPage() {
                 transition={{ delay: index * 0.02 }}
               >
                 <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
-                  <Link href={`/collections/${collection.slug || collection.id}`}>
+                  <Link href={`/collections/${collection.id}`}>
                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                       {collection.coverImageUrl ? (
                         <OptimizedImage
@@ -191,7 +209,7 @@ export default function LikedCollectionsPage() {
                   </Link>
 
                   <div className="p-2.5 flex-1 flex flex-col">
-                    <Link href={`/collections/${collection.slug || collection.id}`}>
+                    <Link href={`/collections/${collection.id}`}>
                       <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
                     </Link>
                     {collection.description && (
@@ -199,8 +217,8 @@ export default function LikedCollectionsPage() {
                     )}
 
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <UserAvatar displayName={collection.user?.displayName} size="xs" className="!w-4 !h-4 !text-[8px]" />
-                      <span className="text-[10px] text-gray-400">{collection.user?.displayName || t('collection.anonymous')}</span>
+                      <UserAvatar displayName={collection.user?.displayName || collection.userName} avatarUrl={collection.user?.avatarUrl} size="xs" className="!w-4 !h-4 !text-[8px]" />
+                      <span className="text-[10px] text-gray-400">{collection.user?.displayName || collection.userName || t('collection.anonymous')}</span>
                     </div>
 
                     <div className="mt-auto pt-2 flex items-center justify-between">

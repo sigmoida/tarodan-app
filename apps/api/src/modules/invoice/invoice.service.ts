@@ -6,6 +6,8 @@
  */
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
@@ -87,6 +89,28 @@ export class InvoiceService {
     private readonly smtpProvider: SmtpProvider,
     private readonly taxService: TaxService,
   ) { }
+
+  /**
+   * Resolve font path for PDF (Turkish support). Uses INVOICE_FONT_PATH env, then platform defaults.
+   * Returns a path that exists, or null to use Helvetica fallback.
+   */
+  private getInvoiceFontPath(): string | null {
+    const envPath = this.configService.get('INVOICE_FONT_PATH');
+    if (envPath && typeof envPath === 'string' && fs.existsSync(envPath)) return envPath;
+    const platform = process.platform;
+    const candidates: string[] = [];
+    if (platform === 'win32') {
+      candidates.push('C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\Arial.ttf');
+    } else if (platform === 'darwin') {
+      candidates.push('/System/Library/Fonts/Supplemental/Arial.ttf', '/Library/Fonts/Arial.ttf');
+    } else {
+      candidates.push('/usr/share/fonts/truetype/msttcorefonts/arial.ttf', '/usr/share/fonts/TTF/Arial.ttf');
+    }
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return null;
+  }
 
   /**
    * Resolve invoice pdfUrl - if it's an S3 key, generate presigned URL
@@ -850,7 +874,7 @@ export class InvoiceService {
       taxRate: 18,
       taxAmount: Number(invoice.taxAmount),
       shippingCost: Number(invoice.shippingCost),
-      commission: 0,
+      commission: Number(invoice.order.commissionAmount ?? 0),
       total: Number(invoice.total),
 
       paymentMethod: 'Online Ödeme',
@@ -1001,6 +1025,12 @@ export class InvoiceService {
             <td>${formatCurrency(data.shippingCost)}</td>
           </tr>
         ` : ''}
+        ${data.commission > 0 ? `
+          <tr>
+            <td>Platform ücreti:</td>
+            <td>${formatCurrency(data.commission)}</td>
+          </tr>
+        ` : ''}
         ${data.taxAmount > 0 ? `
           <tr>
             <td>KDV (%${data.taxRate}):</td>
@@ -1045,12 +1075,12 @@ export class InvoiceService {
         doc.on('end', () => resolve(Buffer.concat(buffers)));
         doc.on('error', (err) => reject(err));
 
-        // Load font for Turkish support
-        const fontPath = '/System/Library/Fonts/Supplemental/Arial.ttf';
+        // Load font for Turkish support (platform-aware: Windows, macOS, Linux or INVOICE_FONT_PATH)
+        const fontPath = this.getInvoiceFontPath();
+        const fontToUse = fontPath || 'Helvetica';
         try {
-          doc.font(fontPath);
+          doc.font(fontToUse);
         } catch {
-          // Fallback to standard Helvetica if Arial is not found (might lose Turkish chars)
           doc.font('Helvetica');
         }
 
@@ -1120,9 +1150,14 @@ export class InvoiceService {
           doc.text('Kargo Ücreti:', 380, currentY, { width: 100, align: 'right' });
           doc.text(`${data.shippingCost.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
         }
+        if (data.commission > 0) {
+          currentY += totalGap;
+          doc.text('Platform ücreti:', 380, currentY, { width: 100, align: 'right' });
+          doc.text(`${data.commission.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        }
 
         currentY += 25;
-        doc.fontSize(14).fillColor('#1d3557').font(fontPath).text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
+        doc.fontSize(14).fillColor('#1d3557').font(fontToUse).text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
         doc.text(`${data.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
 
         // Footer

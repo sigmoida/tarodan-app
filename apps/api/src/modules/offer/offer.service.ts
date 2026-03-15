@@ -10,6 +10,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from './dto';
 import { OfferStatus, ProductStatus, OrderStatus, Prisma } from '@prisma/client';
@@ -17,6 +18,8 @@ import { ConfigService } from '@nestjs/config';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { OrderService } from '../order/order.service';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 
 @Injectable()
 export class OfferService {
@@ -26,10 +29,13 @@ export class OfferService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
     @Optional()
     private readonly storageService: StorageService,
   ) {
@@ -95,6 +101,12 @@ export class OfferService {
         throw new BadRequestException('Bu ürün şu anda satışta değil');
       }
 
+      // Adet bazlı: en az 1 müsait adet olmalı
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
+        throw new BadRequestException('Ürün stokta yok veya yeterli müsait adet yok');
+      }
+
       // Cannot offer on own product
       if (product.sellerId === buyerId) {
         throw new BadRequestException('Kendi ürününüze teklif veremezsiniz');
@@ -137,6 +149,7 @@ export class OfferService {
           buyerId,
           sellerId: product.sellerId,
           amount: dto.amount,
+          message: dto.message || null,
           status: OfferStatus.pending,
           expiresAt,
         },
@@ -147,10 +160,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
         },
       });
@@ -185,24 +198,6 @@ export class OfferService {
       this.logger.error(`Failed to emit offer.created event: ${error}`);
     }
 
-    // Send direct in-app notification to seller
-    this.logger.log(`[CreateOffer] Sending notification to seller ${result.offer.sellerId}`);
-    try {
-      const notificationResult = await this.notificationService.createInAppNotification(
-        result.offer.sellerId,
-        NotificationType.OFFER_RECEIVED,
-        {
-          productId: result.offer.productId,
-          productTitle: result.productTitle,
-          amount: Number(result.offer.amount),
-          buyerName: result.offer.buyer.displayName || 'Bir kullanıcı',
-        },
-      );
-      this.logger.log(`[CreateOffer] Notification result: ${notificationResult}`);
-    } catch (error) {
-      this.logger.error(`[CreateOffer] Failed to send offer notification:`, error);
-    }
-
     return await this.formatOfferResponse(result.offer);
   }
 
@@ -219,10 +214,10 @@ export class OfferService {
   async accept(offerId: string, sellerId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
-      const lockedOffers = await tx.$queryRaw<any[]>`
-        SELECT o.*, o.version as offer_version
-        FROM "Offer" o
-        WHERE o.id = ${offerId}::uuid
+      const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
+        SELECT o.id
+        FROM "offers" o
+        WHERE o.id = ${offerId}
         FOR UPDATE
       `;
 
@@ -230,7 +225,13 @@ export class OfferService {
         throw new NotFoundException('Teklif bulunamadı');
       }
 
-      const offerData = lockedOffers[0];
+      const offerData = await tx.offer.findUnique({
+        where: { id: offerId },
+      });
+
+      if (!offerData) {
+        throw new NotFoundException('Teklif bulunamadı');
+      }
 
       // Only seller can accept
       if (offerData.sellerId !== sellerId) {
@@ -252,30 +253,30 @@ export class OfferService {
         throw new BadRequestException('Bu teklifin süresi dolmuş');
       }
 
-      // Lock product row with FOR UPDATE
-      const lockedProducts = await tx.$queryRaw<any[]>`
-        SELECT p.*
-        FROM "Product" p
-        WHERE p.id = ${offerData.productId}::uuid
-        FOR UPDATE
-      `;
+      // Check product is still available
+      const productData = await tx.product.findUnique({
+        where: { id: offerData.productId },
+      });
 
-      if (!lockedProducts || lockedProducts.length === 0) {
+      if (!productData) {
         throw new NotFoundException('Ürün bulunamadı');
       }
 
-      const productData = lockedProducts[0];
-
-      // Check product is still available
       if (productData.status !== ProductStatus.active) {
         throw new BadRequestException('Ürün artık satışta değil');
+      }
+
+      // Adet bazlı: müsait adet >= 1 olmalı
+      const available = getAvailableQuantity(productData);
+      if (available !== null && available < 1) {
+        throw new BadRequestException('Ürün için yeterli müsait adet yok');
       }
 
       // Accept this offer with version check
       const acceptedOffer = await tx.offer.update({
         where: {
           id: offerId,
-          version: offerData.offer_version,
+          version: offerData.version,
         },
         data: {
           status: OfferStatus.accepted,
@@ -288,10 +289,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true },
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
           },
         },
       });
@@ -308,16 +309,25 @@ export class OfferService {
         },
       });
 
-      // Reserve the product
+      // Adet bazlı rezervasyon: 1 adet rezerve et (ödemeye kadar)
       await tx.product.update({
         where: { id: offerData.productId },
-        data: { status: ProductStatus.reserved },
+        data: { reservedQuantity: { increment: 1 } },
       });
+
+      // Calculate commission using the same logic as direct buy
+      const commissionResult = await this.orderService.calculateCommission(
+        Number(offerData.amount),
+        offerData.sellerId,
+        productData.categoryId,
+      );
+
+      const totalAmount = Number(offerData.amount) + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Create order with pending_payment status
+      // Create order with pending_payment status (buyer adds address later via PATCH)
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -325,13 +335,15 @@ export class OfferService {
           buyerId: offerData.buyerId,
           sellerId: offerData.sellerId,
           offerId: offerId,
-          totalAmount: offerData.amount,
-          commissionAmount: 0, // Will be calculated at payment
+          totalAmount,
+          commissionAmount: commissionResult.commissionAmount,
+          buyerFeeAmount: commissionResult.buyerFeeAmount,
+          sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
         },
       });
 
-      this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId}`);
+      this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`);
 
       return {
         offer: acceptedOffer,
@@ -360,22 +372,8 @@ export class OfferService {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
 
-    // Send direct in-app notification to buyer
-    try {
-      await this.notificationService.createInAppNotification(
-        result.offer.buyerId,
-        NotificationType.OFFER_ACCEPTED,
-        {
-          productId: result.offer.productId,
-          productTitle: result.offer.product.title,
-          orderId: result.order.id,
-          amount: Number(result.offer.amount),
-        },
-      );
-    } catch (error) {
-      this.logger.error(`Failed to send offer accepted notification: ${error}`);
-    }
-
+    // Ürün detay cache'ini temizle; müsait adet (availableQuantity) güncel dönsün
+    await this.cache.del(`products:detail:${result.offer.productId}`);
     return await this.formatOfferResponse(result.offer);
   }
 
@@ -414,10 +412,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -514,10 +512,10 @@ export class OfferService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -561,10 +559,10 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
       },
     });
@@ -638,10 +636,13 @@ export class OfferService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+        },
+        order: {
+          select: { id: true, status: true },
         },
       },
     });
@@ -667,13 +668,17 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+        },
+        order: {
+          select: { id: true, status: true },
         },
       },
     });
@@ -728,13 +733,17 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+        },
+        order: {
+          select: { id: true, status: true },
         },
       },
     });
@@ -779,24 +788,66 @@ export class OfferService {
       timeRemaining = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
 
+    const firstImage = (offer.product.images && offer.product.images[0]) || null;
+    const imageUrl = this.resolveProductImageUrl(firstImage?.cardKey);
+
+    const images =
+      firstImage && firstImage.cardKey
+        ? [
+            {
+              cardKey: firstImage.cardKey,
+              detailKey: firstImage.detailKey,
+              cardUrl: this.storageService.getPublicAssetUrl(firstImage.cardKey),
+              detailUrl: firstImage.detailKey
+                ? this.storageService.getPublicAssetUrl(firstImage.detailKey)
+                : undefined,
+              sortOrder: firstImage.sortOrder,
+            },
+          ]
+        : [];
+
     return {
       id: offer.id,
       amount: Number(offer.amount),
+      message: offer.message ?? null,
       status: isExpired ? OfferStatus.expired : offer.status,
       expiresAt: offer.expiresAt,
       isExpired,
       timeRemaining,
+      orderId: offer.order?.id ?? null,
+      orderStatus: offer.order?.status ?? null,
       product: {
         id: offer.product.id,
         title: offer.product.title,
         price: Number(offer.product.price),
-        imageUrl: this.resolveProductImageUrl(offer.product.images?.[0]?.cardKey),
+        imageUrl: imageUrl || undefined,
+        images,
         status: offer.product.status,
+        categoryId: offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
-      buyer: offer.buyer,
-      seller: offer.seller,
+      buyer: offer.buyer ? {
+        ...offer.buyer,
+        avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
+      } : offer.buyer,
+      seller: offer.seller ? {
+        ...offer.seller,
+        avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
+      } : offer.seller,
       createdAt: offer.createdAt,
       updatedAt: offer.updatedAt,
     };
+  }
+
+  private async resolveOfferAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 }

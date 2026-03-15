@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { SearchIndexingService } from './search-indexing.service';
+import { SearchSyncListener } from './search-sync.listener';
 import { PrismaModule } from '../../prisma';
 import { StorageModule } from '../storage/storage.module';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -18,7 +19,7 @@ import { QUEUE_NAMES } from '../../workers/constants';
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
   ],
   controllers: [SearchController],
-  providers: [SearchService, SearchIndexingService],
+  providers: [SearchService, SearchIndexingService, SearchSyncListener],
   exports: [SearchService, SearchIndexingService],
 })
 export class SearchModule {}

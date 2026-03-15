@@ -64,20 +64,19 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
     canCreateCollections: true,
   },
   premium: {
-    maxListings: -1,
-    maxImagesPerListing: 15,
+    maxListings: 200,
+    maxImagesPerListing: 10,
     canTrade: true,
     canCreateCollections: true,
   },
   business: {
-    maxListings: -1,
-    maxImagesPerListing: 20,
+    maxListings: 1000,
+    maxImagesPerListing: 15,
     canTrade: true,
     canCreateCollections: true,
   },
 };
 
-// Extract membership tier from API response
 const extractMembershipTier = (user: any): MembershipTier => {
   const tier = 
     user.membership?.tier?.type ||
@@ -90,9 +89,9 @@ const extractMembershipTier = (user: any): MembershipTier => {
   
   const normalizedTier = String(tier).toLowerCase();
   
-  if (normalizedTier.includes('premium') || normalizedTier === 'premium') return 'premium';
-  if (normalizedTier.includes('business') || normalizedTier === 'business') return 'business';
-  if (normalizedTier.includes('basic') || normalizedTier === 'basic') return 'premium'; // BASIC üyeleri PREMIUM'a map et
+  if (normalizedTier.includes('business')) return 'business';
+  if (normalizedTier.includes('premium')) return 'premium';
+  if (normalizedTier.includes('basic') || normalizedTier.includes('temel')) return 'basic';
   return 'free';
 };
 
@@ -145,20 +144,19 @@ interface AuthState {
   getMembershipLimits: () => MembershipLimits;
 }
 
-// Sync read from localStorage on client so first paint has correct auth state (no "giriş yapın" flash).
+// Always start with isAuthenticated=false so server and client first-paint match (prevents hydration error).
+// Tokens are read from localStorage but auth state is only set after checkAuth() runs post-mount.
 function getInitialAuthFromStorage(): Pick<AuthState, 'token' | 'refreshToken' | 'isAuthenticated' | 'isLoading'> {
   if (typeof window === 'undefined') {
     return { token: null, refreshToken: null, isAuthenticated: false, isLoading: true };
   }
   const token = localStorage.getItem('auth_token');
   const refreshToken = localStorage.getItem('refresh_token');
-  const hasToken = !!token;
   return {
     token,
     refreshToken,
-    isAuthenticated: hasToken,
-    // When we have a token, keep isLoading true until checkAuth() validates and loads user.
-    isLoading: true,
+    isAuthenticated: false,
+    isLoading: !!token,
   };
 }
 

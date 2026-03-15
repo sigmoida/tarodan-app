@@ -92,6 +92,11 @@ export class ProductRatingResponseDto {
   isVerifiedPurchase: boolean;
   helpfulCount: number;
   createdAt: Date;
+  user?: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
 }
 
 export class UserRatingStatsDto {

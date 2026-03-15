@@ -1,0 +1,101 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsArray, IsNumber, IsOptional, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CheckoutQuoteItemDto {
+  @ApiProperty({ example: 'product-uuid' })
+  @IsString()
+  productId: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  quantity?: number;
+}
+
+export class CheckoutQuoteDto {
+  @ApiProperty({
+    type: [CheckoutQuoteItemDto],
+    description: 'Product IDs and quantities (single item for direct buy, multiple for cart)',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CheckoutQuoteItemDto)
+  items: CheckoutQuoteItemDto[];
+}
+
+export class CheckoutQuoteItemResponseDto {
+  @ApiProperty()
+  productId: string;
+
+  @ApiProperty()
+  quantity: number;
+
+  @ApiProperty({ description: 'Unit price (after sale if any)' })
+  unitPrice: number;
+
+  @ApiProperty({ description: 'Line total (unitPrice * quantity)' })
+  subtotal: number;
+
+  @ApiProperty({ description: 'Buyer fee for this line' })
+  buyerFeeAmount: number;
+
+  @ApiProperty({ description: 'Seller fee for this line' })
+  sellerFeeAmount: number;
+
+  @ApiProperty({ description: 'Net to seller for this line' })
+  sellerNetAmount: number;
+
+  @ApiPropertyOptional({ description: 'Product title' })
+  title?: string;
+}
+
+export class CheckoutQuoteResponseDto {
+  @ApiProperty({ description: 'Sum of item subtotals' })
+  itemsSubtotal: number;
+
+  @ApiProperty({ description: 'Shipping cost (one per order)' })
+  shippingAmount: number;
+
+  @ApiProperty({ description: 'Total buyer fee' })
+  buyerFeeAmount: number;
+
+  @ApiProperty({ description: 'Total seller fee' })
+  sellerFeeAmount: number;
+
+  @ApiProperty({ description: 'Total commission' })
+  commissionAmount: number;
+
+  @ApiProperty({ description: 'Total amount paid by buyer' })
+  totalAmount: number;
+
+  @ApiProperty({ description: 'Total net to seller(s)' })
+  sellerNetAmount: number;
+
+  @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
+  items: CheckoutQuoteItemResponseDto[];
+
+  @ApiProperty({
+    description: 'Standard pricing breakdown (same shape as order/payment)',
+    example: {
+      subtotal: 250,
+      shippingAmount: 29.99,
+      buyerFeeAmount: 12.5,
+      sellerFeeAmount: 10,
+      commissionAmount: 22.5,
+      totalAmount: 292.49,
+      sellerNetAmount: 240,
+    },
+  })
+  pricing: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
+}

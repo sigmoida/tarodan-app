@@ -8,8 +8,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto, DirectPaymentDto, CreditCardDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
@@ -25,6 +27,7 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly iyzicoService: IyzicoService,
     private readonly paytrService: PayTRService,
@@ -150,6 +153,137 @@ export class PaymentService {
   }
 
   /**
+   * Initiate payment for a trade's cash amount (extra money on top of items).
+   * Called from TradeController POST /trades/:id/cash-payment/initiate.
+   */
+  async initiateTradeCashPayment(tradeId: string, userId: string, req?: Request) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      include: {
+        cashPayment: true,
+        initiator: { select: { id: true, displayName: true, email: true, phone: true } },
+        receiver: { select: { id: true, displayName: true, email: true, phone: true } },
+      },
+    });
+
+    if (!trade) throw new NotFoundException('Takas bulunamadı');
+    if (trade.status !== TradeStatus.accepted) {
+      throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
+    }
+    if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
+      throw new BadRequestException('Bu takasta ekstra ödeme bulunmuyor');
+    }
+    if (trade.cashPayerId !== userId) {
+      throw new ForbiddenException('Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir');
+    }
+
+    const cashPayment = trade.cashPayment;
+    if (!cashPayment) {
+      throw new BadRequestException('Nakit ödeme kaydı bulunamadı');
+    }
+    if (cashPayment.status === PaymentStatus.completed) {
+      throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+    }
+
+    // trade_cash_payment_id is unique: only one Payment per TradeCashPayment. Reuse existing if any.
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: { tradeCashPaymentId: cashPayment.id },
+    });
+
+    if (existingPayment) {
+      if (existingPayment.status === PaymentStatus.completed) {
+        throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+      }
+      // Pending veya failed: yeniden kullan (failed ise pending yap)
+      if (existingPayment.status === PaymentStatus.failed) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: { status: PaymentStatus.pending, failureReason: null },
+        });
+      }
+      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+      return {
+        paymentId: existingPayment.id,
+        paymentUrl: `${frontendUrl}/payment/${existingPayment.id}`,
+        provider: existingPayment.provider,
+        expiresIn: 300,
+        ...(paymentBypassExisting && { useBypass: true }),
+        tradeId,
+        amount: Number(cashPayment.totalAmount),
+      };
+    }
+
+    const provider = PaymentProvider.paytr;
+    const totalAmount = Number(cashPayment.totalAmount);
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        tradeCashPaymentId: cashPayment.id,
+        amount: totalAmount,
+        currency: 'TRY',
+        provider,
+        status: PaymentStatus.pending,
+      },
+    });
+
+    await this.logPaymentAction('created', payment.id, undefined, undefined, undefined, PaymentStatus.pending, {
+      amount: totalAmount,
+      provider,
+      tradeId,
+      tradeCashPaymentId: cashPayment.id,
+      payerId: userId,
+    });
+
+    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+    if (paymentBypass) {
+      return {
+        paymentId: payment.id,
+        tradeId,
+        amount: totalAmount,
+        paymentUrl: undefined,
+        paymentHtml: undefined,
+        provider,
+        expiresIn: 300,
+        useBypass: true,
+      };
+    }
+
+    // Build a virtual order-like object for PayTR initialization
+    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
+    const virtualOrder = {
+      id: tradeId,
+      orderNumber: `TRADE-${trade.tradeNumber}`,
+      totalAmount,
+      buyer: payer,
+      product: {
+        id: `trade-cash-${tradeId}`,
+        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
+      },
+      productId: `trade-cash-${tradeId}`,
+      shippingAddress: null,
+    };
+
+    try {
+      const result = await this.initializePayTRPayment(payment, virtualOrder, this.getClientIp(req));
+      return {
+        paymentId: payment.id,
+        paymentUrl: result.paymentUrl,
+        paymentHtml: result.paymentHtml,
+        provider,
+        expiresIn: 300,
+      };
+    } catch (error: any) {
+      // Mark payment as failed but don't release products (trade products are managed separately)
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.failed, failureReason: error.message || 'PayTR ödeme başlatılamadı' },
+      });
+      throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
+    }
+  }
+
+  /**
    * Common payment initiation logic for both authenticated and guest users
    */
   private async processPaymentInitiation(order: any, dto: InitiatePaymentDto, req?: Request) {
@@ -162,7 +296,28 @@ export class PaymentService {
     });
 
     if (existingPayment) {
-      // Return existing payment URL if still valid
+      // Eski hata mesajını temizle; kullanıcı yeni deneme yapıyor
+      if (existingPayment.failureReason) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: { failureReason: null },
+        });
+      }
+
+      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+      if (paymentBypassExisting) {
+        return {
+          paymentId: existingPayment.id,
+          orderId: dto.orderId,
+          amount: Number(order.totalAmount),
+          paymentUrl: undefined,
+          paymentHtml: undefined,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
+      }
+
       return {
         paymentId: existingPayment.id,
         paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
@@ -194,22 +349,28 @@ export class PaymentService {
     let paymentHtml: string | undefined;
     const clientIp = this.getClientIp(req);
 
-    // For Iyzico, use Direct API flow (no Hosted Checkout)
-    // Frontend will show CreditCardForm and call processDirect
+    // İyzico kaldırıldı – sadece PayTR kullanılıyor
     if (dto.provider === PaymentProvider.iyzico) {
-      // Don't initialize Hosted Checkout - just return paymentId
-      // Frontend will handle the card input and call /payments/process-direct
-      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      dto.provider = PaymentProvider.paytr;
+    }
+
+    // Ödeme bypass (test): PayTR çağrılmaz; tek kart başarılı, diğerleri başarısız
+    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+    if (paymentBypass) {
       return {
         paymentId: payment.id,
-        orderId: order.id,
+        orderId: dto.orderId,
         amount: Number(order.totalAmount),
+        paymentUrl: undefined,
+        paymentHtml: undefined,
         provider: dto.provider,
-        // No paymentUrl - frontend will show CreditCardForm
-        expiresIn: 600, // 10 minutes
+        expiresIn: 300,
+        useBypass: true,
       };
-    } else {
-      // PayTR - use existing flow
+    }
+
+    // PayTR flow
+    {
       const result = await this.initializePayTRPayment(payment, order, clientIp);
       return {
         paymentId: payment.id,
@@ -375,6 +536,9 @@ export class PaymentService {
   private async initializePayTRPayment(payment: any, order: any, clientIp: string) {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
+    // PayTR merchant_oid sadece harf ve rakam kabul ediyor (tire vb. kabul etmiyor)
+    const merchantOid = String(order.orderNumber || order.id).replace(/-/g, '');
+
     try {
       // Get shipping address from order
       const shippingAddress = order.shippingAddress as any;
@@ -407,7 +571,7 @@ export class PaymentService {
       // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
       const isMembershipOrder = order.productId?.startsWith?.('membership-');
       const result = await this.paytrService.processOrderPayment(
-        order.id,
+        merchantOid,
         Number(order.totalAmount),
         buyer,
         basketItems,
@@ -415,12 +579,12 @@ export class PaymentService {
         isMembershipOrder ? 'type=membership' : undefined,
       );
 
-      // Update payment with provider reference
+      // Update payment with provider reference (callback merchant_oid ile eşleşmesi için aynı değer)
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
           providerPaymentId: result.token,
-          providerConversationId: order.id,
+          providerConversationId: merchantOid,
         },
       });
 
@@ -432,7 +596,13 @@ export class PaymentService {
     } catch (error: any) {
       this.logger.error(`PayTR initialization error: ${error.message}`, error.stack);
 
-      // Don't fallback - throw error so user knows payment failed
+      // Ödeme hiç başlamadı ama sipariş oluştuğu için ürün rezerve kaldı – hemen serbest bırak (stoktan düşmesin)
+      try {
+        await this.processFailedPayment(payment, error?.message || 'PayTR ödeme başlatılamadı');
+      } catch (releaseErr: any) {
+        this.logger.warn(`Release product after PayTR init error failed: ${releaseErr?.message}`);
+      }
+
       throw new BadRequestException(
         error.message || 'PayTR ödeme başlatılamadı',
       );
@@ -444,6 +614,12 @@ export class PaymentService {
    * Supports saved cards (cardToken) or new card entry
    */
   async processDirectPayment(dto: DirectPaymentDto, userId: string, req?: Request) {
+    // Optional CVV-based bypass for testing:
+    // - CVV "000" => force success (no gateway call)
+    // - CVV "001" => force failure (no gateway call)
+    const cvvBypassFlag = this.configService.get('PAYMENT_CVV_BYPASS_ENABLED');
+    const isCvvBypassEnabled = cvvBypassFlag !== 'false' && cvvBypassFlag !== '0';
+
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
       include: {
@@ -511,6 +687,104 @@ export class PaymentService {
       address,
       zipCode: shippingAddress?.zipCode || '34000',
     };
+
+    // ==========================================================================
+    // CVV BYPASS (test helper)
+    // ==========================================================================
+    if (isCvvBypassEnabled && dto.card?.cvc) {
+      const cvv = String(dto.card.cvc).trim();
+
+      // Success bypass: CVV === "000"
+      if (cvv === '000') {
+        // Reload payment with order relations required by processSuccessfulPayment
+        const paymentWithOrder = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          include: {
+            order: {
+              include: {
+                buyer: true,
+                seller: true,
+                product: true,
+              },
+            },
+          },
+        });
+
+        if (!paymentWithOrder) {
+          throw new NotFoundException('Ödeme bulunamadı');
+        }
+
+        await this.processSuccessfulPayment(paymentWithOrder, 'TEST_CVV_000');
+
+        const frontendUrl =
+          this.configService.get('FRONTEND_URL') ||
+          (this.configService.get('NODE_ENV') === 'production'
+            ? 'https://tarodan.com'
+            : 'http://localhost:3000');
+
+        const guestParam = isGuestOrder ? '&guest=true' : '';
+        const successUrl = `${frontendUrl}/payment/success?orderId=${order.id}&paymentId=${paymentWithOrder.id}${guestParam}&debug=cvv-000-bypass`;
+
+        const html = `
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${successUrl}" />
+    <title>Ödeme Başarılı</title>
+  </head>
+  <body>
+    <p>Ödemeniz test modu (CVV 000) ile başarılı kabul edildi. Yönlendiriliyorsunuz...</p>
+    <script>window.location.href = ${JSON.stringify(successUrl)};</script>
+  </body>
+</html>`;
+
+        return {
+          status: 'success',
+          htmlContent: Buffer.from(html).toString('base64'),
+          isBase64: true,
+          paymentId: paymentWithOrder.id,
+        };
+      }
+
+      // Failure bypass: CVV === "001"
+      if (cvv === '001') {
+        await this.processFailedPayment(payment, 'TEST_CVV_001');
+
+        const frontendUrl =
+          this.configService.get('FRONTEND_URL') ||
+          (this.configService.get('NODE_ENV') === 'production'
+            ? 'https://tarodan.com'
+            : 'http://localhost:3000');
+
+        const guestParam = isGuestOrder ? '&guest=true' : '';
+        const failUrl = `${frontendUrl}/payment/fail?paymentId=${payment.id}&orderId=${order.id}${guestParam}&error=${encodeURIComponent(
+          'TEST_CVV_001',
+        )}&debug=cvv-001-bypass`;
+
+        const html = `
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${failUrl}" />
+    <title>Ödeme Başarısız</title>
+  </head>
+  <body>
+    <p>Ödemeniz test modu (CVV 001) ile başarısız kabul edildi. Yönlendiriliyorsunuz...</p>
+    <script>window.location.href = ${JSON.stringify(failUrl)};</script>
+  </body>
+</html>`;
+
+        return {
+          status: 'error',
+          htmlContent: Buffer.from(html).toString('base64'),
+          isBase64: true,
+          paymentId: payment.id,
+          message: 'TEST_CVV_001',
+        };
+      }
+    }
 
     // Callback URL: bank/iyzico POSTs here after 3DS. Must be backend so we can call complete3DSecure and redirect.
     const apiBaseUrl = this.configService.get('API_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://api.tarodan.com' : 'http://localhost:3001');
@@ -956,7 +1230,7 @@ export class PaymentService {
       throw new BadRequestException('Invalid hash');
     }
 
-    // Find payment by order ID (merchant_oid is the order ID)
+    // Find payment by order ID or trade reference (merchant_oid is the order ID or trade reference)
     const payment = await this.prisma.payment.findFirst({
       where: {
         OR: [
@@ -972,6 +1246,7 @@ export class PaymentService {
             product: true,
           },
         },
+        tradeCashPayment: true,
       },
     });
 
@@ -987,6 +1262,7 @@ export class PaymentService {
               product: true,
             },
           },
+          tradeCashPayment: true,
         },
       });
 
@@ -1103,6 +1379,11 @@ export class PaymentService {
    * Requirement: Queue job publishing after payment (3.1)
    */
   private async processSuccessfulPayment(payment: any, transactionId?: string) {
+    // Trade cash payment: different flow from order payments
+    if (payment.tradeCashPaymentId && !payment.orderId) {
+      return this.processSuccessfulTradeCashPayment(payment, transactionId);
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
 
@@ -1145,7 +1426,8 @@ export class PaymentService {
       });
 
       // Check if this is a membership order (productId starts with "membership-")
-      const isMembershipOrder = payment.order.productId.startsWith('membership-');
+      const isMembershipOrder = payment.order?.productId?.startsWith('membership-') ?? false;
+      const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
         // Activate membership for the buyer
@@ -1237,8 +1519,8 @@ export class PaymentService {
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
       } else {
-        // Regular product order - update product status to SOLD
-        // Note: quantity was already decremented when order was created
+        // Regular product order - update product status to SOLD and decrement stock (stock is only decremented on payment success, not at order creation)
+        productIdsToInvalidate.push(payment.order.productId);
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
         });
@@ -1247,13 +1529,16 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
-        // Update product status to SOLD
-        // If stock is 0, set product to inactive instead
+        // Stok ödeme anında düşer; rezervasyon da kalkar (adet bazlı)
+        const newQuantity =
+          product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
-          status: product.quantity !== null && product.quantity === 0
-            ? ProductStatus.inactive
-            : ProductStatus.sold
+          status: getProductStatusFromQuantity(newQuantity),
+          reservedQuantity: { decrement: 1 },
         };
+        if (product.quantity !== null) {
+          updateData.quantity = { decrement: 1 };
+        }
 
         await tx.product.update({
           where: { id: payment.order.productId },
@@ -1295,29 +1580,30 @@ export class PaymentService {
               },
             });
 
-            // Get all products involved in these cancelled trades
+            // Adet bazlı: iptal edilen takaslardaki ürünlerin reservedQuantity'sini düşür
             const allTradeItems = await tx.tradeItem.findMany({
               where: {
                 tradeId: { in: activeTrades.map((t) => t.id) },
               },
-              select: { productId: true },
-              distinct: ['productId'],
+              select: { productId: true, quantity: true },
             });
 
-            const productIdsToRestore = allTradeItems
-              .map((item) => item.productId)
-              .filter((id) => id !== payment.order.productId); // Don't restore the sold product
-
-            // Restore products from cancelled trades to active status
-            // (except the one that was just sold)
-            // Only restore products that were reserved (from accepted trades)
-            if (productIdsToRestore.length > 0) {
-              await tx.product.updateMany({
-                where: {
-                  id: { in: productIdsToRestore },
-                  status: ProductStatus.reserved, // Only restore if they were reserved
+            const restoreByProduct = new Map<string, number>();
+            for (const item of allTradeItems) {
+              if (item.productId === payment.order.productId) continue;
+              restoreByProduct.set(
+                item.productId,
+                (restoreByProduct.get(item.productId) ?? 0) + item.quantity,
+              );
+            }
+            for (const [productId, qty] of restoreByProduct) {
+              productIdsToInvalidate.push(productId);
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: { decrement: qty },
+                  status: ProductStatus.active,
                 },
-                data: { status: ProductStatus.active },
               });
             }
 
@@ -1367,41 +1653,46 @@ export class PaymentService {
         this.logger.log(`Membership payment ${payment.id} completed, no hold needed`);
       }
 
-      return order;
+      return { order, productIdsToInvalidate };
     });
+
+    const resultOrder = result.order;
+    for (const productId of result.productIdsToInvalidate) {
+      await this.cache.del(`products:detail:${productId}`);
+    }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
     // This publishes jobs to email, push, and shipping queues
-    const isMembershipOrder = result.productId.startsWith('membership-');
+    const isMembershipOrder = resultOrder.productId.startsWith('membership-');
 
     if (!isMembershipOrder) {
       try {
-        const shippingAddressData = result.shippingAddress as any;
+        const shippingAddressData = resultOrder.shippingAddress as any;
 
         // Check if this is a guest order and get actual buyer info
-        const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+        const isGuestOrder = resultOrder.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
-          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || result.buyer.email)
-          : result.buyer.email;
+          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || resultOrder.buyer.email)
+          : resultOrder.buyer.email;
         const actualBuyerName = isGuestOrder
           ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
-          : (result.buyer.displayName || result.buyer.email);
+          : (resultOrder.buyer.displayName || resultOrder.buyer.email);
 
         this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
 
         await this.eventService.emitOrderPaid({
-          orderId: result.id,
-          orderNumber: result.orderNumber,
-          buyerId: result.buyerId,
-          sellerId: result.sellerId,
-          productId: result.productId,
-          productTitle: result.product.title,
-          totalAmount: Number(result.totalAmount),
-          commissionAmount: Number(result.commissionAmount),
+          orderId: resultOrder.id,
+          orderNumber: resultOrder.orderNumber,
+          buyerId: resultOrder.buyerId,
+          sellerId: resultOrder.sellerId,
+          productId: resultOrder.productId,
+          productTitle: resultOrder.product.title,
+          totalAmount: Number(resultOrder.totalAmount),
+          commissionAmount: Number(resultOrder.commissionAmount),
           buyerEmail: actualBuyerEmail,
           buyerName: actualBuyerName,
-          sellerEmail: result.seller.email,
-          sellerName: result.seller.displayName || result.seller.email,
+          sellerEmail: resultOrder.seller.email,
+          sellerName: resultOrder.seller.displayName || resultOrder.seller.email,
           paymentMethod: payment.provider,
           transactionId: transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
@@ -1413,10 +1704,10 @@ export class PaymentService {
             zipCode: shippingAddressData?.zipCode || '',
           },
           isGuestOrder,
-          buyerSystemEmail: result.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || '',
         });
 
-        this.logger.log(`order.paid event emitted for order ${result.orderNumber}`);
+        this.logger.log(`order.paid event emitted for order ${resultOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail - payment was already successful
         this.logger.error(`Failed to emit order.paid event: ${error}`);
@@ -1426,12 +1717,57 @@ export class PaymentService {
     // Generate and send invoice to buyer (only for regular product orders, not membership)
     if (!isMembershipOrder) {
       try {
-        await this.invoiceService.generateAndSendInvoice(result.id);
-        this.logger.log(`Invoice generated and sent for order ${result.orderNumber}`);
+        await this.invoiceService.generateAndSendInvoice(resultOrder.id);
+        this.logger.log(`Invoice generated and sent for order ${resultOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail - payment was already successful
-        this.logger.error(`Failed to generate invoice for order ${result.orderNumber}: ${error}`);
+        this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
       }
+    }
+  }
+
+  /**
+   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır (adet bazlı), siparişi iptal et.
+   */
+  private async releaseProductForFailedPayment(orderId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, productId: true },
+      });
+      if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
+
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+        select: { reservedQuantity: true, status: true },
+      });
+      const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
+      if (product) {
+        const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+        updateData.reservedQuantity = newReserved;
+        if (product.status === ProductStatus.reserved) {
+          updateData.status = ProductStatus.active;
+        }
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.cancelled },
+        }),
+        ...(product && Object.keys(updateData).length > 0
+          ? [
+              this.prisma.product.update({
+                where: { id: order.productId },
+                data: updateData,
+              }),
+            ]
+          : []),
+      ]);
+      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released (reservation decremented) after payment failure`);
+      await this.cache.del(`products:detail:${order.productId}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
     }
   }
 
@@ -1449,6 +1785,17 @@ export class PaymentService {
       },
     });
 
+    // Trade cash payments don't have order/product to release
+    if (payment.tradeCashPaymentId && !payment.orderId) {
+      this.logger.warn(`Trade cash payment ${payment.id} failed: ${reason}`);
+      return;
+    }
+
+    // Siparişi iptal et ve ürünü tekrar satışa aç (ilanlar listesinde görünsün)
+    if (payment.orderId) {
+      await this.releaseProductForFailedPayment(payment.orderId);
+    }
+
     // Log payment failure
     await this.logPaymentAction('failed', payment.id, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
       reason,
@@ -1458,32 +1805,62 @@ export class PaymentService {
 
     // Emit payment.failed event
     try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: payment.orderId },
-        include: {
-          buyer: { select: { id: true, email: true, displayName: true } },
-        },
-      });
-
-      if (order) {
-        await this.eventService.emitPaymentFailed({
-          paymentId: payment.id,
-          orderId: payment.orderId,
-          orderNumber: order.orderNumber,
-          buyerId: order.buyerId,
-          buyerEmail: order.buyer.email,
-          buyerName: order.buyer.displayName || order.buyer.email,
-          amount: Number(payment.amount),
-          provider: payment.provider,
-          failureReason: reason,
+      if (payment.orderId) {
+        const order = await this.prisma.order.findUnique({
+          where: { id: payment.orderId },
+          include: {
+            buyer: { select: { id: true, email: true, displayName: true } },
+          },
         });
 
-        this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
+        if (order) {
+          await this.eventService.emitPaymentFailed({
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            orderNumber: order.orderNumber,
+            buyerId: order.buyerId,
+            buyerEmail: order.buyer.email,
+            buyerName: order.buyer.displayName || order.buyer.email,
+            amount: Number(payment.amount),
+            provider: payment.provider,
+            failureReason: reason,
+          });
+
+          this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
+        }
       }
     } catch (error) {
       // Log but don't fail - payment was already marked as failed
       this.logger.error(`Failed to emit payment.failed event: ${error}`);
     }
+  }
+
+  /**
+   * Handle successful trade cash payment separately from order payments.
+   * Updates TradeCashPayment status to completed; does NOT touch orders/products.
+   */
+  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.completed,
+          providerPaymentId: transactionId || payment.providerPaymentId,
+          paidAt: new Date(),
+        },
+      });
+
+      await tx.tradeCashPayment.update({
+        where: { id: payment.tradeCashPaymentId },
+        data: {
+          status: PaymentStatus.completed,
+          providerPaymentId: transactionId || payment.providerPaymentId,
+          paidAt: new Date(),
+        },
+      });
+    });
+
+    this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
   }
 
   /**
@@ -1518,8 +1895,39 @@ export class PaymentService {
       throw new BadRequestException('Sadece başarısız ödemeler tekrar denenebilir');
     }
 
-    // Verify order is still in pending_payment status
-    if (payment.order.status !== OrderStatus.pending_payment) {
+    const order = payment.order;
+    const wasCancelled = order.status === OrderStatus.cancelled;
+
+    // Sipariş iptal edilmişse (ödeme başarısız sonrası): ürün hâlâ aktifse siparişi yeniden açıp rezerve et
+    if (wasCancelled && order.productId) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+      });
+      if (!product || product.status !== ProductStatus.active) {
+        throw new BadRequestException(
+          'Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.',
+        );
+      }
+      await this.prisma.$transaction([
+        this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.pending_payment },
+        }),
+        this.prisma.product.update({
+          where: { id: order.productId },
+          data: { status: ProductStatus.reserved },
+        }),
+      ]);
+      // Reload order with relations for payment init
+      (payment as any).order = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        include: {
+          buyer: true,
+          seller: true,
+          product: true,
+        },
+      });
+    } else if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException('Sipariş durumu ödeme tekrarına uygun değil');
     }
 
@@ -1549,6 +1957,22 @@ export class PaymentService {
       newPaymentId: newPayment.id,
       userId,
     });
+
+    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+    if (paymentBypass) {
+      this.logger.log(`Payment ${paymentId} retried (bypass), new payment ${newPayment.id}`);
+      return {
+        success: true,
+        paymentId: payment.id,
+        newPaymentId: newPayment.id,
+        orderId: payment.orderId,
+        paymentUrl: undefined,
+        paymentHtml: undefined,
+        provider: payment.provider,
+        expiresIn: 300,
+        useBypass: true,
+      };
+    }
 
     // Generate payment URL based on provider
     let paymentUrl: string;
@@ -1620,6 +2044,9 @@ export class PaymentService {
       },
     });
 
+    // Siparişi iptal et ve ürünü tekrar satışa aç
+    await this.releaseProductForFailedPayment(payment.orderId);
+
     this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
 
     // Log payment cancellation
@@ -1653,6 +2080,23 @@ export class PaymentService {
       paymentId: payment.id,
       message: 'Ödeme başarıyla iptal edildi',
     };
+  }
+
+  /**
+   * Kullanıcı ödeme fail sayfasına geldiğinde çağrılır. PayTR callback bazen ulaşmayabiliyor;
+   * bu endpoint ile ürün rezervasyonu hemen serbest bırakılır (ilan tekrar listelerde görünür).
+   * Sadece status=pending ise işlem yapılır; idempotent.
+   */
+  async confirmFailedFromClient(paymentId: string): Promise<{ released: boolean }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { order: { select: { id: true } } },
+    });
+    if (!payment || payment.status !== PaymentStatus.pending) {
+      return { released: false };
+    }
+    await this.processFailedPayment(payment, 'Fail sayfasından onay - rezervasyon serbest bırakıldı');
+    return { released: true };
   }
 
   /**
@@ -1887,7 +2331,20 @@ export class PaymentService {
           select: {
             buyerId: true,
             sellerId: true,
+            productId: true,
             shippingAddress: true,
+            totalAmount: true,
+            shippingCost: true,
+            buyerFeeAmount: true,
+            sellerFeeAmount: true,
+            commissionAmount: true,
+          },
+        },
+        tradeCashPayment: {
+          select: {
+            payerId: true,
+            recipientId: true,
+            tradeId: true,
           },
         },
       },
@@ -1897,22 +2354,67 @@ export class PaymentService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
+    const useBypass =
+      (this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1') &&
+      payment.status === PaymentStatus.pending;
+
+    // Trade cash payment (no order)
+    if (!payment.order && payment.tradeCashPayment) {
+      if (userId && payment.tradeCashPayment.payerId !== userId && payment.tradeCashPayment.recipientId !== userId) {
+        throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+      }
+      return {
+        id: payment.id,
+        orderId: null,
+        tradeId: payment.tradeCashPayment.tradeId,
+        status: payment.status,
+        amount: Number(payment.amount),
+        currency: payment.currency,
+        provider: payment.provider,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt,
+        ...(useBypass && { useBypass: true }),
+      };
+    }
+
+    if (!payment.order) {
+      throw new NotFoundException('Ödeme ile ilişkili sipariş veya takas bulunamadı');
+    }
+
     // Check if this is a guest order
     const shippingAddress = payment.order.shippingAddress as any;
     const isGuestOrder = shippingAddress?.isGuestOrder === true;
 
     // Validate access
     if (userId) {
-      // Authenticated user - must be buyer or seller
       if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
         throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
       }
     } else {
-      // Guest user - order must be a guest order
       if (!isGuestOrder) {
         throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
       }
     }
+
+    const totalAmount = Number(payment.order.totalAmount ?? 0);
+    const shippingCost = Number(payment.order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(payment.order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(payment.order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(payment.order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
+    const isMembershipOrder = payment.order.productId?.startsWith?.('membership-') ?? false;
 
     return {
       id: payment.id,
@@ -1921,9 +2423,52 @@ export class PaymentService {
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
+      pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
+      ...(useBypass && { useBypass: true }),
+      ...(isMembershipOrder && { isMembershipOrder: true }),
     };
+  }
+
+  /**
+   * Test bypass: belirtilen kart numarası başarılı, diğerleri başarısız (PAYMENT_BYPASS=true iken)
+   */
+  async bypassComplete(paymentId: string, cardNumber: string): Promise<{ success: boolean }> {
+    if (this.configService.get('PAYMENT_BYPASS') !== 'true' && this.configService.get('PAYMENT_BYPASS') !== '1') {
+      throw new BadRequestException('Bypass modu kapalı');
+    }
+
+    const normalized = cardNumber.replace(/\D/g, '');
+    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '0000000000000000').replace(/\D/g, '');
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
+          },
+        },
+        tradeCashPayment: true,
+      },
+    });
+
+    if (!payment) throw new NotFoundException('Ödeme bulunamadı');
+    if (payment.status !== PaymentStatus.pending) {
+      return { success: payment.status === PaymentStatus.completed };
+    }
+
+    if (normalized === successCard) {
+      const transactionRef = payment.order?.orderNumber || payment.orderId || payment.tradeCashPaymentId || payment.id;
+      await this.processSuccessfulPayment(payment, transactionRef);
+      return { success: true };
+    }
+
+    await this.processFailedPayment(payment, 'Test kartı geçersiz (bypass: sadece belirlenen kart başarılı)');
+    return { success: false };
   }
 
   /**
@@ -1965,6 +2510,24 @@ export class PaymentService {
       throw new ForbiddenException('Bu ödemeyi görüntüleme yetkiniz yok');
     }
 
+    const totalAmount = Number(payment.order.totalAmount ?? 0);
+    const shippingCost = Number(payment.order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(payment.order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(payment.order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(payment.order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
     return {
       id: payment.id,
       orderId: payment.orderId,
@@ -1973,6 +2536,7 @@ export class PaymentService {
       provider: payment.provider,
       status: payment.status,
       providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
+      pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     };
@@ -2257,12 +2821,86 @@ export class PaymentService {
   }
 
   /**
+   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 10) içinde ödenmezse
+   * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
+   */
+  async releaseExpiredOrderReservations(): Promise<{ count: number }> {
+    const timeoutMinutes = parseInt(
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      10,
+    );
+    const cutoff = new Date();
+    cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
+
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.pending_payment,
+        createdAt: { lt: cutoff },
+        offerId: null, // Tekliften gelen siparişleri otomatik iptal etme; sadece sepetteki ödeme bekleyen siparişler
+      },
+      select: { id: true, productId: true, orderNumber: true },
+    });
+
+    let released = 0;
+    for (const order of expiredOrders) {
+      if (!order.productId) continue; // productId yoksa atla (Prisma'da not: null hataya yol açıyor)
+      try {
+        const product = await this.prisma.product.findUnique({
+          where: { id: order.productId },
+          select: { reservedQuantity: true, status: true },
+        });
+        const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
+        if (product) {
+          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+          updateData.reservedQuantity = newReserved;
+          if (product.status === ProductStatus.reserved) {
+            updateData.status = ProductStatus.active;
+          }
+        }
+        await this.prisma.$transaction([
+          this.prisma.order.update({
+            where: { id: order.id },
+            data: { status: OrderStatus.cancelled },
+          }),
+          ...(product && Object.keys(updateData).length > 0
+            ? [
+                this.prisma.product.update({
+                  where: { id: order.productId },
+                  data: updateData,
+                }),
+              ]
+            : []),
+        ]);
+        const pendingPayment = await this.prisma.payment.findFirst({
+          where: { orderId: order.id, status: PaymentStatus.pending },
+          select: { id: true },
+        });
+        if (pendingPayment) {
+          await this.prisma.payment.update({
+            where: { id: pendingPayment.id },
+            data: {
+              status: PaymentStatus.failed,
+              failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
+            },
+          });
+        }
+        await this.cache.del(`products:detail:${order.productId}`);
+        released++;
+        this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
+      } catch (error: any) {
+        this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
+      }
+    }
+    return { count: released };
+  }
+
+  /**
    * Cancel expired pending payments
    * Called by scheduler to automatically cancel payments older than timeout period
    */
   async cancelExpiredPayments() {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '15',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
       10,
     );
     const timeoutDate = new Date();
@@ -2297,6 +2935,9 @@ export class PaymentService {
             failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
           },
         });
+
+        // Siparişi iptal et ve ürünü tekrar satışa aç
+        await this.releaseProductForFailedPayment(payment.orderId);
 
         // Emit payment.failed event
         try {

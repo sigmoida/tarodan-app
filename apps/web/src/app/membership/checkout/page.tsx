@@ -12,9 +12,16 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi, api } from '@/lib/api';
+import { membershipApi, api, paymentsApi } from '@/lib/api';
 
 const TIER_FEATURES: Record<string, string[]> = {
+  basic: [
+    '50 ilan limiti',
+    '6 resim/ilan',
+    'Takas yapma',
+    'Koleksiyonlar',
+    '2 öne çıkan ilan',
+  ],
   premium: [
     'Sınırsız aktif ilan',
     '15 resim/ilan',
@@ -43,7 +50,7 @@ export default function MembershipCheckoutPage() {
   const required = searchParams.get('required') === 'true';
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
+  const paymentMethod = 'card';
   const [cardData, setCardData] = useState({
     number: '',
     name: '',
@@ -52,6 +59,8 @@ export default function MembershipCheckoutPage() {
   });
   const [agreed, setAgreed] = useState(false);
   const [membershipPrices, setMembershipPrices] = useState<{
+    basic_monthly_price?: number;
+    basic_yearly_price?: number;
     premium_monthly_price?: number;
     premium_yearly_price?: number;
     business_monthly_price?: number;
@@ -87,6 +96,8 @@ export default function MembershipCheckoutPage() {
         };
         
         setMembershipPrices({
+          basic_monthly_price: sanitizePrice(settings.basic_monthly_price, 49),
+          basic_yearly_price: sanitizePrice(settings.basic_yearly_price, 490),
           premium_monthly_price: sanitizePrice(settings.premium_monthly_price, 99),
           premium_yearly_price: sanitizePrice(settings.premium_yearly_price, 960),
           business_monthly_price: sanitizePrice(settings.business_monthly_price, 499),
@@ -95,8 +106,9 @@ export default function MembershipCheckoutPage() {
         });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error('Failed to fetch prices:', error);
-        // Use defaults if API fails
         setMembershipPrices({
+          basic_monthly_price: 49,
+          basic_yearly_price: 490,
           premium_monthly_price: 99,
           premium_yearly_price: 960,
           business_monthly_price: 499,
@@ -117,12 +129,17 @@ export default function MembershipCheckoutPage() {
   // Get tier info dynamically
   const getTierInfo = () => {
     const tierNames: Record<string, string> = {
+      basic: 'Temel Üyelik',
       premium: 'Premium Üyelik',
       business: 'İş Üyeliği',
     };
     
     let basePrice: number;
-    if (tier === 'premium') {
+    if (tier === 'basic') {
+      basePrice = period === 'monthly'
+        ? (membershipPrices.basic_monthly_price ?? 49)
+        : (membershipPrices.basic_yearly_price ?? 490);
+    } else if (tier === 'premium') {
       basePrice = period === 'monthly' 
         ? (membershipPrices.premium_monthly_price ?? 99)
         : (membershipPrices.premium_yearly_price ?? 960);
@@ -138,13 +155,13 @@ export default function MembershipCheckoutPage() {
       name: tierNames[tier],
       price: basePrice,
       features: TIER_FEATURES[tier] || [],
-      basePrice: period === 'monthly' ? basePrice : (tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
+      basePrice: period === 'monthly' ? basePrice : (tier === 'basic' ? (membershipPrices.basic_monthly_price ?? 49) : tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
     };
   };
 
   const tierInfo = getTierInfo();
   
-  if (!tierInfo || !['premium', 'business'].includes(tier)) {
+  if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -225,7 +242,28 @@ export default function MembershipCheckoutPage() {
           return;
         }
       } else if (paymentId) {
-        // Redirect to payment page (type=membership so success shows membership page, not order)
+        // Bypass modundaysa kart zaten bu sayfada girildi; ara ödeme sayfasına göndermeden burada tamamla
+        try {
+          const statusRes = await paymentsApi.getStatusLight(paymentId);
+          if (statusRes.data?.useBypass) {
+            const cardNumber = cardData.number.replace(/\D/g, '');
+            if (cardNumber) {
+              const bypassRes = await paymentsApi.bypassComplete(paymentId, cardNumber);
+              if (bypassRes.data?.success) {
+                toast.success('Üyelik ödemesi başarılı!');
+                await refreshUserData();
+                window.location.href = '/membership/success';
+                return;
+              } else {
+                toast.error('Ödeme başarısız oldu');
+                setIsProcessing(false);
+                return;
+              }
+            }
+          }
+        } catch (bypassErr: any) {
+          if (process.env.NODE_ENV === 'development') console.error('Bypass check error:', bypassErr);
+        }
         router.push(`/payment/${paymentId}?type=membership`);
         return;
       } else {
@@ -273,121 +311,66 @@ export default function MembershipCheckoutPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Payment Method */}
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Ödeme Yöntemi</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                  Kart Bilgileri
+                </h2>
                 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      paymentMethod === 'card'
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <CreditCardIcon className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-                    <p className="font-medium text-gray-900">Kredi/Banka Kartı</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('bank')}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      paymentMethod === 'bank'
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <svg className="w-8 h-8 mx-auto mb-2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <p className="font-medium text-gray-900">Havale/EFT</p>
-                  </button>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Kart Numarası
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.number}
+                      onChange={(e) => setCardData({ ...cardData, number: formatCardNumber(e.target.value) })}
+                      placeholder="0000 0000 0000 0000"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      maxLength={19}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Kart Üzerindeki İsim
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.name}
+                      onChange={(e) => setCardData({ ...cardData, name: e.target.value.toUpperCase() })}
+                      placeholder="AD SOYAD"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Son Kullanma Tarihi
+                      </label>
+                      <input
+                        type="text"
+                        value={cardData.expiry}
+                        onChange={(e) => setCardData({ ...cardData, expiry: formatExpiry(e.target.value) })}
+                        placeholder="AA/YY"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        maxLength={5}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        CVV
+                      </label>
+                      <input
+                        type="text"
+                        value={cardData.cvv}
+                        onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                        placeholder="000"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        maxLength={4}
+                      />
+                    </div>
+                  </div>
                 </div>
-
-                {paymentMethod === 'card' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Kart Numarası
-                      </label>
-                      <input
-                        type="text"
-                        value={cardData.number}
-                        onChange={(e) => setCardData({ ...cardData, number: formatCardNumber(e.target.value) })}
-                        placeholder="0000 0000 0000 0000"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        maxLength={19}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Kart Üzerindeki İsim
-                      </label>
-                      <input
-                        type="text"
-                        value={cardData.name}
-                        onChange={(e) => setCardData({ ...cardData, name: e.target.value.toUpperCase() })}
-                        placeholder="AD SOYAD"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Son Kullanma Tarihi
-                        </label>
-                        <input
-                          type="text"
-                          value={cardData.expiry}
-                          onChange={(e) => setCardData({ ...cardData, expiry: formatExpiry(e.target.value) })}
-                          placeholder="AA/YY"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          maxLength={5}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          CVV
-                        </label>
-                        <input
-                          type="text"
-                          value={cardData.cvv}
-                          onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                          placeholder="000"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          maxLength={4}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === 'bank' && (
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <h3 className="font-semibold text-gray-900 mb-4">Havale/EFT Bilgileri</h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Banka:</span>
-                        <span className="font-medium">Ziraat Bankası</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Şube:</span>
-                        <span className="font-medium">İstanbul / Kadıköy</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hesap Adı:</span>
-                        <span className="font-medium">Tarodan Teknoloji A.Ş.</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">IBAN:</span>
-                        <span className="font-mono font-medium">TR00 0000 0000 0000 0000 0000 00</span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-amber-600 mt-4">
-                      ⚠️ Havale açıklamasına kullanıcı adınızı ({user?.displayName}) yazmayı unutmayın.
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Terms */}

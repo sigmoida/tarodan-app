@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   Inject,
   forwardRef,
   Logger,
@@ -13,12 +14,14 @@ import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
+import { buildProductWhere } from './helpers/build-product-where';
+import { fulltextProductSearch } from './helpers/fulltext-search';
+import { getAvailableQuantity } from './helpers/product-availability.helper';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -38,7 +41,6 @@ export class ProductService implements OnModuleInit {
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
-    private readonly searchIndexing: SearchIndexingService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
@@ -147,77 +149,103 @@ export class ProductService implements OnModuleInit {
       ? new Date(dto.year, 0, 1)
       : undefined;
 
-    const product = await this.prisma.product.create({
-      data: {
-        sellerId,
-        categoryId: dto.categoryId,
-        title: dto.title,
-        description: dto.description,
-        price: dto.price,
-        condition: dto.condition,
-        status: ProductStatus.pending, // Needs admin approval
-        quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
-        isTradeEnabled: dto.isTradeEnabled || false,
-        isPreorder: dto.isPreorder ?? false,
-        isSet: dto.isSet ?? false,
-        brandId: dto.brandId,
-        carModelId: dto.carModelId,
-        releaseDate,
-        images: dto.images?.length
-          ? {
-            create: dto.images.map((img, index) => ({
-              cardKey: img.cardKey,
-              detailKey: img.detailKey,
-              sortOrder: index,
-            })),
-          }
-          : undefined,
-      },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            sellerType: true,
+    // Normalize optional UUIDs: empty string causes Prisma FK error → use undefined
+    const brandId = dto.brandId?.trim() || undefined;
+    const carModelId = dto.carModelId?.trim() || undefined;
+    const manufacturerId = dto.manufacturerId?.trim() || undefined;
+
+    try {
+      const product = await this.prisma.product.create({
+        data: {
+          sellerId,
+          categoryId: dto.categoryId,
+          title: dto.title,
+          description: dto.description,
+          price: dto.price,
+          condition: dto.condition,
+          status: ProductStatus.pending, // Needs admin approval
+          quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
+          isTradeEnabled: dto.isTradeEnabled || false,
+          isPreorder: dto.isPreorder ?? false,
+          isSet: dto.isSet ?? false,
+          brandId,
+          carModelId,
+          manufacturerId,
+          releaseDate,
+          images: dto.images?.length
+            ? {
+              create: dto.images.map((img, index) => ({
+                cardKey: img.cardKey,
+                detailKey: img.detailKey,
+                sortOrder: index,
+              })),
+            }
+            : undefined,
+        },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' } },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              sellerType: true,
+            },
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
           },
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
-
-    // Link scale and material (attributes) so they show on detail and in filters
-    await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
-
-    // Invalidate product list cache
-    await this.cache.delPattern('products:list:*');
-
-    // Index to Elasticsearch (async, only if status is active)
-    if (product.status === ProductStatus.active) {
-      this.searchIndexing.queueIndexProduct(product.id).catch(() => {
-        this.logger.warn('Failed to queue product index for Elasticsearch');
       });
-    }
 
-    const productWithAttrs = await this.prisma.product.findUnique({
-      where: { id: product.id },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        brand: { select: { id: true, name: true, slug: true } },
-        carModel: { select: { id: true, name: true, slug: true } },
-        productAttributes: { include: { attribute: { include: { group: true } } } },
-      },
-    });
-    return await this.formatProductResponse(productWithAttrs);
+      // Link scale and material (attributes) so they show on detail and in filters
+      await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
+
+      // Invalidate product list cache
+      await this.cache.delPattern('products:list:*');
+
+      const productWithAttrs = await this.prisma.product.findUnique({
+        where: { id: product.id },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' } },
+          seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+          category: { select: { id: true, name: true, slug: true } },
+          brand: { select: { id: true, name: true, slug: true } },
+          carModel: { select: { id: true, name: true, slug: true } },
+          productAttributes: { include: { attribute: { include: { group: true } } } },
+        },
+      });
+
+      if (!productWithAttrs) {
+        throw new BadRequestException('Ürün oluşturuldu ancak yüklenemedi. Lütfen tekrar deneyin.');
+      }
+      return await this.formatProductResponse(productWithAttrs);
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === 'P2003') {
+        throw new BadRequestException(
+          'Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.'
+        );
+      }
+      if (code === 'P2002') {
+        throw new BadRequestException('Bu ürün zaten mevcut veya benzersiz alan çakışması var.');
+      }
+      // Zaten HTTP exception ise (400, 403 vb.) aynen fırlat
+      if (err?.status && err?.status >= 400 && err?.status < 500) {
+        throw err;
+      }
+      // Diğer hataları logla ve 500 döndür (mesajda development'ta detay göster)
+      this.logger.error('Product create failed', err?.stack || err?.message || err);
+      const message =
+        process.env.NODE_ENV === 'development' && err?.message
+          ? `İlan oluşturulamadı: ${err.message}`
+          : 'İlan oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.';
+      throw new InternalServerErrorException(message);
+    }
   }
 
   /**
@@ -232,9 +260,20 @@ export class ProductService implements OnModuleInit {
     const toLink: string[] = [];
 
     if (scale?.trim()) {
-      const scaleNorm = scale.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" or "1/64" -> "164"
+      const scaleTrim = scale.trim();
+      const scaleNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" or "1/64" -> "164"
+      const scaleSlugAlt = scaleTrim.replace(':', '-'); // "1:64" -> "1-64" (seed format)
       const scaleAttr = await this.prisma.attribute.findFirst({
-        where: { group: { slug: 'scale' }, slug: scaleNorm, isActive: true },
+        where: {
+          group: { slug: 'scale', isActive: true },
+          isActive: true,
+          OR: [
+            { slug: scaleNorm },
+            { slug: scaleSlugAlt },
+            { value: scaleTrim },
+            { displayValue: scaleTrim },
+          ],
+        },
         select: { id: true },
       });
       if (scaleAttr) toLink.push(scaleAttr.id);
@@ -295,7 +334,7 @@ export class ProductService implements OnModuleInit {
       condition, brand, brandId, manufacturerId,
       scale, material: materialSlug,
       tradeOnly, discountOnly, preOrder, limited,
-      set: query.set, vehicleType: query.vehicleType,
+      set: query.set,
       minPrice, maxPrice, sortBy, page, limit, carModelId,
     })}`;
 
@@ -337,7 +376,7 @@ export class ProductService implements OnModuleInit {
       take: limit,
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
@@ -362,7 +401,7 @@ export class ProductService implements OnModuleInit {
       search, categoryId, sellerId, condition, brand, scale,
       material: materialSlug, tradeOnly, discountOnly, preOrder,
       limited, set: setFilter, minPrice, maxPrice, sortBy,
-      page = 1, limit = 20, brandId, manufacturerId,
+      page = 1, limit = 20, brandId, manufacturerId, carModelId,
     } = query;
 
     const esOptions = {
@@ -370,6 +409,7 @@ export class ProductService implements OnModuleInit {
       categoryId,
       brandId,
       manufacturerId,
+      carModelId,
       sellerId,
       condition,
       brand,
@@ -381,7 +421,6 @@ export class ProductService implements OnModuleInit {
       preOrder,
       limited,
       set: setFilter,
-      vehicleType: query.vehicleType,
       minPrice,
       maxPrice,
       page,
@@ -434,100 +473,28 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
-   * Original PostgreSQL-based listing (fallback)
+   * PostgreSQL-based listing (primary for non-search queries, fallback for search when ES is down).
+   *
+   * All filters use indexed columns, foreign keys, or attribute joins.
+   * vehicleType is excluded (ES-only text heuristic).
+   * Text search (when present) uses title/description contains as a fallback.
+   * Sorting is always DB-level with skip/take pagination (no in-memory scoring).
    */
   private async findAllViaPostgres(query: ProductQueryDto) {
-    const {
-      search, categoryId, sellerId, condition, brand, scale,
-      material: materialSlug, tradeOnly, discountOnly, preOrder,
-      limited, set: setFilter, minPrice, maxPrice, sortBy,
-      page = 1, limit = 20, carModelId, brandId, manufacturerId,
-    } = query;
+    const { discountOnly, sortBy, page = 1, limit = 20 } = query;
 
-    const where: Prisma.ProductWhereInput = {
-      status: ProductStatus.active,
-      NOT: { id: { startsWith: 'membership-' } },
-      AND: [{ OR: [{ quantity: { gt: 0 } }, { quantity: null }] }],
-    };
-
-    if (search) {
-      const searchCondition = {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), searchCondition] : [searchCondition];
+    // Full-text search via tsvector/tsquery (replaces ILIKE contains)
+    let fulltextIds: string[] | undefined;
+    if (query.search) {
+      fulltextIds = await fulltextProductSearch(this.prisma, query.search);
     }
 
-    if (brandId) {
-      where.brandId = brandId;
-    } else if (brand) {
-      where.brand = { name: { equals: brand, mode: 'insensitive' } };
-    }
+    const where = buildProductWhere(
+      { ...query, material: query.material },
+      { fulltextIds },
+    );
 
-    if (manufacturerId) {
-      where.manufacturerId = manufacturerId;
-    } else if (query.manufacturer) {
-      where.manufacturer = { name: { contains: query.manufacturer, mode: 'insensitive' } };
-    }
-
-    if (carModelId) where.carModelId = carModelId;
-
-    if (scale) {
-      const scaleCondition = {
-        OR: [
-          { title: { contains: scale, mode: 'insensitive' } },
-          { description: { contains: scale, mode: 'insensitive' } },
-        ],
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), scaleCondition] : [scaleCondition];
-    }
-
-    if (materialSlug) {
-      where.productAttributes = {
-        some: {
-          attribute: {
-            isActive: true,
-            group: { slug: 'material', isActive: true },
-            slug: materialSlug,
-          },
-        },
-      };
-    }
-
-    if (query.vehicleType) {
-      const vehicleTypeSearchTerms: Record<string, string[]> = {
-        'araba': ['araba', 'car', 'sedan', 'coupe', 'suv', 'hatchback'],
-        'motosiklet': ['motosiklet', 'motorcycle', 'motor', 'bike'],
-        'motorsports': ['motorsports', 'yarış', 'racing', 'f1', 'formula', 'nascar', 'rally'],
-        'acil-durum': ['ambulans', 'ambulance', 'polis', 'police', 'itfaiye', 'fire', 'acil'],
-        'ticari': ['kamyon', 'truck', 'tır', 'van', 'minibus', 'ticari'],
-        'insaat': ['inşaat', 'construction', 'excavator', 'dozer', 'kepçe', 'vinç', 'crane'],
-        'tarim': ['tarım', 'agriculture', 'traktör', 'tractor', 'biçerdöver'],
-        'askeri': ['askeri', 'military', 'tank', 'zırhlı', 'armored'],
-        'gemi': ['gemi', 'ship', 'tekne', 'boat', 'yat', 'yacht'],
-        'tren': ['tren', 'train', 'lokomotif', 'locomotive', 'vagon'],
-        'ucak': ['uçak', 'aircraft', 'plane', 'helikopter', 'helicopter', 'jet'],
-        'set': ['set', 'koleksiyon', 'collection', 'paket', 'bundle'],
-      };
-      const searchTerms = vehicleTypeSearchTerms[query.vehicleType] || [query.vehicleType];
-      const vehicleTypeCondition = {
-        OR: searchTerms.map((term) => ({
-          OR: [
-            { title: { contains: term, mode: 'insensitive' } },
-            { description: { contains: term, mode: 'insensitive' } },
-          ],
-        })),
-      };
-      where.AND = where.AND ? [...(where.AND as any[]), vehicleTypeCondition] : [vehicleTypeCondition];
-    }
-
-    if (tradeOnly) where.isTradeEnabled = true;
-    if (preOrder) where.isPreorder = true;
-    if (limited) where.isLimited = true;
-    if (setFilter) where.isSet = true;
-
+    // discountOnly requires async DiscountService access, applied separately
     if (discountOnly) {
       const now = new Date();
       const manualDiscountCondition = {
@@ -544,44 +511,42 @@ export class ProductService implements OnModuleInit {
         if (criteria.categoryIds.length > 0) campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
         if (criteria.productIds.length > 0) campaignConditions.push({ id: { in: criteria.productIds } });
         const combinedCondition = { OR: [manualDiscountCondition, ...campaignConditions] };
-        where.AND = where.AND ? [...(where.AND as any[]), combinedCondition] : [combinedCondition];
+        (where.AND as any[]).push(combinedCondition);
       }
     }
 
-    if (categoryId) where.categoryId = categoryId;
-    if (sellerId) where.sellerId = sellerId;
-    if (condition) where.condition = condition as any;
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
-    }
-
-    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
-    const useScoring = !sortBy;
+    // DB-level sorting (replaces old in-memory scoring)
+    let orderBy: Prisma.ProductOrderByWithRelationInput[];
     switch (sortBy) {
-      case 'price_asc': orderBy = { price: 'asc' }; break;
-      case 'price_desc': orderBy = { price: 'desc' }; break;
-      case 'created_asc': orderBy = { createdAt: 'asc' }; break;
-      case 'created_desc': orderBy = { createdAt: 'desc' }; break;
-      case 'title_asc': orderBy = { title: 'asc' }; break;
-      case 'title_desc': orderBy = { title: 'desc' }; break;
-      case 'view_count_asc': orderBy = { viewCount: 'asc' }; break;
-      case 'view_count_desc': orderBy = { viewCount: 'desc' }; break;
+      case 'price_asc': orderBy = [{ price: 'asc' }]; break;
+      case 'price_desc': orderBy = [{ price: 'desc' }]; break;
+      case 'created_asc': orderBy = [{ createdAt: 'asc' }]; break;
+      case 'created_desc': orderBy = [{ createdAt: 'desc' }]; break;
+      case 'title_asc': orderBy = [{ title: 'asc' }]; break;
+      case 'title_desc': orderBy = [{ title: 'desc' }]; break;
+      case 'view_count_asc': orderBy = [{ viewCount: 'asc' }]; break;
+      case 'view_count_desc': orderBy = [{ viewCount: 'desc' }]; break;
+      case 'rating_desc':
+        orderBy = [
+          { averageRating: { sort: 'desc', nulls: 'last' } },
+          { ratingCount: 'desc' },
+          { viewCount: 'desc' },
+          { createdAt: 'desc' },
+        ];
+        break;
+      default:
+        orderBy = [{ viewCount: 'desc' }, { likeCount: 'desc' }, { createdAt: 'desc' }];
     }
 
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: useScoring ? undefined : orderBy,
-      skip: useScoring ? 0 : (page - 1) * limit,
-      take: useScoring ? undefined : limit,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: useScoring
-          ? { include: { membership: { include: { tier: { select: { type: true } } } } } }
-          : { select: { id: true, displayName: true, isVerified: true, sellerType: true } },
+        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
@@ -590,41 +555,8 @@ export class ProductService implements OnModuleInit {
       },
     });
 
-    let productsToReturn = products;
-    if (useScoring) {
-      productsToReturn = products
-        .map((product) => {
-          let membershipScore = 1;
-          const seller = product.seller as any;
-          const membership = seller?.membership;
-          if (membership && membership.status === 'active' && membership.tier?.type) {
-            const tierType = membership.tier.type;
-            if (tierType === 'premium' || tierType === 'business') membershipScore = 3;
-          }
-          const viewCount = product.viewCount || 0;
-          let viewScore = viewCount >= 10000 ? 3 : viewCount >= 1000 ? 2 : 1;
-          const likeCount = product.likeCount || 0;
-          let likeScore = likeCount >= 100 ? 3 : likeCount >= 50 ? 2 : 1;
-          return { ...product, _score: membershipScore + viewScore + likeScore, _random: Math.random() };
-        })
-        .sort((a, b) => b._score !== a._score ? b._score - a._score : b._random - a._random)
-        .slice((page - 1) * limit, page * limit)
-        .map(({ _score, _random, ...product }) => {
-          const cleanedProduct = { ...product };
-          if ((cleanedProduct.seller as any).membership) {
-            cleanedProduct.seller = {
-              id: cleanedProduct.seller.id,
-              displayName: (cleanedProduct.seller as any).displayName,
-              isVerified: (cleanedProduct.seller as any).isVerified,
-              sellerType: (cleanedProduct.seller as any).sellerType,
-            };
-          }
-          return cleanedProduct;
-        });
-    }
-
     const formattedProducts = await Promise.all(
-      productsToReturn.map((p) => this.formatProductResponse(p)),
+      products.map((p) => this.formatProductResponse(p)),
     );
 
     return {
@@ -699,11 +631,15 @@ export class ProductService implements OnModuleInit {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
-        // Allow active and sold products to be viewable
-        // Sold products will show "Out of Stock" on the frontend
-        // Pending, rejected, inactive products are NOT visible publicly
-        const viewableStatuses: ProductStatus[] = [ProductStatus.active, ProductStatus.sold];
-        if (!viewableStatuses.includes(product.status)) {
+        // Allow active, sold, and out-of-stock (inactive + quantity=0) products to be viewable
+        // Sold/out-of-stock will show "Stok bitti" on the frontend
+        // Pending, rejected, inactive with quantity > 0 are NOT visible publicly
+        const isOutOfStock = product.quantity === 0;
+        const canView =
+          product.status === ProductStatus.active ||
+          product.status === ProductStatus.sold ||
+          (product.status === ProductStatus.inactive && isOutOfStock);
+        if (!canView) {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
@@ -868,8 +804,10 @@ export class ProductService implements OnModuleInit {
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; indirim uygulanınca price = indirimli, oldPrice = önceki; indirim bitince price = oldPrice
     const currentPrice = Number(product.price);
     const currentOldPrice = product.oldPrice != null ? Number(product.oldPrice) : null;
-    const isSettingSale = dto.salePrice != null && Number(dto.salePrice) > 0;
-    const isClearingSale = dto.salePrice === null || dto.salePrice === undefined; // Açık null = indirimi kaldır
+    // class-transformer @Type(() => Number) converts null → 0, so treat 0 as "no sale" too
+    const rawSalePrice = dto.salePrice;
+    const isSettingSale = rawSalePrice != null && Number(rawSalePrice) > 0;
+    const isClearingSale = rawSalePrice === null || rawSalePrice === undefined || Number(rawSalePrice) === 0;
 
     let priceUpdate: number | undefined;
     let oldPriceUpdate: number | null | undefined;
@@ -887,15 +825,21 @@ export class ProductService implements OnModuleInit {
       saleEndDateUpdate = dto.saleEndDate != null && dto.saleEndDate !== '' ? new Date(dto.saleEndDate as string) : undefined;
       legacyOriginalPrice = originalNum;
       legacySalePrice = salePriceNum;
-    } else if (isClearingSale && (dto.salePrice === null || dto.originalPrice === null)) {
-      priceUpdate = currentOldPrice ?? currentPrice;
+    } else if (isClearingSale) {
+      priceUpdate = dto.price !== undefined ? Number(dto.price) : (currentOldPrice ?? currentPrice);
       oldPriceUpdate = null;
       saleStartDateUpdate = null;
       saleEndDateUpdate = null;
       legacyOriginalPrice = null;
       legacySalePrice = null;
     } else {
+      // Not setting a sale: update normal price and clear any previous sale so old price does not stick as "indirimli"
       if (dto.price !== undefined) priceUpdate = Number(dto.price);
+      oldPriceUpdate = null;
+      legacyOriginalPrice = null;
+      legacySalePrice = null;
+      saleStartDateUpdate = null;
+      saleEndDateUpdate = null;
       if (dto.saleStartDate !== undefined) saleStartDateUpdate = dto.saleStartDate == null ? null : new Date(dto.saleStartDate);
       if (dto.saleEndDate !== undefined) saleEndDateUpdate = dto.saleEndDate == null ? null : new Date(dto.saleEndDate);
     }
@@ -905,10 +849,16 @@ export class ProductService implements OnModuleInit {
         ? (dto.year >= 1900 && dto.year <= 2100 ? new Date(dto.year, 0, 1) : null)
         : undefined;
 
+    // When client sends dto.price and we're not setting a sale, always apply it so price updates are never dropped
+    const effectivePrice =
+      dto.price !== undefined && !isSettingSale
+        ? Number(dto.price)
+        : (priceUpdate !== undefined ? priceUpdate : dto.price);
+
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
-      ...(priceUpdate !== undefined ? { price: priceUpdate } : { price: dto.price }),
+      ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
       status: dto.status,
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
@@ -918,6 +868,9 @@ export class ProductService implements OnModuleInit {
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       brand: dto.brandId ? { connect: { id: dto.brandId } } : (dto.brandId === null ? { disconnect: true } : undefined),
       carModel: dto.carModelId ? { connect: { id: dto.carModelId } } : (dto.carModelId === null ? { disconnect: true } : undefined),
+      manufacturer: dto.manufacturerId !== undefined
+        ? (dto.manufacturerId ? { connect: { id: dto.manufacturerId } } : { disconnect: true })
+        : undefined,
       version: { increment: 1 },
       ...(releaseDateUpdate !== undefined ? { releaseDate: releaseDateUpdate } : {}),
       ...(oldPriceUpdate !== undefined ? { oldPrice: oldPriceUpdate } : {}),
@@ -947,7 +900,7 @@ export class ProductService implements OnModuleInit {
 
     // Check if price changed (for wishlist notifications) – compare previous selling price with new one
     const prevSellingPrice = Number(product.price);
-    const newSellingPrice = priceUpdate !== undefined ? priceUpdate : (dto.price !== undefined ? Number(dto.price) : prevSellingPrice);
+    const newSellingPrice = effectivePrice !== undefined ? effectivePrice : prevSellingPrice;
     const priceChanged = prevSellingPrice !== newSellingPrice;
 
     // Update with optimistic locking
@@ -997,7 +950,7 @@ export class ProductService implements OnModuleInit {
         },
       });
 
-      if (dto.scale !== undefined || dto.attributeIds !== undefined) {
+      if (dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined) {
         const scaleMaterialAttrIds = await this.prisma.attribute.findMany({
           where: { group: { slug: { in: ['scale', 'material'] } } },
           select: { id: true },
@@ -1008,6 +961,10 @@ export class ProductService implements OnModuleInit {
           });
         }
         await this.linkProductAttributes(id, dto.scale, dto.attributeIds, dto.material);
+        // Reindex in ES so search/list shows updated scale/material
+        if (this.searchService.isAvailable()) {
+          this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
+        }
       }
 
       // Invalidate cache for this product and product lists
@@ -1024,18 +981,24 @@ export class ProductService implements OnModuleInit {
         }
       }
 
-      // Update Elasticsearch index (async)
-      if (updated.status === ProductStatus.active) {
-        this.searchIndexing.queueIndexProduct(updated.id).catch(() => {
-          this.logger.warn('Failed to queue product index for Elasticsearch');
-        });
-      } else {
-        this.searchIndexing.queueRemoveProduct(updated.id).catch(() => {
-          this.logger.warn('Failed to queue product remove from Elasticsearch');
-        });
-      }
+      // Refetch product after attribute linking so response includes updated scale/material
+      const toReturn =
+        dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined
+          ? await this.prisma.product.findUnique({
+              where: { id },
+              include: {
+                images: { orderBy: { sortOrder: 'asc' } },
+                seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+                category: { select: { id: true, name: true, slug: true } },
+                brand: { select: { id: true, name: true, slug: true, logo: true } },
+                manufacturer: { select: { id: true, name: true, slug: true } },
+                carModel: { include: { brand: { select: { slug: true } } } },
+                productAttributes: { include: { attribute: { include: { group: true } } } },
+              },
+            })
+          : updated;
 
-      return await this.formatProductResponse(updated);
+      return await this.formatProductResponse(toReturn ?? updated);
     } catch (error) {
       if (error.code === 'P2025') {
         throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
@@ -1281,11 +1244,6 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
 
-    // Remove from Elasticsearch index (async)
-    this.searchIndexing.queueRemoveProduct(id).catch(() => {
-      this.logger.warn('Failed to queue product remove from Elasticsearch');
-    });
-
     return { message: 'Ürün silindi' };
   }
 
@@ -1388,13 +1346,24 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
   /**
    * Get attribute display value by group slug (e.g. 'scale' -> '1/64', 'material' -> 'Diecast (Metal)')
+   * Also matches by group name for robustness (e.g. 'Ölçek' for scale).
    */
-  private getAttributeValueByGroup(productAttributes: any[] | undefined, groupSlug: string): string | undefined {
+  private getAttributeValueByGroup(productAttributes: any[] | undefined, groupSlug: string, groupNameFallback?: string): string | undefined {
     if (!productAttributes?.length) return undefined;
     const pa = productAttributes.find(
-      (p: any) => p.attribute?.group?.slug === groupSlug,
+      (p: any) =>
+        p.attribute?.group?.slug === groupSlug ||
+        (groupNameFallback && p.attribute?.group?.name?.toLowerCase() === groupNameFallback.toLowerCase()),
     );
-    return pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    const val = pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    if (val) return val;
+    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18")
+    if (groupSlug === 'scale' && pa?.attribute?.slug && /^\d+$/.test(pa.attribute.slug)) {
+      const s = pa.attribute.slug;
+      if (s.length >= 2) return `1:${s.slice(1)}`;
+      if (s.length === 1) return `1:${s}`;
+    }
+    return undefined;
   }
 
   /**
@@ -1415,15 +1384,30 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           value: pa.attribute.displayValue || pa.attribute.value,
           group: pa.attribute.group.name,
         }));
+      const scaleFromGroup = this.getAttributeValueByGroup(productAttributes, 'scale', 'Ölçek');
+      const scaleFromAttrs = attributes.find((a) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value;
       return {
         attributes,
-        scale: this.getAttributeValueByGroup(productAttributes, 'scale'),
-        material: this.getAttributeValueByGroup(productAttributes, 'material'),
+        scale: scaleFromGroup || scaleFromAttrs,
+        material: this.getAttributeValueByGroup(productAttributes, 'material', 'Malzeme'),
       };
     } catch (e) {
       this.logger.warn('getAttributesAndDerived failed', e);
       return { attributes: [], scale: undefined, material: undefined };
     }
+  }
+
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   /**
@@ -1443,9 +1427,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         },
       });
 
-      // Get seller rating stats
+      // Get seller rating stats (only approved)
       const sellerRatingStats = await this.prisma.rating.aggregate({
-        where: { receiverId: product.seller.id },
+        where: { receiverId: product.seller.id, status: 'approved' },
         _avg: { score: true },
         _count: true,
       });
@@ -1456,12 +1440,21 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }
     }
 
-    // Get product rating stats
-    const ratingStats = await this.prisma.productRating.aggregate({
-      where: { productId: product.id },
-      _avg: { score: true },
-      _count: true,
-    });
+    // Get product rating stats (use cached columns when available, else aggregate)
+    let ratingAverage: number | null = null;
+    let ratingCount = 0;
+    if (product.averageRating != null && product.ratingCount != null) {
+      ratingAverage = Number(product.averageRating.toFixed(1));
+      ratingCount = product.ratingCount;
+    } else {
+      const ratingStats = await this.prisma.productRating.aggregate({
+        where: { productId: product.id, status: 'approved' },
+        _avg: { score: true },
+        _count: true,
+      });
+      ratingAverage = ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null;
+      ratingCount = ratingStats._count || 0;
+    }
 
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili)
     const now = new Date();
@@ -1517,7 +1510,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       isTradeEnabled: product.isTradeEnabled || false,
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
-      quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null, // null = unlimited stock
+      quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null,
+      availableQuantity: getAvailableQuantity(product) ?? undefined, // müsait adet (quantity - reservedQuantity); null = sınırsız
       images: (product.images || []).map((img: { id: string; cardKey: string; detailKey: string; sortOrder: number }) => ({
         id: img.id,
         cardKey: img.cardKey,
@@ -1527,8 +1521,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         sortOrder: img.sortOrder,
       })),
       rating: {
-        average: ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null,
-        count: ratingStats._count || 0,
+        average: ratingAverage,
+        count: ratingCount,
       },
       seller: product.seller
         ? {
@@ -1536,6 +1530,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           displayName: product.seller.displayName,
           isVerified: product.seller.isVerified,
           sellerType: product.seller.sellerType,
+          avatarUrl: await this.resolveAvatarUrl((product.seller as any).avatarUrl),
           listings_count: sellerListingsCount,
           productsCount: sellerListingsCount,
           rating: sellerRating,
@@ -1758,23 +1753,30 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       throw new NotFoundException('Ürün bulunamadı');
     }
 
-    // Skip counting views from product owner (kendi ürününü görüntüleme sayılmaz)
     if (userId && product.sellerId === userId) {
       return { viewCount: product.viewCount };
     }
 
-    // Bot protection: Skip counting for bots
     if (this.isBot(userAgent)) {
       return { viewCount: product.viewCount };
     }
 
-    // Her görüntülemede sayacı artır
+    const identifier = userId || clientIp || 'unknown';
+    const rateLimitKey = `viewCount:${productId}:${identifier}`;
+    try {
+      const { allowed } = await this.cache.checkRateLimit(rateLimitKey, 1, 1800);
+      if (!allowed) {
+        return { viewCount: product.viewCount };
+      }
+    } catch {
+      // Redis down - fall through and count the view
+    }
+
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
       data: { viewCount: { increment: 1 } },
     });
 
-    // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
     await this.cache.delPattern('products:list:*');
 
@@ -1911,18 +1913,25 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       orderBy: { name: 'asc' },
     });
 
-    // 2. Brands
+    // 2. Brands (id, name, slug – same format as manufacturers)
     const brands = await this.prisma.brand.findMany({
       where: { isActive: true },
-      select: { name: true },
+      select: { id: true, name: true, slug: true },
       orderBy: { name: 'asc' },
     });
 
-    // 3. Scales (static) & Manufacturers (from DB)
-    const scales = [
-      '1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36',
-      '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'
-    ];
+    // 3. Scales (from Attribute group "scale") & Manufacturers (from DB)
+    const scaleAttrs = await this.prisma.attribute.findMany({
+      where: {
+        isActive: true,
+        group: { slug: 'scale', isActive: true },
+      },
+      select: { value: true, slug: true, displayValue: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const scales = scaleAttrs.length > 0
+      ? scaleAttrs.map((a) => a.displayValue || a.value)
+      : ['1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'];
 
     const manufacturerRecords = await this.prisma.manufacturer.findMany({
       where: { isActive: true },
@@ -1949,9 +1958,17 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       label: a.displayValue || a.value,
     }));
 
+    // 5. Car models (id, name, slug, brandId – for filter dropdown, brand-specific)
+    const carModels = await this.prisma.carModel.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, brandId: true },
+      orderBy: [{ brandId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+    });
+
     return {
       categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
-      brands: brands.map((b: Pick<Brand, 'name'>) => b.name),
+      brands: brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
+      carModels: carModels.map((m) => ({ id: m.id, name: m.name, slug: m.slug, brandId: m.brandId })),
       scales,
       manufacturers,
       materials: materials.length > 0 ? materials : [

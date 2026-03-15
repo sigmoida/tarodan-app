@@ -11,8 +11,10 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
-import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
+import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto, CheckoutQuoteDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -85,6 +87,188 @@ export class OrderService {
   }
 
   /**
+   * Get checkout quote (preview) for given items. Reuses same shipping and commission logic as order create.
+   * Does not create any order; for display only. Final amounts are confirmed at order create.
+   */
+  async getCheckoutQuote(dto: CheckoutQuoteDto): Promise<{
+    itemsSubtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      sellerNetAmount: number;
+      title?: string;
+    }>;
+    pricing: {
+      subtotal: number;
+      shippingAmount: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      commissionAmount: number;
+      totalAmount: number;
+      sellerNetAmount: number;
+    };
+  }> {
+    if (!dto.items?.length) {
+      throw new BadRequestException('En az bir ürün gereklidir');
+    }
+
+    const now = new Date();
+    let itemsSubtotal = 0;
+    let totalBuyerFee = 0;
+    let totalSellerFee = 0;
+    const quoteItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      sellerNetAmount: number;
+      title?: string;
+    }> = [];
+
+    for (const { productId, quantity = 1 } of dto.items) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          oldPrice: true,
+          saleStartDate: true,
+          saleEndDate: true,
+          sellerId: true,
+          categoryId: true,
+          status: true,
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException(`Ürün bulunamadı: ${productId}`);
+      }
+      if (product.status !== ProductStatus.active) {
+        throw new BadRequestException(`Ürün satışta değil: ${product.title || productId}`);
+      }
+
+      const productPrice = Number(product.price);
+      const isSaleActive =
+        product.oldPrice != null &&
+        (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
+        (!product.saleEndDate || now <= new Date(product.saleEndDate));
+      const unitPrice = isSaleActive && product.oldPrice != null
+        ? productPrice
+        : productPrice;
+      const lineSubtotal = unitPrice * quantity;
+
+      const commissionResult = await this.calculateCommission(
+        lineSubtotal,
+        product.sellerId,
+        product.categoryId,
+      );
+
+      const lineBuyerFee = commissionResult.buyerFeeAmount;
+      const lineSellerFee = commissionResult.sellerFeeAmount;
+      const lineSellerNet = lineSubtotal - lineSellerFee;
+
+      itemsSubtotal += lineSubtotal;
+      totalBuyerFee += lineBuyerFee;
+      totalSellerFee += lineSellerFee;
+
+      quoteItems.push({
+        productId: product.id,
+        quantity,
+        unitPrice,
+        subtotal: lineSubtotal,
+        buyerFeeAmount: lineBuyerFee,
+        sellerFeeAmount: lineSellerFee,
+        sellerNetAmount: Math.max(0, lineSellerNet),
+        title: product.title ?? undefined,
+      });
+    }
+
+    const shippingAmount = this.calculateShippingCost(itemsSubtotal);
+    const commissionAmount = totalBuyerFee + totalSellerFee;
+    const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee;
+    const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
+
+    const pricing = {
+      subtotal: itemsSubtotal,
+      shippingAmount,
+      buyerFeeAmount: totalBuyerFee,
+      sellerFeeAmount: totalSellerFee,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
+    return {
+      itemsSubtotal,
+      shippingAmount,
+      buyerFeeAmount: totalBuyerFee,
+      sellerFeeAmount: totalSellerFee,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+      items: quoteItems,
+      pricing,
+    };
+  }
+
+  /**
+   * Commission preview for listing create/edit. Given a price amount and optional category, returns estimated fees.
+   * Used when product does not exist yet (e.g. seller entering price on create form). Reuses same logic as order/quote.
+   */
+  async getCommissionPreview(
+    amount: number,
+    sellerId: string,
+    categoryId?: string | null,
+  ): Promise<{
+    sellerFeeAmount: number;
+    buyerFeeAmount: number;
+    commissionAmount: number;
+    sellerNetAmount: number;
+  }> {
+    const result = await this.calculateCommission(amount, sellerId, categoryId);
+    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount);
+    return {
+      sellerFeeAmount: result.sellerFeeAmount,
+      buyerFeeAmount: result.buyerFeeAmount,
+      commissionAmount: result.commissionAmount,
+      sellerNetAmount,
+    };
+  }
+
+  /**
+   * Batch commission preview for multiple (amount, categoryId) pairs. Same order as input.
+   */
+  async getCommissionPreviewBatch(
+    sellerId: string,
+    items: Array<{ amount: number; categoryId?: string | null }>,
+  ): Promise<{ results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }> }> {
+    const results = await Promise.all(
+      items.map(async (item) => {
+        const amount = Number(item.amount);
+        if (Number.isNaN(amount) || amount < 0) {
+          return { sellerFeeAmount: 0, sellerNetAmount: amount };
+        }
+        const preview = await this.getCommissionPreview(amount, sellerId, item.categoryId ?? null);
+        return { sellerFeeAmount: preview.sellerFeeAmount, sellerNetAmount: preview.sellerNetAmount };
+      }),
+    );
+    return { results };
+  }
+
+  /**
    * Invalidate product caches when product status changes
    */
   private async invalidateProductCaches(productId: string): Promise<void> {
@@ -128,7 +312,7 @@ export class OrderService {
    * 
    * Applies min/max limits after calculation
    */
-  private async calculateCommission(
+  async calculateCommission(
     amount: number,
     sellerId: string,
     categoryId?: string | null,
@@ -166,8 +350,14 @@ export class OrderService {
     const matchedRule = this.findMatchingRule(rules, categoryId, commissionSellerType);
 
     if (!matchedRule) {
-      this.logger.warn('No matching commission rule found');
-      throw new BadRequestException('No matching commission rule found. Please ensure a default rule exists.');
+      this.logger.warn('No matching commission rule found; applying 0 commission fallback');
+      return {
+        buyerFeeAmount: 0,
+        sellerFeeAmount: 0,
+        commissionAmount: 0,
+        ruleId: null,
+        ruleName: null,
+      };
     }
 
     // Calculate fees
@@ -426,13 +616,41 @@ export class OrderService {
         throw new NotFoundException('Ürün bulunamadı');
       }
 
-      // Validate product is available
+      // Aynı alıcının bu ürün için bekleyen (ödeme yapılmamış) siparişi varsa onu döndür, yeni sipariş açma
+      const existingOrder = await tx.order.findFirst({
+        where: {
+          productId: dto.productId,
+          buyerId,
+          status: OrderStatus.pending_payment,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existingOrder) {
+        const numTotal = Number(existingOrder.totalAmount);
+        const numSubtotal = Number(existingOrder.subtotal);
+        const numDiscount = Number(existingOrder.discountAmount || 0);
+        return {
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          totalAmount: numTotal,
+          subtotal: numSubtotal,
+          discountAmount: numDiscount,
+          appliedCouponCode: (existingOrder.discountCode as string) ?? undefined,
+          productId: dto.productId,
+          paymentUrl: '',
+          provider: 'paytr',
+          existingOrder: true,
+        };
+      }
+
+      // Ürün satışta değilse (sold, inactive vb.) hata ver
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
 
-      // Check stock availability (quantity > 0 or null for unlimited)
-      if (product.quantity !== null && product.quantity <= 0) {
+      // Adet bazlı stok: müsait adet (quantity - reservedQuantity) >= 1 olmalı
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
       }
 
@@ -574,20 +792,10 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Reserve product immediately (status = RESERVED) and decrease quantity
-      const updateData: any = { status: ProductStatus.reserved };
-      
-      // Decrease quantity if it's not null (null means unlimited stock)
-      if (product.quantity !== null) {
-        if (product.quantity <= 0) {
-          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
-        }
-        updateData.quantity = { decrement: 1 };
-      }
-      
+      // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
       await tx.product.update({
         where: { id: dto.productId },
-        data: updateData,
+        data: { reservedQuantity: { increment: 1 } },
       });
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
@@ -705,7 +913,7 @@ export class OrderService {
         appliedCouponCode: appliedCouponCode ?? undefined,
         productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
-        provider: 'iyzico', // Default provider
+        provider: 'paytr', // Default provider
       };
     });
 
@@ -838,10 +1046,10 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -855,11 +1063,7 @@ export class OrderService {
         commissionResult,
       );
 
-      // Reserve product (status = RESERVED) - will be set to SOLD after payment is completed
-      await tx.product.update({
-        where: { id: offer.productId },
-        data: { status: ProductStatus.reserved },
-      });
+      // Rezervasyon teklif kabul edildiğinde (offer.service accept) yapıldı; burada tekrar yapmıyoruz.
 
       // Store productId for cache invalidation
       productIdForCache = offer.productId;
@@ -952,8 +1156,9 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil');
       }
 
-      // Check stock availability (quantity > 0 or null for unlimited)
-      if (product.quantity !== null && product.quantity <= 0) {
+      // Adet bazlı stok: müsait adet >= 1
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
       }
 
@@ -1077,10 +1282,10 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -1094,20 +1299,10 @@ export class OrderService {
         commissionResult,
       );
 
-      // Update product status to reserved and decrease quantity
-      const updateData: any = { status: ProductStatus.reserved };
-      
-      // Decrease quantity if it's not null (null means unlimited stock)
-      if (product.quantity !== null) {
-        if (product.quantity <= 0) {
-          throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
-        }
-        updateData.quantity = { decrement: 1 };
-      }
-      
+      // Adet bazlı rezervasyon: 1 adet rezerve et
       await tx.product.update({
         where: { id: dto.productId },
-        data: updateData,
+        data: { reservedQuantity: { increment: 1 } },
       });
 
       return {
@@ -1141,7 +1336,7 @@ export class OrderService {
           select: { id: true, displayName: true, email: true, isVerified: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1203,9 +1398,15 @@ export class OrderService {
       where.OR = [{ buyerId: userId }, { sellerId: userId }];
     }
 
+    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
     if (status) {
       where.status = status;
+    } else {
+      where.status = { not: OrderStatus.cancelled };
     }
+
+    // Üyelik siparişlerini siparişlerim listesinde gösterme (sadece ürün siparişleri)
+    where.NOT = { productId: { startsWith: 'membership-' } };
 
     const total = await this.prisma.order.count({ where });
 
@@ -1221,10 +1422,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1254,10 +1455,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: {
           include: {
@@ -1281,6 +1482,39 @@ export class OrderService {
     }
 
     return await this.formatOrderResponse(order, userId);
+  }
+
+  /**
+   * Set shipping address on an existing order (buyer only, pending_payment).
+   * Used when completing payment for offer-accepted orders that had no address at creation.
+   */
+  async setShippingAddress(
+    orderId: string,
+    userId: string,
+    dto: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: { include: { images: { take: 1 } } }, buyer: true, seller: true, shipment: true, payment: true },
+    });
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.buyerId !== userId) throw new ForbiddenException('Bu siparişe adres ekleme yetkiniz yok');
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException('Sadece ödeme bekleyen siparişlere adres eklenebilir');
+    }
+    const shippingAddress = {
+      fullName: dto.fullName.trim(),
+      phone: dto.phone.trim(),
+      city: dto.city.trim(),
+      district: dto.district.trim(),
+      address: dto.address.trim(),
+      zipCode: dto.zipCode?.trim() || null,
+    };
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { shippingAddress: shippingAddress as any },
+    });
+    return this.formatOrderResponse({ ...order, shippingAddress }, userId);
   }
 
   /**
@@ -1365,10 +1599,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1385,7 +1619,8 @@ export class OrderService {
    * - If paid, triggers refund process
    */
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
+    let productIdToInvalidate: string | null = null;
+    const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { product: true },
@@ -1394,6 +1629,7 @@ export class OrderService {
       if (!order) {
         throw new NotFoundException('Sipariş bulunamadı');
       }
+      productIdToInvalidate = order.productId;
 
       // Only buyer can cancel
       if (order.buyerId !== userId) {
@@ -1435,19 +1671,28 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
 
-      // Restore product to active status
-      await tx.product.update({
-        where: { id: order.productId },
-        data: { status: ProductStatus.active },
-      });
+      // Adet bazlı: rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
+      if (order.status === OrderStatus.pending_payment) {
+        await tx.product.update({
+          where: { id: order.productId },
+          data: { reservedQuantity: { decrement: 1 } },
+        });
+      }
+      // Eski davranış: ürün reserved idiyse tekrar active yap (geçiş dönemi)
+      if (order.product.status === ProductStatus.reserved) {
+        await tx.product.update({
+          where: { id: order.productId },
+          data: { status: ProductStatus.active },
+        });
+      }
 
       // Re-enable the offer (or mark as cancelled)
       if (order.offerId) {
@@ -1461,6 +1706,54 @@ export class OrderService {
 
       return await this.formatOrderResponse(cancelledOrder, userId);
     });
+    if (productIdToInvalidate) {
+      await this.invalidateProductCaches(productIdToInvalidate);
+    }
+    return result;
+  }
+
+  /**
+   * Reactivate a cancelled order that came from an accepted offer.
+   * Allowed when: order is cancelled, has offerId, offer still accepted, product still available, user is buyer.
+   * Used when the order was auto-cancelled by payment timeout; buyer can reopen to complete payment.
+   */
+  async reactivate(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true, offer: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu siparişi yeniden aktive etme yetkiniz yok');
+    }
+    if (order.status !== OrderStatus.cancelled) {
+      throw new BadRequestException('Sadece iptal edilmiş siparişler yeniden aktive edilebilir');
+    }
+    if (!order.offerId || !order.offer) {
+      throw new BadRequestException('Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez');
+    }
+    if (order.offer.status !== OfferStatus.accepted) {
+      throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
+    }
+    const available = getAvailableQuantity(order.product);
+    if (available !== null && available < 1) {
+      throw new BadRequestException('Ürün için yeterli müsait adet yok');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
+      }),
+      this.prisma.product.update({
+        where: { id: order.productId },
+        data: { reservedQuantity: { increment: 1 } },
+      }),
+    ]);
+
+    return this.findOne(orderId, userId);
   }
 
   /**
@@ -1499,10 +1792,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1547,26 +1840,26 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
     });
 
-    // Mark product as sold when order is completed
+    // Update product status based on remaining quantity (no stock decrement - already done at payment)
     if (order.productId) {
       const product = await this.prisma.product.findUnique({
         where: { id: order.productId },
       });
 
-      if (product && product.status !== ProductStatus.sold) {
-        // Mark as SOLD so seller sees it in "Satılan" and can use "Yeniden Satışa Aç"
+      if (product) {
+        const newStatus = getProductStatusFromQuantity(product.quantity);
         await this.prisma.product.update({
           where: { id: order.productId },
-          data: { status: ProductStatus.sold },
+          data: { status: newStatus },
         });
 
         // Invalidate cache
@@ -1583,6 +1876,19 @@ export class OrderService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
@@ -1590,6 +1896,24 @@ export class OrderService {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
+  }
+
+  /**
+   * Get hasProductRating and hasSellerRating for buyer (used in formatOrderResponse)
+   */
+  private async getOrderRatingFlags(order: any, userId: string): Promise<{ hasProductRating?: boolean; hasSellerRating?: boolean }> {
+    const isBuyer = order.buyerId === userId;
+    if (!isBuyer || !order.productId || !order.sellerId) {
+      return {};
+    }
+    const [productRating, userRating] = await Promise.all([
+      this.prisma.productRating.findFirst({ where: { orderId: order.id, userId } }),
+      this.prisma.rating.findFirst({ where: { orderId: order.id, giverId: userId, receiverId: order.sellerId } }),
+    ]);
+    return {
+      hasProductRating: !!productRating,
+      hasSellerRating: !!userRating,
+    };
   }
 
   /**
@@ -1603,13 +1927,35 @@ export class OrderService {
       imageUrl: resolvedImageUrl,
       status: order.product.status,
     } : null;
+
+    const totalAmount = Number(order.totalAmount ?? 0);
+    const shippingCost = Number(order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
     
     return {
       id: order.id,
       orderNumber: order.orderNumber,
-      amount: Number(order.totalAmount),
-      totalAmount: Number(order.totalAmount), // Frontend uyumu için
-      commissionAmount: Number(order.commissionAmount),
+      amount: totalAmount,
+      totalAmount,
+      commissionAmount,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      shippingCost,
+      pricing,
       status: order.status,
       product,
       // Frontend items array bekliyor - tek ürünü items formatında da döndür
@@ -1619,8 +1965,14 @@ export class OrderService {
         quantity: 1,
         price: Number(order.totalAmount),
       }] : [],
-      buyer: order.buyer,
-      seller: order.seller,
+      buyer: {
+        ...order.buyer,
+        avatarUrl: await this.resolveAvatarUrl(order.buyer?.avatarUrl),
+      },
+      seller: {
+        ...order.seller,
+        avatarUrl: await this.resolveAvatarUrl(order.seller?.avatarUrl),
+      },
       shippingAddress: order.shippingAddress && typeof order.shippingAddress === 'object'
         ? {
             id: (order.shippingAddress as any).id || order.shippingAddressId || '',
@@ -1644,6 +1996,8 @@ export class OrderService {
         : null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
+      ...(await this.getOrderRatingFlags(order, userId)),
+      offerId: order.offerId ?? undefined,
       payment: order.payment
         ? {
             id: order.payment.id,

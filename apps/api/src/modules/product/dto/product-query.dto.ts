@@ -15,7 +15,7 @@ import { ProductStatus, ProductCondition } from '@prisma/client';
 export class ProductQueryDto {
   @ApiPropertyOptional({
     example: 'star wars',
-    description: 'Search query for title/description',
+    description: 'Full-text search query (primary: Elasticsearch, fallback: Postgres title/description)',
   })
   @IsOptional()
   @IsString()
@@ -73,7 +73,7 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: '1:64',
-    description: 'Filter by scale',
+    description: 'Filter by scale (matched via ProductAttribute join, not text search)',
   })
   @IsOptional()
   @IsString()
@@ -133,14 +133,6 @@ export class ProductQueryDto {
   set?: boolean;
 
   @ApiPropertyOptional({
-    example: 'araba',
-    description: 'Filter by vehicle type (searches in title/description)',
-  })
-  @IsOptional()
-  @IsString()
-  vehicleType?: string;
-
-  @ApiPropertyOptional({
     example: 100,
     description: 'Minimum price filter',
   })
@@ -163,11 +155,30 @@ export class ProductQueryDto {
   @ApiPropertyOptional({
     example: 'price_asc',
     description: 'Sort order',
-    enum: ['price_asc', 'price_desc', 'created_asc', 'created_desc', 'title_asc', 'title_desc', 'view_count_desc', 'view_count_asc'],
+    enum: [
+      'price_asc',
+      'price_desc',
+      'created_asc',
+      'created_desc',
+      'title_asc',
+      'title_desc',
+      'view_count_desc',
+      'view_count_asc',
+      'rating_desc',
+    ],
   })
   @IsOptional()
   @IsString()
-  sortBy?: 'price_asc' | 'price_desc' | 'created_asc' | 'created_desc' | 'title_asc' | 'title_desc' | 'view_count_desc' | 'view_count_asc';
+  sortBy?:
+    | 'price_asc'
+    | 'price_desc'
+    | 'created_asc'
+    | 'created_desc'
+    | 'title_asc'
+    | 'title_desc'
+    | 'view_count_desc'
+    | 'view_count_asc'
+    | 'rating_desc';
 
   @ApiPropertyOptional({
     example: 1,
@@ -207,7 +218,7 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: 'Hot Wheels',
-    description: 'Filter by manufacturer name (text search)',
+    description: 'Filter by manufacturer name (exact match on relation, prefer manufacturerId)',
   })
   @IsOptional()
   @IsString()

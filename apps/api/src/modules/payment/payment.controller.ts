@@ -14,6 +14,7 @@ import {
   Headers,
   NotFoundException,
   ForbiddenException,
+  UnauthorizedException,
   Res,
   Logger,
 } from '@nestjs/common';
@@ -104,6 +105,36 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
     return this.paymentService.initiatePaymentUnified(null, dto, req);
+  }
+
+  /**
+   * POST /payments/initiate-trade-cash - Initiate cash payment for a trade (nakit fark).
+   * Same auth pattern as POST /payments/initiate: @Public + manual JWT extract so token is always read.
+   */
+  @Post('initiate-trade-cash')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Public()
+  @ApiOperation({ summary: 'Initiate cash payment for a trade' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Payment initiated' })
+  async initiateTradeCash(
+    @Body() body: { tradeId: string },
+    @Req() req: Request,
+  ) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    }
+    try {
+      const token = authHeader.substring(7);
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const userId = decoded.sub || decoded.id;
+      if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
+      return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
+    } catch (e: any) {
+      if (e instanceof UnauthorizedException) throw e;
+      throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    }
   }
 
   /**
@@ -472,6 +503,38 @@ export class PaymentController {
   }
 
   /**
+   * POST /payments/:id/confirm-failed - Fail sayfasından çağrılır; ödeme hâlâ pending ise
+   * rezervasyonu serbest bırakır (PayTR callback ulaşmamış olabilir). Public, idempotent.
+   */
+  @Post(':id/confirm-failed')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Public()
+  @ApiOperation({ summary: 'Confirm payment failed from fail page (release reservation)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Released or already processed' })
+  async confirmFailed(
+    @Param('id') paymentId: string,
+  ): Promise<{ released: boolean }> {
+    return this.paymentService.confirmFailedFromClient(paymentId);
+  }
+
+  /**
+   * POST /payments/:id/bypass-complete - Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true)
+   */
+  @Post(':id/bypass-complete')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Public()
+  @ApiOperation({ summary: 'Complete payment with test bypass (one card success, others fail)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Success or failure based on card number' })
+  async bypassComplete(
+    @Param('id') paymentId: string,
+    @Body() body: { cardNumber: string },
+  ): Promise<{ success: boolean }> {
+    return this.paymentService.bypassComplete(paymentId, body?.cardNumber ?? '');
+  }
+
+  /**
    * POST /payments/:id/cancel - Cancel a pending payment
    */
   @Post(':id/cancel')
@@ -539,9 +602,9 @@ export class PaymentController {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
-    // Only buyer or seller can request refund
-    if (order.buyerId !== userId && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu sipariş için iade yapamazsınız');
+    // Only buyer can request refund (seller cannot initiate refund)
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Sadece alıcı iade talebi oluşturabilir');
     }
 
     return this.paymentService.processRefund(dto.orderId, dto.refundAmount);

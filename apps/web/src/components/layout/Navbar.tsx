@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
@@ -35,6 +35,8 @@ const AuthRequiredModal = dynamic(
   { ssr: false }
 );
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import UserAvatar from '@/components/UserAvatar';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 import { isValidImageSrc } from '@/components/OptimizedImage';
@@ -88,6 +90,7 @@ export default function Navbar() {
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { itemCount: cartCount } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -203,6 +206,16 @@ export default function Navbar() {
     setActiveIndex(-1);
   }, [debouncedQuery]);
 
+  // When on /listings, keep the search input in sync with the URL ?search= param
+  const pathname = usePathname();
+  const navSearchParams = useSearchParams();
+  useEffect(() => {
+    if (pathname === '/listings') {
+      const urlSearch = navSearchParams.get('search') || '';
+      setSearchQuery(urlSearch);
+    }
+  }, [pathname, navSearchParams]);
+
   // Rich autocomplete query
   const richAutoQuery = useQuery({
     queryKey: ['autocomplete-rich', debouncedQuery],
@@ -219,11 +232,15 @@ export default function Navbar() {
   // Build flat list for keyboard navigation
   const flatItems = (() => {
     if (!autoResults || debouncedQuery.length < 2) return [];
-    const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'search'; id: string; label: string; href: string }> = [];
+    const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'carModel' | 'scale' | 'material' | 'condition' | 'search'; id: string; label: string; href: string }> = [];
     autoResults.products?.forEach((p) => items.push({ type: 'product', id: p.id, label: p.title, href: `/listings/${p.id}` }));
-    autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}` }));
+    autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}&brandId=${b.id}` }));
     autoResults.categories?.forEach((c) => items.push({ type: 'category', id: c.id, label: c.name, href: `/listings?categoryId=${c.id}` }));
     autoResults.manufacturers?.forEach((m) => items.push({ type: 'manufacturer', id: m.id, label: m.name, href: `/listings?manufacturer=${encodeURIComponent(m.name)}&manufacturerId=${m.id}` }));
+    autoResults.carModels?.forEach((m) => items.push({ type: 'carModel', id: m.id, label: m.name, href: `/listings?carModelId=${m.id}&carModel=${encodeURIComponent(m.name)}` }));
+    autoResults.scales?.forEach((s) => items.push({ type: 'scale', id: s, label: s, href: `/listings?scale=${encodeURIComponent(s)}` }));
+    autoResults.materials?.forEach((mat) => items.push({ type: 'material', id: mat.slug, label: mat.label, href: `/listings?material=${encodeURIComponent(mat.slug)}` }));
+    autoResults.conditions?.forEach((cond) => items.push({ type: 'condition', id: cond.value, label: cond.label, href: `/listings?condition=${encodeURIComponent(cond.value)}` }));
     items.push({ type: 'search', id: '__search__', label: debouncedQuery, href: `/listings?search=${encodeURIComponent(debouncedQuery)}` });
     return items;
   })();
@@ -311,12 +328,14 @@ export default function Navbar() {
 
   const fetchPendingCounts = async () => {
     try {
-      const [offersRes, tradesRes] = await Promise.all([
+      const [offersRes, tradesRes, notificationsRes] = await Promise.all([
         api.get('/offers/pending-count').catch(() => null),
         api.get('/trades/pending-count').catch(() => null),
+        api.get('/notifications/unread-count').catch(() => null),
       ]);
       setPendingOffersCount(offersRes?.data?.received || 0);
       setPendingTradesCount(tradesRes?.data?.received || 0);
+      setUnreadNotificationsCount(notificationsRes?.data?.count ?? notificationsRes?.data?.unreadCount ?? 0);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
     }
@@ -738,8 +757,108 @@ export default function Navbar() {
                               </div>
                             )}
 
+                            {/* Modeller (Car Models) */}
+                            {autoResults?.carModels && autoResults.carModels.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.carModels.map((m) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels ?? []).indexOf(m);
+                                  return (
+                                    <Link
+                                      key={m.id}
+                                      href={`/listings?carModelId=${m.id}&carModel=${encodeURIComponent(m.name)}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex-shrink-0 flex items-center justify-center text-emerald-600 text-sm font-bold border border-emerald-100">
+                                        {m.name.charAt(0)}
+                                      </div>
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{m.name}</span>
+                                      <span className="text-[11px] text-emerald-600 font-medium px-2 py-0.5 bg-emerald-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Model' : 'Model'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Ölçek (Scale) */}
+                            {autoResults?.scales && autoResults.scales.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.scales.map((s) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales ?? []).indexOf(s);
+                                  return (
+                                    <Link
+                                      key={s}
+                                      href={`/listings?scale=${encodeURIComponent(s)}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      <div className="w-10 h-10 rounded-full bg-amber-50 flex-shrink-0 flex items-center justify-center text-amber-600 text-xs font-bold border border-amber-100">
+                                        {s}
+                                      </div>
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{s}</span>
+                                      <span className="text-[11px] text-amber-600 font-medium px-2 py-0.5 bg-amber-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Scale' : 'Ölçek'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Malzeme (Material) */}
+                            {autoResults?.materials && autoResults.materials.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.materials.map((mat) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials ?? []).indexOf(mat);
+                                  return (
+                                    <Link
+                                      key={mat.slug}
+                                      href={`/listings?material=${encodeURIComponent(mat.slug)}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      <div className="w-10 h-10 rounded-full bg-slate-50 flex-shrink-0 flex items-center justify-center text-slate-600 text-sm font-bold border border-slate-100">
+                                        {mat.label.charAt(0)}
+                                      </div>
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mat.label}</span>
+                                      <span className="text-[11px] text-slate-600 font-medium px-2 py-0.5 bg-slate-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Material' : 'Malzeme'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Durum (Condition) */}
+                            {autoResults?.conditions && autoResults.conditions.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length || autoResults?.materials?.length) ? 'border-t border-gray-100' : ''}>
+                                {autoResults.conditions.map((cond) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials?.length || 0) + (autoResults?.conditions ?? []).indexOf(cond);
+                                  return (
+                                    <Link
+                                      key={cond.value}
+                                      href={`/listings?condition=${encodeURIComponent(cond.value)}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      <div className="w-10 h-10 rounded-full bg-teal-50 flex-shrink-0 flex items-center justify-center text-teal-600 text-sm font-bold border border-teal-100">
+                                        {cond.label.charAt(0)}
+                                      </div>
+                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cond.label}</span>
+                                      <span className="text-[11px] text-teal-600 font-medium px-2 py-0.5 bg-teal-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Condition' : 'Durum'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
                             {/* No results */}
-                            {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && (
+                            {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && !autoResults?.carModels?.length && !autoResults?.scales?.length && !autoResults?.materials?.length && !autoResults?.conditions?.length && (
                               <div className="px-4 py-6 text-center text-sm text-gray-500">
                                 {locale === 'en' ? 'No results found' : 'Sonuç bulunamadı'}
                               </div>
@@ -777,6 +896,9 @@ export default function Navbar() {
                 <span className="hidden sm:inline">{t('nav.newListing')}</span>
               </Link>
 
+              {/* Notification Bell */}
+              {showAuthUI && <NotificationBell />}
+
               {/* Hesap dropdown */}
               <div
                 className="relative"
@@ -807,9 +929,12 @@ export default function Navbar() {
                         {/* Profil - en üstte, profesyonel */}
                         <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="block px-4 py-3 hover:bg-orange-50/50 transition-colors">
                           <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
-                              {(user?.displayName || user?.email || '?').charAt(0).toUpperCase()}
-                            </div>
+                            <UserAvatar
+                              displayName={user?.displayName || user?.email}
+                              avatarUrl={user?.avatarUrl}
+                              size="sm"
+                              className="!w-10 !h-10 flex-shrink-0"
+                            />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
                               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
@@ -828,7 +953,7 @@ export default function Navbar() {
                         </Link>
                         {NAV_LINKS.filter((l) => !['/listings', '/ureticiler', '/collections'].includes(l.href)).map((link) => {
                           const isGuestTrades = link.href === '/trades' && !showAuthUI;
-                          const showTradesBadge = link.href === '/trades' && pendingTradesCount > 0;
+                          const showTradesBadge = false; // Takaslar yanında badge gösterme
                           return (
                             <Link
                               key={link.href}
@@ -865,7 +990,13 @@ export default function Navbar() {
                         <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
                           <BellIcon className="w-5 h-5" />
                           {t('nav.notifications')}
+                          {unreadNotificationsCount > 0 && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                              {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                            </span>
+                          )}
                         </Link>
+
                         <div className="border-t border-gray-100 my-1" />
                         <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
                           <UserCircleIcon className="w-5 h-5" />

@@ -16,7 +16,8 @@ import {
   MessageStatus,
   TicketStatus,
   TicketPriority,
-  TicketCategory
+  TicketCategory,
+  RatingStatus
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
@@ -227,42 +228,54 @@ async function main() {
   console.log(`✅ Created ${categories.length} categories (vehicle types only)`);
 
   // ==========================================================================
-  // 1b. Create Manufacturers
+  // 1b. Create Manufacturers (diecast brands: Hot Wheels, Tomica, etc.)
+  // Logo paths point to apps/web/public/photos/logolar/.
+  // Logos are only set on CREATE, not UPDATE, so re-running seed
+  // does not overwrite admin-uploaded S3 logos.
   // ==========================================================================
   console.log('Creating manufacturers...');
 
   const manufacturerData = [
-    { name: 'Hot Wheels', slug: 'hot-wheels', country: 'ABD', description: 'Mattel tarafından üretilen diecast model araba markası' },
-    { name: 'Matchbox', slug: 'matchbox', country: 'İngiltere', description: 'Lesney Products tarafından başlatılan diecast model markası' },
-    { name: 'Majorette', slug: 'majorette', country: 'Fransa', description: 'Fransız diecast model araba üreticisi' },
-    { name: 'Tomica', slug: 'tomica', country: 'Japonya', description: 'Takara Tomy tarafından üretilen Japon diecast model markası' },
-    { name: 'Bburago', slug: 'bburago', country: 'İtalya', description: 'İtalyan diecast model araba üreticisi' },
-    { name: 'Maisto', slug: 'maisto', country: 'ABD', description: 'Amerikan diecast model araba üreticisi' },
-    { name: 'AUTOart', slug: 'autoart', country: 'Hong Kong', description: 'Yüksek kaliteli koleksiyon diecast model üreticisi' },
-    { name: 'Minichamps', slug: 'minichamps', country: 'Almanya', description: 'Alman model araba üreticisi, özellikle F1 modelleri' },
-    { name: 'Kyosho', slug: 'kyosho', country: 'Japonya', description: 'Japon model araba ve RC araç üreticisi' },
-    { name: 'CMC', slug: 'cmc', country: 'Almanya', description: 'Premium koleksiyon modelleri üreticisi' },
-    { name: 'GT Spirit', slug: 'gt-spirit', country: 'Fransa', description: 'Resin model araba üreticisi' },
-    { name: 'Almost Real', slug: 'almost-real', country: 'Çin', description: 'Yüksek detaylı diecast model üreticisi' },
-    { name: 'Spark', slug: 'spark', country: 'Çin', description: 'Resin model araba üreticisi, yarış modelleri' },
-    { name: 'Schuco', slug: 'schuco', country: 'Almanya', description: 'Alman model araba üreticisi' },
-    { name: 'Norev', slug: 'norev', country: 'Fransa', description: 'Fransız diecast model üreticisi' },
-    { name: 'Oxford Diecast', slug: 'oxford-diecast', country: 'İngiltere', description: 'İngiliz diecast model üreticisi' },
-    { name: 'Greenlight', slug: 'greenlight', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
-    { name: 'ERTL', slug: 'ertl', country: 'ABD', description: 'Amerikan diecast model üreticisi' },
-    { name: 'Tamiya', slug: 'tamiya', country: 'Japonya', description: 'Japon model kit ve diecast üreticisi' },
-    { name: 'Welly', slug: 'welly', country: 'Hong Kong', description: 'Diecast model araba üreticisi' },
+    { name: 'Hot Wheels', slug: 'hot-wheels', country: 'ABD', description: 'Mattel tarafından üretilen diecast model araba markası', logo: '/photos/logolar/2158430f294b152f30824d6bb1ac7bf9.jpg' },
+    { name: 'Matchbox', slug: 'matchbox', country: 'İngiltere', description: 'Lesney Products tarafından başlatılan diecast model markası', logo: '/photos/logolar/images.png' },
+    { name: 'Majorette', slug: 'majorette', country: 'Fransa', description: 'Fransız diecast model araba üreticisi', logo: '/photos/logolar/majorette-logo-png_seeklogo-492958.png' },
+    { name: 'Tomica', slug: 'tomica', country: 'Japonya', description: 'Takara Tomy tarafından üretilen Japon diecast model markası', logo: '/photos/logolar/Tomica_brand_textlogo.png' },
+    { name: 'Bburago', slug: 'bburago', country: 'İtalya', description: 'İtalyan diecast model araba üreticisi', logo: '/photos/logolar/Bburago_Logo.png' },
+    { name: 'Maisto', slug: 'maisto', country: 'ABD', description: 'Amerikan diecast model araba üreticisi', logo: '/photos/logolar/maisto-logo.png' },
+    { name: 'AUTOart', slug: 'autoart', country: 'Hong Kong', description: 'Yüksek kaliteli koleksiyon diecast model üreticisi', logo: '/photos/logolar/download.png' },
+    { name: 'Minichamps', slug: 'minichamps', country: 'Almanya', description: 'Alman model araba üreticisi, özellikle F1 modelleri', logo: '/photos/logolar/minichamps_logo.png' },
+    { name: 'Kyosho', slug: 'kyosho', country: 'Japonya', description: 'Japon model araba ve RC araç üreticisi', logo: '/photos/logolar/Kyosho_corp_logo.png' },
+    { name: 'CMC', slug: 'cmc', country: 'Almanya', description: 'Premium koleksiyon modelleri üreticisi', logo: '/photos/logolar/cmc_logo-640x320.jpg' },
+    { name: 'GT Spirit', slug: 'gt-spirit', country: 'Fransa', description: 'Resin model araba üreticisi', logo: '/photos/logolar/GT-Spirit-Logo.webp' },
+    { name: 'Almost Real', slug: 'almost-real', country: 'Çin', description: 'Yüksek detaylı diecast model üreticisi', logo: null },
+    { name: 'Spark', slug: 'spark', country: 'Çin', description: 'Resin model araba üreticisi, yarış modelleri', logo: null },
+    { name: 'Schuco', slug: 'schuco', country: 'Almanya', description: 'Alman model araba üreticisi', logo: '/photos/logolar/logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg' },
+    { name: 'Norev', slug: 'norev', country: 'Fransa', description: 'Fransız diecast model üreticisi', logo: '/photos/logolar/5bc0b46797d85-thumbnail.jpg' },
+    { name: 'Oxford Diecast', slug: 'oxford-diecast', country: 'İngiltere', description: 'İngiliz diecast model üreticisi', logo: null },
+    { name: 'Greenlight', slug: 'greenlight', country: 'ABD', description: 'Amerikan diecast model üreticisi', logo: '/photos/logolar/Greenlight_collectibles_logo.png' },
+    { name: 'ERTL', slug: 'ertl', country: 'ABD', description: 'Amerikan diecast model üreticisi', logo: null },
+    { name: 'Tamiya', slug: 'tamiya', country: 'Japonya', description: 'Japon model kit ve diecast üreticisi', logo: '/photos/logolar/tamiya-logo-png_seeklogo-324507.png' },
+    { name: 'Welly', slug: 'welly', country: 'Hong Kong', description: 'Diecast model araba üreticisi', logo: null },
+    { name: 'MINI GT', slug: 'mini-gt', country: 'Hong Kong', description: 'TSM tarafından üretilen 1:64 ölçek diecast model markası', logo: '/photos/logolar/mini-gt-logo-png_seeklogo-523421.png' },
   ];
 
-  const manufacturers = await Promise.all(
-    manufacturerData.map((m, i) =>
-      prisma.manufacturer.upsert({
-        where: { slug: m.slug },
-        update: { name: m.name, country: m.country, description: m.description },
-        create: { ...m, sortOrder: i + 1 },
-      })
-    )
-  );
+  const manufacturers: any[] = [];
+  for (let i = 0; i < manufacturerData.length; i++) {
+    const m = manufacturerData[i];
+    const existing = await prisma.manufacturer.findUnique({ where: { slug: m.slug }, select: { logo: true } });
+    // Use repo logo when: no existing logo, or existing is S3 URL (so deployment/clone gets consistent logos from repo)
+    const isRepoPath = (v: string | null) => v != null && (v.startsWith('/photos/logolar') || v.startsWith('/'));
+    const useSeedLogo = m.logo != null && (!existing?.logo || (existing.logo && !isRepoPath(existing.logo)));
+    const result = await prisma.manufacturer.upsert({
+      where: { slug: m.slug },
+      update: {
+        name: m.name, country: m.country, description: m.description,
+        ...(useSeedLogo ? { logo: m.logo } : {}),
+      },
+      create: { name: m.name, slug: m.slug, country: m.country, description: m.description, logo: m.logo, sortOrder: i + 1 },
+    });
+    manufacturers.push(result);
+  }
 
   console.log(`✅ Created ${manufacturers.length} manufacturers`);
 
@@ -394,6 +407,12 @@ async function main() {
     create: { name: 'Malzeme', slug: 'material', isRequired: false, sortOrder: 2 },
   });
 
+  const vehicleTypeGroup = await prisma.attributeGroup.upsert({
+    where: { slug: 'vehicle_type' },
+    update: {},
+    create: { name: 'Araç Türü', slug: 'vehicle_type', description: 'Ürünün temsil ettiği araç kategorisi', isRequired: false, sortOrder: 3 },
+  });
+
   const scaleValues = ['1:18', '1:24', '1:43', '1:64', '1:72', '1:160', '1:350', '1:400', '1:700'];
   const materialValues = [
     { value: 'diecast', display: 'Diecast Metal' },
@@ -421,7 +440,47 @@ async function main() {
     });
   }
 
-  console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials)`);
+  const vehicleTypeValues = [
+    { value: 'car', display: 'Araba' },
+    { value: 'motorcycle', display: 'Motosiklet' },
+    { value: 'motorsports', display: 'Motorsports' },
+    { value: 'truck', display: 'Ticari Araç' },
+    { value: 'emergency', display: 'Acil Durum Aracı' },
+    { value: 'construction', display: 'İnşaat Aracı' },
+    { value: 'agriculture', display: 'Tarım Aracı' },
+    { value: 'military', display: 'Askeri Araç' },
+    { value: 'ship', display: 'Gemi / Tekne' },
+    { value: 'train', display: 'Tren' },
+    { value: 'aircraft', display: 'Uçak / Helikopter' },
+    { value: 'bus', display: 'Otobüs / Minibüs' },
+  ];
+
+  const vehicleTypeAttrs: Record<string, any> = {};
+  for (const vt of vehicleTypeValues) {
+    vehicleTypeAttrs[vt.value] = await prisma.attribute.upsert({
+      where: { groupId_slug: { groupId: vehicleTypeGroup.id, slug: vt.value } },
+      update: {},
+      create: { groupId: vehicleTypeGroup.id, value: vt.value, slug: vt.value, displayValue: vt.display, sortOrder: vehicleTypeValues.indexOf(vt) },
+    });
+  }
+
+  console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`);
+
+  // Map seed category slug (cat) -> vehicle_type attribute slug for product attributes
+  const catToVehicleTypeSlug: Record<string, string> = {
+    araba: 'car',
+    kamyon: 'truck',
+    motosiklet: 'motorcycle',
+    motorspor: 'motorsports',
+    gemi: 'ship',
+    tren: 'train',
+    ucak: 'aircraft',
+    otobus: 'bus',
+    acil: 'emergency',
+    insaat: 'construction',
+    tarim: 'agriculture',
+    askeri: 'military',
+  };
 
   // ==========================================================================
   // 2. Create Membership Tiers
@@ -799,7 +858,6 @@ async function main() {
     users.push(user);
   }
 
-  // No default avatar URLs (Trendyol-style: generic icon or initials on frontend only)
   console.log(`✅ Created ${users.length} users`);
 
   // ==========================================================================
@@ -837,7 +895,12 @@ async function main() {
   for (const ta of tierAssignments) {
     await prisma.userMembership.upsert({
       where: { userId: ta.userId },
-      update: {},
+      update: {
+        tierId: ta.tierId,
+        status: SubscriptionStatus.active,
+        currentPeriodStart: now,
+        currentPeriodEnd: oneYearLater,
+      },
       create: {
         userId: ta.userId,
         tierId: ta.tierId,
@@ -849,6 +912,13 @@ async function main() {
   }
 
   console.log(`✅ Created ${tierAssignments.length} user memberships`);
+
+  // Users who can trade (basic/premium/business) – basic also has canTrade: true
+  const canTradeUserIds = new Set(
+    tierAssignments
+      .filter(ta => ta.tierId === basicTier.id || ta.tierId === premiumTier.id || ta.tierId === businessTier.id)
+      .map(ta => ta.userId),
+  );
 
   // ==========================================================================
   // 8. Create Addresses
@@ -1073,6 +1143,9 @@ async function main() {
     const slugBase = d.img.replace('product-', '').replace('.png', '');
     const slug = `${slugBase}-${i}`;
 
+    // Only premium/business sellers can have trade-enabled products (app rule: takas için premium gerekli)
+    const isTradeEnabled = canTradeUserIds.has(seller.id) && (i % 3 !== 2);
+
     const product = await prisma.product.upsert({
       where: { slug },
       create: {
@@ -1087,7 +1160,7 @@ async function main() {
         price,
         condition: d.cond,
         status,
-        isTradeEnabled: i % 3 !== 2,
+        isTradeEnabled,
         isSet: d.isSet ?? false,
         isLimited: d.isLimited ?? false,
         isPreorder: d.isPreorder ?? false,
@@ -1106,7 +1179,7 @@ async function main() {
         price,
         condition: d.cond,
         status,
-        isTradeEnabled: i % 3 !== 2,
+        isTradeEnabled,
         isSet: d.isSet ?? false,
         isLimited: d.isLimited ?? false,
         isPreorder: d.isPreorder ?? false,
@@ -1116,15 +1189,20 @@ async function main() {
       },
     });
 
-    // Assign scale + material attributes (upsert için önce mevcut attribute'ları sil)
+    // Assign scale + material + vehicle_type attributes (upsert için önce mevcut attribute'ları sil)
     await prisma.productAttribute.deleteMany({ where: { productId: product.id } });
     const sAttr = scaleAttrs[d.scale];
     const mAttr = materialAttrs[d.material];
+    const vehicleTypeSlug = catToVehicleTypeSlug[d.cat];
+    const vtAttr = vehicleTypeSlug ? vehicleTypeAttrs[vehicleTypeSlug] : null;
     if (sAttr) {
       try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: sAttr.id } }); } catch {}
     }
     if (mAttr) {
       try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: mAttr.id } }); } catch {}
+    }
+    if (vtAttr) {
+      try { await prisma.productAttribute.create({ data: { productId: product.id, attributeId: vtAttr.id } }); } catch {}
     }
 
     products.push(product);
@@ -1241,11 +1319,16 @@ async function main() {
     }
     const coverKey = await uploadCollectionCover(storageService!, coverPath);
 
+    const existingBySlug = await prisma.collection.findFirst({
+      where: { slug: cd.slug, userId: cd.user.id },
+    });
+    const collId = existingBySlug?.id ?? randomUUID();
+
     const collection = await prisma.collection.upsert({
-      where: { id: `collection-${cd.slug}` },
+      where: { id: collId },
       update: { coverImageKey: coverKey, categoryId: catId },
       create: {
-        id: `collection-${cd.slug}`,
+        id: collId,
         userId: cd.user.id,
         categoryId: catId,
         name: cd.name,
@@ -1263,7 +1346,7 @@ async function main() {
 
   // Assign products to matching collections
   for (const coll of collections) {
-    const collDef = collectionDefs.find(d => `collection-${d.slug}` === coll.id)!;
+    const collDef = collectionDefs.find(d => d.slug === coll.slug)!;
     const matchingProducts = collDef.catSlug
       ? products.filter((_, idx) => productData[idx].cat === collDef.catSlug)
       : products.filter(() => Math.random() > 0.7);
@@ -1579,6 +1662,7 @@ async function main() {
           orderId: order.id,
           score: Math.floor(Math.random() * 2) + 4, // 4-5 stars
           comment: ['Harika satıcı!', 'Çok hızlı kargo', 'Ürün tam açıklandığı gibi', 'Teşekkürler, çok memnun kaldım'][Math.floor(Math.random() * 4)],
+          status: RatingStatus.approved,
         },
       });
     } catch (e) {
@@ -1586,19 +1670,24 @@ async function main() {
     }
   }
 
-  // Create some product ratings
-  for (let i = 0; i < 30; i++) {
+  // Create product ratings for many completed orders (3-5 stars, varied)
+  const maxProductRatings = Math.min(completedOrders.length, 100);
+  for (let i = 0; i < maxProductRatings; i++) {
     const order = completedOrders[i % completedOrders.length];
     if (!order) continue;
-    
+
+    const possibleScores = [3, 4, 5];
+    const score = possibleScores[Math.floor(Math.random() * possibleScores.length)];
+    const titles = ['Mükemmel!', 'Harika ürün', 'Beklentilerimi karşıladı', 'Çok kaliteli', 'Fena değil'];
+
     try {
       await prisma.productRating.create({
         data: {
           productId: order.productId,
           userId: order.buyerId,
           orderId: order.id,
-          score: Math.floor(Math.random() * 2) + 4,
-          title: ['Mükemmel!', 'Harika ürün', 'Beklentilerimi karşıladı', 'Çok kaliteli'][Math.floor(Math.random() * 4)],
+          score,
+          title: titles[Math.floor(Math.random() * titles.length)],
           review: 'Ürün açıklamaya uygun, paketleme çok iyi yapılmış. Satıcıya teşekkürler.',
           isVerifiedPurchase: true,
           helpfulCount: Math.floor(Math.random() * 20),
@@ -1607,6 +1696,22 @@ async function main() {
     } catch (e) {
       // Ignore duplicates
     }
+  }
+
+  // Update Product.averageRating and Product.ratingCount for all products with ratings
+  const productsWithRatings = await prisma.productRating.groupBy({
+    by: ['productId'],
+    _avg: { score: true },
+    _count: true,
+  });
+  for (const row of productsWithRatings) {
+    await prisma.product.update({
+      where: { id: row.productId },
+      data: {
+        averageRating: row._avg.score ?? undefined,
+        ratingCount: row._count,
+      },
+    });
   }
 
   console.log(`✅ Created ratings`);

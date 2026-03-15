@@ -27,6 +27,12 @@ pnpm seed:admin
 pnpm dev
 ```
 
+### Üretici logoları (anasayfa kayan bar)
+
+- **Seed** (`pnpm db:seed`) üretici kayıtlarını (Hot Wheels, Tomica, vb.) oluşturur; **logo alanı boş** bırakılır.
+- Projeyi clone eden biri seed çalıştırdığında anasayfa logoları **repo’daki** `apps/web/public/photos/logolar/` dosyalarından gelir (frontend BRANDS fallback).
+- Admin’den yüklediğiniz logolar **veritabanında** (S3 key veya URL) saklanır; seed’i tekrar çalıştırmak bu logoları **silmez**.
+
 ## 📝 Ortam Değişkenleri
 
 Eğer `.env` dosyaları yoksa, aşağıdaki komutları çalıştırarak oluşturabilirsiniz:

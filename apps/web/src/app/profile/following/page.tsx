@@ -116,7 +116,7 @@ export default function FollowingPage() {
                   href={`/seller/${item.following.id}`}
                   className="flex items-center gap-4 flex-1 hover:opacity-80 transition-opacity"
                 >
-                  <UserAvatar displayName={item.following.displayName} size="lg" className="!w-16 !h-16 !text-2xl" />
+                  <UserAvatar displayName={item.following.displayName} avatarUrl={item.following?.avatarUrl} size="lg" className="!w-16 !h-16 !text-2xl" />
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900">
                       {item.following.displayName}

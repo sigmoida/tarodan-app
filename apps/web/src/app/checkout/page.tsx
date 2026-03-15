@@ -65,14 +65,16 @@ export default function CheckoutPage() {
   // Guest checkout is allowed - no redirect to login
 
   const directProductId = searchParams.get('productId');
+  const existingOrderId = searchParams.get('orderId');
 
   const [step, setStep] = useState(1); // 1: Address, 2: Payment, 3: Confirm
   const [isLoading, setIsLoading] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
-  const [paymentProvider, setPaymentProvider] = useState<'iyzico' | 'paytr'>('iyzico');
+  const [paymentProvider] = useState<'paytr'>('paytr'); // Sadece PayTR kullanılıyor, iyzico kaldırıldı
   const [directProduct, setDirectProduct] = useState<CheckoutItem | null>(null);
+  
 
   // Guest checkout fields
   const [guestEmail, setGuestEmail] = useState('');
@@ -214,7 +216,58 @@ export default function CheckoutPage() {
         seller: { id: item.seller.id, displayName: item.seller.displayName },
       }));
   const subtotal = Number((directProduct ? directProduct.price : cartSubtotal) ?? 0);
-  const grandTotal = Math.max(0, subtotal + shippingCost);
+
+  // Quote from backend (includes shipping + platform fee). When available, use for summary and button total.
+  const [quote, setQuote] = useState<{
+    pricing: {
+      subtotal: number;
+      shippingAmount: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      commissionAmount: number;
+      totalAmount: number;
+      sellerNetAmount: number;
+    };
+  } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState(false);
+
+  useEffect(() => {
+    if (checkoutItems.length === 0) {
+      setQuote(null);
+      setQuoteError(false);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    setQuoteError(false);
+    ordersApi
+      .getQuote({
+        items: checkoutItems.map((item) => ({ productId: item.productId, quantity: 1 })),
+      })
+      .then((res) => {
+        if (!cancelled && res.data?.pricing) {
+          setQuote({ pricing: res.data.pricing });
+        } else if (!cancelled && res.data) {
+          setQuote(res.data as any);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQuoteError(true);
+          setQuote(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutItems.length, checkoutItems.map((i) => i.productId).join(',')]);
+
+  const displayTotal = quote?.pricing?.totalAmount ?? Math.max(0, subtotal + shippingCost);
+  const grandTotal = displayTotal;
 
 
   useEffect(() => {
@@ -226,6 +279,13 @@ export default function CheckoutPage() {
       fetchSavedCards();
     }
   }, [directProductId, isAuthenticated]);
+
+  // orderId ile gelindiyse sipariş detay sayfasına yönlendir
+  useEffect(() => {
+    if (existingOrderId && isAuthenticated) {
+      router.replace(`/orders/${existingOrderId}`);
+    }
+  }, [existingOrderId, isAuthenticated]);
 
   const fetchSavedCards = async () => {
     try {
@@ -808,132 +868,38 @@ export default function CheckoutPage() {
         }
 
         if (orderId) {
-          // For Iyzico, use Direct API with card info from the form
-          if (paymentProvider === 'iyzico') {
-            try {
-              // Validate card info only when using NEW card
-              if (useNewCard || savedCards.length === 0) {
-                if (!cardName || !cardNumber || !cardExpiry || !cardCvc) {
-                  toast.error(locale === 'en' ? 'Please fill in all card information' : 'Lütfen tüm kart bilgilerini doldurun');
-                  setIsLoading(false);
-                  return;
-                }
-              }
-
-              let month: string | undefined;
-              let year: string | undefined;
-              // Parse expiry only when using new card (saved card does not need expiry in payload)
-              if (useNewCard || savedCards.length === 0) {
-                const expiryNormalized = cardExpiry.replace(/\s/g, '').replace(/-/g, '/');
-                const expiryParts = expiryNormalized.includes('/')
-                  ? expiryNormalized.split('/')
-                  : expiryNormalized.length >= 4
-                    ? [expiryNormalized.slice(0, 2), expiryNormalized.slice(2)]
-                    : [];
-                month = expiryParts[0]?.trim();
-                const rawYear = expiryParts[1]?.trim() || '';
-                year = rawYear.length === 2 ? '20' + rawYear : rawYear;
-                if (!month || !year || month.length !== 2 || Number(month) < 1 || Number(month) > 12) {
-                  toast.error(locale === 'en' ? 'Please enter a valid expiry date (MM/YY)' : 'Geçerli bir son kullanma tarihi girin (AA/YY)');
-                  setIsLoading(false);
-                  return;
-                }
-              }
-
-              const directPayload: any = {
-                orderId,
-                saveCard: isAuthenticated && saveCard,
-              };
-
-              // Use saved card token or new card details
-              if (!useNewCard && selectedSavedCard && savedCards.length > 0) {
-                directPayload.cardToken = selectedSavedCard;
-              } else {
-                if (!month || !year) {
-                  toast.error(locale === 'en' ? 'Please enter a valid expiry date (MM/YY)' : 'Geçerli bir son kullanma tarihi girin (AA/YY)');
-                  setIsLoading(false);
-                  return;
-                }
-                directPayload.card = {
-                  cardHolderName: cardName.trim(),
-                  cardNumber: cardNumber.replace(/\s/g, ''),
-                  expireMonth: month,
-                  expireYear: year,
-                  cvc: cardCvc,
-                };
-              }
-
-              const directResponse = await paymentsApi.processDirect(directPayload);
-              const directData = directResponse.data;
-              // LOG: Tam yanıtı görüp neden 3DS açılmadığını anlamak için
-              console.log('[ÖDEME] API yanıtı (tam):', { ...directData, htmlContentLength: directData?.htmlContent?.length, htmlContentPreview: directData?.htmlContent?.substring?.(0, 80) });
-
-              // API her zaman Base64 gönderiyor – içerik < ile başlamıyorsa decode et
-              let htmlContent = directData?.htmlContent;
-              if (typeof htmlContent !== 'string') {
-                toast.error('Ödeme yanıtı geçersiz.');
-                setIsLoading(false);
-                return;
-              }
-              htmlContent = htmlContent.trim();
-
-              // Base64 ise decode et (isBase64 flag'e güvenme; içerik < ile başlamıyorsa decode dene)
-              if (!htmlContent.startsWith('<')) {
-                try {
-                  htmlContent = atob(htmlContent);
-                  // Çift encode olmuşsa bir kez daha
-                  if (htmlContent && !htmlContent.trim().startsWith('<') && /^[A-Za-z0-9+/=]+$/.test(htmlContent.substring(0, 100).replace(/\s/g, ''))) {
-                    htmlContent = atob(htmlContent);
-                  }
-                } catch (e) {
-                  console.error('Base64 decode hatası', e);
-                  toast.error('Ödeme sayfası yüklenemedi (Decode hatası)');
-                  setIsLoading(false);
-                  return;
-                }
-              }
-              if (htmlContent) htmlContent = htmlContent.trim();
-
-              // HTML mi? (<!DOCTYPE veya <html veya <?xml)
-              const hasHtml = htmlContent.length > 0 && (htmlContent.toLowerCase().startsWith('<!') || htmlContent.toLowerCase().startsWith('<html') || htmlContent.toLowerCase().startsWith('<?'));
-              if (hasHtml) {
-                // Clear cart before showing 3D Secure
-                if (!directProductId) {
-                  await clearCart();
-                }
-                setIsLoading(false);
-                // Open 3D Secure page in current window (bank SMS form)
-                document.open();
-                document.write(htmlContent);
-                document.close();
-                return;
-              }
-              if (!htmlContent || htmlContent.trim().length === 0) {
-                console.error('[ÖDEME] HTML yok. API keys:', Object.keys(directData || {}));
-                toast.error(directData?.message || (locale === 'en' ? 'Payment page could not be loaded.' : 'Ödeme sayfası yüklenemedi. API HTML dönmedi.'));
-                setIsLoading(false);
-                return;
-              }
-              // İçerik var ama HTML değil – gerçek sebebi logla ve göster
-              console.error('[ÖDEME] 3DS HTML sayılmadı. Decode sonrası ilk 400 karakter:', htmlContent.substring(0, 400));
-              console.error('[ÖDEME] API status:', directData?.status, 'Keys:', Object.keys(directData || {}));
-              const errMsg = directData?.message || (locale === 'en' ? '3D Secure response was not valid HTML. See console (F12) for details.' : '3D Secure yanıtı HTML değil. Detay için F12 ile konsolu açın.');
-              toast.error(errMsg);
-              setIsLoading(false);
-              return;
-            } catch (paymentError: any) {
-              const apiMessage = paymentError?.response?.data?.message;
-              const apiError = paymentError?.response?.data;
-              console.error('[ÖDEME] Hata (tam):', { message: apiMessage, status: paymentError?.response?.status, data: apiError });
-              toast.error(apiMessage || paymentError?.message || (locale === 'en' ? 'Payment failed.' : 'Ödeme başarısız.'));
-              setIsLoading(false);
-              return;
-            }
-          } else {
-            // PayTR - use existing hosted checkout flow
-            try {
+          // Sadece PayTR kullanılıyor (iyzico kaldırıldı)
+          try {
               const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
               const paymentData = paymentResponse.data;
+
+              // Bypass: kart numarasını kullan, ödemeyi burada tamamla
+              if (paymentData.useBypass && paymentData.paymentId) {
+                const card = cardNumber.replace(/\D/g, '');
+                if (!card) {
+                  try { await paymentsApi.confirmFailed(paymentData.paymentId); } catch (_) {}
+                  toast.error(locale === 'en' ? 'Enter card number on the Payment step' : 'Ödeme adımında kart numarası girin');
+                  setStep(2);
+                  setIsLoading(false);
+                  return;
+                }
+                try {
+                  const res = await paymentsApi.bypassComplete(paymentData.paymentId, card);
+                  if (!directProductId) await clearCart();
+                  if (res.data?.success) {
+                    toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
+                    router.push(`/payment/success?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
+                  } else {
+                    toast.error(locale === 'en' ? 'Payment failed' : 'Ödeme başarısız');
+                    router.push(`/payment/fail?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
+                  }
+                } catch (err: any) {
+                  toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment failed' : 'Ödeme başarısız'));
+                  router.push(`/payment/fail?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
+                }
+                setIsLoading(false);
+                return;
+              }
 
               // Clear cart before redirecting to payment
               if (!directProductId) {
@@ -962,7 +928,6 @@ export default function CheckoutPage() {
               );
               throw paymentError;
             }
-          }
         }
       }
 
@@ -1015,7 +980,8 @@ export default function CheckoutPage() {
     );
   }
 
-  if (checkoutItems.length === 0 && !directProductId) {
+  // orderId ile geldiyse boş sepete atma (sipariş yüklenene kadar bekle); normal checkout’ta sepette ürün yoksa ilanlara yönlendir
+  if (checkoutItems.length === 0 && !directProductId && !existingOrderId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1071,6 +1037,8 @@ export default function CheckoutPage() {
             </div>
           ))}
         </div>
+
+        
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -1179,7 +1147,7 @@ export default function CheckoutPage() {
                         />
                         <div className="flex gap-2">
                           <button onClick={handleAddAddress} className="btn-primary">
-                            {t('checkout.addressSaved')}
+                            {t('common.save')}
                           </button>
                           <button
                             onClick={() => setShowAddressForm(false)}
@@ -1474,54 +1442,16 @@ export default function CheckoutPage() {
                   <CreditCardIcon className="w-5 h-5 text-primary-500" />
                   {locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}
                 </h3>
-                <div className="space-y-3">
-                  <label
-                    className={`block p-4 border-2 rounded cursor-pointer transition-all ${paymentProvider === 'iyzico'
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="iyzico"
-                        checked={paymentProvider === 'iyzico'}
-                        onChange={() => setPaymentProvider('iyzico')}
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold">{locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde'}</p>
-                        <p className="text-gray-600 text-sm">
-                          {locale === 'en' ? 'Pay with credit card, debit card or iyzico balance' : 'Kredi kartı, banka kartı veya iyzico bakiyesi ile ödeme'}
-                        </p>
-                      </div>
-                      <div className="text-2xl">💳</div>
+                <div className="block p-4 border-2 border-primary-500 bg-primary-50 rounded">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="font-semibold">{locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde'}</p>
+                      <p className="text-gray-600 text-sm">
+                        {locale === 'en' ? 'Secure payment with credit card' : 'Kredi kartı ile güvenli ödeme'}
+                      </p>
                     </div>
-                  </label>
-
-                  <label
-                    className={`block p-4 border-2 rounded cursor-pointer transition-all ${paymentProvider === 'paytr'
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="paytr"
-                        checked={paymentProvider === 'paytr'}
-                        onChange={() => setPaymentProvider('paytr')}
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold">{locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde'}</p>
-                        <p className="text-gray-600 text-sm">
-                          {locale === 'en' ? 'Secure payment with credit card' : 'Kredi kartı ile güvenli ödeme'}
-                        </p>
-                      </div>
-                      <div className="text-2xl">🏦</div>
-                    </div>
-                  </label>
+                    <div className="text-2xl">🏦</div>
+                  </div>
                 </div>
 
                 {/* Card Information */}
@@ -1697,6 +1627,7 @@ export default function CheckoutPage() {
                     <ShieldCheckIcon className="w-4 h-4 text-green-500" />
                     256-bit SSL ile şifrelenmiş güvenli ödeme
                   </div>
+                  
                 </div>
 
                 {/* Invoice Info */}
@@ -1781,9 +1712,7 @@ export default function CheckoutPage() {
                 <div className="mb-6 p-4 bg-gray-50 rounded">
                   <p className="text-sm text-gray-500 mb-1">{locale === 'en' ? 'Payment Method' : 'Ödeme Yöntemi'}</p>
                   <p className="font-medium">
-                    {paymentProvider === 'iyzico'
-                      ? (locale === 'en' ? 'Pay with iyzico' : 'iyzico ile Öde')
-                      : (locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde')}
+                    {locale === 'en' ? 'Pay with PayTR' : 'PayTR ile Öde'}
                   </p>
                 </div>
 
@@ -1867,14 +1796,18 @@ export default function CheckoutPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Subtotal' : 'Ara Toplam'}</span>
-                  <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                  <span className="font-medium">
+                    {(quote?.pricing?.subtotal ?? subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})</span>
                   <span className="font-medium">
-                    {shippingLoading ? (
+                    {quoteLoading || (shippingLoading && !quote) ? (
                       <span className="text-gray-400">Hesaplanıyor...</span>
+                    ) : quote?.pricing?.shippingAmount != null ? (
+                      `${Number(quote.pricing.shippingAmount).toFixed(2)} TL`
                     ) : shippingCost > 0 ? (
                       `${shippingCost.toFixed(2)} TL`
                     ) : (
@@ -1883,12 +1816,20 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
+                {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">{locale === 'en' ? 'Platform fee' : 'Platform ücreti'}</span>
+                    <span className="font-medium">
+                      {Number(quote!.pricing.buyerFeeAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                    </span>
+                  </div>
+                )}
 
                 <hr />
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{locale === 'en' ? 'Total' : 'Toplam'}</span>
                   <span className="font-bold text-primary-500">
-                    {shippingLoading ? (
+                    {(quoteLoading || (shippingLoading && !quote)) ? (
                       <span className="text-gray-400">...</span>
                     ) : (
                       `${grandTotal.toFixed(2)} TL`

@@ -6,9 +6,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { listingsApi, api, mediaApi } from '@/lib/api';
+import { listingsApi, api, mediaApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { SimpleDropdown } from '@/components/SimpleDropdown';
 
 interface Category {
   id: string;
@@ -40,36 +41,7 @@ const getConditions = (locale: string) => [
   { value: 'fair', label: locale === 'en' ? 'Fair' : 'Orta' },
 ];
 
-const BRANDS = [
-  'Hot Wheels',
-  'Matchbox',
-  'Majorette',
-  'Tomica',
-  'Minichamps',
-  'AutoArt',
-  'Maisto',
-  'Bburago',
-  'Welly',
-];
-
 const getOtherLabel = (locale: string) => locale === 'en' ? 'Other' : 'Diğer';
-
-const SCALES = [
-  '1:18',
-  '1:24',
-  '1:32',
-  '1:43',
-  '1:64',
-  '1:72',
-  '1:87',
-];
-
-const MATERIALS: { slug: string; label: string; labelEn: string }[] = [
-  { slug: 'diecast', label: 'Diecast (Metal)', labelEn: 'Diecast (Metal)' },
-  { slug: 'resin', label: 'Resin (Reçine)', labelEn: 'Resin' },
-  { slug: 'composite', label: 'Composite (Kompozit)', labelEn: 'Composite' },
-  { slug: 'plastic', label: 'Plastic (Plastik)', labelEn: 'Plastic' },
-];
 
 interface ListingLimits {
   currentCount: number;
@@ -96,6 +68,9 @@ export default function NewListingPage() {
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [models, setModels] = useState<CarModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [scaleList, setScaleList] = useState<string[]>([]);
+  const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
+  const [manufacturerList, setManufacturerList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i); // 2025..1950
 
@@ -109,6 +84,7 @@ export default function NewListingPage() {
     carModelId: '',
     scale: '1:64',
     material: '' as string,
+    manufacturerId: '' as string,
     year: '' as string | number,
     isTradeEnabled: false,
     isSet: false,
@@ -118,6 +94,8 @@ export default function NewListingPage() {
   const [uploadingImages, setUploadingImages] = useState(false);
   // Store preview URLs (cardUrl from upload response for display)
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [commissionPreview, setCommissionPreview] = useState<{ sellerFeeAmount: number; sellerNetAmount: number } | null>(null);
+  const [commissionPreviewLoading, setCommissionPreviewLoading] = useState(false);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -170,6 +148,38 @@ export default function NewListingPage() {
       }
     }
   }, []);
+
+  // Commission preview when price/category change (for seller: estimated fee and net)
+  useEffect(() => {
+    const amount = Number(formData.price);
+    if (Number.isNaN(amount) || amount < 0) {
+      setCommissionPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setCommissionPreviewLoading(true);
+    api
+      .get('/orders/commission-preview', {
+        params: { amount: formData.price, categoryId: formData.categoryId || undefined },
+      })
+      .then((res) => {
+        if (!cancelled && res.data) {
+          setCommissionPreview({
+            sellerFeeAmount: Number(res.data.sellerFeeAmount ?? 0),
+            sellerNetAmount: Number(res.data.sellerNetAmount ?? 0),
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCommissionPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCommissionPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.price, formData.categoryId]);
 
   // Save form data to localStorage whenever it changes (debounced)
   useEffect(() => {
@@ -299,20 +309,6 @@ export default function NewListingPage() {
     }
   };
 
-  const fetchBrands = async () => {
-    setBrandsLoading(true);
-    try {
-      const response = await api.get('/brands');
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setBrands(data);
-    } catch (error) {
-      console.error('Failed to fetch brands:', error);
-      toast.error(locale === 'en' ? 'Failed to load brands' : 'Markalar yüklenemedi');
-    } finally {
-      setBrandsLoading(false);
-    }
-  };
-
   const fetchModels = async (brandSlug: string) => {
     setModelsLoading(true);
     setModels([]);
@@ -329,7 +325,40 @@ export default function NewListingPage() {
   };
 
   useEffect(() => {
-    fetchBrands();
+    const fetchFilters = async () => {
+      setBrandsLoading(true);
+      try {
+        const response = await listingsApi.getFilters();
+        const data = response.data as {
+          scales?: string[];
+          materials?: Array<{ slug: string; label: string }>;
+          brands?: Array<{ id: string; name: string; slug: string }>;
+          manufacturers?: Array<{ id: string; name: string; slug: string }>;
+        };
+        if (data.scales?.length) setScaleList(data.scales);
+        if (data.materials?.length) setMaterialList(data.materials);
+        if (data.brands?.length) setBrands(data.brands);
+        if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
+        if (!data.brands?.length) {
+          const brandsRes = await brandsApi.findAll();
+          const raw = brandsRes.data;
+          const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+          if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch filters:', error);
+        try {
+          const brandsRes = await brandsApi.findAll();
+          const raw = brandsRes.data;
+          const list = Array.isArray(raw) ? raw : (raw as { data?: unknown[] })?.data || [];
+          if (list.length) setBrands(list as Array<{ id: string; name: string; slug: string }>);
+        } catch (_) {}
+        toast.error(locale === 'en' ? 'Failed to load filters' : 'Filtreler yüklenemedi');
+      } finally {
+        setBrandsLoading(false);
+      }
+    };
+    fetchFilters();
   }, []);
 
   useEffect(() => {
@@ -457,6 +486,7 @@ export default function NewListingPage() {
         carModelId: formData.carModelId || undefined,
         scale: formData.scale || undefined,
         material: formData.material || undefined,
+        manufacturerId: formData.manufacturerId || undefined,
         year: formData.year ? Number(formData.year) : undefined,
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: false,
@@ -641,58 +671,33 @@ export default function NewListingPage() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Marka
-                </label>
-                <select
-                  value={formData.brandId}
-                  onChange={(e) => {
-                    const newBrandId = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      brandId: newBrandId,
-                      carModelId: ''
-                    }));
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={brandsLoading}
-                >
-                  <option value="">{brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}</option>
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Marka"
+                value={formData.brandId}
+                onValueChange={(newBrandId) =>
+                  setFormData((prev) => ({ ...prev, brandId: newBrandId, carModelId: '' }))
+                }
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
+                disabled={brandsLoading}
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model
-                </label>
-                <select
-                  value={formData.carModelId}
-                  onChange={(e) => setFormData({ ...formData, carModelId: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  disabled={!formData.brandId || modelsLoading}
-                >
-                  <option value="">
-                    {!formData.brandId
-                      ? 'Önce marka seçin'
-                      : modelsLoading
-                        ? 'Yükleniyor...'
-                        : models.length === 0
-                          ? 'Bu markaya ait model yok'
-                          : 'Model Seçin'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SimpleDropdown
+                label="Model"
+                value={formData.carModelId}
+                onValueChange={(carModelId) => setFormData({ ...formData, carModelId })}
+                options={models.map((m) => ({ value: m.id, label: m.name }))}
+                placeholder={
+                  !formData.brandId
+                    ? 'Önce marka seçin'
+                    : modelsLoading
+                      ? 'Yükleniyor...'
+                      : models.length === 0
+                        ? 'Bu markaya ait model yok'
+                        : 'Model Seçin'
+                }
+                disabled={!formData.brandId || modelsLoading}
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -703,7 +708,7 @@ export default function NewListingPage() {
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
-                  {SCALES.map((scale) => (
+                  {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
@@ -721,9 +726,32 @@ export default function NewListingPage() {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 >
                   <option value="">{locale === 'en' ? 'Select material' : 'Malzeme seçin'}</option>
-                  {MATERIALS.map((m) => (
+                  {(materialList.length > 0 ? materialList : [
+                    { slug: 'diecast', label: 'Diecast (Metal)' },
+                    { slug: 'resin', label: 'Resin (Reçine)' },
+                    { slug: 'composite', label: 'Composite (Kompozit)' },
+                    { slug: 'plastic', label: 'Plastic (Plastik)' },
+                  ]).map((m) => (
                     <option key={m.slug} value={m.slug}>
-                      {locale === 'en' ? m.labelEn : m.label}
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'en' ? 'Manufacturer' : 'Üretici'}
+                </label>
+                <select
+                  value={formData.manufacturerId}
+                  onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                >
+                  <option value="">{locale === 'en' ? 'Select manufacturer' : 'Üretici seçin'}</option>
+                  {manufacturerList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
@@ -761,7 +789,7 @@ export default function NewListingPage() {
                 <p className="text-sm text-gray-600">
                   {limits?.canTrade
                     ? (locale === 'en' ? 'Also makes this product available for trade' : 'Bu ürünü takas için de açık tutar')
-                    : (locale === 'en' ? 'Trade feature requires Premium membership' : 'Takas özelliği Premium üyelik gerektirir')}
+                    : (locale === 'en' ? 'Trade feature requires Basic or higher membership' : 'Takas özelliği Temel veya üstü üyelik gerektirir')}
                 </p>
               </div>
               {limits?.canTrade ? (
@@ -841,6 +869,19 @@ export default function NewListingPage() {
                   </p>
                 </div>
               </div>
+              {(commissionPreviewLoading || commissionPreview) && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                  <p className="text-gray-600 font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
+                  {commissionPreviewLoading ? (
+                    <span className="text-gray-400">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
+                  ) : commissionPreview ? (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-green-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Section: Images */}

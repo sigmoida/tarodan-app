@@ -77,6 +77,11 @@ export class AdminProductQueryDto {
 }
 
 export class AdminOrderQueryDto {
+  @ApiPropertyOptional({ example: 'ORD-123' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({ enum: OrderStatus })
   @IsOptional()
   @IsEnum(OrderStatus)

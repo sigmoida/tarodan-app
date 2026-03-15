@@ -4,6 +4,7 @@ import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/c
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
+import { RatingService } from '../rating/rating.service';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -26,6 +27,7 @@ export class UserService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly ratingService: RatingService,
   ) {}
 
   /**
@@ -363,8 +365,9 @@ export class UserService {
 
     // All checks passed, delete account
     // Use transaction to ensure atomicity
+    let productIdsToRecalc: string[] = [];
     try {
-      await this.prisma.$transaction(async (tx) => {
+      productIdsToRecalc = await this.prisma.$transaction(async (tx) => {
         // 1. Delete authentication tokens
         await tx.refreshToken.deleteMany({ where: { userId } });
         await tx.passwordResetToken.deleteMany({ where: { userId } });
@@ -397,7 +400,12 @@ export class UserService {
         // 7. Delete product likes by user
         await tx.productLike.deleteMany({ where: { userId } });
         
-        // 8. Delete product ratings by user
+        // 8. Delete product ratings by user (productIds collected before delete for recalc)
+        const userProductRatings = await tx.productRating.findMany({
+          where: { userId },
+          select: { productId: true },
+        });
+        const productIdsToRecalc = [...new Set(userProductRatings.map((r) => r.productId))];
         await tx.productRating.deleteMany({ where: { userId } });
         
         // 9. Delete user ratings given and received
@@ -483,9 +491,20 @@ export class UserService {
         
         // 23. Finally, delete the user
         await tx.user.delete({ where: { id: userId } });
+
+        return productIdsToRecalc;
       }, {
         timeout: 60000, // 60 second timeout for large deletions
       });
+
+      // Recalc Product.averageRating/ratingCount for products that had ratings from this user
+      for (const productId of productIdsToRecalc) {
+        try {
+          await this.ratingService.updateProductRatingStats(productId);
+        } catch (e) {
+          this.logger.warn(`Failed to recalc rating stats for product ${productId} after user delete`);
+        }
+      }
 
       this.logger.log(`User account deleted: ${userId}`);
 
@@ -697,9 +716,8 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Get seller stats
-    // Count only active listings (exclude inactive, draft, and pending for public profile)
-    const [totalListings, totalSales, totalTrades, ratings] = await Promise.all([
+    // Get seller stats + followers count
+    const [totalListings, totalSales, totalTrades, ratings, followersCount] = await Promise.all([
       this.prisma.product.count({ 
         where: { 
           sellerId: userId, 
@@ -714,10 +732,11 @@ export class UserService {
         } 
       }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId },
+        where: { receiverId: userId, status: 'approved' },
         _avg: { score: true },
         _count: true,
       }),
+      this.prisma.userFollow.count({ where: { followingId: userId } }),
     ]);
 
     // Resolve avatar URL (S3 key → presigned URL)
@@ -726,6 +745,7 @@ export class UserService {
     return {
       ...user,
       avatarUrl: resolvedAvatarUrl,
+      followersCount,
       stats: {
         totalListings,
         totalSales,
@@ -873,7 +893,17 @@ export class UserService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return { following };
+    const resolved = await Promise.all(
+      following.map(async (f: any) => ({
+        ...f,
+        following: f.following ? {
+          ...f.following,
+          avatarUrl: await this.resolveAvatarUrl(f.following.avatarUrl),
+        } : f.following,
+      })),
+    );
+
+    return { following: resolved };
   }
 
   // ==========================================================================
@@ -1431,23 +1461,6 @@ export class UserService {
             isVerified: true,
           },
         },
-        items: {
-          include: {
-            product: {
-              include: {
-                images: {
-                  take: 1,
-                  orderBy: { sortOrder: 'asc' },
-                },
-              },
-            },
-          },
-          take: 4,
-          orderBy: [
-            { isFeatured: 'desc' },
-            { sortOrder: 'asc' },
-          ],
-        },
         _count: {
           select: { items: true, likes: true },
         },
@@ -1460,12 +1473,20 @@ export class UserService {
     });
 
     return Promise.all(collections.map(async (collection) => {
-      const items = await Promise.all(collection.items.map(async (item) => ({
-        id: item.id,
-        productId: item.productId,
-        productTitle: item.product?.title || item.customTitle || 'Ürün',
-        productPrice: item.product?.price ? Number(item.product.price) : null,
-        productImage: this.resolveProductImageUrl(item.customImageUrl || item.product?.images?.[0]?.cardKey),
+      // Always show the collection owner's own active products so products always match the user
+      const ownProducts = await this.prisma.product.findMany({
+        where: { sellerId: collection.user.id, status: 'active' },
+        take: 5,
+        include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+        orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
+      });
+
+      const items = await Promise.all(ownProducts.map(async p => ({
+        id: p.id,
+        productId: p.id,
+        productTitle: p.title,
+        productPrice: Number(p.price),
+        productImage: this.resolveProductImageUrl(p.images[0]?.cardKey),
       })));
 
       return {
@@ -1558,22 +1579,21 @@ export class UserService {
 
     const topCollection = topCollectionData.collection;
 
-    // Get collection items with product details for display
-    const displayItems = await this.prisma.collectionItem.findMany({
-      where: { collectionId: topCollection.id },
-      take: 4,
-      include: {
-        product: {
-          include: {
-            images: { take: 1 },
-          },
-        },
-      },
-      orderBy: [
-        { isFeatured: 'desc' }, // Featured items first
-        { sortOrder: 'asc' },
-      ],
+    // Always show the collector's own active product listings (ensures products match the user)
+    const ownProducts = await this.prisma.product.findMany({
+      where: { sellerId: topCollection.user.id, status: 'active' },
+      take: 5,
+      include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+      orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
     });
+
+    const itemsResult = await Promise.all(ownProducts.map(async p => ({
+      id: p.id,
+      productId: p.id,
+      productTitle: p.title,
+      productPrice: Number(p.price),
+      productImage: this.resolveProductImageUrl(p.images[0]?.cardKey),
+    })));
 
     return {
       id: topCollection.id,
@@ -1592,15 +1612,7 @@ export class UserService {
         bio: topCollection.user.bio,
         isVerified: topCollection.user.isVerified,
       },
-      items: await Promise.all(displayItems
-        .filter(item => item.product !== null)
-        .map(async item => ({
-          id: item.id,
-          productId: item.product!.id,
-          productTitle: item.product!.title,
-          productPrice: Number(item.product!.price),
-          productImage: this.resolveProductImageUrl(item.product!.images[0]?.cardKey),
-        }))),
+      items: itemsResult,
     };
   }
 
@@ -1872,7 +1884,7 @@ export class UserService {
             where: { sellerId: seller.id, status: 'completed' },
           }),
           this.prisma.rating.aggregate({
-            where: { receiverId: seller.id },
+            where: { receiverId: seller.id, status: 'approved' },
             _avg: { score: true },
             _count: true,
           }),

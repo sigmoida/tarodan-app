@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi, manufacturersApi } from '@/lib/api';
+import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
 
 interface Category {
     id: string;
@@ -19,18 +19,6 @@ interface Manufacturer {
     name: string;
     slug: string;
 }
-
-// Ölçek listesi
-const SCALES_MENU = {
-    tr: {
-        title: 'ÖLÇEK',
-        items: ['1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'],
-    },
-    en: {
-        title: 'SCALE',
-        items: ['1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'],
-    },
-};
 
 // Bar: Yeni Gelenler, Çok Satanlar, İndirimler, Ön Sipariş, Markalar, Üreticiler, Ölçek
 const CATEGORY_BAR_ITEMS = {
@@ -96,6 +84,7 @@ export default function CategoryNavBar() {
     // Fetch data from APIs
     const [categories, setCategories] = useState<Category[]>([]);
     const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+    const [scaleItems, setScaleItems] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -111,19 +100,34 @@ export default function CategoryNavBar() {
         const fetchManufacturers = async () => {
             try {
                 const response = await manufacturersApi.findAll();
-                const items = Array.isArray(response.data) ? response.data : response.data.data || [];
-                setManufacturers(items);
+                const raw = response.data;
+                const items = Array.isArray(raw) ? raw : (raw?.data ?? []);
+                setManufacturers(Array.isArray(items) ? items : []);
             } catch (error) {
                 console.error('Failed to fetch manufacturers:', error);
             }
         };
 
+        const fetchFilters = async () => {
+            try {
+                const response = await listingsApi.getFilters();
+                const data = response.data as { scales?: string[] };
+                if (data.scales?.length) setScaleItems(data.scales);
+            } catch {
+                // Keep empty, will use fallback
+            }
+        };
+
         fetchCategories();
         fetchManufacturers();
+        fetchFilters();
     }, []);
 
     const categoryItems = CATEGORY_BAR_ITEMS[locale as 'tr' | 'en'];
-    const scalesMenu = SCALES_MENU[locale as 'tr' | 'en'];
+    const scalesMenu = {
+        title: locale === 'en' ? 'SCALE' : 'ÖLÇEK',
+        items: scaleItems.length > 0 ? scaleItems : ['1:18', '1:24', '1:43', '1:64', '1:87'],
+    };
 
     // Group manufacturers alphabetically
     const manufacturerGroups = groupManufacturers(manufacturers);
@@ -154,6 +158,18 @@ export default function CategoryNavBar() {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
     }, []);
+
+    // Scroll yapılınca dropdown kapat; aksi halde fixed panel nav'dan ayrı kalıp beyaz alan kalıyor
+    useEffect(() => {
+        const handleScroll = () => {
+            if (activeDropdown) {
+                if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                setActiveDropdown(null);
+            }
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [activeDropdown]);
 
     const dropdownPortal = typeof document !== 'undefined' ? createPortal(
         <AnimatePresence>
@@ -209,7 +225,7 @@ export default function CategoryNavBar() {
                                     {vehicleTypes.map((type) => (
                                         <Link
                                             key={type.slug}
-                                            href={`/listings?vehicleType=${encodeURIComponent(type.slug)}`}
+                                            href={`/listings?category=${encodeURIComponent(type.slug)}`}
                                             className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
                                         >
                                             {type.label}

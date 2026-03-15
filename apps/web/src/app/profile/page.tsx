@@ -31,7 +31,6 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import UserAvatar from '@/components/UserAvatar';
 
 interface MembershipTier {
@@ -86,10 +85,13 @@ export default function ProfilePage() {
   const pathname = usePathname();
   const { t } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, user, logout, refreshUserData } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const prevPathnameRef = useRef<string | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ offers: 0, trades: 0 });
+
+  useEffect(() => { setMounted(true); }, []);
 
   const wishlistQuery = useQuery({
     queryKey: ['wishlist'],
@@ -99,22 +101,22 @@ export default function ProfilePage() {
       const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
       return Array.isArray(items) ? items : [];
     },
-    enabled: !!isAuthenticated,
+    enabled: !authLoading && !!isAuthenticated,
     meta: { page: 'profile-wishlist-count' },
   });
   const wishlistCount = wishlistQuery.data?.length ?? 0;
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=/profile');
       return;
     }
     if (user) {
       setProfileFromAuthStore();
     }
     loadProfile();
-  }, [isAuthenticated, authLoading]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   // Refresh profile when pathname changes (e.g., returning from edit/delete page)
   useEffect(() => {
@@ -153,7 +155,8 @@ export default function ProfilePage() {
     const tierType = user.membershipTier || 'free';
     const tierDefaults: Record<string, MembershipTier> = {
       free: { type: 'free', name: 'Ücretsiz', maxFreeListings: 5, maxTotalListings: 10, maxImagesPerListing: 3, canTrade: false, canCreateCollections: false, featuredListingSlots: 0, commissionDiscount: 0, isAdFree: false },
-      premium: { type: 'premium', name: 'Premium', maxFreeListings: -1, maxTotalListings: -1, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 3, commissionDiscount: 1, isAdFree: true },
+      basic: { type: 'basic', name: 'Temel', maxFreeListings: 15, maxTotalListings: 50, maxImagesPerListing: 6, canTrade: true, canCreateCollections: true, featuredListingSlots: 2, commissionDiscount: 0.5, isAdFree: false },
+      premium: { type: 'premium', name: 'Premium', maxFreeListings: 50, maxTotalListings: 200, maxImagesPerListing: 10, canTrade: true, canCreateCollections: true, featuredListingSlots: 10, commissionDiscount: 1, isAdFree: true },
       business: { type: 'business', name: 'İş', maxFreeListings: 200, maxTotalListings: 1000, maxImagesPerListing: 15, canTrade: true, canCreateCollections: true, featuredListingSlots: 50, commissionDiscount: 1.5, isAdFree: true },
     };
     
@@ -274,8 +277,28 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!mounted || authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-orange-500 pt-8 pb-24">
+          <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 -mt-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded p-5 shadow-sm border border-gray-100 animate-pulse">
+                <div className="h-12 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const tierColors = {
     free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
@@ -304,7 +327,7 @@ export default function ProfilePage() {
         { icon: TagIcon, label: t('order.myOrders'), href: '/orders', desc: 'Sipariş geçmişiniz' },
         { icon: CurrencyDollarIcon, label: t('offer.myOffers'), href: '/offers', desc: 'Teklif yönetimi', badge: pendingCounts.offers },
         { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', desc: 'Favori ürünleriniz' },
-        { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz', badge: pendingCounts.trades },
+        { icon: ArrowsRightLeftIcon, label: t('trade.myTrades'), href: '/trades', desc: 'Takas teklifleriniz' },
         { icon: SparklesIcon, label: t('membership.title'), href: '/profile/membership', desc: 'Üyelik planınızı yönetin' },
       ],
     },
@@ -349,7 +372,7 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar: initials only (Trendyol-style) */}
               <div className="relative flex-shrink-0">
-                <UserAvatar displayName={profile.displayName} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
+                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
               </div>
               
               {/* User Info */}
@@ -376,7 +399,7 @@ export default function ProfilePage() {
                       {profile.membership.tier.type === 'business' && <span className="mr-1">👑</span>}
                       {profile.membership.tier.type === 'premium' && <span className="mr-1">⭐</span>}
                       {profile.membership.tier.type === 'free' && <span className="mr-1">🆓</span>}
-                      {profile.membership.tier.name} Üyelik
+                      {profile.membership.tier.name}
                     </span>
                   </div>
                 )}
@@ -481,7 +504,7 @@ export default function ProfilePage() {
                     {profile.membership.tier.type === 'business' && '👑 '}
                     {profile.membership.tier.type === 'premium' && '⭐ '}
                     {profile.membership.tier.type === 'free' && '🆓 '}
-                    {profile.membership.tier.name} Üyelik
+                    {profile.membership.tier.name}
                   </h3>
                   <p className="text-sm text-gray-500">Mevcut planınız</p>
                 </div>

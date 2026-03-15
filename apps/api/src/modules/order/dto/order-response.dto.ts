@@ -1,5 +1,32 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * Standard pricing breakdown used across order, payment, and quote responses.
+ * Frontend should use this instead of computing totals locally.
+ */
+export class PricingBreakdownDto {
+  @ApiProperty({ example: 250.0, description: 'Product/subtotal before shipping and buyer fee' })
+  subtotal: number;
+
+  @ApiProperty({ example: 29.99, description: 'Shipping cost' })
+  shippingAmount: number;
+
+  @ApiProperty({ example: 12.5, description: 'Platform fee paid by buyer' })
+  buyerFeeAmount: number;
+
+  @ApiProperty({ example: 10.0, description: 'Platform fee deducted from seller' })
+  sellerFeeAmount: number;
+
+  @ApiProperty({ example: 22.5, description: 'Total commission (buyer + seller)' })
+  commissionAmount: number;
+
+  @ApiProperty({ example: 292.49, description: 'Total amount paid by buyer' })
+  totalAmount: number;
+
+  @ApiProperty({ example: 240.0, description: 'Net amount to seller (subtotal - sellerFeeAmount)' })
+  sellerNetAmount: number;
+}
+
 export class OrderProductDto {
   @ApiProperty({ example: 'uuid' })
   id: string;
@@ -94,6 +121,18 @@ export class OrderResponseDto {
 
   @ApiProperty({ example: 12.5 })
   commissionAmount: number;
+
+  @ApiPropertyOptional({ type: PricingBreakdownDto, description: 'Standard pricing breakdown' })
+  pricing?: PricingBreakdownDto;
+
+  @ApiPropertyOptional({ example: 12.5, description: 'Platform fee paid by buyer' })
+  buyerFeeAmount?: number;
+
+  @ApiPropertyOptional({ example: 10.0, description: 'Platform fee deducted from seller' })
+  sellerFeeAmount?: number;
+
+  @ApiPropertyOptional({ example: 29.99, description: 'Shipping cost' })
+  shippingCost?: number;
 
   @ApiProperty({ example: 'pending_payment' })
   status: string;

@@ -10,6 +10,10 @@ import {
 import { PrismaService } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import {
+  fulltextCollectionSearch,
+  fulltextUserDisplayNameSearch,
+} from '../../common/helpers/fulltext-search';
+import {
   CreateCollectionDto,
   UpdateCollectionDto,
   AddCollectionItemDto,
@@ -23,8 +27,8 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
 import { StorageService } from '../storage/storage.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { SearchService } from '../search/search.service';
+import { SearchIndexingService } from '../search/search-indexing.service';
 import * as https from 'https';
 import * as http from 'http';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,8 +52,8 @@ export class CollectionService {
     private readonly notificationService: NotificationService,
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,
-    private readonly searchIndexing: SearchIndexingService,
     private readonly searchService: SearchService,
+    private readonly searchIndexing: SearchIndexingService,
   ) {}
 
   // ==========================================================================
@@ -105,10 +109,6 @@ export class CollectionService {
           orderBy: { sortOrder: 'asc' },
         },
       },
-    });
-
-    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {
-      this.logger.warn('Failed to queue collection index for ES');
     });
 
     return await this.mapCollectionToDto(collection, false);
@@ -172,7 +172,7 @@ export class CollectionService {
         }
         const arr = imagesByProduct.get(img.productId)!;
         if (arr.length < 1) {
-          arr.push({ url: this.storageService.getPublicAssetUrl(img.cardKey) });
+          arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
         }
       }
       
@@ -237,74 +237,55 @@ export class CollectionService {
     slug: string,
     viewerId?: string,
   ): Promise<CollectionResponseDto> {
-    // Try exact slug first, then try stripping "collection-" prefix if present
-    const slugsToTry = [slug];
-    if (slug.startsWith('collection-')) {
-      slugsToTry.push(slug.replace('collection-', ''));
-    }
-
-    let collection = null;
-    for (const s of slugsToTry) {
-      const basic = await this.prisma.collection.findFirst({
-        where: { slug: s },
-        select: { id: true },
-      });
-      
-      if (!basic) continue;
-      
-      collection = await this.prisma.collection.findFirst({
-        where: { id: basic.id },
-        include: {
-          user: { select: { id: true, displayName: true } },
-          category: { select: { id: true, name: true, slug: true } },
-          items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  price: true,
-                  status: true,
-                },
+    const collection = await this.prisma.collection.findFirst({
+      where: { slug },
+      include: {
+        user: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                price: true,
+                status: true,
               },
             },
-            orderBy: { sortOrder: 'asc' },
           },
+          orderBy: { sortOrder: 'asc' },
         },
-      });
-      
-      if (collection) {
-        // Fetch images separately for each product
-        const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
-        if (productIds.length > 0) {
-          const productImages = await this.prisma.productImage.findMany({
-            where: { productId: { in: productIds } },
-            orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
-          });
-          
-          const imagesByProduct = new Map<string, any[]>();
-          for (const img of productImages) {
-            if (!imagesByProduct.has(img.productId)) {
-              imagesByProduct.set(img.productId, []);
-            }
-            const arr = imagesByProduct.get(img.productId)!;
-            if (arr.length < 1) {
-              arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
-            }
+      },
+    });
+
+    if (collection) {
+      const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
+      if (productIds.length > 0) {
+        const productImages = await this.prisma.productImage.findMany({
+          where: { productId: { in: productIds } },
+          orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+        });
+
+        const imagesByProduct = new Map<string, any[]>();
+        for (const img of productImages) {
+          if (!imagesByProduct.has(img.productId)) {
+            imagesByProduct.set(img.productId, []);
           }
-          
-          // Attach images to products
-          if (collection.items) {
-            for (const item of collection.items) {
-              if (item.product && imagesByProduct.has(item.product.id)) {
-                (item.product as any).images = imagesByProduct.get(item.product.id) || [];
-              } else if (item.product) {
-                (item.product as any).images = [];
-              }
+          const arr = imagesByProduct.get(img.productId)!;
+          if (arr.length < 1) {
+            arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
+          }
+        }
+
+        if (collection.items) {
+          for (const item of collection.items) {
+            if (item.product && imagesByProduct.has(item.product.id)) {
+              (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+            } else if (item.product) {
+              (item.product as any).images = [];
             }
           }
         }
-        break;
       }
     }
 
@@ -461,14 +442,29 @@ export class CollectionService {
     });
 
     if (esResult && esResult.ids.length > 0) {
-      return this.hydrateCollections(esResult.ids, esResult.total, safePage, safePageSize);
+      const validIds = esResult.ids.filter((id): id is string => id != null && id !== '');
+      const expectedCount = Math.min(esResult.total, safePageSize);
+
+      if (validIds.length < expectedCount * 0.5) {
+        this.logger.warn(
+          `ES returned ${validIds.length} valid IDs but expected ~${expectedCount} (total=${esResult.total}) – falling back to Prisma and triggering reindex`,
+        );
+        this.searchIndexing.queueReindexAllCollections().catch(() => {});
+        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+      }
+
+      const hydrated = await this.hydrateCollections(validIds, esResult.total, safePage, safePageSize);
+      if (hydrated.collections.length < validIds.length * 0.5) {
+        this.logger.warn(
+          `ES returned ${validIds.length} IDs but Prisma hydrated only ${hydrated.collections.length} – stale index, falling back to Prisma`,
+        );
+        this.searchIndexing.queueReindexAllCollections().catch(() => {});
+        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+      }
+      return hydrated;
     }
 
-    if (esResult && esResult.total === 0) {
-      return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
-    }
-
-    // Prisma fallback
+    // ES returned null (unavailable) or 0 results – fall back to Prisma (source of truth).
     return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
   }
 
@@ -529,14 +525,24 @@ export class CollectionService {
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
-      ...(search && search.trim() !== '' ? {
-        OR: [
-          { name: { contains: search.trim(), mode: 'insensitive' } },
-          { description: { contains: search.trim(), mode: 'insensitive' } },
-          { user: { displayName: { contains: search.trim(), mode: 'insensitive' } } },
-        ],
-      } : {}),
     };
+
+    if (search && search.trim() !== '') {
+      const trimmed = search.trim();
+      const [collectionIds, userIds] = await Promise.all([
+        fulltextCollectionSearch(this.prisma, trimmed),
+        fulltextUserDisplayNameSearch(this.prisma, trimmed),
+      ]);
+
+      if (collectionIds.length === 0 && userIds.length === 0) {
+        return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
+      }
+
+      const conditions: Prisma.CollectionWhereInput[] = [];
+      if (collectionIds.length > 0) conditions.push({ id: { in: collectionIds } });
+      if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
+      where.OR = conditions;
+    }
 
     let orderBy: Prisma.CollectionOrderByWithRelationInput;
     let needsInMemorySort = false;
@@ -671,10 +677,6 @@ export class CollectionService {
           orderBy: { sortOrder: 'asc' },
         },
       },
-    });
-
-    this.searchIndexing.queueIndexCollection(updated.id).catch(() => {
-      this.logger.warn('Failed to queue collection index for ES');
     });
 
     return await this.mapCollectionToDto(updated, false);
@@ -902,9 +904,6 @@ export class CollectionService {
       where: { id: collectionId },
     });
 
-    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {
-      this.logger.warn('Failed to queue collection remove from ES');
-    });
   }
 
   // ==========================================================================
@@ -979,7 +978,6 @@ export class CollectionService {
         },
       });
 
-      this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
       return await this.mapItemToDto(item);
     }
 
@@ -1005,13 +1003,14 @@ export class CollectionService {
         customModel: dto.customModel,
         customYear: dto.customYear,
         customScale: dto.customScale,
+        customManufacturer: dto.customManufacturer,
+        customMaterial: dto.customMaterial,
         customImageUrl: imageUrl || dto.customImageUrl,
         sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         isFeatured: dto.isFeatured ?? false,
       },
     });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
     return await this.mapItemToDto(item);
   }
 
@@ -1046,8 +1045,6 @@ export class CollectionService {
     await this.prisma.collectionItem.delete({
       where: { id: itemId },
     });
-
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
   }
 
   // ==========================================================================
@@ -1508,6 +1505,8 @@ export class CollectionService {
           customModel: item.customModel,
           customYear: item.customYear,
           customScale: item.customScale,
+          customManufacturer: item.customManufacturer,
+          customMaterial: item.customMaterial,
           customImageUrl: item.customImageUrl,
         };
       }
@@ -1568,6 +1567,8 @@ export class CollectionService {
         customModel: item?.customModel,
         customYear: item?.customYear,
         customScale: item?.customScale,
+        customManufacturer: item?.customManufacturer,
+        customMaterial: item?.customMaterial,
         customImageUrl: item?.customImageUrl,
       };
     }

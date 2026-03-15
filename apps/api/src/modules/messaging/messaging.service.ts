@@ -42,9 +42,17 @@ export class MessagingService {
     private readonly storageService: StorageService,
   ) {}
 
-  /**
-   * Resolve product image URL (S3 key -> presigned URL)
-   */
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch { return null; }
+    }
+    return null;
+  }
+
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
@@ -280,11 +288,11 @@ export class MessagingService {
         const [participant1, participant2, product, unreadCount] = await Promise.all([
           this.prisma.user.findUnique({
             where: { id: thread.participant1Id },
-            select: { id: true, displayName: true },
+            select: { id: true, displayName: true, avatarUrl: true },
           }),
           this.prisma.user.findUnique({
             where: { id: thread.participant2Id },
-            select: { id: true, displayName: true },
+            select: { id: true, displayName: true, avatarUrl: true },
           }),
           thread.productId
             ? this.prisma.product.findUnique({
@@ -308,8 +316,10 @@ export class MessagingService {
           id: thread.id,
           participant1Id: thread.participant1Id,
           participant1Name: participant1?.displayName || '',
+          participant1AvatarUrl: await this.resolveAvatarUrl(participant1?.avatarUrl),
           participant2Id: thread.participant2Id,
           participant2Name: participant2?.displayName || '',
+          participant2AvatarUrl: await this.resolveAvatarUrl(participant2?.avatarUrl),
           productId: thread.productId || undefined,
           productTitle: product?.title,
           productImage: this.resolveProductImageUrl(product?.images?.[0]?.cardKey),
@@ -354,11 +364,11 @@ export class MessagingService {
       await Promise.all([
         this.prisma.user.findUnique({
           where: { id: thread.participant1Id },
-          select: { id: true, displayName: true },
+          select: { id: true, displayName: true, avatarUrl: true },
         }),
         this.prisma.user.findUnique({
           where: { id: thread.participant2Id },
-          select: { id: true, displayName: true },
+          select: { id: true, displayName: true, avatarUrl: true },
         }),
         thread.productId
           ? this.prisma.product.findUnique({
@@ -388,8 +398,10 @@ export class MessagingService {
       id: thread.id,
       participant1Id: thread.participant1Id,
       participant1Name: participant1?.displayName || '',
+      participant1AvatarUrl: await this.resolveAvatarUrl(participant1?.avatarUrl),
       participant2Id: thread.participant2Id,
       participant2Name: participant2?.displayName || '',
+      participant2AvatarUrl: await this.resolveAvatarUrl(participant2?.avatarUrl),
       productId: thread.productId || undefined,
       productTitle: product?.title,
       productImage: this.resolveProductImageUrl(product?.images?.[0]?.cardKey),

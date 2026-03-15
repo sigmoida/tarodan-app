@@ -66,7 +66,7 @@ export default function RegisterPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
   }
@@ -78,7 +78,7 @@ export default function RegisterPage() {
           <p className="text-gray-600 mb-4">
             {locale === 'en' ? 'You are already logged in.' : 'Zaten giriş yapmışsınız.'}
           </p>
-          <Link href="/" className="inline-block px-6 py-2.5 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 transition-colors" style={{ borderRadius: '6px' }}>
+          <Link href="/" className="inline-block px-6 py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 transition-all duration-200 ease-premium">
             {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
           </Link>
         </div>
@@ -88,11 +88,11 @@ export default function RegisterPage() {
 
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
         <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={40} height={40} className="rounded-lg object-contain" />
-            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
               Tarodan
             </span>
           </Link>
@@ -108,7 +108,7 @@ export default function RegisterPage() {
             <div className="bg-white rounded-3xl shadow-2xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center relative overflow-hidden">
               {/* Decorative background circles */}
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-50 rounded-full opacity-60" />
-              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-orange-50 rounded-full opacity-60" />
+              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary-50 rounded-full opacity-60" />
               
               <div className="relative z-10">
                 <div className="flex justify-center mb-6">
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                   className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-6 mb-6 text-left"
                 >
                   <p className="text-sm text-gray-700 font-semibold mb-4 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">?</span>
+                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">?</span>
                     {locale === 'en' ? 'What to do next:' : 'Şimdi ne yapmalısınız:'}
                   </p>
                   <div className="space-y-3">
@@ -173,7 +173,7 @@ export default function RegisterPage() {
                         transition={{ delay: 0.6 + i * 0.1 }}
                         className="flex items-center gap-3"
                       >
-                        <span className="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        <span className="w-7 h-7 bg-primary-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {item.step}
                         </span>
                         <span className="text-sm text-gray-700">{item.text}</span>
@@ -204,7 +204,7 @@ export default function RegisterPage() {
                 >
                   <Link
                     href="/login"
-                    className="block w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 text-center"
+                    className="block w-full py-3.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
                   >
                     {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
                   </Link>
@@ -225,7 +225,7 @@ export default function RegisterPage() {
                   
                   <Link
                     href="/verify-email"
-                    className="block text-center text-sm text-gray-500 hover:text-orange-600 transition-colors mt-2"
+                    className="block text-center text-sm text-gray-500 hover:text-primary-600 transition-colors duration-200 mt-2"
                   >
                     {locale === 'en' ? 'Need to verify later? Go to verification page' : 'Daha sonra mı doğrulayacaksınız? Doğrulama sayfasına gidin'}
                   </Link>
@@ -316,8 +316,7 @@ export default function RegisterPage() {
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors";
-  const inputStyle = { borderRadius: '6px' };
+  const inputClass = "w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium";
 
   return (
     <div className="min-h-screen flex">
@@ -365,11 +364,20 @@ export default function RegisterPage() {
       </div>
 
       {/* Right - Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-10 bg-white overflow-y-auto">
+      <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+        <div className="px-6 pt-6">
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
+              Tarodan
+            </span>
+          </Link>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6 py-10">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-[420px]"
         >
           <div className="mb-7">
@@ -394,7 +402,6 @@ export default function RegisterPage() {
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
                   className={inputClass}
-                  style={inputStyle}
                 />
               </div>
             </div>
@@ -411,18 +418,17 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
                   className={inputClass}
-                  style={inputStyle}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   {t('auth.phone')}
                 </label>
-                <div className="relative flex">
-                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 text-gray-500 text-sm font-medium" style={{ borderRadius: '6px 0 0 6px' }}>
+                <div className="relative flex min-w-0">
+                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 text-gray-500 text-sm font-medium rounded-l-lg flex-shrink-0">
                     +90
                   </span>
                   <input
@@ -431,8 +437,7 @@ export default function RegisterPage() {
                     onChange={handlePhoneChange}
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
-                    className="flex-1 pl-3 pr-4 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
-                    style={{ borderRadius: '0 6px 6px 0' }}
+                    className="flex-1 min-w-0 pl-3 pr-4 py-2.5 text-sm border border-gray-300 rounded-r-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
                   />
                 </div>
               </div>
@@ -450,7 +455,6 @@ export default function RegisterPage() {
                     max={getMaxBirthDate()}
                     required
                     className={inputClass}
-                    style={inputStyle}
                   />
                 </div>
               </div>
@@ -467,13 +471,12 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors"
-                  style={inputStyle}
+                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                 >
                   {showPassword ? <EyeSlashIcon className="w-[18px] h-[18px]" /> : <EyeIcon className="w-[18px] h-[18px]" />}
                 </button>
@@ -495,7 +498,6 @@ export default function RegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   className={inputClass}
-                  style={inputStyle}
                 />
               </div>
             </div>
@@ -506,22 +508,21 @@ export default function RegisterPage() {
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 border-gray-300 text-orange-500 focus:ring-orange-500"
-                  style={{ borderRadius: '3px' }}
+                  className="w-4 h-4 mt-0.5 rounded-sm border-gray-300 text-primary-500 focus:ring-primary-500 transition-colors duration-200"
                 />
                 <span className="text-sm text-gray-600 leading-snug">
                   {locale === 'en' ? (
                     <>
                       I accept the{' '}
-                      <Link href="/terms" className="text-orange-600 hover:text-orange-700 font-medium">Terms of Service</Link>
+                      <Link href="/terms" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Terms of Service</Link>
                       {' '}and{' '}
-                      <Link href="/privacy" className="text-orange-600 hover:text-orange-700 font-medium">Privacy Policy</Link>.
+                      <Link href="/privacy" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Privacy Policy</Link>.
                     </>
                   ) : (
                     <>
-                      <Link href="/terms" className="text-orange-600 hover:text-orange-700 font-medium">Kullanım Şartları</Link>
+                      <Link href="/terms" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Kullanım Şartları</Link>
                       {' '}ve{' '}
-                      <Link href="/privacy" className="text-orange-600 hover:text-orange-700 font-medium">Gizlilik Politikası</Link>
+                      <Link href="/privacy" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Gizlilik Politikası</Link>
                       &apos;nı okudum ve kabul ediyorum.
                     </>
                   )}
@@ -533,8 +534,7 @@ export default function RegisterPage() {
                   type="checkbox"
                   checked={acceptMarketing}
                   onChange={(e) => setAcceptMarketing(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 border-gray-300 text-orange-500 focus:ring-orange-500"
-                  style={{ borderRadius: '3px' }}
+                  className="w-4 h-4 mt-0.5 rounded-sm border-gray-300 text-primary-500 focus:ring-primary-500 transition-colors duration-200"
                 />
                 <span className="text-sm text-gray-600 leading-snug">
                   {locale === 'en' 
@@ -547,9 +547,14 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 active:bg-orange-700 transition-colors disabled:opacity-60 mt-1"
-              style={{ borderRadius: '6px' }}
+              className="w-full py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2 mt-1"
             >
+              {isLoading && (
+                <svg className="animate-spin h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
               {isLoading 
                 ? (locale === 'en' ? 'Signing up...' : 'Kayıt yapılıyor...') 
                 : t('common.register')}
@@ -558,7 +563,7 @@ export default function RegisterPage() {
 
           <p className="text-center mt-5 text-sm text-gray-500">
             {t('auth.hasAccount')}{' '}
-            <Link href="/login" className="font-semibold text-orange-600 hover:text-orange-700">
+            <Link href="/login" className="font-semibold text-primary-600 hover:text-primary-700 transition-colors duration-200">
               {t('common.login')}
             </Link>
           </p>
@@ -566,13 +571,13 @@ export default function RegisterPage() {
           <div className="mt-5 pt-5 border-t border-gray-200">
             <Link
               href="/register/business"
-              className="flex items-center justify-center gap-2 w-full py-2.5 border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
-              style={{ borderRadius: '6px' }}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-all duration-200 ease-premium"
             >
               {locale === 'en' ? 'Open Business Account' : 'Şirket Hesabı Aç'}
             </Link>
           </div>
         </motion.div>
+        </div>
       </div>
     </div>
   );

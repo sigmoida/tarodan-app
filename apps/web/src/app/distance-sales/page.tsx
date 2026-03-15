@@ -80,7 +80,7 @@ export default function DistanceSalesPage() {
           <ul>
             <li>Kredi Kartı / Banka Kartı</li>
             <li>Sanal Kart</li>
-            <li>Ödeme işlemleri Iyzico altyapısı ile güvenli şekilde gerçekleştirilir</li>
+            <li>Ödeme işlemleri PayTR altyapısı ile güvenli şekilde gerçekleştirilir</li>
           </ul>
 
           <h3>3.3 Teslimat</h3>

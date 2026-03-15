@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -39,6 +39,8 @@ interface Collection {
 
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
 
+const PUBLIC_PAGE_SIZE = 24;
+
 function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
   const out: { id: string; name: string; slug: string }[] = [];
   for (const c of tree) {
@@ -56,22 +58,24 @@ export default function CollectionsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
-  const [categorySlug, setCategorySlug] = useState(searchParams.get('category') || '');
+  const [categoryId, setCategoryId] = useState('');
 
   useEffect(() => {
-    setCategorySlug(searchParams.get('category') || '');
-  }, [searchParams]);
+    setCategoryId(searchParams.get('categoryId') || '');
+  }, [searchParams, mounted]);
 
-  const setCategoryFilter = (slug: string) => {
-    setCategorySlug(slug);
+  const setCategoryFilter = (id: string) => {
+    setCategoryId(id);
     const params = new URLSearchParams(searchParams.toString());
-    if (slug) params.set('category', slug);
-    else params.delete('category');
+    if (id) params.set('categoryId', id);
+    else params.delete('categoryId');
     const q = params.toString();
     router.replace(q ? `?${q}` : '/collections', { scroll: false });
   };
@@ -89,23 +93,34 @@ export default function CollectionsPage() {
     [categoriesTree],
   );
 
-  const categoryParam = typeof categorySlug === 'string' ? categorySlug.trim() : '';
+  const categoryParamId = typeof categoryId === 'string' ? categoryId.trim() : '';
+  // page/pageSize göndermiyoruz; API varsayılanı (ilk sayfa, 20 kayıt) kullanılsın. Gönderince sadece 1 sonuç dönme hatası oluşuyordu.
   const publicQuery = useQuery({
-    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParam || null],
-    queryFn: async (): Promise<Collection[]> => {
+    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParamId || null],
+    queryFn: async (): Promise<{ collections: Collection[]; total: number; page: number; pageSize: number }> => {
       const params: Record<string, unknown> = {
         sortBy,
         ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-        ...(categoryParam ? { category: categoryParam } : {}),
+        ...(categoryParamId ? { categoryId: categoryParamId } : {}),
       };
       const response = await collectionsApi.browse(params);
-      const data = response.data?.collections || response.data?.data || [];
-      return Array.isArray(data) ? data : [];
+      const collections = response.data?.collections || response.data?.data || [];
+      const total = response.data?.total ?? (Array.isArray(collections) ? collections.length : 0);
+      const page = response.data?.page ?? 1;
+      const pageSize = response.data?.pageSize ?? PUBLIC_PAGE_SIZE;
+      return {
+        collections: Array.isArray(collections) ? collections : [],
+        total: typeof total === 'number' ? total : 0,
+        page: typeof page === 'number' ? page : 1,
+        pageSize: typeof pageSize === 'number' ? pageSize : PUBLIC_PAGE_SIZE,
+      };
     },
+    placeholderData: keepPreviousData,
     meta: { page: 'collections-public' },
   });
-  const collections = publicQuery.data ?? [];
-
+  const publicData = publicQuery.data;
+  const collections = publicData?.collections ?? [];
+  const publicTotal = publicData?.total ?? 0;
   const myQuery = useQuery({
     queryKey: ['collections', 'mine'],
     queryFn: async (): Promise<Collection[]> => {
@@ -118,7 +133,9 @@ export default function CollectionsPage() {
   });
   const myCollections = myQuery.data ?? [];
 
-  const loading = activeTab === 'public' ? publicQuery.isLoading : myQuery.isLoading;
+  const loading = activeTab === 'public'
+    ? (publicQuery.isLoading && !publicQuery.data)
+    : (myQuery.isLoading && !myQuery.data);
 
   const canCreateCollection = user?.membershipTier !== 'free' || limits?.canCreateCollections;
 
@@ -185,7 +202,7 @@ export default function CollectionsPage() {
               <p className="text-sm text-gray-500 mt-0.5">{t('footer.description')}</p>
             </div>
             <div className="flex items-center gap-2">
-              {isAuthenticated && limits?.canCreateCollections && (
+              {mounted && isAuthenticated && limits?.canCreateCollections && (
                 <button
                   onClick={handleCreateClick}
                   className="px-4 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
@@ -194,7 +211,7 @@ export default function CollectionsPage() {
                   {t('collection.createCollection')}
                 </button>
               )}
-              {isAuthenticated && !limits?.canCreateCollections && (
+              {mounted && isAuthenticated && !limits?.canCreateCollections && (
                 <Link
                   href="/pricing"
                   className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
@@ -209,7 +226,7 @@ export default function CollectionsPage() {
 
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
         {/* Tabs */}
-        {isAuthenticated && (
+        {mounted && isAuthenticated && (
           <div className="flex gap-1 mb-5 bg-gray-100 rounded p-0.5 w-fit">
             <button
               onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
@@ -250,13 +267,13 @@ export default function CollectionsPage() {
           <div className="flex items-center gap-2">
             {activeTab === 'public' && (
               <select
-                value={categorySlug}
+                value={categoryId}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400 min-w-[140px]"
               >
                 <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
                 {flatCategories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             )}
@@ -275,11 +292,13 @@ export default function CollectionsPage() {
         </div>
 
         {/* Results Info */}
-        {(displayedCollections.length > 0 || categoryParam || searchQuery.trim()) && (
+        {(displayedCollections.length > 0 || categoryParamId || searchQuery.trim()) && (
           <p className="text-xs text-gray-500 mb-4">
-            {displayedCollections.length} {locale === 'en' ? 'collections found' : 'koleksiyon bulundu'}
-            {categoryParam && flatCategories.find((c) => c.slug === categoryParam) && (
-              <> · {flatCategories.find((c) => c.slug === categoryParam)?.name}</>
+            {activeTab === 'public'
+              ? `${publicTotal} ${locale === 'en' ? 'collections' : 'koleksiyon'}`
+              : `${displayedCollections.length} ${locale === 'en' ? 'collections' : 'koleksiyon'}`}
+            {categoryParamId && flatCategories.find((c) => c.id === categoryParamId) && (
+              <> · {flatCategories.find((c) => c.id === categoryParamId)?.name}</>
             )}
             {searchQuery.trim() && ` · "${searchQuery}"`}
           </p>
@@ -385,16 +404,18 @@ export default function CollectionsPage() {
             ))}
           </div>
         )}
-      </div>
+
+        </div>
 
       {/* Create Collection Modal */}
       {showCreateModal && (
         <CreateCollectionModal
           flatCategories={flatCategories}
           onClose={() => setShowCreateModal(false)}
-          onCreated={() => {
+          onCreated={(collectionId) => {
             setShowCreateModal(false);
             queryClient.invalidateQueries({ queryKey: ['collections', 'mine'] });
+            if (collectionId) router.push(`/collections/${collectionId}`);
           }}
         />
       )}
@@ -410,9 +431,9 @@ export default function CollectionsPage() {
             <div className="w-14 h-14 bg-orange-50 rounded flex items-center justify-center mx-auto mb-4">
               <FolderPlusIcon className="w-7 h-7 text-orange-500" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Premium Üyelik Gerekli</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Üyelik Yükseltme Gerekli</h2>
             <p className="text-gray-500 text-sm mb-5">
-              Koleksiyon oluşturma özelliği sadece Premium ve üzeri üyelikler için aktiftir.
+              Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowPremiumModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors text-sm">
@@ -435,7 +456,7 @@ function CreateCollectionModal({
   flatCategories,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (collectionId?: string) => void;
   flatCategories: { id: string; name: string; slug: string }[];
 }) {
   const [name, setName] = useState('');
@@ -449,13 +470,14 @@ function CreateCollectionModal({
     setLoading(true);
 
     try {
-      await collectionsApi.create({
+      const { data } = await collectionsApi.create({
         name,
         description,
         isPublic,
         ...(categoryId ? { categoryId } : {}),
       });
-      onCreated();
+      const createdId = data?.id;
+      onCreated(createdId);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';

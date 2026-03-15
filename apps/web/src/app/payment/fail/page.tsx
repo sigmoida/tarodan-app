@@ -47,6 +47,14 @@ export default function PaymentFailPage() {
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatus(paymentId!);
       setPayment(response.data);
+      // Ödeme hâlâ pending ise (PayTR callback ulaşmamış olabilir) rezervasyonu hemen serbest bırak
+      if (response.data?.status === 'pending') {
+        try {
+          await paymentsApi.confirmFailed(paymentId!);
+        } catch (_) {
+          // Sessizce yoksay; cron zaten süresi dolunca serbest bırakacak
+        }
+      }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
     } finally {
@@ -54,36 +62,9 @@ export default function PaymentFailPage() {
     }
   };
 
-  const handleRetryPayment = async () => {
-    // Guest users should go back to listings to start again
-    if (isGuestCheckout) {
-      router.push('/listings');
-      return;
-    }
-
-    if (!paymentId) {
-      if (payment?.orderId) {
-        router.push(`/checkout?orderId=${payment.orderId}`);
-      } else {
-        router.push('/orders');
-      }
-      return;
-    }
-
-    try {
-      const response = await paymentsApi.retry(paymentId);
-      toast.success(locale === 'en' ? 'Payment retry initiated' : 'Ödeme tekrar denendi');
-      if (response.data.paymentUrl) {
-        window.location.href = response.data.paymentUrl;
-      } else if (response.data.paymentHtml) {
-        // For PayTR, redirect to payment page
-        router.push(`/payment/${response.data.newPaymentId}`);
-      } else {
-        router.push('/orders');
-      }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to retry payment' : 'Ödeme tekrar denenemedi'));
-    }
+  const handleRetryPayment = () => {
+    // Sipariş zaten iptal edildi, ürün serbest bırakıldı → ilanlara dön, baştan al
+    router.push('/listings');
   };
 
   if (isLoading) {
@@ -139,7 +120,7 @@ export default function PaymentFailPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">{locale === 'en' ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
                   <span className="font-semibold">
-                    {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'}
+                    PayTR
                   </span>
                 </div>
                 <div className="flex justify-between">

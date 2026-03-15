@@ -15,6 +15,7 @@ import { MediaModule } from '../media/media.module';
 import { DiscountModule } from '../discount/discount.module';
 import { EventModule } from '../events/event.module';
 import { StorageModule } from '../storage/storage.module';
+import { RatingModule } from '../rating/rating.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from '../storage/storage.module';
     DiscountModule,
     EventModule,
     StorageModule,
+    RatingModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ScheduledNotificationScheduler],

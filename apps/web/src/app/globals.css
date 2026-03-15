@@ -53,6 +53,12 @@ body {
   background: #999;
 }
 
+/* Native select: ensure dropdown options are visible (fixes dark/grey dropdown on macOS and some themes) */
+select option {
+  background: #ffffff;
+  color: #111827;
+}
+
 /* Focus styles */
 *:focus-visible {
   outline: 2px solid var(--primary);

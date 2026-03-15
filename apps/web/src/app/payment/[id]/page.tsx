@@ -50,21 +50,45 @@ export default function PaymentPage() {
 
       setPayment(paymentData);
 
+      const isMembership = typeof window !== 'undefined' && window.location.search.includes('type=membership');
+      // Üyelik ödemesi zaten başarılıysa başarı sayfasına gönder (aynı sayfaya döngü olmasın)
+      if (isMembership && paymentData.status === 'completed') {
+        router.replace('/membership/success');
+        return;
+      }
+      // Bypass + üyelik + bekliyor: kart checkout’ta girilsin, bu sayfa gösterilmesin
+      if (paymentData.useBypass && isMembership) {
+        router.replace('/membership/checkout');
+        return;
+      }
+      if (paymentData.useBypass && paymentData.orderId) {
+        router.replace(`/checkout?orderId=${paymentData.orderId}`);
+        return;
+      }
+      if (paymentData.useBypass && paymentData.tradeId) {
+        router.replace(`/trades/${paymentData.tradeId}`);
+        return;
+      }
+      if (paymentData.useBypass) {
+        router.replace('/orders');
+        return;
+      }
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
-      } else if (paymentData.paymentUrl) {
-        // For Iyzico, we stay on page to show custom form (Direct API)
-        // Only redirect if provider is NOT iyzico (fallback) or if legacy checkout
-        if (paymentData.provider !== 'iyzico') {
-          window.location.href = paymentData.paymentUrl;
+      } else if (paymentData.paymentUrl && !paymentData.useBypass) {
+        const url = paymentData.paymentUrl;
+        if (url.includes('/payment/') && url.includes(paymentId)) {
+          // Aynı sayfaya yönlendirilmiş (bypass); redirect etme
+        } else {
+          window.location.href = url;
         }
       }
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
       toast.error('Ödeme bilgisi yüklenemedi');
       // Redirect to home for guests, orders page for authenticated users
-      router.push(isGuestCheckout ? '/' : '/orders');
+      router.push(isGuestCheckout ? '/' : isMembershipPayment ? '/profile/membership' : '/orders');
     } finally {
       setIsLoading(false);
     }
@@ -124,10 +148,10 @@ export default function PaymentPage() {
           <XCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Ödeme bulunamadı</p>
           <button
-            onClick={() => router.push('/orders')}
+            onClick={() => router.push(isMembershipPayment ? '/profile/membership' : '/orders')}
             className="btn-primary"
           >
-            Siparişlerime Dön
+            {isMembershipPayment ? 'Üyelik Sayfasına Dön' : 'Siparişlerime Dön'}
           </button>
         </div>
       </div>
@@ -156,7 +180,7 @@ export default function PaymentPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Ödeme</h1>
           <p className="text-gray-600">
-            {payment.provider === 'iyzico' ? 'iyzico' : 'PayTR'} ile güvenli ödeme
+            PayTR ile güvenli ödeme
           </p>
         </div>
 
@@ -192,7 +216,7 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Payment Content */}
+        {/* Payment Content – üyelik bypass checkout’ta yapılıyor, bu sayfada form yok */}
         {paymentHtml ? (
           // PayTR iframe
           <motion.div
@@ -224,7 +248,7 @@ export default function PaymentPage() {
                 if (html) {
                   setPaymentHtml(html);
                 } else {
-                  handlePaymentComplete(); // If no HTML (direct success without 3D?), poll.
+                  handlePaymentComplete();
                 }
               }}
               onCancel={() => router.back()}

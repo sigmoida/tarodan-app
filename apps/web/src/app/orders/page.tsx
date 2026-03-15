@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { api, ratingsApi } from '@/lib/api';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
@@ -53,6 +52,19 @@ interface Order {
   };
   isBuyer?: boolean;
   isSeller?: boolean;
+  hasProductRating?: boolean;
+  hasSellerRating?: boolean;
+  pricing?: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
+  sellerFeeAmount?: number;
+  sellerNetAmount?: number;
 }
 
 // Status labels will be handled with translation function inside component
@@ -67,7 +79,10 @@ export default function OrdersPage() {
   const { t, locale } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const addToCart = useCartStore((s) => s.addToCart);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'cancelled'>('active');
   const [downloadingInvoiceOrderId, setDownloadingInvoiceOrderId] = useState<string | null>(null);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -76,7 +91,6 @@ export default function OrdersPage() {
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
 
   const statusLabels: Record<string, { label: string; color: string }> = {
     pending_payment: { label: t('order.statusPending'), color: 'text-yellow-400 bg-yellow-400/10' },
@@ -84,7 +98,7 @@ export default function OrdersPage() {
     preparing: { label: t('order.statusProcessing'), color: 'text-orange-400 bg-orange-400/10' },
     shipped: { label: t('order.statusShipped'), color: 'text-purple-400 bg-purple-400/10' },
     delivered: { label: t('order.statusDelivered'), color: 'text-green-400 bg-green-400/10' },
-    completed: { label: t('order.statusDelivered'), color: 'text-green-400 bg-green-400/10' },
+    completed: { label: t('order.statusCompleted'), color: 'text-green-400 bg-green-400/10' },
     cancelled: { label: t('order.statusCancelled'), color: 'text-red-400 bg-red-400/10' },
     refund_requested: { label: t('order.refundStarted'), color: 'text-orange-400 bg-orange-400/10' },
     refunded: { label: t('order.statusRefunded'), color: 'text-gray-400 bg-gray-400/10' },
@@ -102,17 +116,20 @@ export default function OrdersPage() {
   const [submittingShipping, setSubmittingShipping] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/login?redirect=/orders');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [mounted, isAuthenticated, authLoading, router]);
 
   const ordersQuery = useQuery({
-    queryKey: ['orders', filter],
+    queryKey: ['orders', filter, statusFilter],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get('/orders', {
-        params: { role: filter === 'all' ? undefined : filter },
+        params: {
+          role: filter === 'all' ? undefined : filter,
+          status: statusFilter === 'cancelled' ? 'cancelled' : undefined,
+        },
       });
       return response.data.orders || response.data.data || [];
     },
@@ -171,7 +188,6 @@ export default function OrdersPage() {
 
       toast.success(t('review.reviewSubmitted'));
       setShowReviewModal(false);
-      setReviewedOrders(prev => new Set([...Array.from(prev), reviewingOrder.id]));
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Review submit error:', error);
@@ -186,7 +202,7 @@ export default function OrdersPage() {
     const productId = order.product?.id || order.items?.[0]?.product?.id;
     const isBuyer = productId && (order.isBuyer !== false) && filter !== 'seller';
     const isReviewableStatus = REVIEWABLE_STATUSES.includes(order.status);
-    const notAlreadyReviewed = !reviewedOrders.has(order.id);
+    const notAlreadyReviewed = order.hasProductRating !== true || order.hasSellerRating !== true;
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
   };
 
@@ -263,15 +279,25 @@ export default function OrdersPage() {
     }
   };
 
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!mounted || authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center py-24">
+          <div className="animate-pulse text-gray-500 text-sm">
+            {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t('order.myOrders')}</h1>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {(['buyer', 'seller', 'all'] as const).map((f) => (
               <button
                 key={f}
@@ -284,10 +310,25 @@ export default function OrdersPage() {
                 {f === 'buyer' ? t('profile.totalPurchases') : f === 'seller' ? t('profile.totalSales') : t('common.all')}
               </button>
             ))}
+            <span className="text-gray-400 mx-1">|</span>
+            <button
+              onClick={() => setStatusFilter('active')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'active'
+                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {locale === 'en' ? 'Active' : 'Aktif'}
+            </button>
+            <button
+              onClick={() => setStatusFilter('cancelled')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'cancelled'
+                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {locale === 'en' ? 'Cancelled' : 'İptal edilenler'}
+            </button>
           </div>
         </div>
 
-        {loading ? (
+        {(!mounted || authLoading || !isAuthenticated || loading) ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
           </div>
@@ -377,6 +418,11 @@ export default function OrdersPage() {
                       <p className="text-lg font-semibold text-primary-500">
                         {(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
+                      {order.isSeller && (order.pricing?.sellerNetAmount != null || (order as any).sellerNetAmount != null) && (
+                        <p className="text-sm text-green-600 mt-0.5">
+                          {locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{(Number(order.pricing?.sellerNetAmount ?? (order as any).sellerNetAmount ?? 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
                   </div>
 

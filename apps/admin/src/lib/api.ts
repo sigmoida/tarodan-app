@@ -126,6 +126,9 @@ export const adminApi = {
   updateReviewStatus: (id: string, status: string) => api.patch(`/admin/reviews/${id}/status`, { status }),
   replyToReview: (id: string, reply: string) => api.post(`/admin/reviews/${id}/reply`, { reply }),
   deleteReview: (id: string) => api.delete(`/admin/reviews/${id}`),
+  getUserRatings: (params?: any) => api.get('/admin/user-ratings', { params }),
+  updateUserRatingStatus: (id: string, status: string) => api.patch(`/admin/user-ratings/${id}/status`, { status }),
+  deleteUserRating: (id: string) => api.delete(`/admin/user-ratings/${id}`),
 
   // Orders
   getOrders: (params?: any) => api.get('/admin/orders', { params }),
@@ -184,19 +187,29 @@ export const adminApi = {
   updateCategory: (id: string, data: any) => api.patch(`/admin/categories/${id}`, data),
 
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
-  uploadCategoryImage: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<{ url: string }>('/admin/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
 
   // Brands
   getBrands: () => api.get('/admin/brands'),
   createBrand: (data: any) => api.post('/admin/brands', data),
   updateBrand: (id: string, data: any) => api.patch(`/admin/brands/${id}`, data),
   deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
+
+  getManufacturers: () => api.get('/admin/manufacturers'),
+  createManufacturer: (data: any) => api.post('/admin/manufacturers', data),
+  updateManufacturer: (id: string, data: any) => api.patch(`/admin/manufacturers/${id}`, data),
+  deleteManufacturer: (id: string) => api.delete(`/admin/manufacturers/${id}`),
+  uploadManufacturerLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ url: string; key: string }>('/admin/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  getCarModels: (brandId?: string) => api.get('/admin/car-models', { params: brandId ? { brandId } : {} }),
+  createCarModel: (data: any) => api.post('/admin/car-models', data),
+  updateCarModel: (id: string, data: any) => api.patch(`/admin/car-models/${id}`, data),
+  deleteCarModel: (id: string) => api.delete(`/admin/car-models/${id}`),
 
   // Advertisements
   getAds: () => api.get('/admin/ads'),

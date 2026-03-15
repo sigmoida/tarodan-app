@@ -183,7 +183,23 @@ export class PayTRService {
         body: formData.toString(),
       });
 
-      const data: PayTRIframeResponse = await response.json();
+      const rawText = await response.text();
+      if (!rawText?.trim()) {
+        this.logger.error(`PayTR API boş yanıt döndü. HTTP ${response.status}`);
+        throw new BadRequestException(
+          `PayTR yanıt vermedi (HTTP ${response.status}). Merchant ID/Key/Salt ve test modunu kontrol edin.`,
+        );
+      }
+
+      let data: PayTRIframeResponse;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        this.logger.error(`PayTR API JSON değil. Status: ${response.status}, body: ${rawText.slice(0, 200)}`);
+        throw new BadRequestException(
+          'PayTR geçerli yanıt dönmedi. API bilgilerinizi ve PayTR panel ayarlarını kontrol edin.',
+        );
+      }
 
       if (data.status !== 'success' || !data.token) {
         this.logger.error(`PayTR token error: ${data.reason}`);
@@ -195,6 +211,7 @@ export class PayTRService {
         iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}`,
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       this.logger.error('PayTR API error:', error);
       throw new BadRequestException(error.message || 'PayTR bağlantı hatası');
     }

@@ -43,6 +43,8 @@ interface OrderDetail {
   completedAt?: string;
   hasProductRating?: boolean;
   hasSellerRating?: boolean;
+  isBuyer?: boolean;
+  isSeller?: boolean;
 }
 
 export default function OrderDetailScreen() {
@@ -59,7 +61,8 @@ export default function OrderDetailScreen() {
     queryFn: async () => {
       try {
         const response = await api.get(`/orders/${id}`);
-        return response.data;
+        const data = response.data?.data ?? response.data;
+        return data;
       } catch (error) {
         console.log('Failed to fetch order');
         return null;
@@ -297,8 +300,8 @@ export default function OrderDetailScreen() {
           </Card.Content>
         </Card>
 
-        {/* Actions */}
-        {order.status === 'delivered' && (
+        {/* Actions - Only buyer can confirm delivery */}
+        {order.status === 'delivered' && order.isBuyer && (
           <Card style={styles.card}>
             <Card.Content>
               <Button
@@ -316,8 +319,8 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
-        {/* Rating Buttons */}
-        {canRate && (
+        {/* Rating Buttons - Only buyer can rate product and seller */}
+        {canRate && order.isBuyer && (
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="titleSmall" style={styles.sectionTitle}>Değerlendirme</Text>

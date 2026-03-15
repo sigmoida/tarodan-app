@@ -30,6 +30,7 @@ import {
   MapIcon,
   BellAlertIcon,
   CubeIcon,
+  BuildingOffice2Icon,
   ClipboardDocumentCheckIcon,
   StarIcon,
   CreditCardIcon,
@@ -44,9 +45,11 @@ const navigation = [
   { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
   { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
   { name: 'Markalar', href: '/brands', icon: SwatchIcon },
+  { name: 'Modeller', href: '/car-models', icon: TruckIcon },
+  { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon },
+  { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon },
   { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon },
   { name: 'Etiketler', href: '/tags', icon: TagIcon },
-  { name: 'Özellikler', href: '/attributes', icon: ClipboardDocumentListIcon },
   { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
   { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
   { name: 'Kargo', href: '/shipping', icon: TruckIcon },
@@ -101,13 +104,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/dashboard" scroll={false} className="flex items-center">
             <Image
               src="/tarodan-logo.jpg"
               alt="Tarodan Logo"
               width={120}
               height={40}
               className="object-contain"
+              style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '40px' }}
               priority
             />
             <span className="ml-2 text-xs text-gray-500 font-medium">Admin</span>
@@ -128,6 +132,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                scroll={false}
                 className={clsx(
                   'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                   isActive
@@ -184,6 +189,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 width={100}
                 height={32}
                 className="object-contain"
+                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '32px' }}
               />
               <span className="ml-2 text-sm text-gray-500">Admin Panel</span>
             </div>
@@ -194,6 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <Link
               href="/settings"
+              scroll={false}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             >
               <UserCircleIcon className="h-5 w-5" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -72,7 +72,6 @@ export default function ListingsPage() {
   const autoDetectedBrand = urlSearch
     ? KNOWN_BRANDS.find(b => b.toLowerCase() === urlSearch.toLowerCase()) || ''
     : '';
-
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
   const [currentPage, setCurrentPage] = useState(1);
@@ -81,22 +80,73 @@ export default function ListingsPage() {
   const [filters, setFilters] = useState({
     search: autoDetectedBrand ? '' : urlSearch,
     brand: searchParams.get('brand') || autoDetectedBrand || '',
+    brandId: searchParams.get('brandId') || '',
+    carModelId: searchParams.get('carModelId') || '',
+    carModel: searchParams.get('carModel') || '',
     scale: searchParams.get('scale') || '',
     material: searchParams.get('material') || '',
-    condition: '',
-    minPrice: '',
-    maxPrice: '',
-    tradeOnly: false,
+    condition: searchParams.get('condition') || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+    tradeOnly: searchParams.get('tradeOnly') === 'true',
     discountOnly: searchParams.get('discountOnly') === 'true',
     preOrder: searchParams.get('preOrder') === 'true',
     limited: searchParams.get('limited') === 'true',
     set: searchParams.get('set') === 'true',
-    sortBy: 'created_desc',
+    sortBy: searchParams.get('sortBy') || 'created_desc',
     category: searchParams.get('category') || '',
+    categoryId: searchParams.get('categoryId') || '',
     manufacturer: searchParams.get('manufacturer') || '',
     manufacturerId: searchParams.get('manufacturerId') || '',
-    vehicleType: searchParams.get('vehicleType') || '',
   });
+
+  const searchString = searchParams.toString();
+
+  const normalizeParams = (p: URLSearchParams): string => {
+    const sorted = new URLSearchParams(Array.from(p.entries()).sort((a, b) => a[0].localeCompare(b[0])));
+    return sorted.toString();
+  };
+
+  const buildParamsFromFilters = (f: typeof filters, page: number) => {
+    const params = new URLSearchParams();
+    if (f.search) params.set('search', f.search);
+    if (f.brand) params.set('brand', f.brand);
+    if (f.brandId) params.set('brandId', f.brandId);
+    if (f.carModel) params.set('carModel', f.carModel);
+    if (f.carModelId) params.set('carModelId', f.carModelId);
+    if (f.scale) params.set('scale', f.scale);
+    if (f.material) params.set('material', f.material);
+    if (f.condition) params.set('condition', f.condition);
+    if (f.minPrice) params.set('minPrice', f.minPrice);
+    if (f.maxPrice) params.set('maxPrice', f.maxPrice);
+    if (f.tradeOnly) params.set('tradeOnly', 'true');
+    if (f.discountOnly) params.set('discountOnly', 'true');
+    if (f.preOrder) params.set('preOrder', 'true');
+    if (f.limited) params.set('limited', 'true');
+    if (f.set) params.set('set', 'true');
+    if (f.sortBy && f.sortBy !== 'created_desc') params.set('sortBy', f.sortBy);
+    if (f.category) params.set('category', f.category);
+    if (f.categoryId) params.set('categoryId', f.categoryId);
+    if (f.manufacturer) params.set('manufacturer', f.manufacturer);
+    if (f.manufacturerId) params.set('manufacturerId', f.manufacturerId);
+    if (page > 1) params.set('page', page.toString());
+    return params;
+  };
+
+  const hasSyncedToUrl = useRef(false);
+  useEffect(() => {
+    if (!hasSyncedToUrl.current) {
+      hasSyncedToUrl.current = true;
+      return;
+    }
+    const nextParams = buildParamsFromFilters(filters, currentPage);
+    const currentParams = new URLSearchParams(searchString);
+    if (normalizeParams(nextParams) !== normalizeParams(currentParams)) {
+      const nextStr = nextParams.toString();
+      const newUrl = nextStr ? `/listings?${nextStr}` : '/listings';
+      router.replace(newUrl);
+    }
+  }, [filters, currentPage]);
 
   useEffect(() => {
     const newSearch = searchParams.get('search') || '';
@@ -107,27 +157,34 @@ export default function ListingsPage() {
     const page = pageParam ? parseInt(pageParam, 10) : 1;
     setCurrentPage(page);
 
-    setFilters(prev => ({
-      ...prev,
-      search: detectedBrand ? '' : newSearch,
-      tradeOnly: searchParams.get('tradeOnly') === 'true',
-      discountOnly: searchParams.get('discountOnly') === 'true',
-      preOrder: searchParams.get('preOrder') === 'true',
-      limited: searchParams.get('limited') === 'true',
-      set: searchParams.get('set') === 'true',
-      brand: searchParams.get('brand') || detectedBrand || '',
-      scale: searchParams.get('scale') || '',
-      material: searchParams.get('material') || '',
-      condition: searchParams.get('condition') || '',
-      minPrice: searchParams.get('minPrice') || '',
-      maxPrice: searchParams.get('maxPrice') || '',
-      sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
-      category: searchParams.get('category') || '',
-      manufacturer: searchParams.get('manufacturer') || '',
-      manufacturerId: searchParams.get('manufacturerId') || '',
-      vehicleType: searchParams.get('vehicleType') || '',
-    }));
-  }, [searchParams]);
+    setFilters(prev => {
+      const next = {
+        ...prev,
+        search: detectedBrand ? '' : newSearch,
+        tradeOnly: searchParams.get('tradeOnly') === 'true',
+        discountOnly: searchParams.get('discountOnly') === 'true',
+        preOrder: searchParams.get('preOrder') === 'true',
+        limited: searchParams.get('limited') === 'true',
+        set: searchParams.get('set') === 'true',
+        brand: searchParams.get('brand') || detectedBrand || '',
+        brandId: searchParams.get('brandId') || '',
+        carModelId: searchParams.get('carModelId') || '',
+        carModel: searchParams.get('carModel') || '',
+        scale: searchParams.get('scale') || '',
+        material: searchParams.get('material') || '',
+        condition: searchParams.get('condition') || '',
+        minPrice: searchParams.get('minPrice') || '',
+        maxPrice: searchParams.get('maxPrice') || '',
+        sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
+        category: searchParams.get('category') || '',
+        categoryId: searchParams.get('categoryId') || '',
+        manufacturer: searchParams.get('manufacturer') || '',
+        manufacturerId: searchParams.get('manufacturerId') || '',
+      };
+      const changed = (Object.keys(next) as (keyof typeof next)[]).some(k => prev[k] !== next[k]);
+      return changed ? next : prev;
+    });
+  }, [searchString]);
 
   const categorySlug = filters.category || searchParams.get('category') || '';
   const { data: categoryBySlug } = useQuery({
@@ -140,6 +197,13 @@ export default function ListingsPage() {
     staleTime: 5 * 60 * 1000,
   });
   const resolvedCategoryId = searchParams.get('categoryId') || categoryBySlug?.id;
+
+  // Filters for sidebar: merge resolved category when coming from slug (navbar)
+  const filtersForSidebar = {
+    ...filters,
+    categoryId: resolvedCategoryId || filters.categoryId,
+    category: (resolvedCategoryId && categoryBySlug?.name) ? categoryBySlug.name : filters.category,
+  };
 
   const { data: listingsData, isLoading } = useQuery({
     queryKey: ['listings', filters, resolvedCategoryId ?? '', currentPage],
@@ -157,7 +221,9 @@ export default function ListingsPage() {
         if (mappedCondition) p.condition = mappedCondition;
         if (filters.minPrice) p.minPrice = Number(filters.minPrice);
         if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
-        if (filters.brand) p.brand = filters.brand;
+        if (filters.brandId) p.brandId = filters.brandId;
+        else if (filters.brand) p.brand = filters.brand;
+        if (filters.carModelId) p.carModelId = filters.carModelId;
         if (filters.scale) p.scale = filters.scale;
         if (filters.material) p.material = filters.material;
         if (filters.manufacturerId) p.manufacturerId = filters.manufacturerId;
@@ -168,7 +234,6 @@ export default function ListingsPage() {
         if (filters.limited) p.limited = true;
         if (filters.set) p.set = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
-        if (filters.vehicleType) p.vehicleType = filters.vehicleType;
         return p;
       };
 
@@ -185,38 +250,59 @@ export default function ListingsPage() {
   const listings: Listing[] = listingsData?.listings ?? [];
   const pagination = listingsData?.meta ?? { total: 0, page: currentPage, limit: pageLimit, totalPages: 1 };
 
-  const clearFilters = () => {
-    setFilters({
-      search: '', brand: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
-      tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
-      sortBy: 'created_desc', category: '', manufacturer: '', manufacturerId: '', vehicleType: '',
-    });
+  const handleFiltersChange = (nextFilters: typeof filters) => {
+    setFilters(nextFilters);
     setCurrentPage(1);
-
-    const currentParams = new URLSearchParams(searchParams.toString());
-    const filterParams = [
-      'search', 'brand', 'scale', 'material', 'condition',
-      'minPrice', 'maxPrice', 'tradeOnly', 'discountOnly', 'preOrder',
-      'limited', 'set', 'category', 'categoryId', 'manufacturer',
-      'manufacturerId', 'vehicleType', 'page'
-    ];
-    
-    // Check if any filter parameter exists
-    const hasAnyFilter = filterParams.some(param => currentParams.has(param));
-    
-    if (hasAnyFilter) {
-      // Build new URL with only sortBy if it exists
-      const newParams = new URLSearchParams();
-      if (currentParams.has('sortBy')) {
-        newParams.set('sortBy', currentParams.get('sortBy')!);
-      }
-      const newUrl = newParams.toString() ? `/listings?${newParams.toString()}` : '/listings';
-      router.replace(newUrl);
-    }
+    // URL sync is handled by useEffect [filters, currentPage]
   };
 
-  const activeFilterCount = Object.entries(filters)
-    .filter(([key, value]) => key !== 'sortBy' && value !== '' && value !== false).length;
+  const clearFilters = () => {
+    setFilters({
+      search: '', brand: '', brandId: '', carModelId: '', carModel: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
+      tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
+      sortBy: 'created_desc', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
+    });
+    setCurrentPage(1);
+    // URL sync is handled by useEffect [filters, currentPage]
+  };
+
+  // Read search query directly from URL so display is always in sync regardless of state timing
+  const currentSearch = searchParams.get('search') || '';
+
+  // Count active filters; paired keys (e.g. manufacturer+manufacturerId) count as 1.
+  // Uses currentSearch (from URL) so the count is accurate even before state syncs.
+  const activeFilterCount = (() => {
+    const pairs: [string, string][] = [
+      ['manufacturer', 'manufacturerId'],
+      ['brand', 'brandId'],
+      ['category', 'categoryId'],
+      ['carModel', 'carModelId'],
+    ];
+    const exclude = new Set(['sortBy', 'search']);
+    let count = currentSearch ? 1 : 0;
+    const counted = new Set<string>();
+    for (const [k, v] of Object.entries(filters)) {
+      if (exclude.has(k) || v === '' || v === false) continue;
+      const pair = pairs.find(([a, b]) => a === k || b === k);
+      if (pair && !counted.has(pair[0] + pair[1])) {
+        const hasEither = filters[pair[0] as keyof typeof filters] || filters[pair[1] as keyof typeof filters];
+        if (hasEither) {
+          count += 1;
+          counted.add(pair[0] + pair[1]);
+        }
+      } else if (!pair) {
+        if (k === 'minPrice' || k === 'maxPrice') {
+          if (!counted.has('price') && (filters.minPrice || filters.maxPrice)) {
+            count += 1;
+            counted.add('price');
+          }
+        } else {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  })();
 
   const LISTING_PLACEHOLDERS = [
     'https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels',
@@ -248,8 +334,13 @@ export default function ListingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <h1 className="sr-only">
-        {filters.category ? `${filters.category} Diecast Model Arabalar` :
-          filters.brand ? `${filters.brand} Model Araç Koleksiyonu` : t('product.title')}
+        {currentSearch
+          ? (locale === 'en' ? `Search results for ${currentSearch}` : `${currentSearch} arama sonuçları`)
+          : filters.category
+            ? `${filters.category} Diecast Model Arabalar`
+            : filters.brand
+              ? `${filters.brand} Model Araç Koleksiyonu`
+              : t('product.title')}
       </h1>
 
       {/* Page Header */}
@@ -260,7 +351,11 @@ export default function ListingsPage() {
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
                   <div className="w-1 h-6 bg-orange-500 rounded-sm flex-shrink-0" />
-                  <span className="truncate">{filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}</span>
+                  <span className="truncate">
+                    {currentSearch
+                      ? (locale === 'en' ? `Results for "${currentSearch}"` : `"${currentSearch}" araması`)
+                      : filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
+                  </span>
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                   {pagination.total} {locale === 'en' ? 'products found' : 'ürün bulundu'}
@@ -285,7 +380,7 @@ export default function ListingsPage() {
               />
               <select
                 value={filters.sortBy}
-                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                onChange={(e) => handleFiltersChange({ ...filters, sortBy: e.target.value })}
                 className="px-2.5 py-1.5 border border-gray-200 rounded bg-white text-xs sm:text-sm focus:outline-none focus:border-orange-400 text-gray-700 flex-shrink-0"
               >
                 <option value="created_desc">{t('product.sortNewest')}</option>
@@ -293,6 +388,7 @@ export default function ListingsPage() {
                 <option value="view_count_desc">{t('product.sortPopular')}</option>
                 <option value="price_asc">{t('product.sortPriceLow')}</option>
                 <option value="price_desc">{t('product.sortPriceHigh')}</option>
+                <option value="rating_desc">{locale === 'en' ? 'Highest Rating' : 'En yüksek puan'}</option>
                 <option value="title_asc">A-Z</option>
                 <option value="title_desc">Z-A</option>
               </select>
@@ -305,10 +401,10 @@ export default function ListingsPage() {
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto bg-white rounded border border-gray-200">
+            <div className="sticky top-[80px] max-h-[calc(100vh-80px)] overflow-y-auto bg-white rounded border border-gray-200">
               <SidebarFilters
-                filters={filters}
-                onFilterChange={setFilters}
+                filters={filtersForSidebar}
+                onFilterChange={handleFiltersChange}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={clearFilters}
               />
@@ -328,8 +424,8 @@ export default function ListingsPage() {
                 </div>
                 <div className="p-4">
                   <SidebarFilters
-                    filters={filters}
-                    onFilterChange={setFilters}
+                    filters={filtersForSidebar}
+                    onFilterChange={handleFiltersChange}
                     activeFilterCount={activeFilterCount}
                     onClearFilters={clearFilters}
                   />
@@ -344,111 +440,78 @@ export default function ListingsPage() {
             {activeFilterCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200">
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
+                {currentSearch && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
+                    {locale === 'en' ? 'Search' : 'Arama'}: &quot;{currentSearch}&quot;
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, search: '' });
+                        setCurrentPage(1);
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('search');
+                        params.delete('page');
+                        router.replace(params.toString() ? `/listings?${params.toString()}` : '/listings');
+                      }}
+                      className="hover:text-orange-900 ml-0.5"
+                      aria-label={locale === 'en' ? 'Remove search' : 'Aramayı kaldır'}
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                )}
                 {[
-                  { k: 'category', v: filters.category }, { k: 'brand', v: filters.brand },
-                  { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material }, { k: 'condition', v: filters.condition },
-                  { k: 'manufacturer', v: filters.manufacturer }, { k: 'vehicleType', v: filters.vehicleType }
+                  { k: 'category', v: filtersForSidebar.category }, { k: 'brand', v: filters.brand },
+                  { k: 'carModel', v: filters.carModel }, { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material },
+                  { k: 'condition', v: filters.condition }, { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
                   <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
-                    {f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) : 
+                    {f.k === 'condition' ? formatCondition(f.v, locale) :
+                     f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) :
                      f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
                     <button onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
-                      setFilters(updates);
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      if (f.k === 'category') {
-                        params.delete('category');
-                        params.delete('categoryId');
-                      } else if (f.k === 'manufacturer') {
-                        params.delete('manufacturer');
-                        params.delete('manufacturerId');
-                      } else {
-                        params.delete(f.k);
-                      }
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
+                      if (f.k === 'brand') { updates.brandId = ''; updates.carModelId = ''; updates.carModel = ''; }
+                      if (f.k === 'category') updates.categoryId = '';
+                      if (f.k === 'carModel') { updates.carModelId = ''; }
+                      handleFiltersChange(updates);
                     }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => {
-                      setFilters({ ...filters, minPrice: '', maxPrice: '' });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('minPrice');
-                      params.delete('maxPrice');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.tradeOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, tradeOnly: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('tradeOnly');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.preOrder && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
                     {t('product.preOrder')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, preOrder: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('preOrder');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.limited && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, limited: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('limited');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.set && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
                     {t('product.sets')}
-                    <button onClick={() => {
-                      setFilters({ ...filters, set: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('set');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 {filters.discountOnly && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded border border-red-200">
                     {locale === 'en' ? 'On Sale' : 'İndirimli'}
-                    <button onClick={() => {
-                      setFilters({ ...filters, discountOnly: false });
-                      setCurrentPage(1);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('discountOnly');
-                      params.delete('page');
-                      router.replace(`/listings?${params.toString()}`);
-                    }} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleFiltersChange({ ...filters, discountOnly: false })} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>
@@ -512,6 +575,13 @@ export default function ListingsPage() {
                             <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
                           </div>
                           <div className="flex items-center gap-3 ml-4">
+                            {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
+                              <div className="flex items-center gap-1">
+                                <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" />
+                                <span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
+                                <span className="text-[11px] text-gray-400">({listing.rating.count})</span>
+                              </div>
+                            )}
                             {isProductOnSaleDisplay(listing) && (
                               <span className="text-xs text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
                             )}
@@ -589,13 +659,7 @@ export default function ListingsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      const newPage = pagination.page - 1;
-                      setCurrentPage(newPage);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('page', newPage.toString());
-                      router.replace(`/listings?${params.toString()}`);
-                    }}
+                    onClick={() => setCurrentPage(pagination.page - 1)}
                     disabled={pagination.page === 1}
                     className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
                   >
@@ -616,12 +680,7 @@ export default function ListingsPage() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => {
-                            setCurrentPage(pageNum);
-                            const params = new URLSearchParams(searchParams.toString());
-                            params.set('page', pageNum.toString());
-                            router.replace(`/listings?${params.toString()}`);
-                          }}
+                          onClick={() => setCurrentPage(pageNum)}
                           className={`px-3 py-2 rounded-lg text-sm font-medium ${
                             pagination.page === pageNum
                               ? 'bg-orange-500 text-white'
@@ -634,13 +693,7 @@ export default function ListingsPage() {
                     })}
                   </div>
                   <button
-                    onClick={() => {
-                      const newPage = pagination.page + 1;
-                      setCurrentPage(newPage);
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('page', newPage.toString());
-                      router.replace(`/listings?${params.toString()}`);
-                    }}
+                    onClick={() => setCurrentPage(pagination.page + 1)}
                     disabled={pagination.page >= pagination.totalPages}
                     className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
                   >

@@ -8,7 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
-import { OrderStatus, TradeStatus } from '@prisma/client';
+import { OrderStatus, RatingStatus, TradeStatus } from '@prisma/client';
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -20,6 +20,7 @@ import {
 import { CacheService } from '../cache/cache.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class RatingService {
@@ -30,7 +31,21 @@ export class RatingService {
     private readonly cache: CacheService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    private readonly storageService: StorageService,
   ) {}
+
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 
   // ==========================================================================
   // CREATE USER RATING
@@ -141,6 +156,7 @@ export class RatingService {
         tradeId: dto.tradeId,
         score: dto.score,
         comment: dto.comment,
+        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
       },
       include: {
         giver: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -222,6 +238,7 @@ export class RatingService {
         review: dto.review,
         images: dto.images || [],
         isVerifiedPurchase: true,
+        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
       },
       include: {
         product: { select: { id: true, title: true } },
@@ -233,7 +250,33 @@ export class RatingService {
     await this.cache.del(`products:detail:${dto.productId}`);
     await this.cache.delPattern(`products:list:*`);
 
+    // Update Product.averageRating and Product.ratingCount (triggers ES reindex via Prisma middleware)
+    await this.updateProductRatingStats(dto.productId);
+
     return this.mapProductRatingToDto(rating);
+  }
+
+  /**
+   * Recalculate and update Product.averageRating and Product.ratingCount.
+   * Called after create/delete/update of ProductRating. Prisma middleware emits product.changed for ES sync.
+   */
+  async updateProductRatingStats(productId: string): Promise<void> {
+    const stats = await this.prisma.productRating.aggregate({
+      where: { productId, status: RatingStatus.approved },
+      _avg: { score: true },
+      _count: true,
+    });
+
+    const count = stats._count ?? 0;
+    const avg = stats._avg?.score;
+
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        averageRating: avg != null ? avg : null,
+        ratingCount: count,
+      },
+    });
   }
 
   // ==========================================================================
@@ -250,7 +293,7 @@ export class RatingService {
     
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
-        where: { receiverId: userId },
+        where: { receiverId: userId, status: RatingStatus.approved },
         select: {
           id: true,
           giverId: true,
@@ -267,11 +310,18 @@ export class RatingService {
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.rating.count({ where: { receiverId: userId } }),
+      this.prisma.rating.count({ where: { receiverId: userId, status: RatingStatus.approved } }),
     ]);
 
+    const resolvedRatings = await Promise.all(
+      ratings.map(async (r) => {
+        const resolvedUrl = await this.resolveAvatarUrl(r.giver?.avatarUrl);
+        return this.mapUserRatingToDto(r, resolvedUrl);
+      }),
+    );
+
     return {
-      ratings: ratings.map((r) => this.mapUserRatingToDto(r)),
+      ratings: resolvedRatings,
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -292,20 +342,27 @@ export class RatingService {
     
     const [ratings, total] = await Promise.all([
       this.prisma.productRating.findMany({
-        where: { productId },
+        where: { productId, status: RatingStatus.approved },
         include: {
           product: { select: { id: true, title: true } },
-          user: { select: { id: true, displayName: true } },
+          user: { select: { id: true, displayName: true, avatarUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.productRating.count({ where: { productId } }),
+      this.prisma.productRating.count({ where: { productId, status: RatingStatus.approved } }),
     ]);
 
+    const resolvedRatings = await Promise.all(
+      ratings.map(async (r) => {
+        const resolvedUrl = await this.resolveAvatarUrl(r.user?.avatarUrl);
+        return this.mapProductRatingToDto(r, resolvedUrl);
+      }),
+    );
+
     return {
-      ratings: ratings.map((r) => this.mapProductRatingToDto(r)),
+      ratings: resolvedRatings,
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -317,7 +374,7 @@ export class RatingService {
   // ==========================================================================
   async getUserRatingStats(userId: string): Promise<UserRatingStatsDto> {
     const ratings = await this.prisma.rating.findMany({
-      where: { receiverId: userId },
+      where: { receiverId: userId, status: RatingStatus.approved },
       select: { score: true },
     });
 
@@ -345,7 +402,7 @@ export class RatingService {
   // ==========================================================================
   async getProductRatingStats(productId: string): Promise<ProductRatingStatsDto> {
     const ratings = await this.prisma.productRating.findMany({
-      where: { productId },
+      where: { productId, status: RatingStatus.approved },
       select: { score: true },
     });
 
@@ -372,8 +429,15 @@ export class RatingService {
   // MARK HELPFUL
   // ==========================================================================
   async markProductRatingHelpful(ratingId: string): Promise<ProductRatingResponseDto> {
-    const rating = await this.prisma.productRating.update({
+    const existing = await this.prisma.productRating.findUnique({
       where: { id: ratingId },
+      select: { status: true },
+    });
+    if (!existing || existing.status !== RatingStatus.approved) {
+      throw new NotFoundException('Yorum bulunamadı');
+    }
+    const rating = await this.prisma.productRating.update({
+      where: { id: ratingId, status: RatingStatus.approved },
       data: { helpfulCount: { increment: 1 } },
       include: {
         product: { select: { id: true, title: true } },
@@ -387,7 +451,7 @@ export class RatingService {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
-  private mapUserRatingToDto(rating: any): UserRatingResponseDto {
+  private mapUserRatingToDto(rating: any, resolvedGiverAvatar?: string | null): UserRatingResponseDto {
     return {
       id: rating.id,
       giverId: rating.giverId,
@@ -402,12 +466,12 @@ export class RatingService {
       giver: rating.giver ? {
         id: rating.giver.id,
         displayName: rating.giver.displayName || '',
-        avatarUrl: rating.giver.avatarUrl || undefined,
+        avatarUrl: resolvedGiverAvatar ?? rating.giver.avatarUrl ?? undefined,
       } : undefined,
     };
   }
 
-  private mapProductRatingToDto(rating: any): ProductRatingResponseDto {
+  private mapProductRatingToDto(rating: any, resolvedAvatarUrl?: string | null): ProductRatingResponseDto {
     return {
       id: rating.id,
       productId: rating.productId,
@@ -422,6 +486,11 @@ export class RatingService {
       isVerifiedPurchase: rating.isVerifiedPurchase,
       helpfulCount: rating.helpfulCount,
       createdAt: rating.createdAt,
+      user: rating.user ? {
+        id: rating.user.id,
+        displayName: rating.user.displayName || '',
+        avatarUrl: resolvedAvatarUrl ?? rating.user.avatarUrl ?? undefined,
+      } : undefined,
     };
   }
 }

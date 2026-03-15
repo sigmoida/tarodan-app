@@ -33,7 +33,13 @@ export class PaymentInitResponseDto {
   @ApiProperty({ example: 'uuid' })
   paymentId: string;
 
-  @ApiPropertyOptional({ example: 'https://www.iyzipay.com/payment/...' })
+  @ApiPropertyOptional({ example: 'uuid-order-id' })
+  orderId?: string;
+
+  @ApiPropertyOptional({ example: 340.64 })
+  amount?: number;
+
+  @ApiPropertyOptional({ example: 'https://paytr.com/...' })
   paymentUrl?: string;
 
   @ApiPropertyOptional({ example: '<script>...</script>' })
@@ -45,11 +51,14 @@ export class PaymentInitResponseDto {
   @ApiPropertyOptional({ example: true })
   isBase64?: boolean;
 
-  @ApiProperty({ example: 'iyzico' })
+  @ApiProperty({ example: 'paytr' })
   provider: string;
 
   @ApiProperty({ example: 300 })
   expiresIn: number;
+
+  @ApiPropertyOptional({ example: true })
+  useBypass?: boolean;
 }
 
 export class PaymentHoldResponseDto {

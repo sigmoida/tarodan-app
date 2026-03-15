@@ -10,6 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
@@ -21,6 +22,8 @@ import {
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -42,6 +45,7 @@ export class TradeService {
   
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly membershipService: MembershipService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
@@ -133,14 +137,6 @@ export class TradeService {
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
-    const receiverCanTrade = await this.membershipService.canCreateTrade(dto.receiverId);
-    if (!receiverCanTrade.allowed) {
-      this.logger.warn('Trade create failed: receiver cannot trade');
-      throw new BadRequestException(
-        receiverCanTrade.reason || 'Takas teklifi gönderilemiyor. Alıcı kullanıcı takas özelliğine sahip değil.',
-      );
-    }
-
     // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
     const initiatorProducts = await this.prisma.product.findMany({
       where: {
@@ -170,6 +166,48 @@ export class TradeService {
       throw new BadRequestException(
         'Talep edilen bazı ürünler takasa uygun değil',
       );
+    }
+
+    // Only check initiator's offered products — same product can't be offered in multiple active trades.
+    // Receiver's product can be the target of multiple offers; the receiver chooses which to accept.
+    const initiatorProductIds = dto.initiatorItems.map((i) => i.productId);
+    const activeStatuses = [
+      TradeStatus.pending,
+      TradeStatus.accepted,
+      TradeStatus.initiator_shipped,
+      TradeStatus.receiver_shipped,
+      TradeStatus.both_shipped,
+      TradeStatus.initiator_received,
+      TradeStatus.receiver_received,
+    ];
+    if (initiatorProductIds.length > 0) {
+      const existingTradeItems = await this.prisma.tradeItem.findMany({
+        where: {
+          productId: { in: initiatorProductIds },
+          side: 'initiator',
+          trade: { status: { in: activeStatuses } },
+        },
+      });
+      if (existingTradeItems.length > 0) {
+        throw new BadRequestException(
+          'Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.',
+        );
+      }
+    }
+
+    // Validate stock: müsait adet (available) >= item.quantity
+    const allProducts = [...initiatorProducts, ...receiverProducts];
+    const allItems = [...dto.initiatorItems, ...dto.receiverItems];
+    for (const item of allItems) {
+      const product = allProducts.find((p) => p.id === item.productId);
+      if (product) {
+        const available = getAvailableQuantity(product);
+        if (available !== null && available < item.quantity) {
+          throw new BadRequestException(
+            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+          );
+        }
+      }
     }
 
     // Get trade deadlines from platform settings
@@ -274,7 +312,7 @@ export class TradeService {
         items: {
           include: {
             product: {
-              select: { id: true, title: true, images: { take: 1 } },
+              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
             },
           },
         },
@@ -356,7 +394,7 @@ export class TradeService {
         items: {
           include: {
             product: {
-              select: { id: true, title: true, images: { take: 1 } },
+              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
             },
           },
         },
@@ -398,7 +436,7 @@ export class TradeService {
     const receiverCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!receiverCanTrade.allowed) {
       throw new BadRequestException(
-        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Premium üyeliğinizi yenileyin.',
+        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.',
       );
     }
 
@@ -433,15 +471,36 @@ export class TradeService {
     shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
 
     await this.prisma.$transaction(async (tx) => {
-      // Reserve receiver's products too
-      const receiverItems = await tx.tradeItem.findMany({
-        where: { tradeId, side: 'receiver' },
+      const tradeItems = await tx.tradeItem.findMany({
+        where: { tradeId },
       });
 
-      await tx.product.updateMany({
-        where: { id: { in: receiverItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.reserved },
+      // Adet bazlı: müsait adet kontrolü ve rezervasyon
+      const products = await tx.product.findMany({
+        where: { id: { in: tradeItems.map((i) => i.productId) } },
       });
+      for (const item of tradeItems) {
+        const product = products.find((p) => p.id === item.productId);
+        if (product) {
+          const available = getAvailableQuantity(product);
+          if (available !== null && available < item.quantity) {
+            throw new BadRequestException(
+              `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+            );
+          }
+        }
+      }
+
+      const byProduct = new Map<string, number>();
+      for (const item of tradeItems) {
+        byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of byProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { reservedQuantity: { increment: qty } },
+        });
+      }
 
       // Update trade
       await tx.trade.update({
@@ -476,6 +535,8 @@ export class TradeService {
         });
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     // Send notification to initiator that trade was accepted
     try {
@@ -516,17 +577,29 @@ export class TradeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Release initiator's products
-      const initiatorItems = await tx.tradeItem.findMany({
-        where: { tradeId, side: 'initiator' },
-      });
+      const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+      if (allItems.length > 0) {
+        const byProduct = new Map<string, number>();
+        for (const item of allItems) {
+          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+        const products = await tx.product.findMany({
+          where: { id: { in: [...byProduct.keys()] } },
+          select: { id: true, reservedQuantity: true },
+        });
+        for (const product of products) {
+          const qty = byProduct.get(product.id) ?? 0;
+          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - qty);
+          await tx.product.update({
+            where: { id: product.id },
+            data: {
+              reservedQuantity: newReserved,
+              status: ProductStatus.active,
+            },
+          });
+        }
+      }
 
-      await tx.product.updateMany({
-        where: { id: { in: initiatorItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
-
-      // Update trade
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -537,6 +610,8 @@ export class TradeService {
         },
       });
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     // Send notification to initiator that trade was rejected
     try {
@@ -601,7 +676,7 @@ export class TradeService {
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
-        'Karşı teklif göndermek için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+        'Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
       );
     }
 
@@ -675,6 +750,19 @@ export class TradeService {
       );
     }
 
+    // Adet bazlı: karşı teklifteki ürünlerde yeterli müsait adet olmalı
+    for (const item of dto.initiatorItems) {
+      const product = counterOffererProducts.find((p) => p.id === item.productId);
+      if (product) {
+        const available = getAvailableQuantity(product);
+        if (available !== null && available < item.quantity) {
+          throw new BadRequestException(
+            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+          );
+        }
+      }
+    }
+
     // Get trade deadlines from platform settings
     const responseHoursSetting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: 'trade_response_deadline_hours' },
@@ -692,28 +780,44 @@ export class TradeService {
       cashPayerId = dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId;
     }
 
+    const oldItems = await this.prisma.tradeItem.findMany({ where: { tradeId } });
+    const oldProductIds = [...new Set(oldItems.map((i) => i.productId))];
+
     // Update trade in transaction
     await this.prisma.$transaction(async (tx) => {
-      // Release old reserved products (both sides)
-      const oldItems = await tx.tradeItem.findMany({
-        where: { tradeId },
-      });
+      // Eski ürünler (önceki karşı tekliften rezerve edilmiş olabilir) reservedQuantity düşür
+      const oldByProduct = new Map<string, number>();
+      for (const item of oldItems) {
+        oldByProduct.set(item.productId, (oldByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of oldByProduct) {
+        const prod = await tx.product.findUnique({
+          where: { id: productId },
+          select: { reservedQuantity: true },
+        });
+        if (prod) {
+          const newReserved = Math.max(0, (prod.reservedQuantity ?? 0) - qty);
+          await tx.product.update({
+            where: { id: productId },
+            data: { reservedQuantity: newReserved, status: ProductStatus.active },
+          });
+        }
+      }
 
-      await tx.product.updateMany({
-        where: { id: { in: oldItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
-
-      // Delete old trade items
       await tx.tradeItem.deleteMany({
         where: { tradeId },
       });
 
-      // Reserve new products (counter-offerer's products)
-      await tx.product.updateMany({
-        where: { id: { in: dto.initiatorItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.reserved },
-      });
+      const newByProduct = new Map<string, number>();
+      for (const item of dto.initiatorItems) {
+        newByProduct.set(item.productId, (newByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of newByProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { reservedQuantity: { increment: qty } },
+        });
+      }
 
       // Swap roles: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
       // Update trade with swapped roles
@@ -755,6 +859,14 @@ export class TradeService {
         })),
       });
     });
+
+    const newProductIds = [
+      ...new Set([
+        ...dto.initiatorItems.map((i) => i.productId),
+        ...dto.receiverItems.map((i) => i.productId),
+      ]),
+    ];
+    await this.invalidateProductCaches([...oldProductIds, ...newProductIds]);
 
     // Send notification to original initiator about counter offer
     try {
@@ -812,13 +924,22 @@ export class TradeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Release all products
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
 
-      await tx.product.updateMany({
-        where: { id: { in: allItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
+      // Adet bazlı: takasta rezerve edilmiş adetleri serbest bırak (accept veya sonrası)
+      const byProduct = new Map<string, number>();
+      for (const item of allItems) {
+        byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of byProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: {
+            reservedQuantity: { decrement: qty },
+            status: ProductStatus.active,
+          },
+        });
+      }
 
       // Refund cash payment if any
       const cashPayment = await tx.tradeCashPayment.findUnique({
@@ -832,7 +953,6 @@ export class TradeService {
         });
       }
 
-      // Update trade
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -843,6 +963,8 @@ export class TradeService {
         },
       });
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(tradeId, userId);
   }
@@ -869,7 +991,7 @@ export class TradeService {
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
-        'Trade işlemlerini yapmak için Premium üyelik gereklidir. Üyeliğinizi yenileyin.',
+        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
       );
     }
 
@@ -1049,25 +1171,35 @@ export class TradeService {
         },
       });
 
-      // If trade completed, mark products as sold and decrease stock
+      // If trade completed, decrease stock and release reservation (adet bazlı)
       if (newStatus === TradeStatus.completed) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
-        const productIds = allItems.map((i) => i.productId);
-
-        // Get all products to check stock
         const products = await tx.product.findMany({
-          where: { id: { in: productIds } },
+          where: { id: { in: allItems.map((i) => i.productId) } },
         });
 
-        // Update each product individually to handle stock properly
-        // CRITICAL: When trade is completed, products should be marked as inactive
-        // (not sold) so they disappear from listings
+        const qtyByProduct = new Map<string, number>();
+        for (const item of allItems) {
+          qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+
         for (const product of products) {
-          const updateData: any = { status: ProductStatus.inactive };
-          
-          // Decrease quantity if it's not null (null means unlimited stock)
+          const tradedQty = qtyByProduct.get(product.id) ?? 1;
+          let newQuantity: number | null;
+
           if (product.quantity !== null && product.quantity > 0) {
-            const newQuantity = product.quantity - 1;
+            newQuantity = Math.max(0, product.quantity - tradedQty);
+          } else if (product.quantity === null) {
+            newQuantity = null;
+          } else {
+            newQuantity = 0;
+          }
+
+          const updateData: any = {
+            status: getProductStatusFromQuantity(newQuantity),
+            reservedQuantity: { decrement: tradedQty },
+          };
+          if (product.quantity !== null && product.quantity > 0) {
             updateData.quantity = newQuantity;
           }
 
@@ -1090,6 +1222,8 @@ export class TradeService {
         }
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(tradeId, userId);
   }
@@ -1217,21 +1351,49 @@ export class TradeService {
         },
       });
 
-      // Handle products based on resolution
+      // Handle products based on resolution (adet bazlı: quantity + reservedQuantity)
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+      const qtyByProduct = new Map<string, number>();
+      for (const item of allItems) {
+        qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
 
       if (newStatus === TradeStatus.completed) {
-        // CRITICAL: When trade is completed, products should be marked as inactive
-        // (not sold) so they disappear from listings
-        await tx.product.updateMany({
+        const products = await tx.product.findMany({
           where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.inactive },
         });
+        for (const product of products) {
+          const tradedQty = qtyByProduct.get(product.id) ?? 1;
+          let newQuantity: number | null;
+          if (product.quantity !== null && product.quantity > 0) {
+            newQuantity = Math.max(0, product.quantity - tradedQty);
+          } else if (product.quantity === null) {
+            newQuantity = null;
+          } else {
+            newQuantity = 0;
+          }
+          const updateData: any = {
+            status: getProductStatusFromQuantity(newQuantity),
+            reservedQuantity: { decrement: tradedQty },
+          };
+          if (product.quantity !== null && product.quantity > 0) {
+            updateData.quantity = newQuantity;
+          }
+          await tx.product.update({
+            where: { id: product.id },
+            data: updateData,
+          });
+        }
       } else if (newStatus === TradeStatus.cancelled) {
-        await tx.product.updateMany({
-          where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.active },
-        });
+        for (const [productId, qty] of qtyByProduct) {
+          await tx.product.update({
+            where: { id: productId },
+            data: {
+              reservedQuantity: { decrement: qty },
+              status: ProductStatus.active,
+            },
+          });
+        }
 
         // Refund cash payment if any
         const cashPayment = await tx.tradeCashPayment.findUnique({
@@ -1246,6 +1408,8 @@ export class TradeService {
         }
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(
       tradeId,
@@ -1279,17 +1443,31 @@ export class TradeService {
     for (const trade of [...expiredPendingTrades, ...expiredAcceptedTrades]) {
       try {
         await this.prisma.$transaction(async (tx) => {
-          // Release products
           const allItems = await tx.tradeItem.findMany({
             where: { tradeId: trade.id },
           });
 
-          await tx.product.updateMany({
-            where: { id: { in: allItems.map((i) => i.productId) } },
-            data: { status: ProductStatus.active },
-          });
+          if (trade.status === TradeStatus.accepted && allItems.length > 0) {
+            const byProduct = new Map<string, number>();
+            for (const item of allItems) {
+              byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+            }
+            for (const [productId, qty] of byProduct) {
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: { decrement: qty },
+                  status: ProductStatus.active,
+                },
+              });
+            }
+          } else if (allItems.length > 0) {
+            await tx.product.updateMany({
+              where: { id: { in: allItems.map((i) => i.productId) } },
+              data: { status: ProductStatus.active },
+            });
+          }
 
-          // Cancel trade
           await tx.trade.update({
             where: { id: trade.id },
             data: {
@@ -1299,6 +1477,7 @@ export class TradeService {
             },
           });
         });
+        await this.invalidateProductCachesForTrade(trade.id);
         cancelledCount++;
       } catch (error) {
         this.logger.error('Failed to auto-cancel trade');
@@ -1311,6 +1490,23 @@ export class TradeService {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
+
+  /** Invalidate product detail cache for given product IDs. */
+  private async invalidateProductCaches(productIds: string[]): Promise<void> {
+    for (const productId of [...new Set(productIds)]) {
+      await this.cache.del(`products:detail:${productId}`);
+    }
+  }
+
+  /** Invalidate product detail cache for all products in a trade (after reserved/quantity changes). */
+  private async invalidateProductCachesForTrade(tradeId: string): Promise<void> {
+    const items = await this.prisma.tradeItem.findMany({
+      where: { tradeId },
+      select: { productId: true },
+    });
+    await this.invalidateProductCaches(items.map((i) => i.productId));
+  }
+
   private async getTradeWithLock(tradeId: string) {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
@@ -1324,15 +1520,40 @@ export class TradeService {
   }
 
   /**
-   * Resolve product image URL (S3 key -> presigned URL)
+   * Resolve product image URL (S3 key -> public URL). Any non-URL key is treated as S3 key.
    */
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
-      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
-    }
-    return null;
+    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+  }
+
+  private mapTradeItemToDto(item: any): {
+    id: string;
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+    productImages?: { cardUrl: string; detailUrl?: string }[];
+    side: string;
+    quantity: number;
+    valueAtTrade: number;
+  } {
+    const firstImg = item.product?.images?.[0];
+    const cardUrl = firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : undefined;
+    const detailUrl = firstImg?.detailKey ? this.storageService.getPublicAssetUrl(firstImg.detailKey) : undefined;
+    const productImage = this.resolveProductImageUrl(firstImg?.cardKey);
+    const productImages =
+      cardUrl || detailUrl ? [{ cardUrl: cardUrl ?? '', detailUrl }] : undefined;
+    return {
+      id: item.id,
+      productId: item.productId,
+      productTitle: item.product?.title || '',
+      productImage: productImage ?? undefined,
+      productImages,
+      side: item.side,
+      quantity: item.quantity,
+      valueAtTrade: parseFloat(item.valueAtTrade),
+    };
   }
 
   private async mapToResponseDto(trade: any): Promise<TradeResponseDto> {
@@ -1351,28 +1572,12 @@ export class TradeService {
       receiverId: trade.receiverId,
       receiverName: trade.receiver?.displayName || '',
       status: trade.status,
-      initiatorItems: await Promise.all((trade.items || [])
+      initiatorItems: (trade.items || [])
         .filter((item: any) => item.side === 'initiator')
-        .map(async (item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          productTitle: item.product?.title || '',
-          productImage: this.resolveProductImageUrl(item.product?.images?.[0]?.cardKey),
-          side: item.side,
-          quantity: item.quantity,
-          valueAtTrade: parseFloat(item.valueAtTrade),
-        }))),
-      receiverItems: await Promise.all((trade.items || [])
+        .map((item: any) => this.mapTradeItemToDto(item)),
+      receiverItems: (trade.items || [])
         .filter((item: any) => item.side === 'receiver')
-        .map(async (item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          productTitle: item.product?.title || '',
-          productImage: this.resolveProductImageUrl(item.product?.images?.[0]?.cardKey),
-          side: item.side,
-          quantity: item.quantity,
-          valueAtTrade: parseFloat(item.valueAtTrade),
-        }))),
+        .map((item: any) => this.mapTradeItemToDto(item)),
       cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
       cashPayerId: trade.cashPayerId || undefined,
       cashCommission: trade.cashCommission

@@ -5,6 +5,7 @@ export class TradeItemResponseDto {
   productId: string;
   productTitle: string;
   productImage?: string;
+  productImages?: { cardUrl: string; detailUrl?: string }[];
   side: string;
   quantity: number;
   valueAtTrade: number;

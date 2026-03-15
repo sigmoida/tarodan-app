@@ -8,6 +8,25 @@ import {
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import {
+  fulltextUserSearch,
+  fulltextProductRatingSearch,
+  fulltextUserDisplayNameSearch,
+  fulltextCollectionSearch,
+  fulltextTagSearch,
+  fulltextAttributeGroupSearch,
+  fulltextAttributeSearch,
+  fulltextPaymentSearch,
+  fulltextOrderSearch,
+  fulltextDiscountSearch,
+  fulltextShippingMethodSearch,
+  fulltextShippingCarrierSearch,
+  fulltextShippingZoneSearch,
+  fulltextErrorLogSearch,
+  fulltextSecurityLogSearch,
+  fulltextEmailLogSearch,
+} from '../../common/helpers/fulltext-search';
+import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
@@ -37,14 +56,15 @@ import {
   RatingStatus,
 } from './dto';
 import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { SupportService } from '../support/support.service';
 import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
 import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
+import { RatingService } from '../rating/rating.service';
 
 @Injectable()
 export class AdminService {
@@ -56,10 +76,10 @@ export class AdminService {
     private readonly messagingService: MessagingService,
     private readonly supportService: SupportService,
     private readonly searchService: SearchService,
-    private readonly searchIndexing: SearchIndexingService,
     private readonly cache: CacheService,
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
+    private readonly ratingService: RatingService,
     @Optional()
     private readonly storageService: StorageService,
   ) { }
@@ -67,8 +87,9 @@ export class AdminService {
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
-      return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+    // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
+    if (this.storageService) {
+      return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
   }
@@ -366,9 +387,11 @@ export class AdminService {
         settingKey: {
           in: [
             'free_listing_limit',
+            'basic_listing_limit',
             'premium_listing_limit',
             'business_listing_limit',
             'max_message_length',
+            'basic_monthly_price',
             'premium_monthly_price',
             'business_monthly_price',
             'yearly_discount_percentage',
@@ -391,6 +414,9 @@ export class AdminService {
 
     // Calculate yearly prices from monthly prices and discount
     const discountPercentage = result.yearly_discount_percentage ?? 20;
+    if (result.basic_monthly_price) {
+      result.basic_yearly_price = result.basic_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
     if (result.premium_monthly_price) {
       result.premium_yearly_price = result.premium_monthly_price * 12 * (1 - discountPercentage / 100);
     }
@@ -424,7 +450,7 @@ export class AdminService {
     });
 
     // If this is a membership price setting, also update the MembershipTier
-    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' ||
+    if (dto.key === 'basic_monthly_price' || dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' ||
       dto.key === 'yearly_discount_percentage') {
       try {
         // Get discount percentage
@@ -435,6 +461,34 @@ export class AdminService {
           ? parseFloat(discountSetting.settingValue)
           : (dto.key === 'yearly_discount_percentage' ? parseFloat(dto.value) : 20);
         const finalDiscount = isNaN(discountPercentage) ? 20 : discountPercentage;
+
+        if (dto.key === 'basic_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update basic tier
+          const basicMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'basic_monthly_price' },
+          });
+          const basicMonthly = basicMonthlySetting
+            ? parseFloat(basicMonthlySetting.settingValue)
+            : (dto.key === 'basic_monthly_price' ? parseFloat(dto.value) : null);
+
+          if (basicMonthly !== null && !isNaN(basicMonthly)) {
+            const basicYearly = basicMonthly * 12 * (1 - finalDiscount / 100);
+            const basicTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'basic' },
+            });
+
+            if (basicTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: basicTier.id },
+                data: {
+                  monthlyPrice: basicMonthly,
+                  yearlyPrice: basicYearly,
+                },
+              });
+              this.logger.log(`Updated basic tier: monthly=${basicMonthly}, yearly=${basicYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
 
         if (dto.key === 'premium_monthly_price' || dto.key === 'yearly_discount_percentage') {
           // Update premium tier
@@ -521,10 +575,11 @@ export class AdminService {
     const where: Prisma.UserWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { displayName: { contains: search, mode: 'insensitive' } },
-      ];
+      const userIds = await fulltextUserSearch(this.prisma, search);
+      if (userIds.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: userIds };
     }
 
     if (isSeller !== undefined) {
@@ -828,10 +883,11 @@ export class AdminService {
     const where: Prisma.ProductWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const productIds = await fulltextProductSearch(this.prisma, search);
+      if (productIds.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: productIds };
     }
 
     if (status) {
@@ -998,9 +1054,13 @@ export class AdminService {
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.price !== undefined) data.price = dto.price;
     if (dto.oldPrice !== undefined) data.oldPrice = dto.oldPrice;
-    if (dto.quantity !== undefined) data.quantity = dto.quantity;
+    if (dto.quantity !== undefined) {
+      data.quantity = dto.quantity;
+      data.status = getProductStatusFromQuantity(dto.quantity);
+    } else if (dto.status !== undefined) {
+      data.status = dto.status;
+    }
     if (dto.condition !== undefined) data.condition = dto.condition;
-    if (dto.status !== undefined) data.status = dto.status;
     if (dto.categoryId !== undefined) {
       data.category = { connect: { id: dto.categoryId } };
     }
@@ -1017,10 +1077,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_update', 'Product', productId, product, updated);
 
-    // Update Elasticsearch (async)
-    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-    });
 
     // Invalidate caches
     if (this.cache) {
@@ -1055,10 +1111,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_approve', 'Product', productId, product, updated);
 
-    // Index to Elasticsearch when product is approved (async)
-    this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-      this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-    });
 
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
@@ -1126,10 +1178,6 @@ export class AdminService {
 
         await this.createAuditLog(adminId, 'product_bulk_approve', 'Product', productId, product, { ...updated, note });
 
-        // Index to Elasticsearch (async)
-        this.searchIndexing.queueIndexProduct(productId).catch((error) => {
-          this.logger.error(`Failed to queue product ${productId} for Elasticsearch:`, error);
-        });
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
@@ -1214,9 +1262,18 @@ export class AdminService {
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
+    const { search, status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
 
     const where: Prisma.OrderWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { buyer: { displayName: { contains: search, mode: 'insensitive' } } },
+        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
+        { product: { title: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
 
     if (status) {
       where.status = status;
@@ -1770,14 +1827,39 @@ export class AdminService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
+    const totalAmount = Number(order.totalAmount);
+    const shippingCost = Number(order.shippingCost);
+    const commissionAmount = Number(order.commissionAmount);
+    const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
+    const subtotal = order.subtotal != null ? Number(order.subtotal) : totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = subtotal - sellerFeeAmount;
+
     return {
       ...order,
-      totalAmount: Number(order.totalAmount),
-      commissionAmount: Number(order.commissionAmount),
-      shippingCost: Number(order.shippingCost),
+      totalAmount,
+      commissionAmount,
+      shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      subtotal,
+      sellerNetAmount,
+      pricing: {
+        subtotal,
+        shippingAmount: shippingCost,
+        buyerFeeAmount,
+        sellerFeeAmount,
+        commissionAmount,
+        totalAmount,
+        sellerNetAmount,
+      },
       product: {
         ...order.product,
         price: Number(order.product.price),
+        images: (order.product.images || []).map((img: any) => ({
+          ...img,
+          url: this.resolveProductImageUrl(img.cardKey) || this.resolveProductImageUrl(img.url) || img.url,
+        })),
       },
       offer: order.offer ? {
         ...order.offer,
@@ -1812,24 +1894,17 @@ export class AdminService {
       throw new BadRequestException('Geçersiz sipariş durumu');
     }
 
-    // If order is being marked as completed, mark product as sold
+    // If order is being marked as completed, update product status based on remaining quantity
     if (dto.status === OrderStatus.completed && order.productId) {
       const product = await this.prisma.product.findUnique({
         where: { id: order.productId },
       });
 
-      if (product && product.status !== ProductStatus.sold) {
-        // Update product status to SOLD
-        // If stock is 0, set product to inactive instead
-        const updateData: any = {
-          status: product.quantity !== null && product.quantity === 0
-            ? ProductStatus.inactive
-            : ProductStatus.sold
-        };
-
+      if (product) {
+        const newStatus = getProductStatusFromQuantity(product.quantity);
         await this.prisma.product.update({
           where: { id: order.productId },
-          data: updateData,
+          data: { status: newStatus },
         });
 
         // Invalidate cache
@@ -2838,6 +2913,17 @@ export class AdminService {
     newValue: any,
   ) {
     try {
+      // Resolve adminUserId: @CurrentUser('id') returns User.id, but AuditLog expects AdminUser.id
+      const adminUser = await this.prisma.adminUser.findFirst({
+        where: { userId: adminUserId, isActive: true },
+        select: { id: true },
+      });
+      if (!adminUser) {
+        this.logger.warn(`Admin user not found for userId ${adminUserId}, skipping audit log`);
+        return Promise.resolve();
+      }
+      const resolvedAdminUserId = adminUser.id;
+
       // Serialize values to ensure they can be stored as JSON
       const serializeValue = (value: any) => {
         if (value === null || value === undefined) {
@@ -2865,7 +2951,7 @@ export class AdminService {
 
       return await this.prisma.auditLog.create({
         data: {
-          adminUserId,
+          adminUserId: resolvedAdminUserId,
           action,
           entityType,
           entityId,
@@ -3242,11 +3328,17 @@ export class AdminService {
     }
 
     if (query.search) {
-      where.OR = [
-        { providerPaymentId: { contains: query.search, mode: 'insensitive' } },
-        { providerConversationId: { contains: query.search, mode: 'insensitive' } },
-        { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
-      ];
+      const [paymentIds, orderIds] = await Promise.all([
+        fulltextPaymentSearch(this.prisma, query.search),
+        fulltextOrderSearch(this.prisma, query.search),
+      ]);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
+      if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const [payments, total] = await Promise.all([
@@ -3471,11 +3563,17 @@ export class AdminService {
     }
 
     if (query.search) {
-      where.OR = [
-        { providerPaymentId: { contains: query.search, mode: 'insensitive' } },
-        { failureReason: { contains: query.search, mode: 'insensitive' } },
-        { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
-      ];
+      const [paymentIds, orderIds] = await Promise.all([
+        fulltextPaymentSearch(this.prisma, query.search),
+        fulltextOrderSearch(this.prisma, query.search),
+      ]);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
+      if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const [payments, total] = await Promise.all([
@@ -3584,11 +3682,14 @@ export class AdminService {
     };
 
     if (search) {
-      where.OR = [
-        { order: { buyer: { displayName: { contains: search, mode: 'insensitive' } } } },
-        { order: { buyer: { email: { contains: search, mode: 'insensitive' } } } },
-        { id: { contains: search, mode: 'insensitive' } },
-      ];
+      const userIds = await fulltextUserSearch(this.prisma, search);
+      const conditions: Prisma.PaymentWhereInput[] = [];
+      if (userIds.length > 0) conditions.push({ order: { buyerId: { in: userIds } } });
+      if (search.length >= 3) conditions.push({ id: { startsWith: search } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     if (startDate || endDate) {
@@ -4439,12 +4540,12 @@ export class AdminService {
     const categories = await this.prisma.category.findMany({
       include: {
         parent: true,
-        children: { orderBy: { sortOrder: 'asc' } },
+        children: { orderBy: { name: 'asc' } },
         _count: {
-          select: { products: true },
+          select: { products: true, collections: true },
         },
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { name: 'asc' },
     });
 
     return {
@@ -4463,7 +4564,7 @@ export class AdminService {
         sortOrder: c.sortOrder,
         isActive: c.isActive,
         productCount: c._count.products,
-        image: c.image,
+        collectionCount: c._count.collections,
         createdAt: c.createdAt,
       })),
     };
@@ -4475,7 +4576,6 @@ export class AdminService {
   async createCategory(adminId: string, dto: {
     name: string;
     description?: string;
-    image?: string;
     parentId?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -4512,7 +4612,6 @@ export class AdminService {
         name: dto.name,
         slug,
         description: dto.description || null,
-        image: dto.image || null,
         parentId: dto.parentId || null, // Empty string becomes null (root category)
         sortOrder: dto.sortOrder || 0,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
@@ -4531,7 +4630,6 @@ export class AdminService {
   async updateCategory(adminId: string, categoryId: string, dto: {
     name?: string;
     description?: string;
-    image?: string;
     parentId?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -4592,7 +4690,6 @@ export class AdminService {
         name: dto.name,
         slug,
         description: dto.description !== undefined ? (dto.description || null) : undefined,
-        image: dto.image !== undefined ? (dto.image || null) : undefined,
         parentId: dto.parentId !== undefined ? (dto.parentId || null) : undefined, // Empty string becomes null
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
@@ -5440,7 +5537,7 @@ export class AdminService {
    */
   async getBrands() {
     const brands = await this.prisma.brand.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: { name: 'asc' },
     });
 
     return {
@@ -5608,6 +5705,192 @@ export class AdminService {
     return { success: true };
   }
 
+  // ==================== MANUFACTURER MANAGEMENT ====================
+
+  async getManufacturers() {
+    const manufacturers = await this.prisma.manufacturer.findMany({
+      orderBy: { name: 'asc' },
+    });
+    return {
+      data: manufacturers.map(m => ({
+        ...m,
+        logo: this.resolveProductImageUrl(m.logo),
+      })),
+    };
+  }
+
+  async createManufacturer(
+    adminId: string,
+    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    const slug = dto.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+
+    const existing = await this.prisma.manufacturer.findFirst({
+      where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }] },
+    });
+    if (existing) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+
+    const manufacturer = await this.prisma.manufacturer.create({
+      data: {
+        name: dto.name,
+        slug,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        country: dto.country,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.createAuditLog(adminId, 'manufacturer_create', 'Manufacturer', manufacturer.id, null, manufacturer);
+    return manufacturer;
+  }
+
+  async updateManufacturer(
+    adminId: string,
+    id: string,
+    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+  ) {
+    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+
+    let slug = existing.slug;
+    if (dto.name && dto.name !== existing.name) {
+      slug = dto.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+      const duplicate = await this.prisma.manufacturer.findFirst({
+        where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }], NOT: { id } },
+      });
+      if (duplicate) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+    }
+
+    const updated = await this.prisma.manufacturer.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        slug: dto.name ? slug : undefined,
+        logo: dto.logo,
+        description: dto.description,
+        website: dto.website,
+        country: dto.country,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+    await this.createAuditLog(adminId, 'manufacturer_update', 'Manufacturer', id, existing, updated);
+    return updated;
+  }
+
+  async deleteManufacturer(adminId: string, id: string) {
+    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+    await this.prisma.manufacturer.delete({ where: { id } });
+    await this.createAuditLog(adminId, 'manufacturer_delete', 'Manufacturer', id, existing, null);
+    return { success: true };
+  }
+
+  // ==================== CAR MODEL MANAGEMENT ====================
+
+  async getCarModels(brandId?: string) {
+    const where = brandId ? { brandId } : {};
+    const models = await this.prisma.carModel.findMany({
+      where,
+      orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
+      include: { brand: { select: { id: true, name: true, slug: true } } },
+    });
+    return { data: models };
+  }
+
+  async createCarModel(
+    adminId: string,
+    dto: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    const brand = await this.prisma.brand.findUnique({ where: { id: dto.brandId } });
+    if (!brand) throw new NotFoundException('Marka bulunamadı');
+
+    const slug =
+      dto.slug ||
+      `${brand.slug}-${dto.name}`
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+
+    const existing = await this.prisma.carModel.findFirst({
+      where: { OR: [{ slug }, { brandId: dto.brandId, name: { equals: dto.name, mode: 'insensitive' } }] },
+    });
+    if (existing) throw new BadRequestException('Bu isimde veya slug ile bir model zaten mevcut');
+
+    const model = await this.prisma.carModel.create({
+      data: {
+        brandId: dto.brandId,
+        name: dto.name,
+        slug,
+        yearStart: dto.yearStart,
+        yearEnd: dto.yearEnd,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.createAuditLog(adminId, 'car_model_create', 'CarModel', model.id, null, model);
+    await this.cache.delPattern('car-models:*');
+    return model;
+  }
+
+  async updateCarModel(
+    adminId: string,
+    id: string,
+    dto: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    const existing = await this.prisma.carModel.findUnique({ where: { id }, include: { brand: true } });
+    if (!existing) throw new NotFoundException('Model bulunamadı');
+
+    let slug = existing.slug;
+    if (dto.slug) slug = dto.slug;
+    else if (dto.name && dto.name !== existing.name) {
+      slug = `${existing.brand.slug}-${dto.name}`
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+    }
+
+    if (slug !== existing.slug) {
+      const duplicate = await this.prisma.carModel.findFirst({ where: { slug, NOT: { id } } });
+      if (duplicate) throw new BadRequestException('Bu slug ile bir model zaten mevcut');
+    }
+
+    const updated = await this.prisma.carModel.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        slug: dto.slug || (dto.name ? slug : undefined),
+        yearStart: dto.yearStart,
+        yearEnd: dto.yearEnd,
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+      },
+    });
+    await this.createAuditLog(adminId, 'car_model_update', 'CarModel', id, existing, updated);
+    await this.cache.delPattern('car-models:*');
+    return updated;
+  }
+
+  async deleteCarModel(adminId: string, id: string) {
+    const existing = await this.prisma.carModel.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Model bulunamadı');
+    await this.prisma.carModel.delete({ where: { id } });
+    await this.createAuditLog(adminId, 'car_model_delete', 'CarModel', id, existing, null);
+    await this.cache.delPattern('car-models:*');
+    return { success: true };
+  }
+
   // ==================== SHIPPING METHODS ====================
 
   /**
@@ -5621,10 +5904,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { code: { contains: query.search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextShippingMethodSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const methods = await this.prisma.shippingMethod.findMany({
@@ -5758,10 +6040,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { code: { contains: query.search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextShippingCarrierSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const carriers = await this.prisma.shippingCarrier.findMany({
@@ -5945,7 +6226,9 @@ export class AdminService {
     }
 
     if (query?.search) {
-      where.name = { contains: query.search, mode: 'insensitive' };
+      const ids = await fulltextShippingZoneSearch(this.prisma, query.search);
+      if (ids.length === 0) return [];
+      where.id = { in: ids };
     }
 
     const zones = await this.prisma.shippingZone.findMany({
@@ -6689,7 +6972,11 @@ export class AdminService {
     }
 
     if (search) {
-      where.message = { contains: search, mode: 'insensitive' };
+      const ids = await fulltextErrorLogSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0, stats: [] };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -6755,10 +7042,11 @@ export class AdminService {
     }
 
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { ipAddress: { contains: search } },
-      ];
+      const ids = await fulltextSecurityLogSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -6874,7 +7162,6 @@ export class AdminService {
 
     if (status) where.status = status;
     if (template) where.template = template;
-    if (to) where.to = { contains: to, mode: 'insensitive' };
     if (userId) where.userId = userId;
 
     if (startDate || endDate) {
@@ -6883,11 +7170,13 @@ export class AdminService {
       if (endDate) where.createdAt.lte = new Date(endDate);
     }
 
-    if (search) {
-      where.OR = [
-        { to: { contains: search, mode: 'insensitive' } },
-        { subject: { contains: search, mode: 'insensitive' } },
-      ];
+    const searchTerm = search || to;
+    if (searchTerm) {
+      const ids = await fulltextEmailLogSearch(this.prisma, searchTerm);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
 
     const [total, logs] = await Promise.all([
@@ -7007,10 +7296,11 @@ export class AdminService {
 
     const where: Prisma.CollectionWhereInput = {};
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextCollectionSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (userId) where.userId = userId;
     if (isPublic !== undefined) where.isPublic = isPublic;
@@ -7140,8 +7430,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_create', 'Collection', collection.id, null, collection);
 
-    this.searchIndexing.queueIndexCollection(collection.id).catch(() => {});
-
     return {
       ...collection,
       itemCount: 0,
@@ -7188,8 +7476,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_update', 'Collection', collectionId, existing, updated);
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return {
       ...updated,
       itemCount: updated._count.items,
@@ -7214,8 +7500,6 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_delete', 'Collection', collectionId, existing, null);
-
-    this.searchIndexing.queueRemoveCollection(collectionId).catch(() => {});
 
     return { success: true };
   }
@@ -7263,8 +7547,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_items_add', 'Collection', collectionId, null, { addedProductIds: productIds });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return {
       success: true,
       addedCount: successfulItems.length,
@@ -7290,8 +7572,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_item_remove', 'CollectionItem', itemId, item, null);
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return { success: true };
   }
 
@@ -7313,8 +7593,6 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'collection_visibility_change', 'Collection', collectionId, { isPublic: existing.isPublic }, { isPublic });
-
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
 
     return { success: true, isPublic: updated.isPublic };
   }
@@ -7338,8 +7616,6 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
 
-    this.searchIndexing.queueIndexCollection(collectionId).catch(() => {});
-
     return { success: true, isFeatured: updated.isFeatured };
   }
 
@@ -7360,10 +7636,11 @@ export class AdminService {
     const where: Prisma.TagWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextTagSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7658,10 +7935,11 @@ export class AdminService {
     const where: Prisma.AttributeGroupWhereInput = {};
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextAttributeGroupSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7841,10 +8119,11 @@ export class AdminService {
 
     if (groupId) where.groupId = groupId;
     if (search) {
-      where.OR = [
-        { value: { contains: search, mode: 'insensitive' } },
-        { displayValue: { contains: search, mode: 'insensitive' } },
-      ];
+      const ids = await fulltextAttributeSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
@@ -7894,7 +8173,11 @@ export class AdminService {
       throw new NotFoundException('Özellik grubu bulunamadı');
     }
 
-    const slug = this.generateSlug(dto.value);
+    // Scale group: use same slug normalization as product.service linkProductAttributes
+    const slug =
+      group.slug === 'scale'
+        ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
+        : this.generateSlug(dto.value);
 
     // Check for duplicate
     const existing = await this.prisma.attribute.findFirst({
@@ -7946,7 +8229,11 @@ export class AdminService {
     const updateData: Prisma.AttributeUpdateInput = {};
     if (dto.value !== undefined) {
       updateData.value = dto.value;
-      updateData.slug = this.generateSlug(dto.value);
+      const group = await this.prisma.attributeGroup.findUnique({ where: { id: existing.groupId } });
+      updateData.slug =
+        group?.slug === 'scale'
+          ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
+          : this.generateSlug(dto.value);
     }
     if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue;
     if (dto.color !== undefined) updateData.color = dto.color;
@@ -8012,12 +8299,19 @@ export class AdminService {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { review: { contains: search, mode: 'insensitive' } },
-        { user: { displayName: { contains: search, mode: 'insensitive' } } },
-        { product: { title: { contains: search, mode: 'insensitive' } } },
-      ];
+      const [ratingIds, userIds, productIds] = await Promise.all([
+        fulltextProductRatingSearch(this.prisma, search),
+        fulltextUserDisplayNameSearch(this.prisma, search),
+        fulltextProductSearch(this.prisma, search),
+      ]);
+      const conditions: any[] = [];
+      if (ratingIds.length > 0) conditions.push({ id: { in: ratingIds } });
+      if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
+      if (productIds.length > 0) conditions.push({ productId: { in: productIds } });
+      if (conditions.length === 0) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.OR = conditions;
     }
 
     const orderBy: any = {};
@@ -8041,8 +8335,19 @@ export class AdminService {
       }),
     ]);
 
+    const resolvedReviews = reviews.map((review: any) => ({
+      ...review,
+      product: review.product ? {
+        ...review.product,
+        images: (review.product.images || []).map((img: any) => ({
+          ...img,
+          url: this.resolveProductImageUrl(img.cardKey) || this.resolveProductImageUrl(img.url) || img.url,
+        })),
+      } : review.product,
+    }));
+
     return {
-      data: reviews,
+      data: resolvedReviews,
       meta: {
         total,
         page,
@@ -8072,6 +8377,8 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'review_status_update', 'Rating', reviewId, review, updated);
 
+    await this.ratingService.updateProductRatingStats(review.productId);
+
     return updated;
   }
 
@@ -8098,7 +8405,76 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'review_reply', 'Rating', reviewId, review, updated);
 
+    await this.ratingService.updateProductRatingStats(review.productId);
+
     return updated;
+  }
+
+  /**
+   * Get seller (user) ratings for admin panel
+   */
+  async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
+    const p = Number(query.page) || 1;
+    const lim = Number(query.limit) || 20;
+    const search = query.search;
+    const status = query.status;
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { giver: { displayName: { contains: search, mode: 'insensitive' } } },
+        { receiver: { displayName: { contains: search, mode: 'insensitive' } } },
+        { comment: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (status && ['pending', 'approved', 'rejected', 'spam'].includes(status)) {
+      where.status = status;
+    }
+
+    const [total, ratings] = await Promise.all([
+      this.prisma.rating.count({ where }),
+      this.prisma.rating.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (p - 1) * lim,
+        take: lim,
+        include: {
+          giver: { select: { id: true, displayName: true, email: true } },
+          receiver: { select: { id: true, displayName: true, email: true } },
+        },
+      }),
+    ]);
+
+    return {
+      data: ratings,
+      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
+    };
+  }
+
+  /**
+   * Update seller (user) rating status (approve/reject)
+   */
+  async updateUserRatingStatus(adminId: string, ratingId: string, status: RatingStatus) {
+    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
+    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
+    const previous = { ...rating };
+    await this.prisma.rating.update({
+      where: { id: ratingId },
+      data: { status },
+    });
+    await this.createAuditLog(adminId, 'user_rating_status_update', 'Rating', ratingId, previous, { status });
+    return { success: true };
+  }
+
+  /**
+   * Delete a seller (user) rating
+   */
+  async deleteUserRating(adminId: string, ratingId: string) {
+    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
+    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
+    await this.prisma.rating.delete({ where: { id: ratingId } });
+    await this.createAuditLog(adminId, 'user_rating_delete', 'Rating', ratingId, rating, null);
+    return { success: true };
   }
 
   /**
@@ -8118,6 +8494,8 @@ export class AdminService {
     });
 
     await this.createAuditLog(adminId, 'review_delete', 'Rating', reviewId, review, null);
+
+    await this.ratingService.updateProductRatingStats(review.productId);
 
     return { success: true };
   }

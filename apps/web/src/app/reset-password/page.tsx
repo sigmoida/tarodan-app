@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { 
   LockClosedIcon, 
@@ -83,13 +84,11 @@ export default function ResetPasswordPage() {
   // Token Error State
   if (tokenError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
         <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
               Tarodan
             </span>
           </Link>
@@ -99,6 +98,7 @@ export default function ResetPasswordPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
             className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-red-500/10 p-8 md:p-10 border border-gray-100 text-center"
           >
             <div className="flex justify-center mb-6">
@@ -119,7 +119,7 @@ export default function ResetPasswordPage() {
 
             <Link
               href="/forgot-password"
-              className="block w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+              className="block w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
             >
               {locale === 'tr' ? 'Yeni Bağlantı İste' : 'Request New Link'}
             </Link>
@@ -132,13 +132,11 @@ export default function ResetPasswordPage() {
   // Success State
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
         <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+          <Link href="/" className="inline-flex items-center gap-2 group">
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
               Tarodan
             </span>
           </Link>
@@ -148,6 +146,7 @@ export default function ResetPasswordPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
             className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
           >
             <div className="flex justify-center mb-6">
@@ -173,7 +172,7 @@ export default function ResetPasswordPage() {
 
             <Link
               href="/login"
-              className="block w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25"
+              className="block w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
             >
               {locale === 'tr' ? 'Giriş Yap' : 'Login Now'}
             </Link>
@@ -185,14 +184,12 @@ export default function ResetPasswordPage() {
 
   // Main Form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
-        <Link href="/" className="inline-flex items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
-          </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+        <Link href="/" className="inline-flex items-center gap-2 group">
+          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+          <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
             Tarodan
           </span>
         </Link>
@@ -203,16 +200,16 @@ export default function ResetPasswordPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-md"
         >
-          <div className="bg-white rounded-3xl shadow-xl shadow-orange-500/10 p-8 md:p-10 border border-gray-100">
+          <div className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100">
             {/* Back Link */}
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-600 transition-colors mb-8 group"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-600 transition-colors duration-200 mb-8 group"
             >
-              <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" />
               <span className="text-sm font-medium">
                 {locale === 'tr' ? 'Giriş sayfasına dön' : 'Back to login'}
               </span>
@@ -220,8 +217,8 @@ export default function ResetPasswordPage() {
 
             {/* Icon */}
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl flex items-center justify-center">
-                <ShieldCheckIcon className="w-10 h-10 text-orange-600" />
+              <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-2xl flex items-center justify-center">
+                <ShieldCheckIcon className="w-10 h-10 text-primary-600" />
               </div>
             </div>
 
@@ -254,13 +251,13 @@ export default function ResetPasswordPage() {
                       setError('');
                     }}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-12 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-orange-500 transition-colors text-gray-900"
+                    className="w-full pl-12 pr-12 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                   >
                     {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                   </button>
@@ -295,15 +292,15 @@ export default function ResetPasswordPage() {
                       setError('');
                     }}
                     placeholder="••••••••"
-                    className={`w-full pl-12 pr-12 py-4 border-2 rounded-xl focus:ring-0 transition-colors text-gray-900 ${
-                      confirmPassword && !passwordsMatch ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-orange-500'
+                    className={`w-full pl-12 pr-12 py-4 border-2 rounded-xl focus:ring-0 transition-all duration-200 ease-premium text-gray-900 ${
+                      confirmPassword && !passwordsMatch ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-primary-500'
                     }`}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                   >
                     {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                   </button>
@@ -340,7 +337,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading || !isPasswordValid || !passwordsMatch}
-                className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+                className="w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">

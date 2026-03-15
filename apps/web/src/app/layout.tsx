@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
-import Navbar from '@/components/layout/Navbar';
-import CategoryNavBarWrapper from '@/components/layout/CategoryNavBarWrapper';
-import Footer from '@/components/layout/Footer';
+import LayoutShell from '@/components/layout/LayoutShell';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
@@ -37,6 +35,9 @@ export const metadata: Metadata = {
     title: 'Tarodan - Model Araba Pazarı',
     description: 'Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu',
   },
+  icons: {
+    icon: '/tarodanfavicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -49,12 +50,9 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
-            <Navbar />
-            <CategoryNavBarWrapper />
-            <main className="flex-1">
+            <LayoutShell>
               {children}
-            </main>
-            <Footer />
+            </LayoutShell>
             <CookieConsentBanner />
             <Toaster
               position="bottom-right"

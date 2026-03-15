@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { CreditCardIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
@@ -22,15 +23,18 @@ export default function MembershipPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [listingLimits, setListingLimits] = useState<{
     free_listing_limit?: number;
+    basic_listing_limit?: number;
     premium_listing_limit?: number;
     business_listing_limit?: number;
   }>({});
   const [membershipPrices, setMembershipPrices] = useState<{
+    basic_monthly_price?: number;
+    basic_yearly_price?: number;
     premium_monthly_price?: number;
     premium_yearly_price?: number;
     business_monthly_price?: number;
@@ -41,6 +45,9 @@ export default function MembershipPage() {
     currentPeriodStart?: string;
     currentPeriodEnd?: string;
     tier?: string;
+    pendingPayment?: boolean;
+    pendingTierName?: string;
+    pendingTierType?: string;
   } | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<Array<{
     id: string;
@@ -59,10 +66,13 @@ export default function MembershipPage() {
         const settings = response.data || {};
         setListingLimits({
           free_listing_limit: settings.free_listing_limit,
+          basic_listing_limit: settings.basic_listing_limit,
           premium_listing_limit: settings.premium_listing_limit,
           business_listing_limit: settings.business_listing_limit,
         });
         setMembershipPrices({
+          basic_monthly_price: settings.basic_monthly_price,
+          basic_yearly_price: settings.basic_yearly_price,
           premium_monthly_price: settings.premium_monthly_price,
           premium_yearly_price: settings.premium_yearly_price,
           business_monthly_price: settings.business_monthly_price,
@@ -98,21 +108,26 @@ export default function MembershipPage() {
         const membershipResponse = await api.get('/membership/me');
         const membership = membershipResponse.data;
         
-        if (membership && (membership.tier?.type === 'premium' || membership.tier?.type === 'business')) {
+        if (membership) {
+          const isPaidTier = membership.tier?.type === 'basic' || membership.tier?.type === 'premium' || membership.tier?.type === 'business';
+          const pendingPayment = !!membership.pendingPayment;
           setMembershipDetails({
             currentPeriodStart: membership.currentPeriodStart,
             currentPeriodEnd: membership.currentPeriodEnd,
             tier: membership.tier?.type,
+            pendingPayment: pendingPayment || undefined,
+            pendingTierName: membership.pendingTierName,
+            pendingTierType: membership.pendingTierType,
           });
-
-          // Fetch payment methods
-          try {
-            const paymentMethodsResponse = await api.get('/payments/methods');
-            const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
-            setPaymentMethods(methods);
-          } catch (error) {
-            if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
-            setPaymentMethods([]);
+          if (isPaidTier && !pendingPayment) {
+            try {
+              const paymentMethodsResponse = await api.get('/payments/methods');
+              const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
+              setPaymentMethods(methods);
+            } catch (error) {
+              if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
+              setPaymentMethods([]);
+            }
           }
         }
       } catch (error) {
@@ -124,11 +139,11 @@ export default function MembershipPage() {
   }, [isAuthenticated, user]);
 
   const getListingLimitText = (tierId: string) => {
-    const limit = tierId === 'free' 
-      ? listingLimits.free_listing_limit ?? 5
-      : tierId === 'premium'
-      ? listingLimits.premium_listing_limit ?? -1
-      : listingLimits.business_listing_limit ?? 1000;
+    let limit: number;
+    if (tierId === 'free') limit = listingLimits.free_listing_limit ?? 10;
+    else if (tierId === 'basic') limit = listingLimits.basic_listing_limit ?? 50;
+    else if (tierId === 'premium') limit = listingLimits.premium_listing_limit ?? 200;
+    else limit = listingLimits.business_listing_limit ?? 1000;
     
     if (limit === -1) {
       return `${t('membership.unlimited')} ${t('membership.listingsLimit')}`;
@@ -159,6 +174,23 @@ export default function MembershipPage() {
         color: 'gray',
       },
       {
+        id: 'basic',
+        name: 'Temel',
+        price: membershipPrices.basic_monthly_price ?? 49,
+        period: t('membership.perMonth'),
+        description: 'Koleksiyoncular için başlangıç',
+        features: [
+          { text: getListingLimitText('basic'), included: true },
+          { text: '6 resim/ilan', included: true },
+          { text: t('nav.trades'), included: true },
+          { text: t('collection.collections'), included: true },
+          { text: t('membership.noAds'), included: false },
+          { text: '2 öne çıkan ilan', included: true },
+        ],
+        popular: false,
+        color: 'blue',
+      },
+      {
         id: 'premium',
         name: t('membership.premium'),
         price: membershipPrices.premium_monthly_price ?? 99,
@@ -166,11 +198,11 @@ export default function MembershipPage() {
         description: t('membership.mostPopular'),
         features: [
           { text: getListingLimitText('premium'), included: true },
-          { text: '15 resim/ilan', included: true },
+          { text: '10 resim/ilan', included: true },
           { text: t('nav.trades'), included: true },
           { text: `${t('membership.unlimited')} ${t('collection.collections')}`, included: true },
           { text: t('membership.noAds'), included: true },
-          { text: '3 öne çıkan ilan', included: true },
+          { text: '10 öne çıkan ilan', included: true },
         ],
         popular: true,
         color: 'purple',
@@ -287,6 +319,9 @@ export default function MembershipPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     router.push('/login?redirect=/profile/membership');
     return null;
@@ -340,7 +375,14 @@ export default function MembershipPage() {
             {t('membership.subtitle')}
           </p>
           
-          {currentTier && currentTier !== 'free' && (
+          {membershipDetails?.pendingPayment && membershipDetails?.pendingTierName && (
+            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-amber-800 font-medium mb-2">Ödeme bekleniyor – {membershipDetails.pendingTierName} planı için ödemeyi tamamlayın.</p>
+              <Link href={`/membership/checkout?tier=${membershipDetails.pendingTierType || 'premium'}&period=monthly`} className="text-sm font-medium text-amber-700 underline">Ödemeyi tamamla</Link>
+            </div>
+          )}
+          
+          {!membershipDetails?.pendingPayment && currentTier && currentTier !== 'free' && (
             <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
               <p className="text-blue-800 font-medium">
                 {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}
@@ -481,10 +523,14 @@ export default function MembershipPage() {
         </div>
 
         <div className="flex justify-center mb-8">
-          <div className={`grid gap-6 max-w-4xl ${
+          <div className={`grid gap-6 ${
             MEMBERSHIP_TIERS.length === 1 
               ? 'grid-cols-1 max-w-md' 
-              : 'grid-cols-1 md:grid-cols-2'
+              : MEMBERSHIP_TIERS.length === 2
+                ? 'grid-cols-1 md:grid-cols-2 max-w-3xl'
+                : MEMBERSHIP_TIERS.length === 3
+                  ? 'grid-cols-1 md:grid-cols-3 max-w-5xl'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 max-w-6xl'
           }`}>
           {MEMBERSHIP_TIERS.map((tier, index) => {
             let displayPrice = tier.price;

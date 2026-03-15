@@ -39,9 +39,10 @@ export function formatPriceNumber(price: number | string | null | undefined): st
 export function formatCondition(condition: string | null | undefined, locale: string = 'tr'): string {
   if (!condition) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
 
+  // Filtre ve ürün kartında aynı etiketler kullanılsın (Yeni, Yeni Gibi, İyi, Orta)
   const conditionMap: Record<string, { tr: string; en: string }> = {
-    'new': { tr: 'Sıfır', en: 'New' },
-    'like_new': { tr: 'Sıfır Gibi', en: 'Like New' },
+    'new': { tr: 'Yeni', en: 'New' },
+    'like_new': { tr: 'Yeni Gibi', en: 'Like New' },
     'very_good': { tr: 'Çok İyi', en: 'Very Good' },
     'good': { tr: 'İyi', en: 'Good' },
     'fair': { tr: 'Orta', en: 'Fair' },
@@ -164,6 +165,12 @@ export function formatTradeStatus(status: string | null | undefined, locale: str
     'in_progress': { tr: 'Devam Ediyor', en: 'In Progress' },
     'shipping': { tr: 'Kargo Aşamasında', en: 'Shipping' },
     'awaiting_confirmation': { tr: 'Onay Bekleniyor', en: 'Awaiting Confirmation' },
+    'initiator_shipped': { tr: 'Gönderen Kargoya Verdi', en: 'Initiator Shipped' },
+    'receiver_shipped': { tr: 'Alıcı Kargoya Verdi', en: 'Receiver Shipped' },
+    'both_shipped': { tr: 'Her İki Taraf Kargoda', en: 'Both Shipped' },
+    'initiator_received': { tr: 'Gönderen Teslim Aldı', en: 'Initiator Received' },
+    'receiver_received': { tr: 'Alıcı Teslim Aldı', en: 'Receiver Received' },
+    'disputed': { tr: 'Anlaşmazlık', en: 'Disputed' },
   };
 
   const normalized = status.toLowerCase().trim();

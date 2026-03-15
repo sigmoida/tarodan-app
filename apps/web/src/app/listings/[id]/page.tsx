@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { motion } from 'framer-motion';
 import {
   ArrowsRightLeftIcon,
@@ -73,6 +74,11 @@ interface Listing {
     slug: string;
     logo?: string | null;
   };
+  manufacturer?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
   scale?: string;
   material?: string;
   year?: number;
@@ -80,12 +86,15 @@ interface Listing {
   trade_available?: boolean;
   isTradeEnabled?: boolean;
   quantity?: number | null;
+  /** Müsait adet (quantity - reserved); teklif/takas rezervasyonu düşülmüş stok */
+  availableQuantity?: number | null;
   status?: 'pending' | 'active' | 'reserved' | 'sold' | 'inactive' | 'rejected';
   sellerId?: string;
   seller?: {
     id: string;
     displayName?: string;
     username?: string;
+    avatarUrl?: string;
     rating?: number;
     listings_count?: number;
     productsCount?: number;
@@ -125,7 +134,7 @@ export default function ListingDetailPage() {
   const { isAuthenticated, user, limits } = useAuthStore();
 
   // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
-  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  const canTrade = limits?.canTrade ?? (user?.membershipTier === 'basic' || user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   const [showTradeModal, setShowTradeModal] = useState(false);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -827,6 +836,17 @@ export default function ListingDetailPage() {
           <span className="text-gray-400 truncate max-w-[200px]">{listing.title}</span>
         </nav>
 
+        {(() => {
+          const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+            ? listing.availableQuantity
+            : listing.quantity;
+          return available === 0 && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-amber-800 font-medium">{t('product.stockFinished')}</p>
+            </div>
+          );
+        })()}
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
           <div className="relative">
@@ -1351,7 +1371,9 @@ export default function ListingDetailPage() {
               )}
               <div className="text-center p-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.scale')}</p>
-                <p className="font-semibold text-gray-900">{listing.scale || '—'}</p>
+                <p className="font-semibold text-gray-900">
+                  {listing.scale || listing.attributes?.find((a: any) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value || '—'}
+                </p>
               </div>
               <div className="text-center p-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Material' : 'Malzeme'}</p>
@@ -1359,6 +1381,12 @@ export default function ListingDetailPage() {
                   {listing.material || listing.attributes?.find(a => (a.group === 'material' || a.group === 'Malzeme'))?.value || '—'}
                 </p>
               </div>
+              {listing.manufacturer && (
+                <div className="text-center p-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Manufacturer' : 'Üretici'}</p>
+                  <p className="font-semibold text-gray-900">{listing.manufacturer.name}</p>
+                </div>
+              )}
               {listing.category && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{t('product.category')}</p>
@@ -1375,11 +1403,17 @@ export default function ListingDetailPage() {
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Year' : 'Yıl'}</p>
                 <p className="font-semibold text-gray-900">{listing.year ?? '—'}</p>
               </div>
-              {listing.quantity !== undefined && listing.quantity !== null && (
+              {((listing.availableQuantity !== undefined && listing.availableQuantity !== null) || (listing.quantity !== undefined && listing.quantity !== null)) && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Stock' : 'Stok'}</p>
                   <p className="font-semibold text-gray-900">
-                    {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : (locale === 'en' ? 'Out of stock' : 'Stokta yok')}
+                    {(() => {
+                      const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+                        ? listing.availableQuantity
+                        : listing.quantity;
+                      if (available === null || available === undefined) return locale === 'en' ? 'Unlimited' : 'Sınırsız';
+                      return available > 0 ? `${available} ${locale === 'en' ? 'available' : 'adet'}` : t('product.stockFinished');
+                    })()}
                   </p>
                 </div>
               )}
@@ -1428,9 +1462,12 @@ export default function ListingDetailPage() {
                 <div className="flex items-center gap-4">
                   {isAuthenticated ? (
                     <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all">
-                        <UserIcon className="w-6 h-6 text-gray-400" />
-                      </div>
+                      <UserAvatar
+                        displayName={listing.seller.displayName}
+                        avatarUrl={listing.seller.avatarUrl}
+                        size="md"
+                        className="hover:ring-2 hover:ring-orange-500 transition-all"
+                      />
                     </Link>
                   ) : (
                     <button
@@ -1444,9 +1481,12 @@ export default function ListingDetailPage() {
                       }}
                       className="flex-shrink-0"
                     >
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
-                        <UserIcon className="w-6 h-6 text-gray-400" />
-                      </div>
+                      <UserAvatar
+                        displayName={listing.seller.displayName}
+                        avatarUrl={listing.seller.avatarUrl}
+                        size="md"
+                        className="hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer"
+                      />
                     </button>
                   )}
                   <div className="flex-1">
@@ -1602,19 +1642,25 @@ export default function ListingDetailPage() {
               )}
 
               {/* Primary Action: Buy Now - Hide for owner */}
-              {!isOwner && (
-                <button
-                  onClick={handleBuyNow}
-                  disabled={listing.status !== 'active'}
-                  className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active'
-                    ? 'btn-primary'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
-                    }`}
-                >
-                  <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
-                </button>
-              )}
+              {!isOwner && (() => {
+                const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+                  ? listing.availableQuantity
+                  : listing.quantity;
+                const hasStock = available === null || available === undefined || available > 0;
+                return (
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={listing.status !== 'active' || !hasStock}
+                    className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active' && hasStock
+                      ? 'btn-primary'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
+                      }`}
+                  >
+                    <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : !hasStock ? t('product.stockFinished') : t('product.buyNow')}
+                  </button>
+                );
+              })()}
 
               {/* Secondary Actions - Hide most for owner */}
               {!isOwner && (
@@ -1751,11 +1797,11 @@ export default function ListingDetailPage() {
                   className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-orange-600 font-semibold">
-                        {(review.userName || review.user?.displayName)?.[0]?.toUpperCase() || '?'}
-                      </span>
-                    </div>
+                    <UserAvatar
+                      displayName={review.userName || review.user?.displayName}
+                      avatarUrl={review.user?.avatarUrl}
+                      size="sm"
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900">

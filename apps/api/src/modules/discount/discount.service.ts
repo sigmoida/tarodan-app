@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
+import { fulltextDiscountSearch } from '../../common/helpers/fulltext-search';
 import {
   CreateDiscountDto,
   UpdateDiscountDto,
@@ -356,23 +357,24 @@ export class DiscountService {
     } = query;
 
     const where: Prisma.DiscountWhereInput = {
-      // Sellers only see their own discounts
       ...(isAdmin
         ? sellerId
           ? { sellerId }
           : {}
         : { sellerId: actorId }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { code: { contains: search.toUpperCase(), mode: 'insensitive' as const } },
-        ],
-      }),
       ...(scope && { scope }),
       ...(isActive !== undefined && { isActive }),
       ...(couponsOnly && { code: { not: null } }),
       ...(autoOnly && { code: null }),
     };
+
+    if (search) {
+      const ids = await fulltextDiscountSearch(this.prisma, search);
+      if (ids.length === 0) {
+        return { items: [], total: 0, page, limit, totalPages: 0 };
+      }
+      where.id = { in: ids };
+    }
 
     const orderBy = this.getOrderBy(sortBy);
 

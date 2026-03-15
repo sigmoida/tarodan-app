@@ -19,7 +19,7 @@ interface Product {
   originalPrice?: number | null;
   salePrice?: number | null;
   isOnSale?: boolean;
-  images?: Array<{ url: string } | string>;
+  images?: Array<{ url?: string; cardUrl?: string; detailUrl?: string } | string>;
   isTradeEnabled?: boolean;
   status?: string;
 }
@@ -30,7 +30,7 @@ export default function NewTradePage() {
   const listingId = searchParams.get('listing');
   const { t, locale } = useTranslation();
   
-  const { user, isAuthenticated, limits, checkAuth, refreshUserData } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, limits, checkAuth, refreshUserData } = useAuthStore();
   
   // Ensure auth is checked on mount
   useEffect(() => {
@@ -41,9 +41,9 @@ export default function NewTradePage() {
   
   // Check canTrade: prefer limits, fallback to membership tier
   // If limits is not loaded yet, check membership tier directly
-  const canTrade = limits 
-    ? limits.canTrade 
-    : (user?.membershipTier === 'premium' || user?.membershipTier === 'business');
+  const canTrade = limits
+    ? limits.canTrade
+    : (user?.membershipTier === 'basic' || user?.membershipTier === 'premium' || user?.membershipTier === 'business');
   
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && isAuthenticated && user) {
@@ -65,21 +65,20 @@ export default function NewTradePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/login?redirect=/trades/new?listing=${listingId}`);
       return;
     }
-    
-    if (!canTrade) {
+    if (limits !== null && !canTrade) {
       toast.error(t('trade.requiresPremium'));
       router.push('/pricing');
       return;
     }
-    
-    if (listingId) {
+    if (listingId && (limits === null || canTrade)) {
       fetchData();
     }
-  }, [isAuthenticated, canTrade, listingId]);
+  }, [authLoading, isAuthenticated, limits, canTrade, listingId]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -113,7 +112,11 @@ export default function NewTradePage() {
       return placeholder;
     }
     const img = product.images[0];
-    return typeof img === 'string' ? img : img.url;
+    if (typeof img === 'string') return img;
+    const url = (img as { cardUrl?: string; detailUrl?: string; url?: string }).cardUrl
+      ?? (img as { detailUrl?: string; url?: string }).detailUrl
+      ?? (img as { url?: string }).url;
+    return url || placeholder;
   };
 
   const toggleProduct = (productId: string) => {
@@ -130,7 +133,7 @@ export default function NewTradePage() {
       .filter(p => selectedProducts.includes(p.id))
       .reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
     const cash = parseFloat(cashAmount) || 0;
-    return productsTotal + cash;
+    return cashPayer === 'me' ? productsTotal + cash : productsTotal;
   };
 
   const handleSubmit = async () => {
@@ -430,7 +433,14 @@ export default function NewTradePage() {
             </div>
             {parseFloat(cashAmount) > 0 && (
               <div className="flex justify-between">
-                <span>{t('trade.cashDifference')}:</span>
+                <span>
+                  {t('trade.cashDifference')}
+                  <span className="text-xs text-gray-500 ml-1">
+                    ({cashPayer === 'me'
+                      ? (locale === 'en' ? 'You pay' : 'Siz ödeyeceksiniz')
+                      : (locale === 'en' ? 'They pay' : 'Karşı taraf ödeyecek')})
+                  </span>
+                </span>
                 <span className="font-medium">{parseFloat(cashAmount || '0').toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
               </div>
             )}

@@ -1,8 +1,13 @@
 import axios from 'axios';
 
-// Use relative URL to go through Next.js rewrite proxy (avoids CORS)
+// Tarayıcıda doğrudan API'ye git (3001); proxy bazen 500 veriyor. Sunucu tarafında /api (rewrite) kullanılır.
+const baseURL =
+  typeof window !== 'undefined'
+    ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api`
+    : '/api';
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -174,6 +179,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
     api.post(`/trades/${id}/dispute`, data),
+  initiateCashPayment: (id: string | number) =>
+    api.post(`/trades/${id}/cash-payment/initiate`),
 };
 
 // Wishlist (no cart in backend - use wishlist for favorites)
@@ -249,8 +256,19 @@ export const ordersApi = {
     api.post(`/orders/${id}/cancel`, { reason }),
   confirm: (id: string | number) =>
     api.post(`/orders/${id}/confirm`),
+  setShippingAddress: (id: string | number, data: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string }) =>
+    api.patch(`/orders/${id}/shipping-address`, data),
   trackGuest: (data: { orderNumber: string; email: string }) =>
     api.post('/orders/guest/track', data),
+  /** Checkout quote (pricing breakdown). Use for order summary; same logic as order create. */
+  getQuote: (data: { items: Array<{ productId: string; quantity?: number }> }) =>
+    api.post('/orders/quote', data),
+  /** Commission preview for one amount/category (listing form). */
+  getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
+    api.get('/orders/commission-preview', { params }),
+  /** Batch commission preview for multiple items (e.g. ilanlarım list). */
+  getCommissionPreviewBatch: (items: Array<{ amount: number; categoryId?: string | null }>) =>
+    api.post('/orders/commission-preview-batch', { items }),
 };
 
 // Payments
@@ -259,6 +277,9 @@ export const paymentsApi = {
     api.post('/payments/initiate', { orderId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
+  /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
+  initiateTradeCash: (tradeId: string) =>
+    api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>
@@ -275,6 +296,12 @@ export const paymentsApi = {
   }) => api.get('/payments/me', { params }),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
+  /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
+  confirmFailed: (paymentId: string) =>
+    api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
+  /** Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true) */
+  bypassComplete: (paymentId: string, cardNumber: string) =>
+    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
@@ -402,6 +429,8 @@ export const collectionsApi = {
       customModel?: string;
       customYear?: number;
       customScale?: string;
+      customManufacturer?: string;
+      customMaterial?: string;
       customImageUrl?: string;
       sortOrder?: number;
       isFeatured?: boolean;
@@ -418,6 +447,8 @@ export const collectionsApi = {
     if (data.customModel) formData.append('customModel', data.customModel);
     if (data.customYear !== undefined) formData.append('customYear', data.customYear.toString());
     if (data.customScale) formData.append('customScale', data.customScale);
+    if (data.customManufacturer) formData.append('customManufacturer', data.customManufacturer);
+    if (data.customMaterial) formData.append('customMaterial', data.customMaterial);
     if (data.customImageUrl) formData.append('customImageUrl', data.customImageUrl);
     if (data.sortOrder !== undefined) formData.append('sortOrder', data.sortOrder.toString());
     if (data.isFeatured !== undefined) formData.append('isFeatured', data.isFeatured.toString());
@@ -539,6 +570,10 @@ export const searchApi = {
       brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
       categories: Array<{ id: string; name: string; slug: string }>;
       manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
+      scales?: string[];
+      materials?: Array<{ slug: string; label: string }>;
+      conditions?: Array<{ value: string; label: string }>;
       suggestions: string[];
     }>('/search/autocomplete-rich', { params: { q } }),
 };

@@ -121,6 +121,14 @@ export class CreateProductDto {
   carModelId?: string;
 
   @ApiPropertyOptional({
+    example: 'uuid-manufacturer-id',
+    description: 'Manufacturer ID (e.g. Hot Wheels, Matchbox)',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Geçerli bir üretici ID giriniz' })
+  manufacturerId?: string;
+
+  @ApiPropertyOptional({
     example: 5,
     description: 'Stock quantity (null for unlimited stock)',
   })
