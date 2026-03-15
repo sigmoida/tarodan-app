@@ -14,6 +14,7 @@ import {
   Headers,
   NotFoundException,
   ForbiddenException,
+  UnauthorizedException,
   Res,
   Logger,
 } from '@nestjs/common';
@@ -104,6 +105,36 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
     return this.paymentService.initiatePaymentUnified(null, dto, req);
+  }
+
+  /**
+   * POST /payments/initiate-trade-cash - Initiate cash payment for a trade (nakit fark).
+   * Same auth pattern as POST /payments/initiate: @Public + manual JWT extract so token is always read.
+   */
+  @Post('initiate-trade-cash')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Public()
+  @ApiOperation({ summary: 'Initiate cash payment for a trade' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Payment initiated' })
+  async initiateTradeCash(
+    @Body() body: { tradeId: string },
+    @Req() req: Request,
+  ) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    }
+    try {
+      const token = authHeader.substring(7);
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const userId = decoded.sub || decoded.id;
+      if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
+      return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
+    } catch (e: any) {
+      if (e instanceof UnauthorizedException) throw e;
+      throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    }
   }
 
   /**

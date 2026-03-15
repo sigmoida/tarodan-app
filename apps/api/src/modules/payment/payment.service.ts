@@ -183,21 +183,32 @@ export class PaymentService {
       throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
     }
 
-    // Check for existing pending Payment record for this TradeCashPayment
-    const existingPayment = await this.prisma.payment.findFirst({
-      where: {
-        tradeCashPaymentId: cashPayment.id,
-        status: PaymentStatus.pending,
-      },
+    // trade_cash_payment_id is unique: only one Payment per TradeCashPayment. Reuse existing if any.
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: { tradeCashPaymentId: cashPayment.id },
     });
 
     if (existingPayment) {
+      if (existingPayment.status === PaymentStatus.completed) {
+        throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+      }
+      // Pending veya failed: yeniden kullan (failed ise pending yap)
+      if (existingPayment.status === PaymentStatus.failed) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: { status: PaymentStatus.pending, failureReason: null },
+        });
+      }
       const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
       return {
         paymentId: existingPayment.id,
         paymentUrl: `${frontendUrl}/payment/${existingPayment.id}`,
         provider: existingPayment.provider,
         expiresIn: 300,
+        ...(paymentBypassExisting && { useBypass: true }),
+        tradeId,
+        amount: Number(cashPayment.totalAmount),
       };
     }
 

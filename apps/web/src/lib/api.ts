@@ -277,6 +277,9 @@ export const paymentsApi = {
     api.post('/payments/initiate', { orderId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
+  /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
+  initiateTradeCash: (tradeId: string) =>
+    api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>
