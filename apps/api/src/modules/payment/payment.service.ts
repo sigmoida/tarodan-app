@@ -1426,7 +1426,7 @@ export class PaymentService {
       });
 
       // Check if this is a membership order (productId starts with "membership-")
-      const isMembershipOrder = payment.order.productId.startsWith('membership-');
+      const isMembershipOrder = payment.order?.productId?.startsWith('membership-') ?? false;
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {

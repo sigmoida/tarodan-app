@@ -450,7 +450,7 @@ export class AdminService {
     });
 
     // If this is a membership price setting, also update the MembershipTier
-    if (dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' ||
+    if (dto.key === 'basic_monthly_price' || dto.key === 'premium_monthly_price' || dto.key === 'business_monthly_price' ||
       dto.key === 'yearly_discount_percentage') {
       try {
         // Get discount percentage
@@ -461,6 +461,34 @@ export class AdminService {
           ? parseFloat(discountSetting.settingValue)
           : (dto.key === 'yearly_discount_percentage' ? parseFloat(dto.value) : 20);
         const finalDiscount = isNaN(discountPercentage) ? 20 : discountPercentage;
+
+        if (dto.key === 'basic_monthly_price' || dto.key === 'yearly_discount_percentage') {
+          // Update basic tier
+          const basicMonthlySetting = await this.prisma.platformSetting.findUnique({
+            where: { settingKey: 'basic_monthly_price' },
+          });
+          const basicMonthly = basicMonthlySetting
+            ? parseFloat(basicMonthlySetting.settingValue)
+            : (dto.key === 'basic_monthly_price' ? parseFloat(dto.value) : null);
+
+          if (basicMonthly !== null && !isNaN(basicMonthly)) {
+            const basicYearly = basicMonthly * 12 * (1 - finalDiscount / 100);
+            const basicTier = await this.prisma.membershipTier.findUnique({
+              where: { type: 'basic' },
+            });
+
+            if (basicTier) {
+              await this.prisma.membershipTier.update({
+                where: { id: basicTier.id },
+                data: {
+                  monthlyPrice: basicMonthly,
+                  yearlyPrice: basicYearly,
+                },
+              });
+              this.logger.log(`Updated basic tier: monthly=${basicMonthly}, yearly=${basicYearly} (${finalDiscount}% discount)`);
+            }
+          }
+        }
 
         if (dto.key === 'premium_monthly_price' || dto.key === 'yearly_discount_percentage') {
           // Update premium tier
