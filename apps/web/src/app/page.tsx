@@ -375,7 +375,7 @@ export default function Home() {
                       src={brand.logoUrl}
                       alt={brand.name}
                       fill
-                      className="object-contain opacity-70 group-hover:opacity-100 transition-opacity p-1"
+                      className="object-contain p-1"
                       sizes="(max-width: 640px) 96px, 112px"
                       unoptimized
                       fallbackSrc={`https://placehold.co/112x64/ffffff/9ca3af?text=${encodeURIComponent(brand.name)}`}

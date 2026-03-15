@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   FunnelIcon,
@@ -29,6 +30,7 @@ interface Product {
   seller: {
     id: string;
     displayName: string;
+    avatarUrl?: string;
   };
   createdAt: string;
 }
@@ -373,8 +375,12 @@ export default function CategoryPage() {
                         <p className="text-gray-600 text-sm">
                           Durum: {getConditionLabel(product.condition)}
                         </p>
-                        <p className="text-gray-600 text-sm">
-                          Satıcı: {product.seller?.displayName || 'Bilinmiyor'}
+                        <p className="text-gray-600 text-sm flex items-center gap-1.5">
+                          Satıcı: 
+                          {product.seller && (
+                            <UserAvatar displayName={product.seller.displayName} avatarUrl={product.seller.avatarUrl} size="xs" />
+                          )}
+                          {product.seller?.displayName || 'Bilinmiyor'}
                         </p>
                       </div>
                       <div className="flex items-center justify-between mt-4">

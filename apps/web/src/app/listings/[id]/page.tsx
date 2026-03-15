@@ -92,6 +92,7 @@ interface Listing {
     id: string;
     displayName?: string;
     username?: string;
+    avatarUrl?: string;
     rating?: number;
     listings_count?: number;
     productsCount?: number;
@@ -1450,7 +1451,7 @@ export default function ListingDetailPage() {
                     <Link href={`/seller/${listing.seller.id}`} className="flex-shrink-0">
                       <UserAvatar
                         displayName={listing.seller.displayName}
-                        avatarUrl={(listing.seller as any).avatarUrl}
+                        avatarUrl={listing.seller.avatarUrl}
                         size="md"
                         className="hover:ring-2 hover:ring-orange-500 transition-all"
                       />
@@ -1469,7 +1470,7 @@ export default function ListingDetailPage() {
                     >
                       <UserAvatar
                         displayName={listing.seller.displayName}
-                        avatarUrl={(listing.seller as any).avatarUrl}
+                        avatarUrl={listing.seller.avatarUrl}
                         size="md"
                         className="hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer"
                       />

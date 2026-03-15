@@ -1044,10 +1044,10 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -1283,10 +1283,10 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -1337,7 +1337,7 @@ export class OrderService {
           select: { id: true, displayName: true, email: true, isVerified: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1423,10 +1423,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1456,10 +1456,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: {
           include: {
@@ -1600,10 +1600,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1670,10 +1670,10 @@ export class OrderService {
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true },
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
           },
         },
       });
@@ -1777,10 +1777,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1825,10 +1825,10 @@ export class OrderService {
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true },
+          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
       },
@@ -1861,6 +1861,19 @@ export class OrderService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
+  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+    if (!avatarUrl) return null;
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (this.storageService) {
+      try {
+        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
@@ -1919,8 +1932,14 @@ export class OrderService {
         quantity: 1,
         price: Number(order.totalAmount),
       }] : [],
-      buyer: order.buyer,
-      seller: order.seller,
+      buyer: {
+        ...order.buyer,
+        avatarUrl: await this.resolveAvatarUrl(order.buyer?.avatarUrl),
+      },
+      seller: {
+        ...order.seller,
+        avatarUrl: await this.resolveAvatarUrl(order.seller?.avatarUrl),
+      },
       shippingAddress: order.shippingAddress && typeof order.shippingAddress === 'object'
         ? {
             id: (order.shippingAddress as any).id || order.shippingAddressId || '',

@@ -1461,23 +1461,6 @@ export class UserService {
             isVerified: true,
           },
         },
-        items: {
-          include: {
-            product: {
-              include: {
-                images: {
-                  take: 1,
-                  orderBy: { sortOrder: 'asc' },
-                },
-              },
-            },
-          },
-          take: 4,
-          orderBy: [
-            { isFeatured: 'desc' },
-            { sortOrder: 'asc' },
-          ],
-        },
         _count: {
           select: { items: true, likes: true },
         },
@@ -1490,12 +1473,20 @@ export class UserService {
     });
 
     return Promise.all(collections.map(async (collection) => {
-      const items = await Promise.all(collection.items.map(async (item) => ({
-        id: item.id,
-        productId: item.productId,
-        productTitle: item.product?.title || item.customTitle || 'Ürün',
-        productPrice: item.product?.price ? Number(item.product.price) : null,
-        productImage: this.resolveProductImageUrl(item.customImageUrl || item.product?.images?.[0]?.cardKey),
+      // Always show the collection owner's own active products so products always match the user
+      const ownProducts = await this.prisma.product.findMany({
+        where: { sellerId: collection.user.id, status: 'active' },
+        take: 5,
+        include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+        orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
+      });
+
+      const items = await Promise.all(ownProducts.map(async p => ({
+        id: p.id,
+        productId: p.id,
+        productTitle: p.title,
+        productPrice: Number(p.price),
+        productImage: this.resolveProductImageUrl(p.images[0]?.cardKey),
       })));
 
       return {
@@ -1588,22 +1579,21 @@ export class UserService {
 
     const topCollection = topCollectionData.collection;
 
-    // Get collection items with product details for display
-    const displayItems = await this.prisma.collectionItem.findMany({
-      where: { collectionId: topCollection.id },
-      take: 4,
-      include: {
-        product: {
-          include: {
-            images: { take: 1 },
-          },
-        },
-      },
-      orderBy: [
-        { isFeatured: 'desc' }, // Featured items first
-        { sortOrder: 'asc' },
-      ],
+    // Always show the collector's own active product listings (ensures products match the user)
+    const ownProducts = await this.prisma.product.findMany({
+      where: { sellerId: topCollection.user.id, status: 'active' },
+      take: 5,
+      include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+      orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
     });
+
+    const itemsResult = await Promise.all(ownProducts.map(async p => ({
+      id: p.id,
+      productId: p.id,
+      productTitle: p.title,
+      productPrice: Number(p.price),
+      productImage: this.resolveProductImageUrl(p.images[0]?.cardKey),
+    })));
 
     return {
       id: topCollection.id,
@@ -1622,15 +1612,7 @@ export class UserService {
         bio: topCollection.user.bio,
         isVerified: topCollection.user.isVerified,
       },
-      items: await Promise.all(displayItems
-        .filter(item => item.product !== null)
-        .map(async item => ({
-          id: item.id,
-          productId: item.product!.id,
-          productTitle: item.product!.title,
-          productPrice: Number(item.product!.price),
-          productImage: this.resolveProductImageUrl(item.product!.images[0]?.cardKey),
-        }))),
+      items: itemsResult,
     };
   }
 
