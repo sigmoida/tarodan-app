@@ -95,12 +95,27 @@ export class MembershipService {
       });
     }
 
+    // Ödeme beklerken (past_due) “satın alınmış” gibi gösterme: efektif planı ücretsiz yap
+    let effectiveTier = membership.tier;
+    let pendingTierName: string | undefined;
+    let pendingPayment = false;
+    if (membership.status === SubscriptionStatus.past_due) {
+      const freeTier = await this.prisma.membershipTier.findUnique({
+        where: { type: MembershipTierType.free },
+      });
+      if (freeTier) {
+        effectiveTier = freeTier;
+        pendingTierName = membership.tier.name;
+        pendingPayment = true;
+      }
+    }
+
     // Map tier to DTO first
-    let tierDto = this.mapTierToDto(membership.tier);
+    let tierDto = this.mapTierToDto(effectiveTier);
     
     // Override listing limits based on tier type if platform setting exists
     // This must be done BEFORE getUserUsageStats so it uses the correct limit
-    if (membership.tier.type === MembershipTierType.free) {
+    if (effectiveTier.type === MembershipTierType.free) {
       const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
         where: { settingKey: 'free_listing_limit' },
       });
@@ -110,11 +125,11 @@ export class MembershipService {
           tierDto.maxFreeListings = platformLimit;
           tierDto.maxTotalListings = platformLimit; // For free tier, total = free
           // Also update the tier object so getUserUsageStats uses the correct value
-          membership.tier.maxFreeListings = platformLimit;
-          membership.tier.maxTotalListings = platformLimit;
+          effectiveTier.maxFreeListings = platformLimit;
+          effectiveTier.maxTotalListings = platformLimit;
         }
       }
-    } else if (membership.tier.type === MembershipTierType.premium) {
+    } else if (effectiveTier.type === MembershipTierType.premium) {
       const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
         where: { settingKey: 'premium_listing_limit' },
       });
@@ -123,14 +138,14 @@ export class MembershipService {
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             tierDto.maxTotalListings = -1; // Unlimited
-            membership.tier.maxTotalListings = -1;
+            effectiveTier.maxTotalListings = -1;
           } else if (platformLimit > 0) {
             tierDto.maxTotalListings = platformLimit;
-            membership.tier.maxTotalListings = platformLimit;
+            effectiveTier.maxTotalListings = platformLimit;
           }
         }
       }
-    } else if (membership.tier.type === MembershipTierType.business) {
+    } else if (effectiveTier.type === MembershipTierType.business) {
       const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
         where: { settingKey: 'business_listing_limit' },
       });
@@ -139,17 +154,17 @@ export class MembershipService {
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             tierDto.maxTotalListings = -1; // Unlimited
-            membership.tier.maxTotalListings = -1;
+            effectiveTier.maxTotalListings = -1;
           } else if (platformLimit > 0) {
             tierDto.maxTotalListings = platformLimit;
-            membership.tier.maxTotalListings = platformLimit;
+            effectiveTier.maxTotalListings = platformLimit;
           }
         }
       }
     }
 
     // Get usage stats (this will use the overridden maxFreeListings)
-    const stats = await this.getUserUsageStats(userId, membership.tier);
+    const stats = await this.getUserUsageStats(userId, effectiveTier);
 
     return {
       id: membership.id,
@@ -162,6 +177,7 @@ export class MembershipService {
       currentPeriodEnd: membership.currentPeriodEnd,
       cancelledAt: membership.cancelledAt || undefined,
       createdAt: membership.createdAt,
+      ...(pendingPayment && pendingTierName ? { pendingTierName, pendingPayment: true } : {}),
       ...stats,
     };
   }
@@ -281,13 +297,13 @@ export class MembershipService {
       }
     }
 
-    // Check if user already has this tier
+    // Check if user already has this tier (past_due = ödeme bekliyor, sayma; sadece aktif plan aynıysa engelle)
     const existingMembership = await this.prisma.userMembership.findUnique({
       where: { userId },
       include: { tier: true },
     });
 
-    if (existingMembership?.tier.type === dto.tierType) {
+    if (existingMembership?.tier.type === dto.tierType && existingMembership?.status !== SubscriptionStatus.past_due) {
       throw new BadRequestException('Zaten bu üyelik tipine sahipsiniz');
     }
 

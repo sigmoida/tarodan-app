@@ -1406,6 +1406,9 @@ export class OrderService {
       where.status = { not: OrderStatus.cancelled };
     }
 
+    // Üyelik siparişlerini siparişlerim listesinde gösterme (sadece ürün siparişleri)
+    where.NOT = { productId: { startsWith: 'membership-' } };
+
     const total = await this.prisma.order.count({ where });
 
     const orders = await this.prisma.order.findMany({

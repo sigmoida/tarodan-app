@@ -15,6 +15,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { membershipApi, api } from '@/lib/api';
 
 const TIER_FEATURES: Record<string, string[]> = {
+  basic: [
+    '50 ilan limiti',
+    '6 resim/ilan',
+    'Takas yapma',
+    'Koleksiyonlar',
+    '2 öne çıkan ilan',
+  ],
   premium: [
     'Sınırsız aktif ilan',
     '15 resim/ilan',
@@ -52,6 +59,8 @@ export default function MembershipCheckoutPage() {
   });
   const [agreed, setAgreed] = useState(false);
   const [membershipPrices, setMembershipPrices] = useState<{
+    basic_monthly_price?: number;
+    basic_yearly_price?: number;
     premium_monthly_price?: number;
     premium_yearly_price?: number;
     business_monthly_price?: number;
@@ -87,6 +96,8 @@ export default function MembershipCheckoutPage() {
         };
         
         setMembershipPrices({
+          basic_monthly_price: sanitizePrice(settings.basic_monthly_price, 49),
+          basic_yearly_price: sanitizePrice(settings.basic_yearly_price, 490),
           premium_monthly_price: sanitizePrice(settings.premium_monthly_price, 99),
           premium_yearly_price: sanitizePrice(settings.premium_yearly_price, 960),
           business_monthly_price: sanitizePrice(settings.business_monthly_price, 499),
@@ -95,8 +106,9 @@ export default function MembershipCheckoutPage() {
         });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error('Failed to fetch prices:', error);
-        // Use defaults if API fails
         setMembershipPrices({
+          basic_monthly_price: 49,
+          basic_yearly_price: 490,
           premium_monthly_price: 99,
           premium_yearly_price: 960,
           business_monthly_price: 499,
@@ -117,12 +129,17 @@ export default function MembershipCheckoutPage() {
   // Get tier info dynamically
   const getTierInfo = () => {
     const tierNames: Record<string, string> = {
+      basic: 'Temel Üyelik',
       premium: 'Premium Üyelik',
       business: 'İş Üyeliği',
     };
     
     let basePrice: number;
-    if (tier === 'premium') {
+    if (tier === 'basic') {
+      basePrice = period === 'monthly'
+        ? (membershipPrices.basic_monthly_price ?? 49)
+        : (membershipPrices.basic_yearly_price ?? 490);
+    } else if (tier === 'premium') {
       basePrice = period === 'monthly' 
         ? (membershipPrices.premium_monthly_price ?? 99)
         : (membershipPrices.premium_yearly_price ?? 960);
@@ -138,13 +155,13 @@ export default function MembershipCheckoutPage() {
       name: tierNames[tier],
       price: basePrice,
       features: TIER_FEATURES[tier] || [],
-      basePrice: period === 'monthly' ? basePrice : (tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
+      basePrice: period === 'monthly' ? basePrice : (tier === 'basic' ? (membershipPrices.basic_monthly_price ?? 49) : tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
     };
   };
 
   const tierInfo = getTierInfo();
   
-  if (!tierInfo || !['premium', 'business'].includes(tier)) {
+  if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

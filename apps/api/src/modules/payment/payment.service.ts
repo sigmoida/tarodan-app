@@ -2287,6 +2287,7 @@ export class PaymentService {
           select: {
             buyerId: true,
             sellerId: true,
+            productId: true,
             shippingAddress: true,
             totalAmount: true,
             shippingCost: true,
@@ -2369,6 +2370,8 @@ export class PaymentService {
       sellerNetAmount,
     };
 
+    const isMembershipOrder = payment.order.productId?.startsWith?.('membership-') ?? false;
+
     return {
       id: payment.id,
       orderId: payment.orderId,
@@ -2380,6 +2383,7 @@ export class PaymentService {
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       ...(useBypass && { useBypass: true }),
+      ...(isMembershipOrder && { isMembershipOrder: true }),
     };
   }
 

@@ -540,7 +540,7 @@ export class SearchService implements OnModuleInit {
           : undefined,
       };
     } catch (error) {
-      this.logger.warn('Elasticsearch search error, falling back to database');
+      this.logger.debug('Elasticsearch search error, falling back to database');
       return this.fallbackSearch(options);
     }
   }

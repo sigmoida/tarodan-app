@@ -41,6 +41,8 @@ export default function MembershipPage() {
     currentPeriodStart?: string;
     currentPeriodEnd?: string;
     tier?: string;
+    pendingPayment?: boolean;
+    pendingTierName?: string;
   } | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<Array<{
     id: string;
@@ -98,21 +100,25 @@ export default function MembershipPage() {
         const membershipResponse = await api.get('/membership/me');
         const membership = membershipResponse.data;
         
-        if (membership && (membership.tier?.type === 'basic' || membership.tier?.type === 'premium' || membership.tier?.type === 'business')) {
+        if (membership) {
+          const isPaidTier = membership.tier?.type === 'basic' || membership.tier?.type === 'premium' || membership.tier?.type === 'business';
+          const pendingPayment = !!membership.pendingPayment;
           setMembershipDetails({
             currentPeriodStart: membership.currentPeriodStart,
             currentPeriodEnd: membership.currentPeriodEnd,
             tier: membership.tier?.type,
+            pendingPayment: pendingPayment || undefined,
+            pendingTierName: membership.pendingTierName,
           });
-
-          // Fetch payment methods
-          try {
-            const paymentMethodsResponse = await api.get('/payments/methods');
-            const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
-            setPaymentMethods(methods);
-          } catch (error) {
-            if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
-            setPaymentMethods([]);
+          if (isPaidTier && !pendingPayment) {
+            try {
+              const paymentMethodsResponse = await api.get('/payments/methods');
+              const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
+              setPaymentMethods(methods);
+            } catch (error) {
+              if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
+              setPaymentMethods([]);
+            }
           }
         }
       } catch (error) {
@@ -357,7 +363,14 @@ export default function MembershipPage() {
             {t('membership.subtitle')}
           </p>
           
-          {currentTier && currentTier !== 'free' && (
+          {membershipDetails?.pendingPayment && membershipDetails?.pendingTierName && (
+            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-amber-800 font-medium mb-2">Ödeme bekleniyor – {membershipDetails.pendingTierName} planı için ödemeyi tamamlayın.</p>
+              <Link href="/membership/checkout" className="text-sm font-medium text-amber-700 underline">Ödemeyi tamamla</Link>
+            </div>
+          )}
+          
+          {!membershipDetails?.pendingPayment && currentTier && currentTier !== 'free' && (
             <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
               <p className="text-blue-800 font-medium">
                 {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}

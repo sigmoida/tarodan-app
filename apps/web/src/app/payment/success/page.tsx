@@ -92,6 +92,12 @@ export default function PaymentSuccessPage() {
       const paymentData = response.data;
       setPayment(paymentData);
 
+      // Üyelik ödemesi: siparişlerime atma, üyelik başarı sayfasına git (URL'de type=membership olmasa bile)
+      if (paymentData?.isMembershipOrder) {
+        router.replace('/membership/success');
+        return;
+      }
+
       const actualOrderId = paymentData?.orderId || orderIdFromUrl;
 
       // Fetch invoice (with retry because it might be generating)
