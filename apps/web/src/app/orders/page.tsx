@@ -52,6 +52,8 @@ interface Order {
   };
   isBuyer?: boolean;
   isSeller?: boolean;
+  hasProductRating?: boolean;
+  hasSellerRating?: boolean;
   pricing?: {
     subtotal: number;
     shippingAmount: number;
@@ -89,7 +91,6 @@ export default function OrdersPage() {
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
 
   const statusLabels: Record<string, { label: string; color: string }> = {
     pending_payment: { label: t('order.statusPending'), color: 'text-yellow-400 bg-yellow-400/10' },
@@ -187,7 +188,6 @@ export default function OrdersPage() {
 
       toast.success(t('review.reviewSubmitted'));
       setShowReviewModal(false);
-      setReviewedOrders(prev => new Set([...Array.from(prev), reviewingOrder.id]));
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Review submit error:', error);
@@ -202,7 +202,7 @@ export default function OrdersPage() {
     const productId = order.product?.id || order.items?.[0]?.product?.id;
     const isBuyer = productId && (order.isBuyer !== false) && filter !== 'seller';
     const isReviewableStatus = REVIEWABLE_STATUSES.includes(order.status);
-    const notAlreadyReviewed = !reviewedOrders.has(order.id);
+    const notAlreadyReviewed = order.hasProductRating !== true || order.hasSellerRating !== true;
     return isBuyer && isReviewableStatus && notAlreadyReviewed;
   };
 

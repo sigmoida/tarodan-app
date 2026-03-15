@@ -1884,6 +1884,24 @@ export class OrderService {
   }
 
   /**
+   * Get hasProductRating and hasSellerRating for buyer (used in formatOrderResponse)
+   */
+  private async getOrderRatingFlags(order: any, userId: string): Promise<{ hasProductRating?: boolean; hasSellerRating?: boolean }> {
+    const isBuyer = order.buyerId === userId;
+    if (!isBuyer || !order.productId || !order.sellerId) {
+      return {};
+    }
+    const [productRating, userRating] = await Promise.all([
+      this.prisma.productRating.findFirst({ where: { orderId: order.id, userId } }),
+      this.prisma.rating.findFirst({ where: { orderId: order.id, giverId: userId, receiverId: order.sellerId } }),
+    ]);
+    return {
+      hasProductRating: !!productRating,
+      hasSellerRating: !!userRating,
+    };
+  }
+
+  /**
    * Format order response
    */
   private async formatOrderResponse(order: any, userId: string) {
@@ -1963,6 +1981,7 @@ export class OrderService {
         : null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
+      ...(await this.getOrderRatingFlags(order, userId)),
       offerId: order.offerId ?? undefined,
       payment: order.payment
         ? {
