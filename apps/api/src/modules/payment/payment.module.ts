@@ -5,6 +5,7 @@ import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PrismaModule } from '../../prisma';
+import { CacheModule } from '../cache/cache.module';
 import { PaymentProvidersModule } from '../payment-providers';
 import { EventModule } from '../events';
 import { RawBodyMiddleware } from './middleware/raw-body.middleware';
@@ -14,6 +15,7 @@ import { InvoiceModule } from '../invoice/invoice.module';
   imports: [
     PrismaModule,
     ConfigModule,
+    CacheModule,
     PaymentProvidersModule,
     EventModule,
     ScheduleModule.forRoot(),

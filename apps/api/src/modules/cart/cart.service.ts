@@ -18,6 +18,7 @@ import {
   AppliedDiscountDto,
 } from './dto';
 import { ProductStatus, DiscountScope, Prisma } from '@prisma/client';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -135,9 +136,12 @@ export class CartService {
       throw new BadRequestException('Kendi ürününüzü satın alamazsınız');
     }
 
-    // Check stock if quantity tracking is enabled
-    if (product.quantity !== null && product.quantity < (dto.quantity || 1)) {
-      throw new BadRequestException(`Stokta sadece ${product.quantity} adet var`);
+    // Adet bazlı: müsait adet kontrolü
+    const available = getAvailableQuantity(product);
+    if (available !== null && available < (dto.quantity || 1)) {
+      throw new BadRequestException(
+        available === 0 ? 'Ürün stokta yok' : `Stokta sadece ${available} adet var`,
+      );
     }
 
     // Check if item already in cart
@@ -161,9 +165,11 @@ export class CartService {
         );
       }
 
-      // Check stock
-      if (product.quantity !== null && newQuantity > product.quantity) {
-        throw new BadRequestException(`Stokta sadece ${product.quantity} adet var`);
+      const available = getAvailableQuantity(product);
+      if (available !== null && newQuantity > available) {
+        throw new BadRequestException(
+          available === 0 ? 'Ürün stokta yok' : `Stokta sadece ${available} adet var`,
+        );
       }
 
       await this.prisma.cartItem.update({
@@ -447,16 +453,17 @@ export class CartService {
       subtotal += lineTotal;
       productDiscountTotal += productDiscount;
 
+      const available = getAvailableQuantity(product);
       let isAvailable = product.status === ProductStatus.active;
       let stockWarning: string | undefined;
 
-      if (product.quantity !== null) {
-        if (product.quantity === 0) {
+      if (available !== null) {
+        if (available === 0) {
           isAvailable = false;
           stockWarning = 'Stokta yok';
-        } else if (product.quantity < item.quantity) {
-          stockWarning = `Stokta sadece ${product.quantity} adet var`;
-        } else if (product.quantity <= 5) {
+        } else if (available < item.quantity) {
+          stockWarning = `Stokta sadece ${available} adet var`;
+        } else if (available <= 5) {
           stockWarning = 'Son birkaç ürün!';
         }
       }

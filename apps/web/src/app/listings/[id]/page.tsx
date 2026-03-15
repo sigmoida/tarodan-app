@@ -86,6 +86,8 @@ interface Listing {
   trade_available?: boolean;
   isTradeEnabled?: boolean;
   quantity?: number | null;
+  /** Müsait adet (quantity - reserved); teklif/takas rezervasyonu düşülmüş stok */
+  availableQuantity?: number | null;
   status?: 'pending' | 'active' | 'reserved' | 'sold' | 'inactive' | 'rejected';
   sellerId?: string;
   seller?: {
@@ -834,11 +836,16 @@ export default function ListingDetailPage() {
           <span className="text-gray-400 truncate max-w-[200px]">{listing.title}</span>
         </nav>
 
-        {listing.quantity === 0 && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-            <p className="text-amber-800 font-medium">{t('product.stockFinished')}</p>
-          </div>
-        )}
+        {(() => {
+          const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+            ? listing.availableQuantity
+            : listing.quantity;
+          return available === 0 && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-amber-800 font-medium">{t('product.stockFinished')}</p>
+            </div>
+          );
+        })()}
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
@@ -1396,11 +1403,17 @@ export default function ListingDetailPage() {
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Year' : 'Yıl'}</p>
                 <p className="font-semibold text-gray-900">{listing.year ?? '—'}</p>
               </div>
-              {listing.quantity !== undefined && listing.quantity !== null && (
+              {((listing.availableQuantity !== undefined && listing.availableQuantity !== null) || (listing.quantity !== undefined && listing.quantity !== null)) && (
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Stock' : 'Stok'}</p>
                   <p className="font-semibold text-gray-900">
-                    {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : t('product.stockFinished')}
+                    {(() => {
+                      const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+                        ? listing.availableQuantity
+                        : listing.quantity;
+                      if (available === null || available === undefined) return locale === 'en' ? 'Unlimited' : 'Sınırsız';
+                      return available > 0 ? `${available} ${locale === 'en' ? 'available' : 'adet'}` : t('product.stockFinished');
+                    })()}
                   </p>
                 </div>
               )}
@@ -1629,19 +1642,25 @@ export default function ListingDetailPage() {
               )}
 
               {/* Primary Action: Buy Now - Hide for owner */}
-              {!isOwner && (
-                <button
-                  onClick={handleBuyNow}
-                  disabled={listing.status !== 'active' || listing.quantity === 0}
-                  className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active' && listing.quantity !== 0
-                    ? 'btn-primary'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
-                    }`}
-                >
-                  <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : listing.quantity === 0 ? t('product.stockFinished') : t('product.buyNow')}
-                </button>
-              )}
+              {!isOwner && (() => {
+                const available = listing.availableQuantity !== undefined && listing.availableQuantity !== null
+                  ? listing.availableQuantity
+                  : listing.quantity;
+                const hasStock = available === null || available === undefined || available > 0;
+                return (
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={listing.status !== 'active' || !hasStock}
+                    className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active' && hasStock
+                      ? 'btn-primary'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
+                      }`}
+                  >
+                    <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : !hasStock ? t('product.stockFinished') : t('product.buyNow')}
+                  </button>
+                );
+              })()}
 
               {/* Secondary Actions - Hide most for owner */}
               {!isOwner && (

@@ -14,6 +14,7 @@ import { StorageService } from '../storage/storage.service';
 import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto, CheckoutQuoteDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -647,8 +648,9 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
 
-      // Check stock availability (quantity > 0 or null for unlimited)
-      if (product.quantity !== null && product.quantity <= 0) {
+      // Adet bazlı stok: müsait adet (quantity - reservedQuantity) >= 1 olmalı
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
       }
 
@@ -790,10 +792,10 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
+      // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
       await tx.product.update({
         where: { id: dto.productId },
-        data: { status: ProductStatus.reserved },
+        data: { reservedQuantity: { increment: 1 } },
       });
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
@@ -1061,11 +1063,7 @@ export class OrderService {
         commissionResult,
       );
 
-      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
-      await tx.product.update({
-        where: { id: offer.productId },
-        data: { status: ProductStatus.reserved },
-      });
+      // Rezervasyon teklif kabul edildiğinde (offer.service accept) yapıldı; burada tekrar yapmıyoruz.
 
       // Store productId for cache invalidation
       productIdForCache = offer.productId;
@@ -1158,8 +1156,9 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil');
       }
 
-      // Check stock availability (quantity > 0 or null for unlimited)
-      if (product.quantity !== null && product.quantity <= 0) {
+      // Adet bazlı stok: müsait adet >= 1
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
       }
 
@@ -1300,10 +1299,10 @@ export class OrderService {
         commissionResult,
       );
 
-      // Rezerve et: aynı anda başka biri satın alamaz. Stok sadece ödeme tamamlanınca düşer.
+      // Adet bazlı rezervasyon: 1 adet rezerve et
       await tx.product.update({
         where: { id: dto.productId },
-        data: { status: ProductStatus.reserved },
+        data: { reservedQuantity: { increment: 1 } },
       });
 
       return {
@@ -1620,7 +1619,8 @@ export class OrderService {
    * - If paid, triggers refund process
    */
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
+    let productIdToInvalidate: string | null = null;
+    const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { product: true },
@@ -1629,6 +1629,7 @@ export class OrderService {
       if (!order) {
         throw new NotFoundException('Sipariş bulunamadı');
       }
+      productIdToInvalidate = order.productId;
 
       // Only buyer can cancel
       if (order.buyerId !== userId) {
@@ -1678,11 +1679,20 @@ export class OrderService {
         },
       });
 
-      // Restore product to active status
-      await tx.product.update({
-        where: { id: order.productId },
-        data: { status: ProductStatus.active },
-      });
+      // Adet bazlı: rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
+      if (order.status === OrderStatus.pending_payment) {
+        await tx.product.update({
+          where: { id: order.productId },
+          data: { reservedQuantity: { decrement: 1 } },
+        });
+      }
+      // Eski davranış: ürün reserved idiyse tekrar active yap (geçiş dönemi)
+      if (order.product.status === ProductStatus.reserved) {
+        await tx.product.update({
+          where: { id: order.productId },
+          data: { status: ProductStatus.active },
+        });
+      }
 
       // Re-enable the offer (or mark as cancelled)
       if (order.offerId) {
@@ -1696,6 +1706,10 @@ export class OrderService {
 
       return await this.formatOrderResponse(cancelledOrder, userId);
     });
+    if (productIdToInvalidate) {
+      await this.invalidateProductCaches(productIdToInvalidate);
+    }
+    return result;
   }
 
   /**
@@ -1723,8 +1737,9 @@ export class OrderService {
     if (order.offer.status !== OfferStatus.accepted) {
       throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
     }
-    if (order.product.status !== ProductStatus.active) {
-      throw new BadRequestException('Ürün artık satın alınamaz durumda');
+    const available = getAvailableQuantity(order.product);
+    if (available !== null && available < 1) {
+      throw new BadRequestException('Ürün için yeterli müsait adet yok');
     }
 
     await this.prisma.$transaction([
@@ -1734,7 +1749,7 @@ export class OrderService {
       }),
       this.prisma.product.update({
         where: { id: order.productId },
-        data: { status: ProductStatus.reserved },
+        data: { reservedQuantity: { increment: 1 } },
       }),
     ]);
 

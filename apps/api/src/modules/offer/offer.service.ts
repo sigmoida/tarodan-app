@@ -10,6 +10,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from './dto';
 import { OfferStatus, ProductStatus, OrderStatus, Prisma } from '@prisma/client';
@@ -18,6 +19,7 @@ import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { OrderService } from '../order/order.service';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 
 @Injectable()
 export class OfferService {
@@ -27,6 +29,7 @@ export class OfferService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
     @Inject(forwardRef(() => NotificationService))
@@ -96,6 +99,12 @@ export class OfferService {
 
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException('Bu ürün şu anda satışta değil');
+      }
+
+      // Adet bazlı: en az 1 müsait adet olmalı
+      const available = getAvailableQuantity(product);
+      if (available !== null && available < 1) {
+        throw new BadRequestException('Ürün stokta yok veya yeterli müsait adet yok');
       }
 
       // Cannot offer on own product
@@ -274,6 +283,12 @@ export class OfferService {
         throw new BadRequestException('Ürün artık satışta değil');
       }
 
+      // Adet bazlı: müsait adet >= 1 olmalı
+      const available = getAvailableQuantity(productData);
+      if (available !== null && available < 1) {
+        throw new BadRequestException('Ürün için yeterli müsait adet yok');
+      }
+
       // Accept this offer with version check
       const acceptedOffer = await tx.offer.update({
         where: {
@@ -311,10 +326,10 @@ export class OfferService {
         },
       });
 
-      // Reserve product so nobody else can buy it while payment is pending
+      // Adet bazlı rezervasyon: 1 adet rezerve et (ödemeye kadar)
       await tx.product.update({
         where: { id: offerData.productId },
-        data: { status: ProductStatus.reserved },
+        data: { reservedQuantity: { increment: 1 } },
       });
 
       // Calculate commission using the same logic as direct buy
@@ -389,6 +404,9 @@ export class OfferService {
     } catch (error) {
       this.logger.error(`Failed to send offer accepted notification: ${error}`);
     }
+
+    // Ürün detay cache'ini temizle; müsait adet (availableQuantity) güncel dönsün
+    await this.cache.del(`products:detail:${result.offer.productId}`);
 
     return await this.formatOfferResponse(result.offer);
   }

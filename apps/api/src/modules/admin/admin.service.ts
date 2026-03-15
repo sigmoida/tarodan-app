@@ -1026,9 +1026,13 @@ export class AdminService {
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.price !== undefined) data.price = dto.price;
     if (dto.oldPrice !== undefined) data.oldPrice = dto.oldPrice;
-    if (dto.quantity !== undefined) data.quantity = dto.quantity;
+    if (dto.quantity !== undefined) {
+      data.quantity = dto.quantity;
+      data.status = getProductStatusFromQuantity(dto.quantity);
+    } else if (dto.status !== undefined) {
+      data.status = dto.status;
+    }
     if (dto.condition !== undefined) data.condition = dto.condition;
-    if (dto.status !== undefined) data.status = dto.status;
     if (dto.categoryId !== undefined) {
       data.category = { connect: { id: dto.categoryId } };
     }

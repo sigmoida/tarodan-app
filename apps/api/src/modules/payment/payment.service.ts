@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto, DirectPaymentDto, CreditCardDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
@@ -26,6 +27,7 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly iyzicoService: IyzicoService,
     private readonly paytrService: PayTRService,
@@ -1425,6 +1427,7 @@ export class PaymentService {
 
       // Check if this is a membership order (productId starts with "membership-")
       const isMembershipOrder = payment.order.productId.startsWith('membership-');
+      const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
         // Activate membership for the buyer
@@ -1517,6 +1520,7 @@ export class PaymentService {
         }
       } else {
         // Regular product order - update product status to SOLD and decrement stock (stock is only decremented on payment success, not at order creation)
+        productIdsToInvalidate.push(payment.order.productId);
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
         });
@@ -1525,11 +1529,12 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
-        // Stok ödeme anında düşer; sipariş oluşturulurken düşülmez (ürün ödenene kadar listede kalsın)
+        // Stok ödeme anında düşer; rezervasyon da kalkar (adet bazlı)
         const newQuantity =
           product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
+          reservedQuantity: { decrement: 1 },
         };
         if (product.quantity !== null) {
           updateData.quantity = { decrement: 1 };
@@ -1575,29 +1580,30 @@ export class PaymentService {
               },
             });
 
-            // Get all products involved in these cancelled trades
+            // Adet bazlı: iptal edilen takaslardaki ürünlerin reservedQuantity'sini düşür
             const allTradeItems = await tx.tradeItem.findMany({
               where: {
                 tradeId: { in: activeTrades.map((t) => t.id) },
               },
-              select: { productId: true },
-              distinct: ['productId'],
+              select: { productId: true, quantity: true },
             });
 
-            const productIdsToRestore = allTradeItems
-              .map((item) => item.productId)
-              .filter((id) => id !== payment.order.productId); // Don't restore the sold product
-
-            // Restore products from cancelled trades to active status
-            // (except the one that was just sold)
-            // Only restore products that were reserved (from accepted trades)
-            if (productIdsToRestore.length > 0) {
-              await tx.product.updateMany({
-                where: {
-                  id: { in: productIdsToRestore },
-                  status: ProductStatus.reserved, // Only restore if they were reserved
+            const restoreByProduct = new Map<string, number>();
+            for (const item of allTradeItems) {
+              if (item.productId === payment.order.productId) continue;
+              restoreByProduct.set(
+                item.productId,
+                (restoreByProduct.get(item.productId) ?? 0) + item.quantity,
+              );
+            }
+            for (const [productId, qty] of restoreByProduct) {
+              productIdsToInvalidate.push(productId);
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: { decrement: qty },
+                  status: ProductStatus.active,
                 },
-                data: { status: ProductStatus.active },
               });
             }
 
@@ -1647,41 +1653,46 @@ export class PaymentService {
         this.logger.log(`Membership payment ${payment.id} completed, no hold needed`);
       }
 
-      return order;
+      return { order, productIdsToInvalidate };
     });
+
+    const resultOrder = result.order;
+    for (const productId of result.productIdsToInvalidate) {
+      await this.cache.del(`products:detail:${productId}`);
+    }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
     // This publishes jobs to email, push, and shipping queues
-    const isMembershipOrder = result.productId.startsWith('membership-');
+    const isMembershipOrder = resultOrder.productId.startsWith('membership-');
 
     if (!isMembershipOrder) {
       try {
-        const shippingAddressData = result.shippingAddress as any;
+        const shippingAddressData = resultOrder.shippingAddress as any;
 
         // Check if this is a guest order and get actual buyer info
-        const isGuestOrder = result.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+        const isGuestOrder = resultOrder.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
-          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || result.buyer.email)
-          : result.buyer.email;
+          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || resultOrder.buyer.email)
+          : resultOrder.buyer.email;
         const actualBuyerName = isGuestOrder
           ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
-          : (result.buyer.displayName || result.buyer.email);
+          : (resultOrder.buyer.displayName || resultOrder.buyer.email);
 
         this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
 
         await this.eventService.emitOrderPaid({
-          orderId: result.id,
-          orderNumber: result.orderNumber,
-          buyerId: result.buyerId,
-          sellerId: result.sellerId,
-          productId: result.productId,
-          productTitle: result.product.title,
-          totalAmount: Number(result.totalAmount),
-          commissionAmount: Number(result.commissionAmount),
+          orderId: resultOrder.id,
+          orderNumber: resultOrder.orderNumber,
+          buyerId: resultOrder.buyerId,
+          sellerId: resultOrder.sellerId,
+          productId: resultOrder.productId,
+          productTitle: resultOrder.product.title,
+          totalAmount: Number(resultOrder.totalAmount),
+          commissionAmount: Number(resultOrder.commissionAmount),
           buyerEmail: actualBuyerEmail,
           buyerName: actualBuyerName,
-          sellerEmail: result.seller.email,
-          sellerName: result.seller.displayName || result.seller.email,
+          sellerEmail: resultOrder.seller.email,
+          sellerName: resultOrder.seller.displayName || resultOrder.seller.email,
           paymentMethod: payment.provider,
           transactionId: transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
@@ -1693,10 +1704,10 @@ export class PaymentService {
             zipCode: shippingAddressData?.zipCode || '',
           },
           isGuestOrder,
-          buyerSystemEmail: result.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || '',
         });
 
-        this.logger.log(`order.paid event emitted for order ${result.orderNumber}`);
+        this.logger.log(`order.paid event emitted for order ${resultOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail - payment was already successful
         this.logger.error(`Failed to emit order.paid event: ${error}`);
@@ -1706,17 +1717,17 @@ export class PaymentService {
     // Generate and send invoice to buyer (only for regular product orders, not membership)
     if (!isMembershipOrder) {
       try {
-        await this.invoiceService.generateAndSendInvoice(result.id);
-        this.logger.log(`Invoice generated and sent for order ${result.orderNumber}`);
+        await this.invoiceService.generateAndSendInvoice(resultOrder.id);
+        this.logger.log(`Invoice generated and sent for order ${resultOrder.orderNumber}`);
       } catch (error) {
         // Log but don't fail - payment was already successful
-        this.logger.error(`Failed to generate invoice for order ${result.orderNumber}: ${error}`);
+        this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
       }
     }
   }
 
   /**
-   * Ödeme başarısız/iptal olduğunda ürünü tekrar satışa aç (reserved -> active), siparişi iptal et.
+   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır (adet bazlı), siparişi iptal et.
    */
   private async releaseProductForFailedPayment(orderId: string): Promise<void> {
     try {
@@ -1726,17 +1737,35 @@ export class PaymentService {
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
+      const product = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+        select: { reservedQuantity: true, status: true },
+      });
+      const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
+      if (product) {
+        const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+        updateData.reservedQuantity = newReserved;
+        if (product.status === ProductStatus.reserved) {
+          updateData.status = ProductStatus.active;
+        }
+      }
+
       await this.prisma.$transaction([
         this.prisma.order.update({
           where: { id: orderId },
           data: { status: OrderStatus.cancelled },
         }),
-        this.prisma.product.update({
-          where: { id: order.productId },
-          data: { status: ProductStatus.active },
-        }),
+        ...(product && Object.keys(updateData).length > 0
+          ? [
+              this.prisma.product.update({
+                where: { id: order.productId },
+                data: updateData,
+              }),
+            ]
+          : []),
       ]);
-      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released to active after payment failure`);
+      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released (reservation decremented) after payment failure`);
+      await this.cache.del(`products:detail:${order.productId}`);
     } catch (error: any) {
       this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
     }
@@ -2816,15 +2845,31 @@ export class PaymentService {
     for (const order of expiredOrders) {
       if (!order.productId) continue; // productId yoksa atla (Prisma'da not: null hataya yol açıyor)
       try {
+        const product = await this.prisma.product.findUnique({
+          where: { id: order.productId },
+          select: { reservedQuantity: true, status: true },
+        });
+        const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
+        if (product) {
+          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+          updateData.reservedQuantity = newReserved;
+          if (product.status === ProductStatus.reserved) {
+            updateData.status = ProductStatus.active;
+          }
+        }
         await this.prisma.$transaction([
           this.prisma.order.update({
             where: { id: order.id },
             data: { status: OrderStatus.cancelled },
           }),
-          this.prisma.product.update({
-            where: { id: order.productId },
-            data: { status: ProductStatus.active },
-          }),
+          ...(product && Object.keys(updateData).length > 0
+            ? [
+                this.prisma.product.update({
+                  where: { id: order.productId },
+                  data: updateData,
+                }),
+              ]
+            : []),
         ]);
         const pendingPayment = await this.prisma.payment.findFirst({
           where: { orderId: order.id, status: PaymentStatus.pending },
@@ -2839,6 +2884,7 @@ export class PaymentService {
             },
           });
         }
+        await this.cache.del(`products:detail:${order.productId}`);
         released++;
         this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
       } catch (error: any) {

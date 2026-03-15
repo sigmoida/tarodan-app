@@ -62,6 +62,13 @@ export class ProductResponseDto {
   })
   quantity?: number | null;
 
+  @ApiPropertyOptional({
+    example: 4,
+    description: 'Available quantity (quantity - reserved); undefined when unlimited',
+    nullable: true,
+  })
+  availableQuantity?: number | null;
+
   @ApiProperty({ type: [ProductImageDto] })
   images: ProductImageDto[];
 
