@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 interface Settings {
   freeListingLimit: number;
+  basicListingLimit: number;
   premiumListingLimit: number;
   businessListingLimit: number;
   tradeResponseHours: number;
@@ -15,6 +16,7 @@ interface Settings {
   minProductPrice: number;
   maxProductPrice: number;
   maxMessageLength: number;
+  basicMonthlyPrice: number;
   premiumMonthlyPrice: number;
   businessMonthlyPrice: number;
   yearlyDiscountPercentage: number;
@@ -29,6 +31,7 @@ interface Settings {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
     freeListingLimit: 10,
+    basicListingLimit: 50,
     premiumListingLimit: -1, // -1 means unlimited
     businessListingLimit: -1, // -1 means unlimited
     tradeResponseHours: 72,
@@ -38,6 +41,7 @@ export default function SettingsPage() {
     minProductPrice: 10,
     maxProductPrice: 100000,
     maxMessageLength: 1000,
+    basicMonthlyPrice: 49,
     premiumMonthlyPrice: 99,
     businessMonthlyPrice: 499,
     yearlyDiscountPercentage: 20,
@@ -82,18 +86,23 @@ export default function SettingsPage() {
       if (process.env.NODE_ENV === 'development') console.log('Loaded settings:', settingsObj);
 
       // Load membership tier prices if not in platform settings
+      let basicMonthlyPrice = settingsObj.basic_monthly_price ? Number(settingsObj.basic_monthly_price) : null;
       let premiumMonthlyPrice = settingsObj.premium_monthly_price ? Number(settingsObj.premium_monthly_price) : null;
       let businessMonthlyPrice = settingsObj.business_monthly_price ? Number(settingsObj.business_monthly_price) : null;
       let yearlyDiscountPercentage = settingsObj.yearly_discount_percentage ? Number(settingsObj.yearly_discount_percentage) : null;
 
-      if (premiumMonthlyPrice === null || businessMonthlyPrice === null || yearlyDiscountPercentage === null) {
+      if (basicMonthlyPrice === null || premiumMonthlyPrice === null || businessMonthlyPrice === null || yearlyDiscountPercentage === null) {
         try {
           const tiersResponse = await adminApi.getMembershipTiers();
           const tiers = tiersResponse.data?.tiers || tiersResponse.data || [];
 
+          const basicTier = tiers.find((t: any) => t.type === 'basic');
           const premiumTier = tiers.find((t: any) => t.type === 'premium');
           const businessTier = tiers.find((t: any) => t.type === 'business');
 
+          if (basicMonthlyPrice === null && basicTier) {
+            basicMonthlyPrice = Number(basicTier.monthlyPrice) || 49;
+          }
           if (premiumMonthlyPrice === null && premiumTier) {
             premiumMonthlyPrice = Number(premiumTier.monthlyPrice) || 99;
           }
@@ -120,6 +129,7 @@ export default function SettingsPage() {
       // Map platform setting keys to local settings
       setSettings({
         freeListingLimit: settingsObj.free_listing_limit ? Number(settingsObj.free_listing_limit) : 10,
+        basicListingLimit: settingsObj.basic_listing_limit ? Number(settingsObj.basic_listing_limit) : 50,
         premiumListingLimit: settingsObj.premium_listing_limit ? Number(settingsObj.premium_listing_limit) : -1,
         businessListingLimit: settingsObj.business_listing_limit ? Number(settingsObj.business_listing_limit) : -1,
         minProductPrice: settingsObj.min_product_price ? Number(settingsObj.min_product_price) : 10,
@@ -129,6 +139,7 @@ export default function SettingsPage() {
         tradeShippingDays: settingsObj.trade_shipping_deadline_days ? Number(settingsObj.trade_shipping_deadline_days) : 7,
         tradeConfirmationDays: settingsObj.trade_confirmation_deadline_days ? Number(settingsObj.trade_confirmation_deadline_days) : 3,
         maxMessageLength: settingsObj.max_message_length ? Number(settingsObj.max_message_length) : 1000,
+        basicMonthlyPrice: basicMonthlyPrice ?? 49,
         premiumMonthlyPrice: premiumMonthlyPrice ?? 99,
         businessMonthlyPrice: businessMonthlyPrice ?? 499,
         yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
@@ -156,6 +167,7 @@ export default function SettingsPage() {
       if (activeTab === 'listing') {
         settingsToSave.push(
           adminApi.updateSetting('free_listing_limit', settings.freeListingLimit.toString()),
+          adminApi.updateSetting('basic_listing_limit', settings.basicListingLimit.toString()),
           adminApi.updateSetting('premium_listing_limit', settings.premiumListingLimit.toString()),
           adminApi.updateSetting('business_listing_limit', settings.businessListingLimit.toString()),
           adminApi.updateSetting('min_product_price', settings.minProductPrice.toString()),
@@ -183,6 +195,7 @@ export default function SettingsPage() {
         );
       } else if (activeTab === 'membership') {
         settingsToSave.push(
+          adminApi.updateSetting('basic_monthly_price', settings.basicMonthlyPrice.toString()),
           adminApi.updateSetting('premium_monthly_price', settings.premiumMonthlyPrice.toString()),
           adminApi.updateSetting('business_monthly_price', settings.businessMonthlyPrice.toString()),
           adminApi.updateSetting('yearly_discount_percentage', settings.yearlyDiscountPercentage.toString())
@@ -334,6 +347,23 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Ücretsiz üyelerin ilan limiti
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">
+                  Temel İlan Limiti
+                </label>
+                <input
+                  type="number"
+                  min="-1"
+                  value={settings.basicListingLimit}
+                  onChange={(e) =>
+                    setSettings({ ...settings, basicListingLimit: Number(e.target.value) })
+                  }
+                  className="admin-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Temel üyelerin ilan limiti (-1 = sınırsız)
                 </p>
               </div>
               <div>
@@ -538,6 +568,42 @@ export default function SettingsPage() {
                     </p>
                     <p className="text-xs text-blue-700 mt-2">
                       Yıllık fiyat = (Aylık Fiyat × 12) × (1 - İndirim%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Basic Tier */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-md font-semibold text-gray-900 mb-4">Temel Üyelik</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">
+                      Aylık Fiyat (₺)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.basicMonthlyPrice}
+                      onChange={(e) =>
+                        setSettings({ ...settings, basicMonthlyPrice: Number(e.target.value) })
+                      }
+                      className="admin-input"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Temel üyeliğin aylık fiyatı
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">
+                      Yıllık Fiyat (₺) <span className="text-xs text-gray-500">(Otomatik Hesaplanır)</span>
+                    </label>
+                    <div className="admin-input bg-white text-gray-500 cursor-not-allowed">
+                      {Math.round((settings.basicMonthlyPrice * 12 * (1 - settings.yearlyDiscountPercentage / 100)) * 100) / 100}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Yıllık fiyat otomatik hesaplanır: {settings.basicMonthlyPrice} × 12 × (1 - {settings.yearlyDiscountPercentage}%)
                     </p>
                   </div>
                 </div>

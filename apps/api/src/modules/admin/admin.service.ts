@@ -387,9 +387,11 @@ export class AdminService {
         settingKey: {
           in: [
             'free_listing_limit',
+            'basic_listing_limit',
             'premium_listing_limit',
             'business_listing_limit',
             'max_message_length',
+            'basic_monthly_price',
             'premium_monthly_price',
             'business_monthly_price',
             'yearly_discount_percentage',
@@ -412,6 +414,9 @@ export class AdminService {
 
     // Calculate yearly prices from monthly prices and discount
     const discountPercentage = result.yearly_discount_percentage ?? 20;
+    if (result.basic_monthly_price) {
+      result.basic_yearly_price = result.basic_monthly_price * 12 * (1 - discountPercentage / 100);
+    }
     if (result.premium_monthly_price) {
       result.premium_yearly_price = result.premium_monthly_price * 12 * (1 - discountPercentage / 100);
     }

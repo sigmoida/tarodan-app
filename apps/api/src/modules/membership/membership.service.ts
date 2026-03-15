@@ -98,6 +98,7 @@ export class MembershipService {
     // Ödeme beklerken (past_due) “satın alınmış” gibi gösterme: efektif planı ücretsiz yap
     let effectiveTier = membership.tier;
     let pendingTierName: string | undefined;
+    let pendingTierType: string | undefined;
     let pendingPayment = false;
     if (membership.status === SubscriptionStatus.past_due) {
       const freeTier = await this.prisma.membershipTier.findUnique({
@@ -106,6 +107,7 @@ export class MembershipService {
       if (freeTier) {
         effectiveTier = freeTier;
         pendingTierName = membership.tier.name;
+        pendingTierType = membership.tier.type;
         pendingPayment = true;
       }
     }
@@ -127,6 +129,22 @@ export class MembershipService {
           // Also update the tier object so getUserUsageStats uses the correct value
           effectiveTier.maxFreeListings = platformLimit;
           effectiveTier.maxTotalListings = platformLimit;
+        }
+      }
+    } else if (effectiveTier.type === MembershipTierType.basic) {
+      const basicListingLimitSetting = await this.prisma.platformSetting.findUnique({
+        where: { settingKey: 'basic_listing_limit' },
+      });
+      if (basicListingLimitSetting?.settingValue) {
+        const platformLimit = parseInt(basicListingLimitSetting.settingValue, 10);
+        if (!isNaN(platformLimit)) {
+          if (platformLimit === -1) {
+            tierDto.maxTotalListings = -1;
+            effectiveTier.maxTotalListings = -1;
+          } else if (platformLimit > 0) {
+            tierDto.maxTotalListings = platformLimit;
+            effectiveTier.maxTotalListings = platformLimit;
+          }
         }
       }
     } else if (effectiveTier.type === MembershipTierType.premium) {
@@ -177,7 +195,7 @@ export class MembershipService {
       currentPeriodEnd: membership.currentPeriodEnd,
       cancelledAt: membership.cancelledAt || undefined,
       createdAt: membership.createdAt,
-      ...(pendingPayment && pendingTierName ? { pendingTierName, pendingPayment: true } : {}),
+      ...(pendingPayment && pendingTierName ? { pendingTierName, pendingTierType, pendingPayment: true } : {}),
       ...stats,
     };
   }

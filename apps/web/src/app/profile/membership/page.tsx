@@ -27,10 +27,13 @@ export default function MembershipPage() {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [listingLimits, setListingLimits] = useState<{
     free_listing_limit?: number;
+    basic_listing_limit?: number;
     premium_listing_limit?: number;
     business_listing_limit?: number;
   }>({});
   const [membershipPrices, setMembershipPrices] = useState<{
+    basic_monthly_price?: number;
+    basic_yearly_price?: number;
     premium_monthly_price?: number;
     premium_yearly_price?: number;
     business_monthly_price?: number;
@@ -43,6 +46,7 @@ export default function MembershipPage() {
     tier?: string;
     pendingPayment?: boolean;
     pendingTierName?: string;
+    pendingTierType?: string;
   } | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<Array<{
     id: string;
@@ -61,10 +65,13 @@ export default function MembershipPage() {
         const settings = response.data || {};
         setListingLimits({
           free_listing_limit: settings.free_listing_limit,
+          basic_listing_limit: settings.basic_listing_limit,
           premium_listing_limit: settings.premium_listing_limit,
           business_listing_limit: settings.business_listing_limit,
         });
         setMembershipPrices({
+          basic_monthly_price: settings.basic_monthly_price,
+          basic_yearly_price: settings.basic_yearly_price,
           premium_monthly_price: settings.premium_monthly_price,
           premium_yearly_price: settings.premium_yearly_price,
           business_monthly_price: settings.business_monthly_price,
@@ -109,6 +116,7 @@ export default function MembershipPage() {
             tier: membership.tier?.type,
             pendingPayment: pendingPayment || undefined,
             pendingTierName: membership.pendingTierName,
+            pendingTierType: membership.pendingTierType,
           });
           if (isPaidTier && !pendingPayment) {
             try {
@@ -132,7 +140,7 @@ export default function MembershipPage() {
   const getListingLimitText = (tierId: string) => {
     let limit: number;
     if (tierId === 'free') limit = listingLimits.free_listing_limit ?? 10;
-    else if (tierId === 'basic') limit = 50;
+    else if (tierId === 'basic') limit = listingLimits.basic_listing_limit ?? 50;
     else if (tierId === 'premium') limit = listingLimits.premium_listing_limit ?? 200;
     else limit = listingLimits.business_listing_limit ?? 1000;
     
@@ -167,7 +175,7 @@ export default function MembershipPage() {
       {
         id: 'basic',
         name: 'Temel',
-        price: 49,
+        price: membershipPrices.basic_monthly_price ?? 49,
         period: t('membership.perMonth'),
         description: 'Koleksiyoncular için başlangıç',
         features: [
@@ -366,7 +374,7 @@ export default function MembershipPage() {
           {membershipDetails?.pendingPayment && membershipDetails?.pendingTierName && (
             <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto">
               <p className="text-amber-800 font-medium mb-2">Ödeme bekleniyor – {membershipDetails.pendingTierName} planı için ödemeyi tamamlayın.</p>
-              <Link href="/membership/checkout" className="text-sm font-medium text-amber-700 underline">Ödemeyi tamamla</Link>
+              <Link href={`/membership/checkout?tier=${membershipDetails.pendingTierType || 'premium'}&period=monthly`} className="text-sm font-medium text-amber-700 underline">Ödemeyi tamamla</Link>
             </div>
           )}
           
@@ -511,10 +519,14 @@ export default function MembershipPage() {
         </div>
 
         <div className="flex justify-center mb-8">
-          <div className={`grid gap-6 max-w-4xl ${
+          <div className={`grid gap-6 ${
             MEMBERSHIP_TIERS.length === 1 
               ? 'grid-cols-1 max-w-md' 
-              : 'grid-cols-1 md:grid-cols-2'
+              : MEMBERSHIP_TIERS.length === 2
+                ? 'grid-cols-1 md:grid-cols-2 max-w-3xl'
+                : MEMBERSHIP_TIERS.length === 3
+                  ? 'grid-cols-1 md:grid-cols-3 max-w-5xl'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 max-w-6xl'
           }`}>
           {MEMBERSHIP_TIERS.map((tier, index) => {
             let displayPrice = tier.price;

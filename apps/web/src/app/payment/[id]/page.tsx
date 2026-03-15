@@ -62,7 +62,7 @@ export default function PaymentPage() {
         router.replace(`/trades/${paymentData.tradeId}`);
         return;
       }
-      if (paymentData.useBypass) {
+      if (paymentData.useBypass && !isMembership) {
         router.replace('/orders');
         return;
       }
@@ -81,7 +81,7 @@ export default function PaymentPage() {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
       toast.error('Ödeme bilgisi yüklenemedi');
       // Redirect to home for guests, orders page for authenticated users
-      router.push(isGuestCheckout ? '/' : '/orders');
+      router.push(isGuestCheckout ? '/' : isMembershipPayment ? '/profile/membership' : '/orders');
     } finally {
       setIsLoading(false);
     }
@@ -141,10 +141,10 @@ export default function PaymentPage() {
           <XCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Ödeme bulunamadı</p>
           <button
-            onClick={() => router.push('/orders')}
+            onClick={() => router.push(isMembershipPayment ? '/profile/membership' : '/orders')}
             className="btn-primary"
           >
-            Siparişlerime Dön
+            {isMembershipPayment ? 'Üyelik Sayfasına Dön' : 'Siparişlerime Dön'}
           </button>
         </div>
       </div>

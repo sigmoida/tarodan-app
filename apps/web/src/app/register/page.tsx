@@ -422,13 +422,13 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   {t('auth.phone')}
                 </label>
-                <div className="relative flex">
-                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 text-gray-500 text-sm font-medium rounded-l-lg">
+                <div className="relative flex min-w-0">
+                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 text-gray-500 text-sm font-medium rounded-l-lg flex-shrink-0">
                     +90
                   </span>
                   <input
@@ -437,7 +437,7 @@ export default function RegisterPage() {
                     onChange={handlePhoneChange}
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
-                    className="flex-1 pl-3 pr-4 py-2.5 text-sm border border-gray-300 rounded-r-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
+                    className="flex-1 min-w-0 pl-3 pr-4 py-2.5 text-sm border border-gray-300 rounded-r-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
                   />
                 </div>
               </div>

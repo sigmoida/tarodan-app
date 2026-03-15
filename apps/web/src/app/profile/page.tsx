@@ -399,7 +399,7 @@ export default function ProfilePage() {
                       {profile.membership.tier.type === 'business' && <span className="mr-1">👑</span>}
                       {profile.membership.tier.type === 'premium' && <span className="mr-1">⭐</span>}
                       {profile.membership.tier.type === 'free' && <span className="mr-1">🆓</span>}
-                      {profile.membership.tier.name} Üyelik
+                      {profile.membership.tier.name}
                     </span>
                   </div>
                 )}
@@ -504,7 +504,7 @@ export default function ProfilePage() {
                     {profile.membership.tier.type === 'business' && '👑 '}
                     {profile.membership.tier.type === 'premium' && '⭐ '}
                     {profile.membership.tier.type === 'free' && '🆓 '}
-                    {profile.membership.tier.name} Üyelik
+                    {profile.membership.tier.name}
                   </h3>
                   <p className="text-sm text-gray-500">Mevcut planınız</p>
                 </div>
