@@ -97,7 +97,7 @@ export default function OrdersPage() {
     preparing: { label: t('order.statusProcessing'), color: 'text-orange-400 bg-orange-400/10' },
     shipped: { label: t('order.statusShipped'), color: 'text-purple-400 bg-purple-400/10' },
     delivered: { label: t('order.statusDelivered'), color: 'text-green-400 bg-green-400/10' },
-    completed: { label: t('order.statusDelivered'), color: 'text-green-400 bg-green-400/10' },
+    completed: { label: t('order.statusCompleted'), color: 'text-green-400 bg-green-400/10' },
     cancelled: { label: t('order.statusCancelled'), color: 'text-red-400 bg-red-400/10' },
     refund_requested: { label: t('order.refundStarted'), color: 'text-orange-400 bg-orange-400/10' },
     refunded: { label: t('order.statusRefunded'), color: 'text-gray-400 bg-gray-400/10' },

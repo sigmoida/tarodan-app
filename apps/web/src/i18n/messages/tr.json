@@ -457,6 +457,7 @@
     "statusConfirmed": "Onaylandı",
     "statusShipped": "Kargoya Verildi",
     "statusDelivered": "Teslim Edildi",
+    "statusCompleted": "Tamamlandı",
     "statusCancelled": "İptal Edildi",
     "statusRefunded": "İade Edildi",
     "statusPaid": "Ödendi",
