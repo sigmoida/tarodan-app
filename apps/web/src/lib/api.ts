@@ -570,6 +570,10 @@ export const searchApi = {
       brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
       categories: Array<{ id: string; name: string; slug: string }>;
       manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
+      scales?: string[];
+      materials?: Array<{ slug: string; label: string }>;
+      conditions?: Array<{ value: string; label: string }>;
       suggestions: string[];
     }>('/search/autocomplete-rich', { params: { q } }),
 };
