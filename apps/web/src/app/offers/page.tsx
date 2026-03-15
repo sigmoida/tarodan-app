@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
@@ -31,6 +31,8 @@ interface Offer {
   id: string;
   amount: number;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired';
+  orderId?: string | null;
+  orderStatus?: string | null;
   message?: string;
   expiresAt: string;
   createdAt: string;
@@ -58,13 +60,22 @@ interface Offer {
   };
 }
 
-export default function OffersPage() {
+function OffersPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'sent' | 'received'>(tabParam === 'sent' ? 'sent' : 'received');
+
+  const switchTab = (tab: 'sent' | 'received') => {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url.toString());
+  };
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [estimatedNetByOfferId, setEstimatedNetByOfferId] = useState<Record<string, number>>({});
 
@@ -73,12 +84,12 @@ export default function OffersPage() {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/offers');
       return;
     }
-  }, [mounted, isAuthenticated, router]);
+  }, [mounted, authLoading, isAuthenticated, router]);
 
   const offersQuery = useQuery({
     queryKey: ['offers', activeTab],
@@ -296,7 +307,7 @@ export default function OffersPage() {
         {/* Tabs */}
         <div className="bg-gray-100 rounded p-0.5 mb-6 inline-flex">
           <button
-            onClick={() => setActiveTab('received')}
+            onClick={() => switchTab('received')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'received'
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -307,7 +318,7 @@ export default function OffersPage() {
             {locale === 'en' ? 'Received' : 'Gelen Teklifler'}
           </button>
           <button
-            onClick={() => setActiveTab('sent')}
+            onClick={() => switchTab('sent')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'sent'
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -560,14 +571,25 @@ export default function OffersPage() {
                             </div>
                           )}
 
-                          {offer.status === 'accepted' && (
-                            <Link
-                              href="/orders"
-                              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
-                            >
-                              {locale === 'en' ? 'View Order' : 'Siparişi Görüntüle'}
-                            </Link>
-                          )}
+                          {offer.status === 'accepted' && (() => {
+                            const paidStatuses = ['paid', 'preparing', 'shipped', 'delivered', 'completed'];
+                            const isOrderPaid = paidStatuses.includes(offer.orderStatus ?? '');
+                            const showPayButton = activeTab === 'sent' && !isOrderPaid;
+                            return (
+                              <Link
+                                href={offer.orderId ? `/orders/${offer.orderId}` : '/orders'}
+                                className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
+                                  showPayButton
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : 'bg-orange-500 hover:bg-orange-600 text-white'
+                                }`}
+                              >
+                                {showPayButton
+                                  ? (locale === 'en' ? 'Pay Now' : 'Ödeme Yap')
+                                  : (locale === 'en' ? 'View Order' : 'Siparişi Görüntüle')}
+                              </Link>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -579,5 +601,13 @@ export default function OffersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function OffersPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <OffersPageContent />
+    </Suspense>
   );
 }

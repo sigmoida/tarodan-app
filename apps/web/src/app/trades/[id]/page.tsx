@@ -17,6 +17,7 @@ import {
   PlusIcon,
   TrashIcon,
   CheckIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -61,6 +62,16 @@ interface Trade {
     carrier: string;
     trackingNumber: string;
     status: string;
+  };
+  cashPayment?: {
+    id: string;
+    payerId: string;
+    recipientId: string;
+    amount: number;
+    commission: number;
+    totalAmount: number;
+    status: string;
+    paidAt?: string;
   };
   createdAt: string;
   acceptedAt?: string;
@@ -149,6 +160,7 @@ export default function TradeDetailPage() {
   const STATUS_CONFIG = getStatusConfig(locale);
 
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -196,9 +208,11 @@ export default function TradeDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
   ]);
 
+  const cashPaymentPending = trade?.cashAmount && trade.cashAmount > 0 && trade?.cashPayment?.status !== 'completed';
   const needToShip =
     trade &&
     user &&
+    !cashPaymentPending &&
     ((user.id === trade.initiatorId && !trade.initiatorShipment && (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
      (user.id === trade.receiverId && !trade.receiverShipment && (trade.status === 'accepted' || trade.status === 'initiator_shipped')));
 
@@ -1067,24 +1081,74 @@ export default function TradeDetailPage() {
           </div>
         </div>
 
-        {/* Value Difference & Cash */}
+        {/* Value Difference & Cash Payment */}
         {trade.cashAmount && trade.cashAmount > 0 && (
           <div className="card p-6 mb-6 bg-green-50 border-green-200">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm text-gray-600">Nakit Fark</p>
+                <p className="text-sm text-gray-600">{locale === 'en' ? 'Cash Difference' : 'Nakit Fark'}</p>
                 <p className="text-2xl font-bold text-green-700">
                   {Math.abs(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
+                {trade.cashPayment && trade.cashPayment.commission > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {locale === 'en' ? 'Total with commission:' : 'Komisyon dahil toplam:'}{' '}
+                    {trade.cashPayment.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-600">
                   {trade.cashPayerId === trade.initiatorId 
-                    ? `${trade.initiatorName} ödeyecek`
-                    : `${trade.receiverName} ödeyecek`}
+                    ? `${trade.initiatorName} ${locale === 'en' ? 'will pay' : 'ödeyecek'}`
+                    : `${trade.receiverName} ${locale === 'en' ? 'will pay' : 'ödeyecek'}`}
                 </p>
+                {trade.cashPayment?.status === 'completed' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full mt-1">
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    {locale === 'en' ? 'Paid' : 'Ödendi'}
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* Payment button for the cash payer when trade is accepted and payment is not yet completed */}
+            {trade.status === 'accepted' && user && trade.cashPayerId === user.id && trade.cashPayment?.status !== 'completed' && (
+              <div className="pt-3 border-t border-green-200">
+                <p className="text-sm text-green-800 mb-3">
+                  {locale === 'en'
+                    ? 'The trade has been accepted. Please complete the cash payment to proceed.'
+                    : 'Takas kabul edildi. Devam etmek için nakit ödemeyi tamamlayın.'}
+                </p>
+                <button
+                  onClick={async () => {
+                    setCashPaymentLoading(true);
+                    try {
+                      const res = await tradesApi.initiateCashPayment(trade.id);
+                      const data = res.data;
+                      if (data?.paymentUrl) {
+                        window.location.href = data.paymentUrl;
+                      } else if (data?.paymentId) {
+                        router.push(`/payment/${data.paymentId}`);
+                      } else {
+                        toast.error(locale === 'en' ? 'Could not start payment' : 'Ödeme başlatılamadı');
+                      }
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment initiation failed' : 'Ödeme başlatılamadı'));
+                    } finally {
+                      setCashPaymentLoading(false);
+                    }
+                  }}
+                  disabled={cashPaymentLoading}
+                  className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <CreditCardIcon className="w-5 h-5" />
+                  {cashPaymentLoading
+                    ? (locale === 'en' ? 'Starting Payment...' : 'Ödeme Başlatılıyor...')
+                    : (locale === 'en' ? 'Pay Now' : 'Ödeme Yap')}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

@@ -6,9 +6,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { api, paymentsApi } from '@/lib/api';
-import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon } from '@heroicons/react/24/outline';
+import { api, paymentsApi, addressesApi } from '@/lib/api';
+import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon, CheckIcon, PlusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import CityDistrictSelector from '@/components/CityDistrictSelector';
 
 interface OrderDetail {
   id: string;
@@ -75,6 +76,7 @@ interface OrderDetail {
   };
   isBuyer: boolean;
   isSeller: boolean;
+  offerId?: string;
   payment?: {
     id: string;
     status: string;
@@ -107,6 +109,40 @@ export default function OrderDetailPage() {
   const [refundAmount, setRefundAmount] = useState<number | undefined>(undefined);
   const [processingRefund, setProcessingRefund] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [addressesFetched, setAddressesFetched] = useState(false);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    fullName: '',
+    phone: '',
+    city: '',
+    district: '',
+    address: '',
+    zipCode: '',
+  });
+
+  // Card states (mirrors checkout)
+  const [savedCards, setSavedCards] = useState<Array<{
+    id: string;
+    cardBrand: string;
+    lastFour: string;
+    expiryMonth: number;
+    expiryYear: number;
+    isDefault?: boolean;
+  }>>([]);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
+  const [cardsFetched, setCardsFetched] = useState(false);
 
   const orderId = params?.id as string;
 
@@ -115,13 +151,18 @@ export default function OrderDetailPage() {
     queryKey: ['order', orderId],
     queryFn: async (): Promise<OrderDetail> => {
       const response = await api.get(`/orders/${orderId}`);
-      return response.data;
+      const data = response.data?.data ?? response.data;
+      if (!data || typeof data !== 'object' || data.status === undefined) {
+        throw new Error('Invalid order response');
+      }
+      return data as OrderDetail;
     },
     enabled: !!orderId && !authLoading && !!isAuthenticated,
     meta: { page: 'order-detail' },
     retry: false,
   });
-  const order = orderQuery.data ?? null;
+  const rawOrder = orderQuery.data;
+  const order = rawOrder && typeof rawOrder === 'object' && rawOrder.status !== undefined ? rawOrder : null;
   const loading = orderQuery.isLoading;
   useEffect(() => {
     if (orderQuery.isError && orderId) {
@@ -131,6 +172,189 @@ export default function OrderDetailPage() {
   }, [orderQuery.isError, orderId, locale, router]);
 
   const invalidateOrder = () => queryClient.invalidateQueries({ queryKey: ['order', orderId] }).then(() => queryClient.invalidateQueries({ queryKey: ['orders'] }));
+
+  const hasShippingAddress = !!(order?.shippingAddress && (order.shippingAddress as any).city);
+  const isPendingPaymentBuyer = order?.isBuyer && order?.status === 'pending_payment';
+
+  useEffect(() => {
+    if (!isPendingPaymentBuyer) return;
+
+    if (!addressesFetched) {
+      addressesApi.getAll().then((res) => {
+        const addrs = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+        setSavedAddresses(addrs);
+        if (addrs.length === 0) {
+          setShowNewAddressForm(true);
+        } else {
+          const currentOrder = order;
+          const orderAddr = currentOrder?.shippingAddress != null && typeof currentOrder.shippingAddress === 'object'
+            ? (currentOrder.shippingAddress as any)
+            : null;
+          const match = orderAddr?.city && addrs.find((a: any) =>
+            a.city === orderAddr.city && a.district === orderAddr.district && (a.address === orderAddr.addressLine1 || a.address === orderAddr.address));
+          const defaultAddr = addrs.find((a: any) => a.isDefault);
+          if (match) setSelectedAddressId(match.id);
+          else if (defaultAddr) setSelectedAddressId(defaultAddr.id);
+          else if (addrs[0]?.id) setSelectedAddressId(addrs[0].id);
+        }
+        setAddressesFetched(true);
+      }).catch(() => {
+        setAddressesFetched(true);
+        setShowNewAddressForm(true);
+      });
+    }
+
+    if (!cardsFetched) {
+      api.get('/payments/methods').then((res) => {
+        const cards = res.data?.methods || res.data || [];
+        setSavedCards(cards);
+        const defaultCard = cards.find((c: any) => c.isDefault);
+        if (defaultCard) setSelectedSavedCard(defaultCard.id);
+        else if (cards.length > 0) setSelectedSavedCard(cards[0].id);
+        if (cards.length === 0) setUseNewCard(true);
+        setCardsFetched(true);
+      }).catch(() => {
+        setUseNewCard(true);
+        setCardsFetched(true);
+      });
+    }
+  }, [isPendingPaymentBuyer, addressesFetched, cardsFetched, hasShippingAddress, order]);
+
+  const handleSetAddressAndPay = async () => {
+    if (!order) return;
+    setAddressLoading(true);
+
+    let addrPayload: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
+
+    if (showNewAddressForm) {
+      if (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address) {
+        toast.error(locale === 'en' ? 'Please fill all required fields' : 'Lütfen tüm zorunlu alanları doldurun');
+        setAddressLoading(false);
+        return;
+      }
+      addrPayload = {
+        fullName: newAddress.fullName,
+        phone: newAddress.phone,
+        city: newAddress.city,
+        district: newAddress.district,
+        address: newAddress.address,
+        zipCode: newAddress.zipCode || undefined,
+      };
+      try {
+        await addressesApi.create({ ...addrPayload, title: newAddress.fullName, isDefault: savedAddresses.length === 0 });
+      } catch {
+        // Non-critical: address may already exist or user might not want to save
+      }
+    } else {
+      if (!selectedAddressId) return;
+      const addr = savedAddresses.find((a: any) => a.id === selectedAddressId);
+      if (!addr) return;
+      addrPayload = {
+        fullName: addr.fullName,
+        phone: addr.phone,
+        city: addr.city,
+        district: addr.district,
+        address: addr.address,
+        zipCode: addr.zipCode || undefined,
+      };
+    }
+
+    try {
+      await api.patch(`/orders/${order.id}/shipping-address`, addrPayload);
+      await invalidateOrder();
+      handleInitiatePayment();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to set address' : 'Adres kaydedilemedi'));
+      setAddressLoading(false);
+    }
+  };
+
+  const handleInitiatePayment = async () => {
+    if (!order) return;
+    setPaymentLoading(true);
+    try {
+      const res = await paymentsApi.initiate(order.id, 'paytr');
+      const data = res.data?.data ?? res.data;
+
+      // Bypass mode: complete payment with the entered card number
+      if (data?.useBypass && data?.paymentId) {
+        const card = cardNumber.replace(/\D/g, '');
+        setCardError(null);
+        if (!card) {
+          try { await paymentsApi.confirmFailed(data.paymentId); } catch (_) {}
+          setCardError(locale === 'en' ? 'Enter card number' : 'Kart numarası girin');
+          setPaymentLoading(false);
+          setAddressLoading(false);
+          return;
+        }
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(data.paymentId, card);
+          if (bypassRes.data?.success) {
+            toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
+            router.push(`/payment/success?paymentId=${data.paymentId}`);
+          } else {
+            setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
+            setPaymentLoading(false);
+            setAddressLoading(false);
+            return;
+          }
+        } catch (err: any) {
+          setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
+          setPaymentLoading(false);
+          setAddressLoading(false);
+          return;
+        }
+        // Save card if requested
+        if (saveCard && useNewCard && cardNumber && cardExpiry) {
+          try {
+            const [month, year] = cardExpiry.split('/');
+            await api.post('/payments/methods', {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              cardHolder: cardName,
+              expiryMonth: parseInt(month),
+              expiryYear: parseInt('20' + year),
+              cvv: cardCvc,
+            });
+          } catch {}
+        }
+        setPaymentLoading(false);
+        setAddressLoading(false);
+        return;
+      }
+
+      // PayTR mode: redirect
+      if (data?.paymentUrl) {
+        // Save card before redirecting
+        if (saveCard && useNewCard && cardNumber && cardExpiry) {
+          try {
+            const [month, year] = cardExpiry.split('/');
+            await api.post('/payments/methods', {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              cardHolder: cardName,
+              expiryMonth: parseInt(month),
+              expiryYear: parseInt('20' + year),
+              cvv: cardCvc,
+            });
+          } catch {}
+        }
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      if (data?.paymentId) {
+        router.push(`/payment/${data.paymentId}`);
+        return;
+      }
+
+      toast.error(locale === 'en' ? 'Could not start payment' : 'Ödeme başlatılamadı');
+      setPaymentLoading(false);
+      setAddressLoading(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment initiation failed' : 'Ödeme başlatılamadı'));
+      setPaymentLoading(false);
+      setAddressLoading(false);
+    }
+  };
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
@@ -158,6 +382,20 @@ export default function OrderDetailPage() {
       toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to start refund' : 'İade işlemi başlatılamadı'));
     } finally {
       setProcessingRefund(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!orderId) return;
+    setReactivateLoading(true);
+    try {
+      await api.post(`/orders/${orderId}/reactivate`);
+      toast.success(locale === 'en' ? 'Order reactivated. You can complete payment now.' : 'Sipariş yeniden aktive edildi. Ödemenizi tamamlayabilirsiniz.');
+      await invalidateOrder();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Could not reactivate order' : 'Sipariş aktive edilemedi'));
+    } finally {
+      setReactivateLoading(false);
     }
   };
 
@@ -258,6 +496,30 @@ export default function OrderDetailPage() {
           </span>
         </div>
 
+        {/* İptal edilmiş teklif siparişi: alıcı ödemeyi tamamlamak için yeniden aktive edebilir */}
+        {order.status === 'cancelled' && order.offerId && order.isBuyer && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <p className="text-amber-800 text-sm">
+              {locale === 'en'
+                ? 'This order expired before payment. You can reactivate it to complete payment.'
+                : 'Bu sipariş ödeme yapılmadan süre aşımına uğradı. Ödemeyi tamamlamak için siparişi yeniden aktive edebilirsiniz.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleReactivate}
+              disabled={reactivateLoading}
+              className="flex-shrink-0 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {reactivateLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <CreditCardIcon className="w-5 h-5" />
+              )}
+              {locale === 'en' ? 'Complete payment' : 'Ödemeyi tamamla'}
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -328,8 +590,8 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Shipping Address */}
-            {order.shippingAddress && (
+            {/* Shipping Address - sadece ödeme bekleyen alıcı değilse göster (alıcı için adres ödeme kartının içinde) */}
+            {order.shippingAddress && !(order.isBuyer && order.status === 'pending_payment') && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <MapPinIcon className="w-5 h-5" />
@@ -375,39 +637,363 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Pending Payment – Buyer can complete payment */}
+            {/* Pending Payment – Buyer: full checkout (address + card + pay) */}
             {order.isBuyer && order.status === 'pending_payment' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl sm:p-6 p-4">
-                <h2 className="text-lg font-semibold text-amber-900 mb-2 flex items-center gap-2">
-                  <CreditCardIcon className="w-5 h-5 text-amber-600" />
-                  {locale === 'en' ? 'Payment Pending' : 'Ödeme Bekleniyor'}
-                </h2>
-                <p className="text-sm text-amber-800 mb-3">
-                  {locale === 'en'
-                    ? 'This order has not been paid yet. You can buy the product directly from its listing page.'
-                    : 'Bu siparişin ödemesi henüz yapılmadı. Ürünü doğrudan ilan sayfasından satın alabilirsiniz.'}
-                </p>
-                {order.payment?.failureReason && (
-                  <p className="text-sm text-red-700 mb-3 bg-red-50 px-3 py-2 rounded-lg">
-                    <strong>{locale === 'en' ? 'Last error:' : 'Son hata:'}</strong> {order.payment.failureReason}
-                  </p>
-                )}
-                {order.product?.id ? (
-                  <Link
-                    href={`/listings/${order.product.id}`}
-                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-                  >
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                {/* Header banner */}
+                <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5" />
-                    {locale === 'en' ? 'Go to Product' : 'Ürüne Git'}
-                  </Link>
-                ) : (
-                  <Link
-                    href="/listings"
-                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-                  >
-                    {locale === 'en' ? 'Browse Listings' : 'İlanları Görüntüle'}
-                  </Link>
-                )}
+                    {locale === 'en' ? 'Complete Your Payment' : 'Ödemenizi Tamamlayın'}
+                  </h2>
+                  <p className="text-sm text-primary-100 mt-1">
+                    {locale === 'en'
+                      ? 'Your offer has been accepted. Complete the payment to finalize the purchase.'
+                      : 'Teklifiniz kabul edildi. Satın alma işlemini tamamlamak için ödeme yapın.'}
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {cardError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      <span aria-hidden>!</span>
+                      {cardError}
+                    </div>
+                  )}
+
+                  {/* Section 1: Teslimat Adresi - kayıtlı adreslerden seç veya yeni adres ekle (normal ödeme gibi) */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">1</span>
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <MapPinIcon className="w-5 h-5 text-primary-500" />
+                        {locale === 'en' ? 'Delivery Address' : 'Teslimat Adresi'}
+                      </h3>
+                    </div>
+
+                    {!addressesFetched ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                        <div className="w-4 h-4 border-2 border-gray-300 border-t-primary-500 rounded-full animate-spin" />
+                        {locale === 'en' ? 'Loading addresses...' : 'Adresler yükleniyor...'}
+                      </div>
+                    ) : !showNewAddressForm ? (
+                      <div className="space-y-2">
+                        {savedAddresses.map((addr: any) => (
+                          <label
+                            key={addr.id}
+                            className={`flex items-center gap-3 p-3.5 border-2 rounded-lg cursor-pointer transition-all ${
+                              selectedAddressId === addr.id
+                                ? 'border-primary-500 bg-primary-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="shippingAddress"
+                              checked={selectedAddressId === addr.id}
+                              onChange={() => setSelectedAddressId(addr.id)}
+                              className="text-primary-500"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">{addr.title || addr.fullName}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {addr.address}, {addr.district}/{addr.city}
+                              </p>
+                            </div>
+                            {addr.isDefault && (
+                              <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
+                                {locale === 'en' ? 'Default' : 'Varsayılan'}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewAddressForm(true); setSelectedAddressId(null); }}
+                          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium py-2"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                          {locale === 'en' ? 'Add new address' : 'Yeni adres ekle'}
+                        </button>
+                      </div>
+                    ) : (
+                        <div className="space-y-3">
+                          {savedAddresses.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowNewAddressForm(false);
+                                if (!selectedAddressId && savedAddresses.length > 0) {
+                                  setSelectedAddressId(savedAddresses[0].id);
+                                }
+                              }}
+                              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                            >
+                              &larr; {locale === 'en' ? 'Back to saved addresses' : 'Kayıtlı adreslere dön'}
+                            </button>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {locale === 'en' ? 'Full Name' : 'Ad Soyad'} *
+                              </label>
+                              <input
+                                type="text"
+                                value={newAddress.fullName}
+                                onChange={(e) => setNewAddress(a => ({ ...a, fullName: e.target.value }))}
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                                placeholder={locale === 'en' ? 'John Doe' : 'Ahmet Yılmaz'}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {locale === 'en' ? 'Phone' : 'Telefon'} *
+                              </label>
+                              <input
+                                type="tel"
+                                value={newAddress.phone}
+                                onChange={(e) => setNewAddress(a => ({ ...a, phone: e.target.value }))}
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                                placeholder="05XX XXX XX XX"
+                              />
+                            </div>
+                          </div>
+                          <CityDistrictSelector
+                            city={newAddress.city}
+                            district={newAddress.district}
+                            onCityChange={(city) => setNewAddress(a => ({ ...a, city, district: '' }))}
+                            onDistrictChange={(district) => setNewAddress(a => ({ ...a, district }))}
+                          />
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {locale === 'en' ? 'Address' : 'Adres'} *
+                            </label>
+                            <textarea
+                              value={newAddress.address}
+                              onChange={(e) => setNewAddress(a => ({ ...a, address: e.target.value }))}
+                              rows={2}
+                              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm resize-none"
+                              placeholder={locale === 'en' ? 'Street, building, floor...' : 'Mahalle, sokak, bina, kat...'}
+                            />
+                          </div>
+                          <div className="sm:w-1/2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {locale === 'en' ? 'Postal Code' : 'Posta Kodu'}
+                            </label>
+                            <input
+                              type="text"
+                              value={newAddress.zipCode}
+                              onChange={(e) => setNewAddress(a => ({ ...a, zipCode: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                              placeholder="34000"
+                            />
+                          </div>
+                        </div>
+                    )}
+                  </div>
+
+                  {/* Section 2: Card Information */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">2</span>
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                        {locale === 'en' ? 'Card Information' : 'Kart Bilgileri'}
+                      </h3>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      {/* Saved Cards */}
+                      {savedCards.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-700 mb-3">
+                            {locale === 'en' ? 'My Saved Cards' : 'Kayıtlı Kartlarım'}
+                          </p>
+                          <div className="space-y-2">
+                            {savedCards.map((card) => (
+                              <label
+                                key={card.id}
+                                className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                                  !useNewCard && selectedSavedCard === card.id
+                                    ? 'border-primary-500 bg-primary-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="savedCard"
+                                  checked={!useNewCard && selectedSavedCard === card.id}
+                                  onChange={() => {
+                                    setSelectedSavedCard(card.id);
+                                    setUseNewCard(false);
+                                  }}
+                                  className="text-primary-500"
+                                />
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">
+                                    {card.cardBrand} •••• {card.lastFour}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    {card.expiryMonth.toString().padStart(2, '0')}/{card.expiryYear}
+                                  </p>
+                                </div>
+                                {card.isDefault && (
+                                  <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
+                                    {locale === 'en' ? 'Default' : 'Varsayılan'}
+                                  </span>
+                                )}
+                              </label>
+                            ))}
+
+                            {/* New Card Option */}
+                            <label
+                              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                                useNewCard
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="savedCard"
+                                checked={useNewCard}
+                                onChange={() => setUseNewCard(true)}
+                                className="text-primary-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <PlusIcon className="w-5 h-5 text-gray-500" />
+                                <span className="font-medium text-gray-900">
+                                  {locale === 'en' ? 'Pay with New Card' : 'Yeni Kart ile Öde'}
+                                </span>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* New Card Form */}
+                      {(savedCards.length === 0 || useNewCard) && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {locale === 'en' ? 'Name on Card' : 'Kart Üzerindeki İsim'}
+                            </label>
+                            <input
+                              type="text"
+                              value={cardName}
+                              onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                              placeholder="AD SOYAD"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {locale === 'en' ? 'Card Number' : 'Kart Numarası'}
+                            </label>
+                            <input
+                              type="text"
+                              value={cardNumber}
+                              onChange={(e) => {
+                                setCardError(null);
+                                const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                                const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+                                setCardNumber(formatted);
+                              }}
+                              placeholder="4508 3456 7890 1234"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {locale === 'en' ? 'Expiry Date' : 'Son Kullanma Tarihi'}
+                              </label>
+                              <input
+                                type="text"
+                                value={cardExpiry}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                  if (value.length >= 2) {
+                                    setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
+                                  } else {
+                                    setCardExpiry(value);
+                                  }
+                                }}
+                                placeholder="AA/YY"
+                                maxLength={5}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                CVV/CVC
+                              </label>
+                              <input
+                                type="password"
+                                value={cardCvc}
+                                onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                placeholder="•••"
+                                maxLength={3}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={saveCard}
+                              onChange={(e) => setSaveCard(e.target.checked)}
+                              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                            {locale === 'en' ? 'Save this card for future purchases' : 'Bu kartı gelecekteki alışverişlerim için kaydet'}
+                          </label>
+                        </div>
+                      )}
+
+                      {/* CVV for saved card */}
+                      {!useNewCard && selectedSavedCard && (
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            CVV/CVC ({locale === 'en' ? 'Re-enter for security' : 'Güvenlik için tekrar girin'})
+                          </label>
+                          <input
+                            type="password"
+                            value={cardCvc}
+                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                            placeholder="•••"
+                            maxLength={3}
+                            className="w-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                        <ShieldCheckIcon className="w-4 h-4 text-green-500" />
+                        {locale === 'en' ? '256-bit SSL encrypted secure payment' : '256-bit SSL ile şifrelenmiş güvenli ödeme'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ödeme Yap - adres zorunlu (kayıtlıdan seç veya yeni adres doldur) */}
+                  <div>
+                    <button
+                      onClick={handleSetAddressAndPay}
+                      disabled={
+                        addressLoading ||
+                        paymentLoading ||
+                        (!showNewAddressForm && !selectedAddressId) ||
+                        (showNewAddressForm && (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address))
+                      }
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
+                    >
+                      <ShieldCheckIcon className="w-5 h-5" />
+                      {(addressLoading || paymentLoading)
+                        ? (locale === 'en' ? 'Processing...' : 'İşleniyor...')
+                        : `${locale === 'en' ? 'Pay' : 'Ödeme Yap'} – ${orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

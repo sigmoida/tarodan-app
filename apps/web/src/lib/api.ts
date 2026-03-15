@@ -179,6 +179,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
     api.post(`/trades/${id}/dispute`, data),
+  initiateCashPayment: (id: string | number) =>
+    api.post(`/trades/${id}/cash-payment/initiate`),
 };
 
 // Wishlist (no cart in backend - use wishlist for favorites)

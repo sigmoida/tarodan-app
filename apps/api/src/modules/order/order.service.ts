@@ -311,7 +311,7 @@ export class OrderService {
    * 
    * Applies min/max limits after calculation
    */
-  private async calculateCommission(
+  async calculateCommission(
     amount: number,
     sellerId: string,
     categoryId?: string | null,
@@ -1696,6 +1696,49 @@ export class OrderService {
   }
 
   /**
+   * Reactivate a cancelled order that came from an accepted offer.
+   * Allowed when: order is cancelled, has offerId, offer still accepted, product still available, user is buyer.
+   * Used when the order was auto-cancelled by payment timeout; buyer can reopen to complete payment.
+   */
+  async reactivate(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true, offer: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu siparişi yeniden aktive etme yetkiniz yok');
+    }
+    if (order.status !== OrderStatus.cancelled) {
+      throw new BadRequestException('Sadece iptal edilmiş siparişler yeniden aktive edilebilir');
+    }
+    if (!order.offerId || !order.offer) {
+      throw new BadRequestException('Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez');
+    }
+    if (order.offer.status !== OfferStatus.accepted) {
+      throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
+    }
+    if (order.product.status !== ProductStatus.active) {
+      throw new BadRequestException('Ürün artık satın alınamaz durumda');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
+      }),
+      this.prisma.product.update({
+        where: { id: order.productId },
+        data: { status: ProductStatus.reserved },
+      }),
+    ]);
+
+    return this.findOne(orderId, userId);
+  }
+
+  /**
    * Mark order as preparing (seller only)
    */
   async markAsPreparing(orderId: string, sellerId: string) {
@@ -1898,6 +1941,7 @@ export class OrderService {
         : null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
+      offerId: order.offerId ?? undefined,
       payment: order.payment
         ? {
             id: order.payment.id,

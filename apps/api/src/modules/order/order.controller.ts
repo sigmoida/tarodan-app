@@ -289,6 +289,25 @@ export class OrderController {
   }
 
   /**
+   * POST /orders/:id/reactivate - Reactivate cancelled offer order so buyer can pay (buyer only)
+   */
+  @Post(':id/reactivate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reactivate cancelled order from accepted offer' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Order reactivated', type: OrderResponseDto })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Cannot reactivate' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized' })
+  async reactivate(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<OrderResponseDto> {
+    return this.orderService.reactivate(id, userId);
+  }
+
+  /**
    * POST /orders/:id/prepare - Mark order as preparing (seller only)
    * Requirement: Order status management (project.md)
    */
