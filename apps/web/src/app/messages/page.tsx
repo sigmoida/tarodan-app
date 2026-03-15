@@ -94,7 +94,7 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   /** Taslak sohbet bazında: sohbet değişince yazı/resim eski sohbette kalır */
   const [draftsByThreadId, setDraftsByThreadId] = useState<Record<string, { text: string; urls: string[] }>>({});
@@ -125,11 +125,11 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    if (mounted && !isAuthenticated) {
+    if (mounted && !authLoading && !isAuthenticated) {
       router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
       return;
     }
-  }, [mounted, isAuthenticated, router]);
+  }, [mounted, authLoading, isAuthenticated, router]);
 
   const messageSettingsQuery = useQuery({
     queryKey: ['message-settings'],
@@ -415,8 +415,8 @@ export default function MessagesPage() {
     }
   };
 
-  // Avoid hydration mismatch: render same placeholder until mounted, then auth/query data can differ.
-  const showPlaceholder = !mounted || !isAuthenticated;
+  // Avoid hydration mismatch: render same placeholder until mounted and auth resolved.
+  const showPlaceholder = !mounted || authLoading || !isAuthenticated;
   if (showPlaceholder) {
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
