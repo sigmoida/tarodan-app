@@ -361,7 +361,14 @@ export default function OrderDetailPage() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+      if (newStatus === 'completed') {
+        await api.post(`/orders/${orderId}/confirm`);
+      } else if (newStatus === 'preparing') {
+        await api.post(`/orders/${orderId}/prepare`);
+      } else {
+        toast.error(locale === 'en' ? 'Unsupported status' : 'Desteklenmeyen durum');
+        return;
+      }
       toast.success(locale === 'en' ? 'Order status updated' : 'Sipariş durumu güncellendi');
       await invalidateOrder();
     } catch (error: any) {
