@@ -154,7 +154,7 @@ export default function BusinessDashboardPage() {
         {/* Header */}
         <div className="bg-gradient-to-br from-orange-900/40 to-amber-900/40 border border-orange-500/30 rounded-xl p-6 mb-8">
           <div className="flex items-center gap-6">
-            <UserAvatar displayName={stats?.company.displayName} companyName={stats?.company.name} size="xl" className="!w-20 !h-20 !text-3xl" />
+            <UserAvatar displayName={stats?.company.displayName} companyName={stats?.company.name} avatarUrl={stats?.company.avatarUrl} size="xl" className="!w-20 !h-20 !text-3xl" />
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
                 📊 İşletme Paneli

@@ -16,7 +16,8 @@ import {
   MessageStatus,
   TicketStatus,
   TicketPriority,
-  TicketCategory
+  TicketCategory,
+  RatingStatus
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
@@ -857,7 +858,6 @@ async function main() {
     users.push(user);
   }
 
-  // No default avatar URLs (Trendyol-style: generic icon or initials on frontend only)
   console.log(`✅ Created ${users.length} users`);
 
   // ==========================================================================
@@ -1662,6 +1662,7 @@ async function main() {
           orderId: order.id,
           score: Math.floor(Math.random() * 2) + 4, // 4-5 stars
           comment: ['Harika satıcı!', 'Çok hızlı kargo', 'Ürün tam açıklandığı gibi', 'Teşekkürler, çok memnun kaldım'][Math.floor(Math.random() * 4)],
+          status: RatingStatus.approved,
         },
       });
     } catch (e) {

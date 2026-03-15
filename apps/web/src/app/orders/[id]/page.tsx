@@ -10,6 +10,7 @@ import { api, paymentsApi, addressesApi } from '@/lib/api';
 import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon, CheckIcon, PlusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
+import UserAvatar from '@/components/UserAvatar';
 
 interface OrderDetail {
   id: string;
@@ -52,11 +53,13 @@ interface OrderDetail {
     id: string;
     displayName: string;
     isVerified?: boolean;
+    avatarUrl?: string;
   };
   seller: {
     id: string;
     displayName: string;
     isVerified?: boolean;
+    avatarUrl?: string;
   };
   shippingAddress?: {
     id: string;
@@ -1084,11 +1087,11 @@ export default function OrderDetailPage() {
                 href={`/seller/${order.isBuyer ? order.seller.id : order.buyer.id}`}
                 className="flex items-center gap-3 hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg transition-colors"
               >
-                <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span className="text-primary-600 font-semibold text-lg">
-                    {(order.isBuyer ? order.seller.displayName : order.buyer.displayName)?.[0]?.toUpperCase()}
-                  </span>
-                </div>
+                <UserAvatar
+                  displayName={order.isBuyer ? order.seller.displayName : order.buyer.displayName}
+                  avatarUrl={order.isBuyer ? order.seller.avatarUrl : order.buyer.avatarUrl}
+                  size="md"
+                />
                 <div>
                   <p className="font-medium text-gray-900">
                     {order.isBuyer ? order.seller.displayName : order.buyer.displayName}

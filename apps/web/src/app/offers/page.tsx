@@ -477,19 +477,11 @@ function OffersPageContent() {
 
                           {otherUser && (
                             <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">
-                                {otherUser.avatarUrl ? (
-                                  <OptimizedImage
-                                    src={otherUser.avatarUrl}
-                                    alt={otherUser.displayName}
-                                    width={40}
-                                    height={40}
-                                    className="w-full h-full rounded-full object-cover"
-                                  />
-                                ) : (
-                                  otherUser.displayName.charAt(0).toUpperCase()
-                                )}
-                              </div>
+                              <UserAvatar
+                                displayName={otherUser.displayName}
+                                avatarUrl={otherUser.avatarUrl}
+                                size="sm"
+                              />
                               <div>
                                 <p className="text-[10px] sm:text-xs text-gray-500">
                                   {activeTab === 'received' ? (locale === 'en' ? 'From' : 'Teklif Veren') : (locale === 'en' ? 'Seller' : 'Satıcı')}

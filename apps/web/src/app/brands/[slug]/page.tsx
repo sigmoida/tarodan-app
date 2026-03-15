@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { api, listingsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import OptimizedImage from '@/components/OptimizedImage';
+import UserAvatar from '@/components/UserAvatar';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import { ArrowLeftIcon, GlobeAltIcon, CalendarIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,7 +43,7 @@ interface Product {
     isLimited?: boolean;
     editionNumber?: string;
     condition?: string;
-    seller?: { displayName: string };
+    seller?: { displayName: string; avatarUrl?: string };
     status: string;
 }
 
@@ -356,7 +357,10 @@ export default function BrandDetailPage() {
                                                             {product.condition ? (conditionLabels[product.condition] || product.condition) : 'Bilinmiyor'}
                                                         </span>
                                                         {product.seller?.displayName && (
-                                                            <span className="text-[10px] font-medium text-gray-400 truncate max-w-[80px]">@{product.seller.displayName}</span>
+                                                            <span className="text-[10px] font-medium text-gray-400 truncate max-w-[80px] flex items-center gap-1">
+                                                                <UserAvatar displayName={product.seller.displayName} avatarUrl={product.seller.avatarUrl} size="xs" />
+                                                                @{product.seller.displayName}
+                                                            </span>
                                                         )}
                                                     </div>
 
