@@ -1020,8 +1020,8 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Refund Button for Completed Payments */}
-            {order.payment && order.payment.status === 'completed' && (order.isBuyer || order.isSeller) && (
+            {/* Refund Button for Completed Payments - Only buyer can request refund */}
+            {order.payment && order.payment.status === 'completed' && order.isBuyer && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
                 <p className="text-sm text-gray-600 mb-4">
@@ -1148,9 +1148,14 @@ export default function OrderDetailPage() {
                 <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                   {locale === 'en' ? 'Report Order Issue' : 'Sipariş Sorunu Bildir'}
                 </button>
-                <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                  {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
-                </button>
+                {order.isBuyer && order.payment?.status === 'completed' && (
+                  <button
+                    onClick={() => { setRefundAmount(undefined); setShowRefundModal(true); }}
+                    className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
+                  </button>
+                )}
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"

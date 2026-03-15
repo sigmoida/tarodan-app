@@ -602,9 +602,9 @@ export class PaymentController {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
-    // Only buyer or seller can request refund
-    if (order.buyerId !== userId && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu sipariş için iade yapamazsınız');
+    // Only buyer can request refund (seller cannot initiate refund)
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Sadece alıcı iade talebi oluşturabilir');
     }
 
     return this.paymentService.processRefund(dto.orderId, dto.refundAmount);
