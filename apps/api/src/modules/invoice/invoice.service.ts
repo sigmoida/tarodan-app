@@ -874,7 +874,7 @@ export class InvoiceService {
       taxRate: 18,
       taxAmount: Number(invoice.taxAmount),
       shippingCost: Number(invoice.shippingCost),
-      commission: 0,
+      commission: Number(invoice.order.commissionAmount ?? 0),
       total: Number(invoice.total),
 
       paymentMethod: 'Online Ödeme',
@@ -1025,6 +1025,12 @@ export class InvoiceService {
             <td>${formatCurrency(data.shippingCost)}</td>
           </tr>
         ` : ''}
+        ${data.commission > 0 ? `
+          <tr>
+            <td>Platform ücreti:</td>
+            <td>${formatCurrency(data.commission)}</td>
+          </tr>
+        ` : ''}
         ${data.taxAmount > 0 ? `
           <tr>
             <td>KDV (%${data.taxRate}):</td>
@@ -1143,6 +1149,11 @@ export class InvoiceService {
           currentY += totalGap;
           doc.text('Kargo Ücreti:', 380, currentY, { width: 100, align: 'right' });
           doc.text(`${data.shippingCost.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        }
+        if (data.commission > 0) {
+          currentY += totalGap;
+          doc.text('Platform ücreti:', 380, currentY, { width: 100, align: 'right' });
+          doc.text(`${data.commission.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
         }
 
         currentY += 25;

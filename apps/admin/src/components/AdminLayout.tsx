@@ -104,7 +104,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/dashboard" scroll={false} className="flex items-center">
             <Image
               src="/tarodan-logo.jpg"
               alt="Tarodan Logo"
@@ -132,6 +132,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                scroll={false}
                 className={clsx(
                   'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                   isActive
@@ -199,6 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <Link
               href="/settings"
+              scroll={false}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             >
               <UserCircleIcon className="h-5 w-5" />

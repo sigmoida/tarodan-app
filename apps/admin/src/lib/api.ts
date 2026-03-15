@@ -127,6 +127,7 @@ export const adminApi = {
   replyToReview: (id: string, reply: string) => api.post(`/admin/reviews/${id}/reply`, { reply }),
   deleteReview: (id: string) => api.delete(`/admin/reviews/${id}`),
   getUserRatings: (params?: any) => api.get('/admin/user-ratings', { params }),
+  updateUserRatingStatus: (id: string, status: string) => api.patch(`/admin/user-ratings/${id}/status`, { status }),
   deleteUserRating: (id: string) => api.delete(`/admin/user-ratings/${id}`),
 
   // Orders
@@ -186,13 +187,6 @@ export const adminApi = {
   updateCategory: (id: string, data: any) => api.patch(`/admin/categories/${id}`, data),
 
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
-  uploadCategoryImage: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<{ url: string }>('/admin/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
 
   // Brands
   getBrands: () => api.get('/admin/brands'),

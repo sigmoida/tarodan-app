@@ -23,7 +23,7 @@ import {
 import { StarIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { userApi, api } from '@/lib/api';
+import { userApi, api, ordersApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 
 interface Listing {
@@ -43,6 +43,7 @@ interface Listing {
   buyer?: { id: string; displayName: string };
   orderId?: string;
   rating?: { average: number | null; count: number };
+  category?: { id: string; name: string; slug: string };
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -99,6 +100,26 @@ export default function ProfileListingsPage() {
   });
   const listings = listingsQuery.data ?? [];
   const isLoading = listingsQuery.isLoading;
+
+  const [estimatedNets, setEstimatedNets] = useState<Array<{ sellerFeeAmount: number; sellerNetAmount: number }>>([]);
+
+  useEffect(() => {
+    if (listings.length === 0) {
+      setEstimatedNets([]);
+      return;
+    }
+    const effectivePrice = (l: Listing) => (l.price != null ? Number(l.price) : 0);
+    ordersApi
+      .getCommissionPreviewBatch(
+        listings.map((l) => ({ amount: effectivePrice(l), categoryId: l.category?.id ?? null })),
+      )
+      .then((res) => {
+        if (res.data?.results && Array.isArray(res.data.results)) {
+          setEstimatedNets(res.data.results);
+        }
+      })
+      .catch(() => setEstimatedNets([]));
+  }, [listings.length, listings.map((l) => `${l.id}-${l.price}-${l.category?.id}`).join(',')]);
 
   const getImageUrl = (listing: Listing): string => {
     if (!listing.images || listing.images.length === 0) {
@@ -265,6 +286,11 @@ export default function ProfileListingsPage() {
                       <p className="text-xl font-bold text-primary-500">
                         {getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
+                      {listing.status !== 'sold' && estimatedNets[index] != null && (
+                        <p className="text-xs text-green-600 mt-0.5">
+                          Tahmini net kazanç: ₺{estimatedNets[index].sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-3">

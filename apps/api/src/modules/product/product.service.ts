@@ -630,11 +630,15 @@ export class ProductService implements OnModuleInit {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
-        // Allow active and sold products to be viewable
-        // Sold products will show "Out of Stock" on the frontend
-        // Pending, rejected, inactive products are NOT visible publicly
-        const viewableStatuses: ProductStatus[] = [ProductStatus.active, ProductStatus.sold];
-        if (!viewableStatuses.includes(product.status)) {
+        // Allow active, sold, and out-of-stock (inactive + quantity=0) products to be viewable
+        // Sold/out-of-stock will show "Stok bitti" on the frontend
+        // Pending, rejected, inactive with quantity > 0 are NOT visible publicly
+        const isOutOfStock = product.quantity === 0;
+        const canView =
+          product.status === ProductStatus.active ||
+          product.status === ProductStatus.sold ||
+          (product.status === ProductStatus.inactive && isOutOfStock);
+        if (!canView) {
           throw new NotFoundException('Ürün bulunamadı');
         }
 
@@ -1422,9 +1426,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         },
       });
 
-      // Get seller rating stats
+      // Get seller rating stats (only approved)
       const sellerRatingStats = await this.prisma.rating.aggregate({
-        where: { receiverId: product.seller.id },
+        where: { receiverId: product.seller.id, status: 'approved' },
         _avg: { score: true },
         _count: true,
       });
@@ -1443,7 +1447,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ratingCount = product.ratingCount;
     } else {
       const ratingStats = await this.prisma.productRating.aggregate({
-        where: { productId: product.id },
+        where: { productId: product.id, status: 'approved' },
         _avg: { score: true },
         _count: true,
       });

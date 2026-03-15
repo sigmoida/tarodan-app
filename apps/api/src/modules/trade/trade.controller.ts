@@ -28,12 +28,16 @@ import {
 } from './dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRole } from '@prisma/client';
+import { PaymentService } from '../payment/payment.service';
 
 @Controller('trades')
 export class TradeController {
   private readonly logger = new Logger(TradeController.name);
 
-  constructor(private readonly tradeService: TradeService) {}
+  constructor(
+    private readonly tradeService: TradeService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   private getUserId(req: any): string {
     const userId = req?.user?.id;
@@ -197,5 +201,17 @@ export class TradeController {
     @Body() dto: ResolveTradeDisputeDto,
   ): Promise<TradeResponseDto> {
     return this.tradeService.resolveDispute(id, req.user?.adminId || this.getUserId(req), dto);
+  }
+
+  /**
+   * Initiate cash payment for a trade
+   * POST /trades/:id/cash-payment/initiate
+   */
+  @Post(':id/cash-payment/initiate')
+  async initiateCashPayment(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.paymentService.initiateTradeCashPayment(id, this.getUserId(req), req);
   }
 }

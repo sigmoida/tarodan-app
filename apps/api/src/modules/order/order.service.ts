@@ -11,8 +11,9 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
-import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto } from './dto';
+import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto, CheckoutQuoteDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -85,6 +86,188 @@ export class OrderService {
   }
 
   /**
+   * Get checkout quote (preview) for given items. Reuses same shipping and commission logic as order create.
+   * Does not create any order; for display only. Final amounts are confirmed at order create.
+   */
+  async getCheckoutQuote(dto: CheckoutQuoteDto): Promise<{
+    itemsSubtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      sellerNetAmount: number;
+      title?: string;
+    }>;
+    pricing: {
+      subtotal: number;
+      shippingAmount: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      commissionAmount: number;
+      totalAmount: number;
+      sellerNetAmount: number;
+    };
+  }> {
+    if (!dto.items?.length) {
+      throw new BadRequestException('En az bir ürün gereklidir');
+    }
+
+    const now = new Date();
+    let itemsSubtotal = 0;
+    let totalBuyerFee = 0;
+    let totalSellerFee = 0;
+    const quoteItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      buyerFeeAmount: number;
+      sellerFeeAmount: number;
+      sellerNetAmount: number;
+      title?: string;
+    }> = [];
+
+    for (const { productId, quantity = 1 } of dto.items) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          oldPrice: true,
+          saleStartDate: true,
+          saleEndDate: true,
+          sellerId: true,
+          categoryId: true,
+          status: true,
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException(`Ürün bulunamadı: ${productId}`);
+      }
+      if (product.status !== ProductStatus.active) {
+        throw new BadRequestException(`Ürün satışta değil: ${product.title || productId}`);
+      }
+
+      const productPrice = Number(product.price);
+      const isSaleActive =
+        product.oldPrice != null &&
+        (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
+        (!product.saleEndDate || now <= new Date(product.saleEndDate));
+      const unitPrice = isSaleActive && product.oldPrice != null
+        ? productPrice
+        : productPrice;
+      const lineSubtotal = unitPrice * quantity;
+
+      const commissionResult = await this.calculateCommission(
+        lineSubtotal,
+        product.sellerId,
+        product.categoryId,
+      );
+
+      const lineBuyerFee = commissionResult.buyerFeeAmount;
+      const lineSellerFee = commissionResult.sellerFeeAmount;
+      const lineSellerNet = lineSubtotal - lineSellerFee;
+
+      itemsSubtotal += lineSubtotal;
+      totalBuyerFee += lineBuyerFee;
+      totalSellerFee += lineSellerFee;
+
+      quoteItems.push({
+        productId: product.id,
+        quantity,
+        unitPrice,
+        subtotal: lineSubtotal,
+        buyerFeeAmount: lineBuyerFee,
+        sellerFeeAmount: lineSellerFee,
+        sellerNetAmount: Math.max(0, lineSellerNet),
+        title: product.title ?? undefined,
+      });
+    }
+
+    const shippingAmount = this.calculateShippingCost(itemsSubtotal);
+    const commissionAmount = totalBuyerFee + totalSellerFee;
+    const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee;
+    const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
+
+    const pricing = {
+      subtotal: itemsSubtotal,
+      shippingAmount,
+      buyerFeeAmount: totalBuyerFee,
+      sellerFeeAmount: totalSellerFee,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
+
+    return {
+      itemsSubtotal,
+      shippingAmount,
+      buyerFeeAmount: totalBuyerFee,
+      sellerFeeAmount: totalSellerFee,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+      items: quoteItems,
+      pricing,
+    };
+  }
+
+  /**
+   * Commission preview for listing create/edit. Given a price amount and optional category, returns estimated fees.
+   * Used when product does not exist yet (e.g. seller entering price on create form). Reuses same logic as order/quote.
+   */
+  async getCommissionPreview(
+    amount: number,
+    sellerId: string,
+    categoryId?: string | null,
+  ): Promise<{
+    sellerFeeAmount: number;
+    buyerFeeAmount: number;
+    commissionAmount: number;
+    sellerNetAmount: number;
+  }> {
+    const result = await this.calculateCommission(amount, sellerId, categoryId);
+    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount);
+    return {
+      sellerFeeAmount: result.sellerFeeAmount,
+      buyerFeeAmount: result.buyerFeeAmount,
+      commissionAmount: result.commissionAmount,
+      sellerNetAmount,
+    };
+  }
+
+  /**
+   * Batch commission preview for multiple (amount, categoryId) pairs. Same order as input.
+   */
+  async getCommissionPreviewBatch(
+    sellerId: string,
+    items: Array<{ amount: number; categoryId?: string | null }>,
+  ): Promise<{ results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }> }> {
+    const results = await Promise.all(
+      items.map(async (item) => {
+        const amount = Number(item.amount);
+        if (Number.isNaN(amount) || amount < 0) {
+          return { sellerFeeAmount: 0, sellerNetAmount: amount };
+        }
+        const preview = await this.getCommissionPreview(amount, sellerId, item.categoryId ?? null);
+        return { sellerFeeAmount: preview.sellerFeeAmount, sellerNetAmount: preview.sellerNetAmount };
+      }),
+    );
+    return { results };
+  }
+
+  /**
    * Invalidate product caches when product status changes
    */
   private async invalidateProductCaches(productId: string): Promise<void> {
@@ -128,7 +311,7 @@ export class OrderService {
    * 
    * Applies min/max limits after calculation
    */
-  private async calculateCommission(
+  async calculateCommission(
     amount: number,
     sellerId: string,
     categoryId?: string | null,
@@ -166,8 +349,14 @@ export class OrderService {
     const matchedRule = this.findMatchingRule(rules, categoryId, commissionSellerType);
 
     if (!matchedRule) {
-      this.logger.warn('No matching commission rule found');
-      throw new BadRequestException('No matching commission rule found. Please ensure a default rule exists.');
+      this.logger.warn('No matching commission rule found; applying 0 commission fallback');
+      return {
+        buyerFeeAmount: 0,
+        sellerFeeAmount: 0,
+        commissionAmount: 0,
+        ruleId: null,
+        ruleName: null,
+      };
     }
 
     // Calculate fees
@@ -1507,6 +1696,49 @@ export class OrderService {
   }
 
   /**
+   * Reactivate a cancelled order that came from an accepted offer.
+   * Allowed when: order is cancelled, has offerId, offer still accepted, product still available, user is buyer.
+   * Used when the order was auto-cancelled by payment timeout; buyer can reopen to complete payment.
+   */
+  async reactivate(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true, offer: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu siparişi yeniden aktive etme yetkiniz yok');
+    }
+    if (order.status !== OrderStatus.cancelled) {
+      throw new BadRequestException('Sadece iptal edilmiş siparişler yeniden aktive edilebilir');
+    }
+    if (!order.offerId || !order.offer) {
+      throw new BadRequestException('Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez');
+    }
+    if (order.offer.status !== OfferStatus.accepted) {
+      throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
+    }
+    if (order.product.status !== ProductStatus.active) {
+      throw new BadRequestException('Ürün artık satın alınamaz durumda');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
+      }),
+      this.prisma.product.update({
+        where: { id: order.productId },
+        data: { status: ProductStatus.reserved },
+      }),
+    ]);
+
+    return this.findOne(orderId, userId);
+  }
+
+  /**
    * Mark order as preparing (seller only)
    */
   async markAsPreparing(orderId: string, sellerId: string) {
@@ -1599,17 +1831,17 @@ export class OrderService {
       },
     });
 
-    // Mark product as sold when order is completed
+    // Update product status based on remaining quantity (no stock decrement - already done at payment)
     if (order.productId) {
       const product = await this.prisma.product.findUnique({
         where: { id: order.productId },
       });
 
-      if (product && product.status !== ProductStatus.sold) {
-        // Mark as SOLD so seller sees it in "Satılan" and can use "Yeniden Satışa Aç"
+      if (product) {
+        const newStatus = getProductStatusFromQuantity(product.quantity);
         await this.prisma.product.update({
           where: { id: order.productId },
-          data: { status: ProductStatus.sold },
+          data: { status: newStatus },
         });
 
         // Invalidate cache
@@ -1646,13 +1878,35 @@ export class OrderService {
       imageUrl: resolvedImageUrl,
       status: order.product.status,
     } : null;
+
+    const totalAmount = Number(order.totalAmount ?? 0);
+    const shippingCost = Number(order.shippingCost ?? 0);
+    const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
+    const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
+    const commissionAmount = Number(order.commissionAmount ?? 0);
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
+    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+
+    const pricing = {
+      subtotal,
+      shippingAmount: shippingCost,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      commissionAmount,
+      totalAmount,
+      sellerNetAmount,
+    };
     
     return {
       id: order.id,
       orderNumber: order.orderNumber,
-      amount: Number(order.totalAmount),
-      totalAmount: Number(order.totalAmount), // Frontend uyumu için
-      commissionAmount: Number(order.commissionAmount),
+      amount: totalAmount,
+      totalAmount,
+      commissionAmount,
+      buyerFeeAmount,
+      sellerFeeAmount,
+      shippingCost,
+      pricing,
       status: order.status,
       product,
       // Frontend items array bekliyor - tek ürünü items formatında da döndür
@@ -1687,6 +1941,7 @@ export class OrderService {
         : null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
+      offerId: order.offerId ?? undefined,
       payment: order.payment
         ? {
             id: order.payment.id,

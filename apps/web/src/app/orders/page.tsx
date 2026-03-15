@@ -52,6 +52,17 @@ interface Order {
   };
   isBuyer?: boolean;
   isSeller?: boolean;
+  pricing?: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
+  sellerFeeAmount?: number;
+  sellerNetAmount?: number;
 }
 
 // Status labels will be handled with translation function inside component
@@ -407,6 +418,11 @@ export default function OrdersPage() {
                       <p className="text-lg font-semibold text-primary-500">
                         {(Number(order.totalAmount) || Number(order.amount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </p>
+                      {order.isSeller && (order.pricing?.sellerNetAmount != null || (order as any).sellerNetAmount != null) && (
+                        <p className="text-sm text-green-600 mt-0.5">
+                          {locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{(Number(order.pricing?.sellerNetAmount ?? (order as any).sellerNetAmount ?? 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
                   </div>
 

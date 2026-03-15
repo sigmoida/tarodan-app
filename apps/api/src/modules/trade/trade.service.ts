@@ -21,6 +21,7 @@ import {
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -1093,15 +1094,21 @@ export class TradeService {
         for (const product of products) {
           const tradeItem = allItems.find((i) => i.productId === product.id);
           const tradedQty = tradeItem?.quantity ?? 1;
-          const updateData: any = { status: ProductStatus.inactive };
+          let newQuantity: number | null;
 
           if (product.quantity !== null && product.quantity > 0) {
-            const newQuantity = Math.max(0, product.quantity - tradedQty);
+            newQuantity = Math.max(0, product.quantity - tradedQty);
+          } else if (product.quantity === null) {
+            newQuantity = null; // unlimited stock, no decrement
+          } else {
+            newQuantity = 0;
+          }
+
+          const updateData: any = {
+            status: getProductStatusFromQuantity(newQuantity),
+          };
+          if (product.quantity !== null && product.quantity > 0) {
             updateData.quantity = newQuantity;
-            // If stock remains, keep product active so it stays in listings
-            if (newQuantity > 0) {
-              updateData.status = ProductStatus.active;
-            }
           }
 
           await tx.product.update({

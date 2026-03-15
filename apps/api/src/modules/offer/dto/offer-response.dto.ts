@@ -57,6 +57,18 @@ export class OfferResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({
+    example: 'uuid',
+    description: 'Order ID created when offer is accepted (null if not accepted yet)',
+  })
+  orderId?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'pending_payment',
+    description: 'Status of the associated order (e.g. pending_payment, paid, preparing)',
+  })
+  orderStatus?: string | null;
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Whether the offer has expired',
   })

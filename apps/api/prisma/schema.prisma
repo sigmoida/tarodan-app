@@ -287,7 +287,6 @@ model Category {
   sortOrder       Int              @default(0) @map("sort_order")
   isActive        Boolean          @default(true) @map("is_active")
   createdAt       DateTime         @default(now()) @map("created_at")
-  image           String?          @map("image")
   parent          Category?        @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children        Category[]       @relation("CategoryHierarchy")
   commissionRules CommissionRule[]
@@ -560,6 +559,7 @@ model TradeCashPayment {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   trade             Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  payment           Payment?
 
   @@map("trade_cash_payments")
 }
@@ -650,21 +650,23 @@ model ContentFilter {
 }
 
 model Rating {
-  id         String   @id @default(uuid())
-  giverId    String   @map("giver_id")
-  receiverId String   @map("receiver_id")
-  orderId    String?  @map("order_id")
-  tradeId    String?  @map("trade_id")
+  id         String       @id @default(uuid())
+  giverId    String       @map("giver_id")
+  receiverId String       @map("receiver_id")
+  orderId    String?      @map("order_id")
+  tradeId    String?      @map("trade_id")
   score      Int
   comment    String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  giver      User     @relation("RatingGiver", fields: [giverId], references: [id])
-  receiver   User     @relation("RatingReceiver", fields: [receiverId], references: [id])
+  status     RatingStatus @default(pending)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  giver      User         @relation("RatingGiver", fields: [giverId], references: [id])
+  receiver   User         @relation("RatingReceiver", fields: [receiverId], references: [id])
 
   @@unique([giverId, orderId])
   @@unique([giverId, tradeId])
   @@index([receiverId])
+  @@index([status])
   @@map("ratings")
 }
 
@@ -960,22 +962,24 @@ model Order {
 }
 
 model Payment {
-  id                     String        @id @default(uuid())
-  orderId                String        @unique @map("order_id")
+  id                     String            @id @default(uuid())
+  orderId                String?           @unique @map("order_id")
+  tradeCashPaymentId     String?           @unique @map("trade_cash_payment_id")
   provider               String
-  providerPaymentId      String?       @map("provider_payment_id")
-  providerConversationId String?       @map("provider_conversation_id")
-  amount                 Decimal       @db.Decimal(10, 2)
-  currency               String        @default("TRY")
-  installmentCount       Int           @default(1) @map("installment_count")
-  status                 PaymentStatus @default(pending)
-  failureReason          String?       @map("failure_reason")
+  providerPaymentId      String?           @map("provider_payment_id")
+  providerConversationId String?           @map("provider_conversation_id")
+  amount                 Decimal           @db.Decimal(10, 2)
+  currency               String            @default("TRY")
+  installmentCount       Int               @default(1) @map("installment_count")
+  status                 PaymentStatus     @default(pending)
+  failureReason          String?           @map("failure_reason")
   metadata               Json?
-  paidAt                 DateTime?     @map("paid_at")
-  createdAt              DateTime      @default(now()) @map("created_at")
-  updatedAt              DateTime      @updatedAt @map("updated_at")
+  paidAt                 DateTime?         @map("paid_at")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHold            PaymentHold?
-  order                  Order         @relation(fields: [orderId], references: [id])
+  order                  Order?            @relation(fields: [orderId], references: [id])
+  tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
   @@map("payments")
 }

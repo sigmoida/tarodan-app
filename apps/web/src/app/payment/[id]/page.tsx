@@ -55,6 +55,10 @@ export default function PaymentPage() {
         router.replace(`/checkout?orderId=${paymentData.orderId}`);
         return;
       }
+      if (paymentData.useBypass && paymentData.tradeId) {
+        router.replace(`/trades/${paymentData.tradeId}`);
+        return;
+      }
       if (paymentData.useBypass) {
         router.replace('/orders');
         return;

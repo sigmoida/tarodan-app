@@ -833,6 +833,12 @@ export default function ListingDetailPage() {
           <span className="text-gray-400 truncate max-w-[200px]">{listing.title}</span>
         </nav>
 
+        {listing.quantity === 0 && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-amber-800 font-medium">{t('product.stockFinished')}</p>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
           <div className="relative">
@@ -1393,7 +1399,7 @@ export default function ListingDetailPage() {
                 <div className="text-center p-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{locale === 'en' ? 'Stock' : 'Stok'}</p>
                   <p className="font-semibold text-gray-900">
-                    {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : (locale === 'en' ? 'Out of stock' : 'Stokta yok')}
+                    {listing.quantity > 0 ? `${listing.quantity} ${locale === 'en' ? 'available' : 'adet'}` : t('product.stockFinished')}
                   </p>
                 </div>
               )}
@@ -1625,14 +1631,14 @@ export default function ListingDetailPage() {
               {!isOwner && (
                 <button
                   onClick={handleBuyNow}
-                  disabled={listing.status !== 'active'}
-                  className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active'
+                  disabled={listing.status !== 'active' || listing.quantity === 0}
+                  className={`w-full flex items-center justify-center gap-2 py-3 text-base sm:py-4 sm:text-lg ${listing.status === 'active' && listing.quantity !== 0
                     ? 'btn-primary'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded'
                     }`}
                 >
                   <BoltIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : t('product.buyNow')}
+                  {listing.status === 'sold' ? t('product.sold') : listing.status === 'reserved' ? t('product.reserved') : listing.quantity === 0 ? t('product.stockFinished') : t('product.buyNow')}
                 </button>
               )}
 

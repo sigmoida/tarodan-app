@@ -2591,8 +2591,21 @@ export class AdminController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all seller/user ratings' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of user ratings' })
-  async getUserRatings(@Query() query: { page?: number; limit?: number; search?: string }) {
+  async getUserRatings(@Query() query: { page?: number; limit?: number; search?: string; status?: string }) {
     return this.adminService.getUserRatings(query);
+  }
+
+  @Patch('user-ratings/:id/status')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Update seller rating status (approve/reject)' })
+  @ApiParam({ name: 'id', description: 'User Rating ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Status updated' })
+  async updateUserRatingStatus(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateRatingStatusDto,
+  ) {
+    return this.adminService.updateUserRatingStatus(adminId, id, dto.status);
   }
 
   @Delete('user-ratings/:id')

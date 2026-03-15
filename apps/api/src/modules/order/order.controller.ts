@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -32,12 +33,67 @@ import {
   DirectBuyDto,
   DirectBuyResponseDto,
   SetShippingAddressDto,
+  CheckoutQuoteDto,
+  CheckoutQuoteResponseDto,
 } from './dto';
 
 @ApiTags('orders')
 @Controller('orders')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
+
+  /**
+   * POST /orders/quote - Get checkout quote (preview) for items. Reuses same shipping/commission logic as order create.
+   */
+  @Post('quote')
+  @Public()
+  @ApiOperation({ summary: 'Get checkout quote (pricing breakdown for items)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Quote with pricing breakdown',
+    type: CheckoutQuoteResponseDto,
+  })
+  async getCheckoutQuote(@Body() dto: CheckoutQuoteDto) {
+    return this.orderService.getCheckoutQuote(dto);
+  }
+
+  /**
+   * GET /orders/commission-preview - Estimated commission for a given amount and category (for listing create/edit).
+   * Uses current user as seller. Returns sellerFeeAmount, sellerNetAmount, etc.
+   */
+  @Get('commission-preview')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get commission preview for a price (seller listing form)' })
+  async getCommissionPreview(
+    @Query('amount') amountStr: string,
+    @Query('categoryId') categoryId: string | undefined,
+    @CurrentUser('id') userId: string,
+  ) {
+    const amount = parseFloat(amountStr);
+    if (Number.isNaN(amount) || amount < 0) {
+      throw new BadRequestException('Geçerli bir tutar girin');
+    }
+    return this.orderService.getCommissionPreview(amount, userId, categoryId || null);
+  }
+
+  /**
+   * POST /orders/commission-preview-batch - Batch commission preview for multiple amounts (e.g. ilanlarım list).
+   * Uses current user as seller. Returns array of { sellerFeeAmount, sellerNetAmount } in same order.
+   */
+  @Post('commission-preview-batch')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Batch commission preview for multiple items' })
+  async getCommissionPreviewBatch(
+    @Body() body: { items: Array<{ amount: number; categoryId?: string | null }> },
+    @CurrentUser('id') userId: string,
+  ) {
+    if (!body?.items || !Array.isArray(body.items) || body.items.length > 50) {
+      throw new BadRequestException('items array required (max 50)');
+    }
+    return this.orderService.getCommissionPreviewBatch(userId, body.items);
+  }
 
   /**
    * POST /orders/guest - Guest checkout without registration
@@ -230,6 +286,25 @@ export class OrderController {
     @Body() dto: CancelOrderDto,
   ): Promise<OrderResponseDto> {
     return this.orderService.cancel(id, userId, dto);
+  }
+
+  /**
+   * POST /orders/:id/reactivate - Reactivate cancelled offer order so buyer can pay (buyer only)
+   */
+  @Post(':id/reactivate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reactivate cancelled order from accepted offer' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Order reactivated', type: OrderResponseDto })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Cannot reactivate' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized' })
+  async reactivate(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<OrderResponseDto> {
+    return this.orderService.reactivate(id, userId);
   }
 
   /**

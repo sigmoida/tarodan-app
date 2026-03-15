@@ -17,12 +17,14 @@ import {
   PlusIcon,
   TrashIcon,
   CheckIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { tradesApi, listingsApi, userApi, addressesApi } from '@/lib/api';
+import { tradesApi, listingsApi, userApi, addressesApi, api, paymentsApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 interface TradeItem {
   id: string;
@@ -61,6 +63,16 @@ interface Trade {
     carrier: string;
     trackingNumber: string;
     status: string;
+  };
+  cashPayment?: {
+    id: string;
+    payerId: string;
+    recipientId: string;
+    amount: number;
+    commission: number;
+    totalAmount: number;
+    status: string;
+    paidAt?: string;
   };
   createdAt: string;
   acceptedAt?: string;
@@ -149,6 +161,7 @@ export default function TradeDetailPage() {
   const STATUS_CONFIG = getStatusConfig(locale);
 
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -163,6 +176,25 @@ export default function TradeDetailPage() {
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
   const [shipAddressId, setShipAddressId] = useState('');
   const [shipCarrier, setShipCarrier] = useState('aras');
+
+  // Card states for inline cash payment checkout
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<Array<{
+    id: string;
+    cardBrand: string;
+    lastFour: string;
+    expiryMonth: number;
+    expiryYear: number;
+    isDefault?: boolean;
+  }>>([]);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
+  const [cardsFetched, setCardsFetched] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -183,7 +215,11 @@ export default function TradeDetailPage() {
     retry: false,
   });
   const trade = tradeQuery.data ?? null;
-  const isLoading = tradeQuery.isLoading;
+  const isLoading =
+    authLoading ||
+    tradeQuery.isLoading ||
+    tradeQuery.isFetching ||
+    (!!tradeId && isAuthenticated && tradeQuery.isPending);
   useEffect(() => {
     if (tradeQuery.isError && tradeId) {
       toast.error(locale === 'en' ? 'Failed to load trade' : 'Takas yüklenemedi');
@@ -196,9 +232,29 @@ export default function TradeDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
   ]);
 
+  const cashPaymentPending = trade?.cashAmount && trade.cashAmount > 0 && trade?.cashPayment?.status !== 'completed';
+  const isCashPayer = !!(trade && user && trade.cashPayerId === user.id);
+
+  useEffect(() => {
+    if (!cashPaymentPending || !isCashPayer || cardsFetched) return;
+    api.get('/payments/methods').then((res) => {
+      const cards = res.data?.methods || res.data || [];
+      setSavedCards(cards);
+      const defaultCard = cards.find((c: any) => c.isDefault);
+      if (defaultCard) setSelectedSavedCard(defaultCard.id);
+      else if (cards.length > 0) setSelectedSavedCard(cards[0].id);
+      if (cards.length === 0) setUseNewCard(true);
+      setCardsFetched(true);
+    }).catch(() => {
+      setUseNewCard(true);
+      setCardsFetched(true);
+    });
+  }, [cashPaymentPending, isCashPayer, cardsFetched]);
+
   const needToShip =
     trade &&
     user &&
+    !cashPaymentPending &&
     ((user.id === trade.initiatorId && !trade.initiatorShipment && (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
      (user.id === trade.receiverId && !trade.receiverShipment && (trade.status === 'accepted' || trade.status === 'initiator_shipped')));
 
@@ -219,6 +275,83 @@ export default function TradeDetailPage() {
       setShipAddressId(addresses[0].id);
     }
   }, [addresses, shipAddressId]);
+
+  const handleCashPayment = async () => {
+    if (!trade) return;
+    setCashPaymentLoading(true);
+    setCardError(null);
+    try {
+      const res = await paymentsApi.initiateTradeCash(trade.id);
+      const data = res.data?.data ?? res.data;
+
+      if (data?.useBypass && data?.paymentId) {
+        const card = cardNumber.replace(/\D/g, '');
+        if (!card) {
+          try { await paymentsApi.confirmFailed(data.paymentId); } catch (_) {}
+          setCardError(locale === 'en' ? 'Enter card number' : 'Kart numarası girin');
+          setCashPaymentLoading(false);
+          return;
+        }
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(data.paymentId, card);
+          if (bypassRes.data?.success) {
+            toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
+            await invalidateTrade();
+          } else {
+            setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
+            setCashPaymentLoading(false);
+            return;
+          }
+        } catch {
+          setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
+          setCashPaymentLoading(false);
+          return;
+        }
+        if (saveCard && useNewCard && cardNumber && cardExpiry) {
+          try {
+            const [month, year] = cardExpiry.split('/');
+            await api.post('/payments/methods', {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              cardHolder: cardName,
+              expiryMonth: parseInt(month),
+              expiryYear: parseInt('20' + year),
+              cvv: cardCvc,
+            });
+          } catch {}
+        }
+        setCashPaymentLoading(false);
+        return;
+      }
+
+      if (data?.paymentUrl) {
+        if (saveCard && useNewCard && cardNumber && cardExpiry) {
+          try {
+            const [month, year] = cardExpiry.split('/');
+            await api.post('/payments/methods', {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              cardHolder: cardName,
+              expiryMonth: parseInt(month),
+              expiryYear: parseInt('20' + year),
+              cvv: cardCvc,
+            });
+          } catch {}
+        }
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      if (data?.paymentId) {
+        router.push(`/payment/${data.paymentId}`);
+        return;
+      }
+
+      toast.error(locale === 'en' ? 'Could not start payment' : 'Ödeme başlatılamadı');
+      setCashPaymentLoading(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment initiation failed' : 'Ödeme başlatılamadı'));
+      setCashPaymentLoading(false);
+    }
+  };
 
   const handleShipSubmit = async () => {
     if (!trade || !shipAddressId || !shipCarrier) {
@@ -1067,24 +1200,230 @@ export default function TradeDetailPage() {
           </div>
         </div>
 
-        {/* Value Difference & Cash */}
+        {/* Value Difference & Cash Payment */}
         {trade.cashAmount && trade.cashAmount > 0 && (
           <div className="card p-6 mb-6 bg-green-50 border-green-200">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm text-gray-600">Nakit Fark</p>
+                <p className="text-sm text-gray-600">{locale === 'en' ? 'Cash Difference' : 'Nakit Fark'}</p>
                 <p className="text-2xl font-bold text-green-700">
                   {Math.abs(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
+                {trade.cashPayment && trade.cashPayment.commission > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {locale === 'en' ? 'Total with commission:' : 'Komisyon dahil toplam:'}{' '}
+                    {trade.cashPayment.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-600">
                   {trade.cashPayerId === trade.initiatorId 
-                    ? `${trade.initiatorName} ödeyecek`
-                    : `${trade.receiverName} ödeyecek`}
+                    ? `${trade.initiatorName} ${locale === 'en' ? 'will pay' : 'ödeyecek'}`
+                    : `${trade.receiverName} ${locale === 'en' ? 'will pay' : 'ödeyecek'}`}
                 </p>
+                {trade.cashPayment?.status === 'completed' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full mt-1">
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    {locale === 'en' ? 'Paid' : 'Ödendi'}
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* Inline checkout for cash payer */}
+            {trade.status === 'accepted' && user && trade.cashPayerId === user.id && trade.cashPayment?.status !== 'completed' && (
+              <div className="pt-4 border-t border-green-200 space-y-5">
+                <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-3 rounded-lg -mx-1">
+                  <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                    <CreditCardIcon className="w-5 h-5" />
+                    {locale === 'en' ? 'Complete Your Payment' : 'Ödemenizi Tamamlayın'}
+                  </h3>
+                  <p className="text-sm text-primary-100 mt-0.5">
+                    {locale === 'en'
+                      ? 'The trade has been accepted. Complete the cash difference payment to proceed.'
+                      : 'Takas kabul edildi. Devam etmek için nakit fark ödemesini tamamlayın.'}
+                  </p>
+                </div>
+
+                {cardError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <span aria-hidden>!</span>
+                    {cardError}
+                  </div>
+                )}
+
+                {/* Card Information */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">1</span>
+                    <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                      {locale === 'en' ? 'Card Information' : 'Kart Bilgileri'}
+                    </h4>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    {savedCards.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm font-medium text-gray-700 mb-3">
+                          {locale === 'en' ? 'My Saved Cards' : 'Kayıtlı Kartlarım'}
+                        </p>
+                        <div className="space-y-2">
+                          {savedCards.map((card) => (
+                            <label
+                              key={card.id}
+                              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                                !useNewCard && selectedSavedCard === card.id
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="tradeCard"
+                                checked={!useNewCard && selectedSavedCard === card.id}
+                                onChange={() => { setSelectedSavedCard(card.id); setUseNewCard(false); }}
+                                className="text-primary-500"
+                              />
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900">{card.cardBrand} •••• {card.lastFour}</p>
+                                <p className="text-sm text-gray-500">{card.expiryMonth.toString().padStart(2, '0')}/{card.expiryYear}</p>
+                              </div>
+                              {card.isDefault && (
+                                <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
+                                  {locale === 'en' ? 'Default' : 'Varsayılan'}
+                                </span>
+                              )}
+                            </label>
+                          ))}
+                          <label
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              useNewCard ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input type="radio" name="tradeCard" checked={useNewCard} onChange={() => setUseNewCard(true)} className="text-primary-500" />
+                            <div className="flex items-center gap-2">
+                              <PlusIcon className="w-5 h-5 text-gray-500" />
+                              <span className="font-medium text-gray-900">{locale === 'en' ? 'Pay with New Card' : 'Yeni Kart ile Öde'}</span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {(savedCards.length === 0 || useNewCard) && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {locale === 'en' ? 'Name on Card' : 'Kart Üzerindeki İsim'}
+                          </label>
+                          <input
+                            type="text"
+                            value={cardName}
+                            onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                            placeholder="AD SOYAD"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {locale === 'en' ? 'Card Number' : 'Kart Numarası'}
+                          </label>
+                          <input
+                            type="text"
+                            value={cardNumber}
+                            onChange={(e) => {
+                              setCardError(null);
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                              const formatted = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+                              setCardNumber(formatted);
+                            }}
+                            placeholder="4508 3456 7890 1234"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {locale === 'en' ? 'Expiry Date' : 'Son Kullanma Tarihi'}
+                            </label>
+                            <input
+                              type="text"
+                              value={cardExpiry}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                if (value.length >= 2) {
+                                  setCardExpiry(value.slice(0, 2) + '/' + value.slice(2));
+                                } else {
+                                  setCardExpiry(value);
+                                }
+                              }}
+                              placeholder="AA/YY"
+                              maxLength={5}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">CVV/CVC</label>
+                            <input
+                              type="password"
+                              value={cardCvc}
+                              onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                              placeholder="•••"
+                              maxLength={3}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={saveCard}
+                            onChange={(e) => setSaveCard(e.target.checked)}
+                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          />
+                          {locale === 'en' ? 'Save this card for future purchases' : 'Bu kartı gelecekteki alışverişlerim için kaydet'}
+                        </label>
+                      </div>
+                    )}
+
+                    {!useNewCard && selectedSavedCard && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          CVV/CVC ({locale === 'en' ? 'Re-enter for security' : 'Güvenlik için tekrar girin'})
+                        </label>
+                        <input
+                          type="password"
+                          value={cardCvc}
+                          onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                          placeholder="•••"
+                          maxLength={3}
+                          className="w-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                        />
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                      <ShieldCheckIcon className="w-4 h-4 text-green-500" />
+                      {locale === 'en' ? '256-bit SSL encrypted secure payment' : '256-bit SSL ile şifrelenmiş güvenli ödeme'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pay Button */}
+                <button
+                  onClick={handleCashPayment}
+                  disabled={cashPaymentLoading}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
+                >
+                  <ShieldCheckIcon className="w-5 h-5" />
+                  {cashPaymentLoading
+                    ? (locale === 'en' ? 'Processing...' : 'İşleniyor...')
+                    : `${locale === 'en' ? 'Pay' : 'Ödeme Yap'} – ${(trade.cashPayment?.totalAmount ?? trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

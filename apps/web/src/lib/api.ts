@@ -179,6 +179,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
     api.post(`/trades/${id}/dispute`, data),
+  initiateCashPayment: (id: string | number) =>
+    api.post(`/trades/${id}/cash-payment/initiate`),
 };
 
 // Wishlist (no cart in backend - use wishlist for favorites)
@@ -258,6 +260,15 @@ export const ordersApi = {
     api.patch(`/orders/${id}/shipping-address`, data),
   trackGuest: (data: { orderNumber: string; email: string }) =>
     api.post('/orders/guest/track', data),
+  /** Checkout quote (pricing breakdown). Use for order summary; same logic as order create. */
+  getQuote: (data: { items: Array<{ productId: string; quantity?: number }> }) =>
+    api.post('/orders/quote', data),
+  /** Commission preview for one amount/category (listing form). */
+  getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
+    api.get('/orders/commission-preview', { params }),
+  /** Batch commission preview for multiple items (e.g. ilanlarım list). */
+  getCommissionPreviewBatch: (items: Array<{ amount: number; categoryId?: string | null }>) =>
+    api.post('/orders/commission-preview-batch', { items }),
 };
 
 // Payments
@@ -266,6 +277,9 @@ export const paymentsApi = {
     api.post('/payments/initiate', { orderId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
+  /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
+  initiateTradeCash: (tradeId: string) =>
+    api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>

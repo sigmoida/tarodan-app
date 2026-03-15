@@ -5,9 +5,10 @@ import { PrismaModule } from '../../prisma';
 import { MembershipModule } from '../membership/membership.module';
 import { NotificationModule } from '../notification/notification.module';
 import { StorageModule } from '../storage/storage.module';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
-  imports: [PrismaModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule],
+  imports: [PrismaModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule],
   controllers: [TradeController],
   providers: [TradeService],
   exports: [TradeService],

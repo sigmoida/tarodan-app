@@ -94,6 +94,8 @@ export default function NewListingPage() {
   const [uploadingImages, setUploadingImages] = useState(false);
   // Store preview URLs (cardUrl from upload response for display)
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [commissionPreview, setCommissionPreview] = useState<{ sellerFeeAmount: number; sellerNetAmount: number } | null>(null);
+  const [commissionPreviewLoading, setCommissionPreviewLoading] = useState(false);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -146,6 +148,38 @@ export default function NewListingPage() {
       }
     }
   }, []);
+
+  // Commission preview when price/category change (for seller: estimated fee and net)
+  useEffect(() => {
+    const amount = Number(formData.price);
+    if (Number.isNaN(amount) || amount < 0) {
+      setCommissionPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setCommissionPreviewLoading(true);
+    api
+      .get('/orders/commission-preview', {
+        params: { amount: formData.price, categoryId: formData.categoryId || undefined },
+      })
+      .then((res) => {
+        if (!cancelled && res.data) {
+          setCommissionPreview({
+            sellerFeeAmount: Number(res.data.sellerFeeAmount ?? 0),
+            sellerNetAmount: Number(res.data.sellerNetAmount ?? 0),
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCommissionPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCommissionPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.price, formData.categoryId]);
 
   // Save form data to localStorage whenever it changes (debounced)
   useEffect(() => {
@@ -835,6 +869,19 @@ export default function NewListingPage() {
                   </p>
                 </div>
               </div>
+              {(commissionPreviewLoading || commissionPreview) && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                  <p className="text-gray-600 font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
+                  {commissionPreviewLoading ? (
+                    <span className="text-gray-400">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
+                  ) : commissionPreview ? (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-green-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Section: Images */}

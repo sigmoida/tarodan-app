@@ -17,6 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { OrderService } from '../order/order.service';
 
 @Injectable()
 export class OfferService {
@@ -30,6 +31,8 @@ export class OfferService {
     private readonly eventService: EventService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
     @Optional()
     private readonly storageService: StorageService,
   ) {
@@ -308,10 +311,25 @@ export class OfferService {
         },
       });
 
+      // Reserve product so nobody else can buy it while payment is pending
+      await tx.product.update({
+        where: { id: offerData.productId },
+        data: { status: ProductStatus.reserved },
+      });
+
+      // Calculate commission using the same logic as direct buy
+      const commissionResult = await this.orderService.calculateCommission(
+        Number(offerData.amount),
+        offerData.sellerId,
+        productData.categoryId,
+      );
+
+      const totalAmount = Number(offerData.amount) + commissionResult.buyerFeeAmount;
+
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
-      // Create order with pending_payment status
+      // Create order with pending_payment status (buyer adds address later via PATCH)
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -319,13 +337,15 @@ export class OfferService {
           buyerId: offerData.buyerId,
           sellerId: offerData.sellerId,
           offerId: offerId,
-          totalAmount: offerData.amount,
-          commissionAmount: 0, // Will be calculated at payment
+          totalAmount,
+          commissionAmount: commissionResult.commissionAmount,
+          buyerFeeAmount: commissionResult.buyerFeeAmount,
+          sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
         },
       });
 
-      this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId}`);
+      this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`);
 
       return {
         offer: acceptedOffer,
@@ -637,6 +657,9 @@ export class OfferService {
         seller: {
           select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
+        order: {
+          select: { id: true, status: true },
+        },
       },
     });
 
@@ -661,6 +684,7 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
@@ -668,6 +692,9 @@ export class OfferService {
         },
         seller: {
           select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+        },
+        order: {
+          select: { id: true, status: true },
         },
       },
     });
@@ -722,6 +749,7 @@ export class OfferService {
         product: {
           include: {
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            category: { select: { id: true } },
           },
         },
         buyer: {
@@ -729,6 +757,9 @@ export class OfferService {
         },
         seller: {
           select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+        },
+        order: {
+          select: { id: true, status: true },
         },
       },
     });
@@ -798,6 +829,8 @@ export class OfferService {
       expiresAt: offer.expiresAt,
       isExpired,
       timeRemaining,
+      orderId: offer.order?.id ?? null,
+      orderStatus: offer.order?.status ?? null,
       product: {
         id: offer.product.id,
         title: offer.product.title,
@@ -805,6 +838,7 @@ export class OfferService {
         imageUrl: imageUrl || undefined,
         images,
         status: offer.product.status,
+        categoryId: offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
       buyer: offer.buyer ? {
         ...offer.buyer,
