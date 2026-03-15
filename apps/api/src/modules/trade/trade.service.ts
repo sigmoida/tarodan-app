@@ -10,6 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
 import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
@@ -22,6 +23,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -43,6 +45,7 @@ export class TradeService {
   
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly membershipService: MembershipService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
@@ -192,15 +195,18 @@ export class TradeService {
       }
     }
 
-    // Validate stock: product.quantity >= item.quantity (null quantity means unlimited)
+    // Validate stock: müsait adet (available) >= item.quantity
     const allProducts = [...initiatorProducts, ...receiverProducts];
     const allItems = [...dto.initiatorItems, ...dto.receiverItems];
     for (const item of allItems) {
       const product = allProducts.find((p) => p.id === item.productId);
-      if (product && product.quantity !== null && product.quantity < item.quantity) {
-        throw new BadRequestException(
-          `"${product.title}" için yeterli stok yok (mevcut: ${product.quantity}, talep: ${item.quantity})`,
-        );
+      if (product) {
+        const available = getAvailableQuantity(product);
+        if (available !== null && available < item.quantity) {
+          throw new BadRequestException(
+            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+          );
+        }
       }
     }
 
@@ -465,16 +471,36 @@ export class TradeService {
     shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
 
     await this.prisma.$transaction(async (tx) => {
-      // Reserve both sides' products
       const tradeItems = await tx.tradeItem.findMany({
         where: { tradeId },
       });
 
-      const allProductIds = tradeItems.map((i) => i.productId);
-      await tx.product.updateMany({
-        where: { id: { in: allProductIds } },
-        data: { status: ProductStatus.reserved },
+      // Adet bazlı: müsait adet kontrolü ve rezervasyon
+      const products = await tx.product.findMany({
+        where: { id: { in: tradeItems.map((i) => i.productId) } },
       });
+      for (const item of tradeItems) {
+        const product = products.find((p) => p.id === item.productId);
+        if (product) {
+          const available = getAvailableQuantity(product);
+          if (available !== null && available < item.quantity) {
+            throw new BadRequestException(
+              `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+            );
+          }
+        }
+      }
+
+      const byProduct = new Map<string, number>();
+      for (const item of tradeItems) {
+        byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of byProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { reservedQuantity: { increment: qty } },
+        });
+      }
 
       // Update trade
       await tx.trade.update({
@@ -509,6 +535,8 @@ export class TradeService {
         });
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     // Send notification to initiator that trade was accepted
     try {
@@ -549,16 +577,29 @@ export class TradeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Release all products (both sides) back to active
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
       if (allItems.length > 0) {
-        await tx.product.updateMany({
-          where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.active },
+        const byProduct = new Map<string, number>();
+        for (const item of allItems) {
+          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+        const products = await tx.product.findMany({
+          where: { id: { in: [...byProduct.keys()] } },
+          select: { id: true, reservedQuantity: true },
         });
+        for (const product of products) {
+          const qty = byProduct.get(product.id) ?? 0;
+          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - qty);
+          await tx.product.update({
+            where: { id: product.id },
+            data: {
+              reservedQuantity: newReserved,
+              status: ProductStatus.active,
+            },
+          });
+        }
       }
 
-      // Update trade
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -569,6 +610,8 @@ export class TradeService {
         },
       });
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     // Send notification to initiator that trade was rejected
     try {
@@ -707,6 +750,19 @@ export class TradeService {
       );
     }
 
+    // Adet bazlı: karşı teklifteki ürünlerde yeterli müsait adet olmalı
+    for (const item of dto.initiatorItems) {
+      const product = counterOffererProducts.find((p) => p.id === item.productId);
+      if (product) {
+        const available = getAvailableQuantity(product);
+        if (available !== null && available < item.quantity) {
+          throw new BadRequestException(
+            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+          );
+        }
+      }
+    }
+
     // Get trade deadlines from platform settings
     const responseHoursSetting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: 'trade_response_deadline_hours' },
@@ -724,28 +780,44 @@ export class TradeService {
       cashPayerId = dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId;
     }
 
+    const oldItems = await this.prisma.tradeItem.findMany({ where: { tradeId } });
+    const oldProductIds = [...new Set(oldItems.map((i) => i.productId))];
+
     // Update trade in transaction
     await this.prisma.$transaction(async (tx) => {
-      // Release old reserved products (both sides)
-      const oldItems = await tx.tradeItem.findMany({
-        where: { tradeId },
-      });
+      // Eski ürünler (önceki karşı tekliften rezerve edilmiş olabilir) reservedQuantity düşür
+      const oldByProduct = new Map<string, number>();
+      for (const item of oldItems) {
+        oldByProduct.set(item.productId, (oldByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of oldByProduct) {
+        const prod = await tx.product.findUnique({
+          where: { id: productId },
+          select: { reservedQuantity: true },
+        });
+        if (prod) {
+          const newReserved = Math.max(0, (prod.reservedQuantity ?? 0) - qty);
+          await tx.product.update({
+            where: { id: productId },
+            data: { reservedQuantity: newReserved, status: ProductStatus.active },
+          });
+        }
+      }
 
-      await tx.product.updateMany({
-        where: { id: { in: oldItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
-
-      // Delete old trade items
       await tx.tradeItem.deleteMany({
         where: { tradeId },
       });
 
-      // Reserve new products (counter-offerer's products)
-      await tx.product.updateMany({
-        where: { id: { in: dto.initiatorItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.reserved },
-      });
+      const newByProduct = new Map<string, number>();
+      for (const item of dto.initiatorItems) {
+        newByProduct.set(item.productId, (newByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of newByProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { reservedQuantity: { increment: qty } },
+        });
+      }
 
       // Swap roles: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
       // Update trade with swapped roles
@@ -787,6 +859,14 @@ export class TradeService {
         })),
       });
     });
+
+    const newProductIds = [
+      ...new Set([
+        ...dto.initiatorItems.map((i) => i.productId),
+        ...dto.receiverItems.map((i) => i.productId),
+      ]),
+    ];
+    await this.invalidateProductCaches([...oldProductIds, ...newProductIds]);
 
     // Send notification to original initiator about counter offer
     try {
@@ -844,13 +924,22 @@ export class TradeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Release all products
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
 
-      await tx.product.updateMany({
-        where: { id: { in: allItems.map((i) => i.productId) } },
-        data: { status: ProductStatus.active },
-      });
+      // Adet bazlı: takasta rezerve edilmiş adetleri serbest bırak (accept veya sonrası)
+      const byProduct = new Map<string, number>();
+      for (const item of allItems) {
+        byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, qty] of byProduct) {
+        await tx.product.update({
+          where: { id: productId },
+          data: {
+            reservedQuantity: { decrement: qty },
+            status: ProductStatus.active,
+          },
+        });
+      }
 
       // Refund cash payment if any
       const cashPayment = await tx.tradeCashPayment.findUnique({
@@ -864,7 +953,6 @@ export class TradeService {
         });
       }
 
-      // Update trade
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -875,6 +963,8 @@ export class TradeService {
         },
       });
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(tradeId, userId);
   }
@@ -1081,31 +1171,33 @@ export class TradeService {
         },
       });
 
-      // If trade completed, mark products as sold and decrease stock
+      // If trade completed, decrease stock and release reservation (adet bazlı)
       if (newStatus === TradeStatus.completed) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
-        const productIds = allItems.map((i) => i.productId);
-
-        // Get all products to check stock
         const products = await tx.product.findMany({
-          where: { id: { in: productIds } },
+          where: { id: { in: allItems.map((i) => i.productId) } },
         });
 
+        const qtyByProduct = new Map<string, number>();
+        for (const item of allItems) {
+          qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+
         for (const product of products) {
-          const tradeItem = allItems.find((i) => i.productId === product.id);
-          const tradedQty = tradeItem?.quantity ?? 1;
+          const tradedQty = qtyByProduct.get(product.id) ?? 1;
           let newQuantity: number | null;
 
           if (product.quantity !== null && product.quantity > 0) {
             newQuantity = Math.max(0, product.quantity - tradedQty);
           } else if (product.quantity === null) {
-            newQuantity = null; // unlimited stock, no decrement
+            newQuantity = null;
           } else {
             newQuantity = 0;
           }
 
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
+            reservedQuantity: { decrement: tradedQty },
           };
           if (product.quantity !== null && product.quantity > 0) {
             updateData.quantity = newQuantity;
@@ -1130,6 +1222,8 @@ export class TradeService {
         }
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(tradeId, userId);
   }
@@ -1257,21 +1351,49 @@ export class TradeService {
         },
       });
 
-      // Handle products based on resolution
+      // Handle products based on resolution (adet bazlı: quantity + reservedQuantity)
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+      const qtyByProduct = new Map<string, number>();
+      for (const item of allItems) {
+        qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+      }
 
       if (newStatus === TradeStatus.completed) {
-        // CRITICAL: When trade is completed, products should be marked as inactive
-        // (not sold) so they disappear from listings
-        await tx.product.updateMany({
+        const products = await tx.product.findMany({
           where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.inactive },
         });
+        for (const product of products) {
+          const tradedQty = qtyByProduct.get(product.id) ?? 1;
+          let newQuantity: number | null;
+          if (product.quantity !== null && product.quantity > 0) {
+            newQuantity = Math.max(0, product.quantity - tradedQty);
+          } else if (product.quantity === null) {
+            newQuantity = null;
+          } else {
+            newQuantity = 0;
+          }
+          const updateData: any = {
+            status: getProductStatusFromQuantity(newQuantity),
+            reservedQuantity: { decrement: tradedQty },
+          };
+          if (product.quantity !== null && product.quantity > 0) {
+            updateData.quantity = newQuantity;
+          }
+          await tx.product.update({
+            where: { id: product.id },
+            data: updateData,
+          });
+        }
       } else if (newStatus === TradeStatus.cancelled) {
-        await tx.product.updateMany({
-          where: { id: { in: allItems.map((i) => i.productId) } },
-          data: { status: ProductStatus.active },
-        });
+        for (const [productId, qty] of qtyByProduct) {
+          await tx.product.update({
+            where: { id: productId },
+            data: {
+              reservedQuantity: { decrement: qty },
+              status: ProductStatus.active,
+            },
+          });
+        }
 
         // Refund cash payment if any
         const cashPayment = await tx.tradeCashPayment.findUnique({
@@ -1286,6 +1408,8 @@ export class TradeService {
         }
       }
     });
+
+    await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(
       tradeId,
@@ -1319,17 +1443,31 @@ export class TradeService {
     for (const trade of [...expiredPendingTrades, ...expiredAcceptedTrades]) {
       try {
         await this.prisma.$transaction(async (tx) => {
-          // Release products
           const allItems = await tx.tradeItem.findMany({
             where: { tradeId: trade.id },
           });
 
-          await tx.product.updateMany({
-            where: { id: { in: allItems.map((i) => i.productId) } },
-            data: { status: ProductStatus.active },
-          });
+          if (trade.status === TradeStatus.accepted && allItems.length > 0) {
+            const byProduct = new Map<string, number>();
+            for (const item of allItems) {
+              byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+            }
+            for (const [productId, qty] of byProduct) {
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: { decrement: qty },
+                  status: ProductStatus.active,
+                },
+              });
+            }
+          } else if (allItems.length > 0) {
+            await tx.product.updateMany({
+              where: { id: { in: allItems.map((i) => i.productId) } },
+              data: { status: ProductStatus.active },
+            });
+          }
 
-          // Cancel trade
           await tx.trade.update({
             where: { id: trade.id },
             data: {
@@ -1339,6 +1477,7 @@ export class TradeService {
             },
           });
         });
+        await this.invalidateProductCachesForTrade(trade.id);
         cancelledCount++;
       } catch (error) {
         this.logger.error('Failed to auto-cancel trade');
@@ -1351,6 +1490,23 @@ export class TradeService {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
+
+  /** Invalidate product detail cache for given product IDs. */
+  private async invalidateProductCaches(productIds: string[]): Promise<void> {
+    for (const productId of [...new Set(productIds)]) {
+      await this.cache.del(`products:detail:${productId}`);
+    }
+  }
+
+  /** Invalidate product detail cache for all products in a trade (after reserved/quantity changes). */
+  private async invalidateProductCachesForTrade(tradeId: string): Promise<void> {
+    const items = await this.prisma.tradeItem.findMany({
+      where: { tradeId },
+      select: { productId: true },
+    });
+    await this.invalidateProductCaches(items.map((i) => i.productId));
+  }
+
   private async getTradeWithLock(tradeId: string) {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },

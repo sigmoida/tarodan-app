@@ -379,6 +379,7 @@ model Product {
   popularityScore     Int?               @map("popularity_score")
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
+  reservedQuantity    Int?               @default(0) @map("reserved_quantity")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
   originalPrice       Decimal?           @map("original_price") @db.Decimal(10, 2)

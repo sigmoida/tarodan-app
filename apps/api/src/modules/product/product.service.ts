@@ -21,6 +21,7 @@ import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
 import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client';
 import { buildProductWhere } from './helpers/build-product-where';
 import { fulltextProductSearch } from './helpers/fulltext-search';
+import { getAvailableQuantity } from './helpers/product-availability.helper';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -1509,7 +1510,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       isTradeEnabled: product.isTradeEnabled || false,
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
-      quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null, // null = unlimited stock
+      quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null,
+      availableQuantity: getAvailableQuantity(product) ?? undefined, // müsait adet (quantity - reservedQuantity); null = sınırsız
       images: (product.images || []).map((img: { id: string; cardKey: string; detailKey: string; sortOrder: number }) => ({
         id: img.id,
         cardKey: img.cardKey,
