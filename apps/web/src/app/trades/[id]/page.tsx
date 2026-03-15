@@ -683,7 +683,8 @@ export default function TradeDetailPage() {
       return 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
     }
     const img = product.images[0];
-    return typeof img === 'string' ? img : img.url;
+    const url = typeof img === 'string' ? img : (img.cardUrl ?? img.detailUrl ?? img.url);
+    return url || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
   };
 
   if (isLoading) {

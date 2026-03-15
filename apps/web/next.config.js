@@ -13,6 +13,7 @@ function getCacheHeaders() {
   const oneWeek = 'public, max-age=604800, stale-while-revalidate=86400';
   return [
     { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
+    { source: '/tarodanfavicon.png', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/tarodan-logo.jpg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/images/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
@@ -43,9 +44,6 @@ const nextConfig = {
   },
   async headers() {
     return getCacheHeaders();
-  },
-  async rewrites() {
-    return [{ source: '/favicon.ico', destination: '/tarodan-logo.jpg' }];
   },
   images: {
     remotePatterns: [
@@ -110,6 +108,10 @@ const nextConfig = {
     const apiUrl = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     return {
       beforeFiles: [
+        {
+          source: '/favicon.ico',
+          destination: '/tarodanfavicon.png',
+        },
         {
           source: '/api/payment/callback/:path*',
           destination: '/api/payment/callback/:path*',

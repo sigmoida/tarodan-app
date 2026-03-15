@@ -1,5 +1,5 @@
-import { IsUUID, IsNumber, Min, Max, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsUUID, IsNumber, IsOptional, IsString, Min, Max, MaxLength, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateOfferDto {
@@ -21,4 +21,10 @@ export class CreateOfferDto {
   @Min(1, { message: 'Teklif en az 1 TL olmalıdır' })
   @Max(9999999, { message: 'Teklif en fazla 9,999,999 TL olabilir' })
   amount: number;
+
+  @ApiPropertyOptional({ example: 'Bu fiyata alabilir miyim?', description: 'Optional message with the offer' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  message?: string;
 }

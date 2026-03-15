@@ -36,6 +36,7 @@ const AuthRequiredModal = dynamic(
 );
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import UserAvatar from '@/components/UserAvatar';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 import { isValidImageSrc } from '@/components/OptimizedImage';
@@ -89,6 +90,7 @@ export default function Navbar() {
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { itemCount: cartCount } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -326,12 +328,14 @@ export default function Navbar() {
 
   const fetchPendingCounts = async () => {
     try {
-      const [offersRes, tradesRes] = await Promise.all([
+      const [offersRes, tradesRes, notificationsRes] = await Promise.all([
         api.get('/offers/pending-count').catch(() => null),
         api.get('/trades/pending-count').catch(() => null),
+        api.get('/notifications/unread-count').catch(() => null),
       ]);
       setPendingOffersCount(offersRes?.data?.received || 0);
       setPendingTradesCount(tradesRes?.data?.received || 0);
+      setUnreadNotificationsCount(notificationsRes?.data?.count ?? notificationsRes?.data?.unreadCount ?? 0);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
     }
@@ -892,6 +896,9 @@ export default function Navbar() {
                 <span className="hidden sm:inline">{t('nav.newListing')}</span>
               </Link>
 
+              {/* Notification Bell */}
+              {showAuthUI && <NotificationBell />}
+
               {/* Hesap dropdown */}
               <div
                 className="relative"
@@ -983,7 +990,13 @@ export default function Navbar() {
                         <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
                           <BellIcon className="w-5 h-5" />
                           {t('nav.notifications')}
+                          {unreadNotificationsCount > 0 && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                              {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                            </span>
+                          )}
                         </Link>
+
                         <div className="border-t border-gray-100 my-1" />
                         <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
                           <UserCircleIcon className="w-5 h-5" />

@@ -444,22 +444,7 @@ export default function OrderDetailPage() {
   };
 
   const handleRefund = async () => {
-    if (!order?.payment) {
-      toast.error(locale === 'en' ? 'Payment information not found' : 'Ödeme bilgisi bulunamadı');
-      return;
-    }
-    setProcessingRefund(true);
-    try {
-      await paymentsApi.refund(order.id, refundAmount);
-      toast.success(locale === 'en' ? 'Refund process started' : 'İade işlemi başlatıldı');
-      setShowRefundModal(false);
-      setRefundAmount(undefined);
-      await invalidateOrder();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to start refund' : 'İade işlemi başlatılamadı'));
-    } finally {
-      setProcessingRefund(false);
-    }
+    toast.info(locale === 'en' ? 'Coming soon' : 'Yakında gelecektir');
   };
 
   const handleReactivate = async () => {
@@ -1112,11 +1097,8 @@ export default function OrderDetailPage() {
                   {locale === 'en' ? 'Payment completed. You can start a refund if needed.' : 'Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.'}
                 </p>
                 <button
-                  onClick={() => {
-                    setRefundAmount(undefined);
-                    setShowRefundModal(true);
-                  }}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                  onClick={handleRefund}
+                  className="w-full bg-gray-400 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-not-allowed"
                 >
                   <ArrowUturnLeftIcon className="w-5 h-5" />
                   {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
@@ -1232,14 +1214,9 @@ export default function OrderDetailPage() {
                 <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                   {locale === 'en' ? 'Report Order Issue' : 'Sipariş Sorunu Bildir'}
                 </button>
-                {order.isBuyer && order.payment?.status === 'completed' && (
-                  <button
-                    onClick={() => { setRefundAmount(undefined); setShowRefundModal(true); }}
-                    className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
-                  </button>
-                )}
+                <button onClick={handleRefund} className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                  {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
+                </button>
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
@@ -1426,52 +1403,6 @@ export default function OrderDetailPage() {
                   className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
                   {submittingReview ? t('common.sending') : t('review.submit')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Refund Modal */}
-        {showRefundModal && order?.payment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
-              <p className="text-gray-600 mb-4">
-                {locale === 'en' ? 'Total payment amount:' : 'Toplam ödeme tutarı:'} {order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-              </p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {locale === 'en' ? 'Refund Amount (Leave empty for full refund)' : 'İade Tutarı (Boş bırakırsanız tam iade yapılır)'}
-                </label>
-                <input
-                  type="number"
-                  min="0.01"
-                  max={order.payment.amount}
-                  step="0.01"
-                  value={refundAmount || ''}
-                  onChange={(e) => setRefundAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  placeholder={locale === 'en' ? 'Refund amount (optional)' : 'İade tutarı (opsiyonel)'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowRefundModal(false);
-                    setRefundAmount(undefined);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  disabled={processingRefund}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  onClick={handleRefund}
-                  disabled={processingRefund}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processingRefund ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : (locale === 'en' ? 'Refund' : 'İade Et')}
                 </button>
               </div>
             </div>

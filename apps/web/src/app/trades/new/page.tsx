@@ -30,7 +30,7 @@ export default function NewTradePage() {
   const listingId = searchParams.get('listing');
   const { t, locale } = useTranslation();
   
-  const { user, isAuthenticated, limits, checkAuth, refreshUserData } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, limits, checkAuth, refreshUserData } = useAuthStore();
   
   // Ensure auth is checked on mount
   useEffect(() => {
@@ -65,11 +65,11 @@ export default function NewTradePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/login?redirect=/trades/new?listing=${listingId}`);
       return;
     }
-    // Only block when we have resolved limits (avoids false "Premium required" on refresh before checkAuth completes)
     if (limits !== null && !canTrade) {
       toast.error(t('trade.requiresPremium'));
       router.push('/pricing');
@@ -78,7 +78,7 @@ export default function NewTradePage() {
     if (listingId && (limits === null || canTrade)) {
       fetchData();
     }
-  }, [isAuthenticated, limits, canTrade, listingId]);
+  }, [authLoading, isAuthenticated, limits, canTrade, listingId]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -133,7 +133,7 @@ export default function NewTradePage() {
       .filter(p => selectedProducts.includes(p.id))
       .reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
     const cash = parseFloat(cashAmount) || 0;
-    return productsTotal + cash;
+    return cashPayer === 'me' ? productsTotal + cash : productsTotal;
   };
 
   const handleSubmit = async () => {
@@ -433,7 +433,14 @@ export default function NewTradePage() {
             </div>
             {parseFloat(cashAmount) > 0 && (
               <div className="flex justify-between">
-                <span>{t('trade.cashDifference')}:</span>
+                <span>
+                  {t('trade.cashDifference')}
+                  <span className="text-xs text-gray-500 ml-1">
+                    ({cashPayer === 'me'
+                      ? (locale === 'en' ? 'You pay' : 'Siz ödeyeceksiniz')
+                      : (locale === 'en' ? 'They pay' : 'Karşı taraf ödeyecek')})
+                  </span>
+                </span>
                 <span className="font-medium">{parseFloat(cashAmount || '0').toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
               </div>
             )}

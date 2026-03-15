@@ -149,6 +149,7 @@ export class OfferService {
           buyerId,
           sellerId: product.sellerId,
           amount: dto.amount,
+          message: dto.message || null,
           status: OfferStatus.pending,
           expiresAt,
         },
@@ -195,24 +196,6 @@ export class OfferService {
     } catch (error) {
       // Log but don't fail - offer was already created
       this.logger.error(`Failed to emit offer.created event: ${error}`);
-    }
-
-    // Send direct in-app notification to seller
-    this.logger.log(`[CreateOffer] Sending notification to seller ${result.offer.sellerId}`);
-    try {
-      const notificationResult = await this.notificationService.createInAppNotification(
-        result.offer.sellerId,
-        NotificationType.OFFER_RECEIVED,
-        {
-          productId: result.offer.productId,
-          productTitle: result.productTitle,
-          amount: Number(result.offer.amount),
-          buyerName: result.offer.buyer.displayName || 'Bir kullanıcı',
-        },
-      );
-      this.logger.log(`[CreateOffer] Notification result: ${notificationResult}`);
-    } catch (error) {
-      this.logger.error(`[CreateOffer] Failed to send offer notification:`, error);
     }
 
     return await this.formatOfferResponse(result.offer);
@@ -389,25 +372,8 @@ export class OfferService {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
 
-    // Send direct in-app notification to buyer
-    try {
-      await this.notificationService.createInAppNotification(
-        result.offer.buyerId,
-        NotificationType.OFFER_ACCEPTED,
-        {
-          productId: result.offer.productId,
-          productTitle: result.offer.product.title,
-          orderId: result.order.id,
-          amount: Number(result.offer.amount),
-        },
-      );
-    } catch (error) {
-      this.logger.error(`Failed to send offer accepted notification: ${error}`);
-    }
-
     // Ürün detay cache'ini temizle; müsait adet (availableQuantity) güncel dönsün
     await this.cache.del(`products:detail:${result.offer.productId}`);
-
     return await this.formatOfferResponse(result.offer);
   }
 
@@ -843,6 +809,7 @@ export class OfferService {
     return {
       id: offer.id,
       amount: Number(offer.amount),
+      message: offer.message ?? null,
       status: isExpired ? OfferStatus.expired : offer.status,
       expiresAt: offer.expiresAt,
       isExpired,
