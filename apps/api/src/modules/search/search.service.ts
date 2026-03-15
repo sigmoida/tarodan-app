@@ -15,7 +15,9 @@ import { fulltextProductSearch } from '../product/helpers/fulltext-search';
 import {
   fulltextBrandSearch,
   fulltextCategorySearch,
+  fulltextCarModelSearch,
   fulltextManufacturerSearch,
+  fulltextAttributeSearch,
 } from '../../common/helpers/fulltext-search';
 
 export interface ProductSearchResult {
@@ -273,7 +275,21 @@ export class SearchService implements OnModuleInit {
               carModelId: { type: 'keyword' },
               carModelName: {
                 type: 'text',
-                fields: { keyword: { type: 'keyword' } },
+                analyzer: 'turkish',
+                search_analyzer: 'turkish_search',
+                fields: {
+                  keyword: { type: 'keyword' },
+                  edge_ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_edge_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                  ngram: {
+                    type: 'text',
+                    analyzer: 'turkish_ngram',
+                    search_analyzer: 'turkish_search',
+                  },
+                },
               },
               sellerId: { type: 'keyword' },
               sellerName: { type: 'keyword' },
@@ -367,6 +383,8 @@ export class SearchService implements OnModuleInit {
             { match: { manufacturerName: { query, boost: 2 } } },
             { match: { 'manufacturerName.edge_ngram': { query, boost: 1 } } },
             { match: { carModelName: { query, boost: 2 } } },
+            { match: { 'carModelName.edge_ngram': { query, boost: 1 } } },
+            { match: { 'carModelName.ngram': { query, boost: 2 } } },
             {
               multi_match: {
                 query,
@@ -795,23 +813,31 @@ export class SearchService implements OnModuleInit {
     brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
     categories: Array<{ id: string; name: string; slug: string }>;
     manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+    carModels: Array<{ id: string; name: string; slug: string; brandId: string }>;
+    scales: string[];
+    materials: Array<{ slug: string; label: string }>;
+    conditions: Array<{ value: string; label: string }>;
     suggestions: string[];
   }> {
     const trimmed = query.trim();
     if (!trimmed) {
-      return { products: [], brands: [], categories: [], manufacturers: [], suggestions: [] };
+      return { products: [], brands: [], categories: [], manufacturers: [], carModels: [], scales: [], materials: [], conditions: [], suggestions: [] };
     }
 
-    // Run all queries in parallel
-    const [products, brands, categories, manufacturers, suggestions] = await Promise.all([
+    // Same pattern as brands/categories/manufacturers: direct search per entity type
+    const [products, brands, categories, manufacturers, carModels, scales, materials, conditions, suggestions] = await Promise.all([
       this.richAutocompleteProducts(trimmed, 5),
       this.richAutocompleteBrands(trimmed, 3),
       this.richAutocompleteCategories(trimmed, 3),
       this.richAutocompleteManufacturers(trimmed, 3),
+      this.richAutocompleteCarModels(trimmed, 5),
+      this.richAutocompleteScales(trimmed, 5),
+      this.richAutocompleteMaterials(trimmed, 5),
+      this.richAutocompleteConditions(trimmed, 5),
       this.autocomplete(trimmed, 5),
     ]);
 
-    return { products, brands, categories, manufacturers, suggestions };
+    return { products, brands, categories, manufacturers, carModels, scales, materials, conditions, suggestions };
   }
 
   private async richAutocompleteProducts(
@@ -827,11 +853,15 @@ export class SearchService implements OnModuleInit {
               should: [
                 { match: { 'title.edge_ngram': { query, boost: 4 } } },
                 { match: { 'title.ngram': { query, boost: 2 } } },
+                { match: { carModelName: { query, boost: 2 } } },
+                { match: { 'carModelName.edge_ngram': { query, boost: 1 } } },
+                { match: { 'carModelName.ngram': { query, boost: 2 } } },
+                { match_phrase_prefix: { carModelName: { query, boost: 2, max_expansions: 20 } } },
                 {
                   multi_match: {
                     query,
                     type: 'phrase_prefix',
-                    fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName'],
+                    fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName', 'carModelName^2'],
                     boost: 3,
                   },
                 },
@@ -855,12 +885,14 @@ export class SearchService implements OnModuleInit {
           price: hit._source.price,
           brandName: hit._source.brandName,
         }));
-      } catch {
-        // Fall through to Prisma fallback
+      } catch (err) {
+        this.logger.warn(
+          `Autocomplete products ES failed, using Prisma fallback: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
-    // Prisma fallback – tsvector search for product IDs, then hydrate
+    // Prisma fallback – tsvector search for product IDs, then hydrate (only title+description)
     const productIds = await fulltextProductSearch(this.prisma, query, limit);
     const products = productIds.length > 0
       ? await this.prisma.product.findMany({
@@ -956,6 +988,69 @@ export class SearchService implements OnModuleInit {
       take: limit,
       orderBy: { name: 'asc' },
     });
+  }
+
+  private async richAutocompleteCarModels(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ id: string; name: string; slug: string; brandId: string }>> {
+    const ids = await fulltextCarModelSearch(this.prisma, query, limit);
+    if (ids.length === 0) return [];
+
+    return this.prisma.carModel.findMany({
+      where: { id: { in: ids }, isActive: true },
+      select: { id: true, name: true, slug: true, brandId: true },
+      take: limit,
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private async richAutocompleteScales(query: string, limit: number): Promise<string[]> {
+    const ids = await fulltextAttributeSearch(this.prisma, query, 50);
+    if (ids.length === 0) return [];
+
+    const attrs = await this.prisma.attribute.findMany({
+      where: { id: { in: ids }, isActive: true, group: { slug: 'scale', isActive: true } },
+      select: { value: true, displayValue: true },
+    });
+    const scaleSet = new Set<string>();
+    for (const a of attrs) {
+      scaleSet.add(a.displayValue || a.value);
+    }
+    return Array.from(scaleSet).sort().slice(0, limit);
+  }
+
+  private async richAutocompleteMaterials(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ slug: string; label: string }>> {
+    const ids = await fulltextAttributeSearch(this.prisma, query, 50);
+    if (ids.length === 0) return [];
+
+    const attrs = await this.prisma.attribute.findMany({
+      where: { id: { in: ids }, isActive: true, group: { slug: 'material', isActive: true } },
+      select: { slug: true, value: true, displayValue: true },
+    });
+    const map = new Map<string, string>();
+    for (const a of attrs) {
+      map.set(a.slug, a.displayValue || a.value);
+    }
+    return Array.from(map.entries()).map(([slug, label]) => ({ slug, label })).slice(0, limit);
+  }
+
+  private async richAutocompleteConditions(
+    query: string,
+    limit: number,
+  ): Promise<Array<{ value: string; label: string }>> {
+    const conditionLabels: Record<string, string> = {
+      new: 'Yeni',
+      very_good: 'Mükemmel',
+      good: 'İyi',
+      fair: 'Orta',
+    };
+    const list = Object.entries(conditionLabels).map(([value, label]) => ({ value, label }));
+    const q = query.toLowerCase();
+    return list.filter((c) => c.value.toLowerCase().includes(q) || c.label.toLowerCase().includes(q)).slice(0, limit);
   }
 
   // ──────────────────────────── Fallback Search ────────────────────────────

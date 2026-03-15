@@ -7,6 +7,7 @@ const ALLOWED_TABLES = new Set([
   'collections',
   'brands',
   'categories',
+  'car_models',
   'manufacturers',
   'users',
   'payments',
@@ -104,6 +105,9 @@ export const fulltextBrandSearch = (p: PrismaService, q: string, limit?: number)
 
 export const fulltextCategorySearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'categories', tsvExpr(['name']), q, limit);
+
+export const fulltextCarModelSearch = (p: PrismaService, q: string, limit?: number) =>
+  fulltextSearch(p, 'car_models', tsvExpr(['name']), q, limit);
 
 export const fulltextManufacturerSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'manufacturers', tsvExpr(['name']), q, limit);

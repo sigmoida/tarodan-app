@@ -6,8 +6,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { api, paymentsApi, addressesApi } from '@/lib/api';
-import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon, CheckIcon, PlusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { api, paymentsApi, addressesApi, ratingsApi } from '@/lib/api';
+import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon, CheckIcon, PlusIcon, ShieldCheckIcon, StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
+import { StarIcon } from '@heroicons/react/24/solid';
 import { useTranslation } from '@/i18n/LanguageContext';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import UserAvatar from '@/components/UserAvatar';
@@ -79,6 +80,8 @@ interface OrderDetail {
   };
   isBuyer: boolean;
   isSeller: boolean;
+  hasProductRating?: boolean;
+  hasSellerRating?: boolean;
   offerId?: string;
   payment?: {
     id: string;
@@ -147,6 +150,16 @@ export default function OrderDetailPage() {
   const [saveCard, setSaveCard] = useState(false);
   const [cardsFetched, setCardsFetched] = useState(false);
 
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewScore, setReviewScore] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewText, setReviewText] = useState('');
+  const [sellerCommunication, setSellerCommunication] = useState(5);
+  const [sellerShipping, setSellerShipping] = useState(5);
+  const [sellerPackaging, setSellerPackaging] = useState(5);
+  const [sellerReviewText, setSellerReviewText] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   const orderId = params?.id as string;
 
   // No programmatic redirect to login (like cart page). Auth done: show order or "please log in" with link.
@@ -175,6 +188,60 @@ export default function OrderDetailPage() {
   }, [orderQuery.isError, orderId, locale, router]);
 
   const invalidateOrder = () => queryClient.invalidateQueries({ queryKey: ['order', orderId] }).then(() => queryClient.invalidateQueries({ queryKey: ['orders'] }));
+
+  const REVIEWABLE_STATUSES = ['completed', 'delivered'];
+  const canReview = (o: OrderDetail) =>
+    o.isBuyer &&
+    REVIEWABLE_STATUSES.includes(o.status) &&
+    (o.hasProductRating === false || o.hasSellerRating === false);
+  const openReviewModal = () => {
+    setReviewScore(5);
+    setReviewTitle('');
+    setReviewText('');
+    setSellerCommunication(5);
+    setSellerShipping(5);
+    setSellerPackaging(5);
+    setSellerReviewText('');
+    setShowReviewModal(true);
+  };
+  const submitReview = async () => {
+    if (!order) return;
+    const productId = order.product?.id || order.items?.[0]?.product?.id;
+    const sellerId = order.seller?.id;
+    if (!productId) {
+      toast.error(t('order.orderNotFound'));
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await ratingsApi.createProductRating({
+        productId,
+        orderId: order.id,
+        score: reviewScore,
+        title: reviewTitle || undefined,
+        review: reviewText || undefined,
+      });
+      if (sellerId) {
+        const avgSellerScore = Math.round((sellerCommunication + sellerShipping + sellerPackaging) / 3);
+        const scoreBreakdown = `İletişim: ${sellerCommunication}/5, Kargo: ${sellerShipping}/5, Paketleme: ${sellerPackaging}/5`;
+        const fullComment = sellerReviewText ? `${sellerReviewText}\n\n${scoreBreakdown}` : scoreBreakdown;
+        await ratingsApi.createUserRating({
+          receiverId: sellerId,
+          orderId: order.id,
+          score: avgSellerScore,
+          comment: fullComment,
+        });
+      }
+      toast.success(t('review.reviewSubmitted'));
+      setShowReviewModal(false);
+      await invalidateOrder();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Review submit error:', error);
+      toast.error((error as any)?.response?.data?.message || t('common.operationFailed'));
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const hasShippingAddress = !!(order?.shippingAddress && (order.shippingAddress as any).city);
   const isPendingPaymentBuyer = order?.isBuyer && order?.status === 'pending_payment';
@@ -361,7 +428,14 @@ export default function OrderDetailPage() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+      if (newStatus === 'completed') {
+        await api.post(`/orders/${orderId}/confirm`);
+      } else if (newStatus === 'preparing') {
+        await api.post(`/orders/${orderId}/prepare`);
+      } else {
+        toast.error(locale === 'en' ? 'Unsupported status' : 'Desteklenmeyen durum');
+        return;
+      }
       toast.success(locale === 'en' ? 'Order status updated' : 'Sipariş durumu güncellendi');
       await invalidateOrder();
     } catch (error: any) {
@@ -1013,8 +1087,25 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Refund Button for Completed Payments */}
-            {order.payment && order.payment.status === 'completed' && (order.isBuyer || order.isSeller) && (
+            {/* Yorum Yap - Sadece alınan siparişlerde, teslim/tamamlandıktan sonra */}
+            {canReview(order) && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('review.reviewOrder')}</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  {locale === 'en' ? 'Share your experience about the product and seller.' : 'Ürün ve satıcı hakkında deneyiminizi paylaşın.'}
+                </p>
+                <button
+                  onClick={openReviewModal}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <StarIcon className="w-5 h-5" />
+                  {t('review.writeReview')}
+                </button>
+              </div>
+            )}
+
+            {/* Refund Button for Completed Payments - Only buyer can request refund */}
+            {order.payment && order.payment.status === 'completed' && order.isBuyer && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Refund' : 'İade İşlemi'}</h2>
                 <p className="text-sm text-gray-600 mb-4">
@@ -1141,9 +1232,14 @@ export default function OrderDetailPage() {
                 <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                   {locale === 'en' ? 'Report Order Issue' : 'Sipariş Sorunu Bildir'}
                 </button>
-                <button className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                  {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
-                </button>
+                {order.isBuyer && order.payment?.status === 'completed' && (
+                  <button
+                    onClick={() => { setRefundAmount(undefined); setShowRefundModal(true); }}
+                    className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
+                  </button>
+                )}
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
@@ -1154,6 +1250,187 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Review Modal */}
+        {showReviewModal && order && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">{t('review.reviewOrder')}</h2>
+
+              {/* Product Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  📦 {t('review.productReview')}
+                </h3>
+
+                {(order.product || order.items?.[0]?.product) && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl overflow-hidden">
+                      {(order.product?.imageUrl || order.items?.[0]?.product?.imageUrl) ? (
+                        <img
+                          src={order.product?.imageUrl || order.items?.[0]?.product?.imageUrl}
+                          alt={locale === 'en' ? 'Product' : 'Ürün'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : '🚗'}
+                    </div>
+                    <p className="font-medium text-gray-900">
+                      {order.product?.title || order.items?.[0]?.product?.title}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('review.productScore')}</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewScore(star)}
+                        className="p-1 hover:scale-110 transition-transform"
+                      >
+                        {star <= reviewScore ? (
+                          <StarIcon className="w-8 h-8 text-yellow-400" />
+                        ) : (
+                          <StarOutlineIcon className="w-8 h-8 text-gray-300" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('review.titleOptional')}</label>
+                  <input
+                    type="text"
+                    value={reviewTitle}
+                    onChange={(e) => setReviewTitle(e.target.value)}
+                    placeholder={locale === 'en' ? 'E.g.: Great product!' : 'Örn: Harika bir ürün!'}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    maxLength={100}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('review.commentOptional')}</label>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder={locale === 'en' ? 'Share your experience about the product...' : 'Ürün hakkında deneyiminizi paylaşın...'}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    maxLength={1000}
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 my-6"></div>
+
+              {/* Seller Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  👤 {t('review.sellerReview')}
+                </h3>
+
+                {order.seller && (
+                  <p className="text-sm text-gray-600 mb-4">
+                    {t('product.seller')}: <span className="font-medium text-gray-900">{order.seller.displayName}</span>
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">{t('review.communication')}</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerCommunication(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerCommunication ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">{t('review.shippingSpeed')}</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerShipping(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerShipping ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">{t('review.packaging')}</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSellerPackaging(star)}
+                          className="p-0.5 hover:scale-110 transition-transform"
+                        >
+                          {star <= sellerPackaging ? (
+                            <StarIcon className="w-5 h-5 text-yellow-400" />
+                          ) : (
+                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('review.sellerComment')}</label>
+                    <textarea
+                      value={sellerReviewText}
+                      onChange={(e) => setSellerReviewText(e.target.value)}
+                      placeholder={t('review.sellerCommentPlaceholder')}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowReviewModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={submitReview}
+                  disabled={submittingReview}
+                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                >
+                  {submittingReview ? t('common.sending') : t('review.submit')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Refund Modal */}
         {showRefundModal && order?.payment && (
