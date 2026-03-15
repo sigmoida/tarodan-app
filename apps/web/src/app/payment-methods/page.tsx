@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { CreditCardIcon, PlusIcon, TrashIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import api from '@/lib/api';
 
 interface PaymentMethod {
@@ -20,17 +21,18 @@ interface PaymentMethod {
 
 export default function PaymentMethodsPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/payment-methods');
       return;
     }
     fetchPaymentMethods();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const fetchPaymentMethods = async () => {
     setIsLoading(true);
@@ -78,6 +80,13 @@ export default function PaymentMethodsPage() {
     if (brandLower.includes('amex')) return '💳';
     return '💳';
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (isLoading) {
     return (

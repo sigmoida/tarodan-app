@@ -12,13 +12,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function PaymentFailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
   const isGuestCheckout = searchParams.get('guest') === 'true';
@@ -27,6 +28,7 @@ export default function PaymentFailPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
     if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push('/login');
@@ -38,7 +40,7 @@ export default function PaymentFailPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, isAuthenticated, isGuestCheckout]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
@@ -66,6 +68,11 @@ export default function PaymentFailPage() {
     // Sipariş zaten iptal edildi, ürün serbest bırakıldı → ilanlara dön, baştan al
     router.push('/listings');
   };
+
+  const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+  if (authLoading && !isGuestCheckout && !urlGuest) {
+    return <AuthLoadingScreen />;
+  }
 
   if (isLoading) {
     return (

@@ -28,6 +28,7 @@ import {
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 
 interface RecentSale {
@@ -62,19 +63,20 @@ interface UserStats {
 export default function StatisticsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
     loadStatistics();
     loadRecentSales();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const loadStatistics = async () => {
     try {
@@ -196,6 +198,9 @@ export default function StatisticsPage() {
     visible: { opacity: 1, y: 0 }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

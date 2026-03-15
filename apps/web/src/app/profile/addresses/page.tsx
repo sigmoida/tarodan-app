@@ -8,6 +8,7 @@ import { PlusIcon, PencilIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/
 import toast from 'react-hot-toast';
 import { addressesApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -26,7 +27,7 @@ interface Address {
 export default function AddressesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,11 +43,12 @@ export default function AddressesPage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/addresses');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const addressesQuery = useQuery({
     queryKey: ['profile-addresses'],
@@ -54,7 +56,7 @@ export default function AddressesPage() {
       const response = await addressesApi.getAll();
       return response.data.data || response.data || [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-addresses' },
   });
   const addresses = addressesQuery.data ?? [];
@@ -165,6 +167,13 @@ export default function AddressesPage() {
       isDefault: false,
     });
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (isLoading) {
     return (

@@ -9,6 +9,7 @@ import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, Rectangle
 import { api } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface ProductStats {
   id: string;
@@ -59,19 +60,20 @@ interface BusinessStats {
 
 export default function BusinessDashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [stats, setStats] = useState<BusinessStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'collections'>('overview');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
     loadBusinessStats();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const loadBusinessStats = async () => {
     try {
@@ -89,6 +91,9 @@ export default function BusinessDashboardPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

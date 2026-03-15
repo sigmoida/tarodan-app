@@ -7,6 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
 import { UserMinusIcon, ArrowLeftIcon, UserIcon } from '@heroicons/react/24/outline';
 
@@ -28,14 +29,15 @@ interface FollowedUser {
 export default function FollowingPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/following');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const followingQuery = useQuery({
     queryKey: ['profile-following'],
@@ -44,7 +46,7 @@ export default function FollowingPage() {
       const data = response.data.data || response.data.following || response.data || [];
       return Array.isArray(data) ? data : [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-following' },
   });
   const following = followingQuery.data ?? [];
@@ -65,6 +67,9 @@ export default function FollowingPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

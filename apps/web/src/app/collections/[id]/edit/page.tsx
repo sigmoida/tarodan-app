@@ -6,6 +6,7 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -46,7 +47,7 @@ export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
@@ -80,6 +81,7 @@ export default function EditCollectionPage() {
   );
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated || !user) {
       router.push('/login');
       return;
@@ -88,7 +90,7 @@ export default function EditCollectionPage() {
     if (collectionIdOrSlug) {
       fetchCollection();
     }
-  }, [collectionIdOrSlug, isAuthenticated, user]);
+  }, [collectionIdOrSlug, authLoading, isAuthenticated, user]);
 
   const fetchCollection = async () => {
     if (!collectionIdOrSlug) {
@@ -225,6 +227,8 @@ export default function EditCollectionPage() {
     }
   };
 
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!authLoading && (!isAuthenticated || !user)) return null;
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

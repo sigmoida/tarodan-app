@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import api from '@/lib/api';
 
 interface MembershipInfo {
@@ -59,7 +60,7 @@ const tierPrices: Record<string, number> = {
 
 export default function MembershipManagePage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
@@ -80,13 +81,14 @@ export default function MembershipManagePage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/membership/manage');
       return;
     }
     fetchMembershipInfo();
     fetchPaymentMethods();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const fetchMembershipInfo = async () => {
     setIsLoading(true);
@@ -274,6 +276,13 @@ export default function MembershipManagePage() {
   const getSelectedCard = () => {
     return paymentMethods.find(m => m.id === membership?.paymentMethodId);
   };
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (isLoading) {
     return (

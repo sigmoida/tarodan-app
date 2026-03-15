@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { listingsApi, api, userApi, mediaApi, discountsApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 import { SimpleDropdown } from '@/components/SimpleDropdown';
 
@@ -48,7 +49,7 @@ export default function EditListingPage() {
   const id = params.id as string;
   const { locale } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, limits, refreshUserData } = useAuthStore();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -194,6 +195,7 @@ export default function EditListingPage() {
   }, [formData, id]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       toast.error('İlan düzenlemek için giriş yapmalısınız');
       router.push('/login');
@@ -231,7 +233,7 @@ export default function EditListingPage() {
     fetchListing();
     fetchCategories();
     fetchProductDiscounts();
-  }, [id, isAuthenticated]);
+  }, [id, authLoading, isAuthenticated]);
 
   const fetchFilters = async () => {
     setBrandsLoading(true);
@@ -767,6 +769,8 @@ export default function EditListingPage() {
 
   const flatCategories = flattenCategories(categories);
 
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!authLoading && !isAuthenticated) return null;
   if (isFetching) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

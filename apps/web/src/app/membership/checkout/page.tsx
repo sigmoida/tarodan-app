@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
 
 const TIER_FEATURES: Record<string, string[]> = {
@@ -43,7 +44,7 @@ const TIER_FEATURES: Record<string, string[]> = {
 export default function MembershipCheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, user, refreshUserData } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, refreshUserData } = useAuthStore();
   
   const tier = searchParams.get('tier') || 'premium';
   const period = (searchParams.get('period') || 'monthly') as 'monthly' | 'yearly';
@@ -121,10 +122,11 @@ export default function MembershipCheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/login?redirect=/membership/checkout?tier=${tier}&period=${period}`);
     }
-  }, [isAuthenticated, tier, period, router]);
+  }, [authLoading, isAuthenticated, tier, period, router]);
 
   // Get tier info dynamically
   const getTierInfo = () => {
@@ -280,6 +282,9 @@ export default function MembershipCheckoutPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

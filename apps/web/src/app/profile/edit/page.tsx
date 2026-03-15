@@ -22,11 +22,12 @@ import {
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, user, setUser, refreshUser } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, setUser, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -47,6 +48,7 @@ export default function EditProfilePage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -68,7 +70,7 @@ export default function EditProfilePage() {
         setProfilePhoto(user.avatarUrl);
       }
     }
-  }, [isAuthenticated, user]);
+  }, [authLoading, isAuthenticated, user]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -176,6 +178,9 @@ export default function EditProfilePage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

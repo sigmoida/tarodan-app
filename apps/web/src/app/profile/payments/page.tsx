@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { paymentsApi } from '@/lib/api';
 import {
   CheckCircleIcon,
@@ -91,7 +92,7 @@ const getStatusConfig = (locale: string) => ({
 export default function PaymentHistoryPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
   const [pagination, setPagination] = useState({
     page: 1,
@@ -108,11 +109,12 @@ export default function PaymentHistoryPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const paymentsQuery = useQuery({
     queryKey: ['profile-payments', pagination.page, filters],
@@ -125,7 +127,7 @@ export default function PaymentHistoryPage() {
       const response = await paymentsApi.getMyPayments(params);
       return response.data;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-payments' },
   });
   const data = paymentsQuery.data;
@@ -185,6 +187,9 @@ export default function PaymentHistoryPage() {
     setPagination({ ...pagination, page: 1 });
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

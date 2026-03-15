@@ -31,6 +31,7 @@ import {
 import { HeartIcon as HeartSolidIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import api from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n';
@@ -95,7 +96,7 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { isAuthenticated, user, limits } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, limits } = useAuthStore();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
@@ -105,12 +106,13 @@ export default function AnalyticsPage() {
   const isPremium = user?.membershipTier === 'premium' || user?.membershipTier === 'business';
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/analytics');
       return;
     }
     fetchAnalytics();
-  }, [isAuthenticated, period]);
+  }, [authLoading, isAuthenticated, period]);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -191,6 +193,7 @@ export default function AnalyticsPage() {
     visible: { opacity: 1, y: 0 }
   };
 
+  if (authLoading) return <AuthLoadingScreen />;
   if (!canAccessAnalytics) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 py-12">

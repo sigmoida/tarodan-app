@@ -17,6 +17,7 @@ import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 
 interface Notification {
@@ -71,16 +72,17 @@ export default function NotificationsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [filter, setFilter] = useState<FilterType>('all');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/notifications');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
@@ -91,7 +93,7 @@ export default function NotificationsPage() {
       const data = response.data.notifications || response.data.data || [];
       return data;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'notifications' },
   });
   const notifications = notificationsQuery.data ?? [];
@@ -145,6 +147,9 @@ export default function NotificationsPage() {
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR');
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

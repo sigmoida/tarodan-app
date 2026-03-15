@@ -13,13 +13,14 @@ import {
 import toast from 'react-hot-toast';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import CreditCardForm from '@/components/payment/CreditCardForm';
 
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const paymentId = params.id as string;
   const isGuestCheckout = searchParams.get('guest') === 'true';
   const isMembershipPayment = searchParams.get('type') === 'membership';
@@ -30,6 +31,7 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
     if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push(`/login?redirect=/payment/${paymentId}`);
@@ -37,7 +39,7 @@ export default function PaymentPage() {
     }
 
     fetchPayment();
-  }, [paymentId, isAuthenticated, isGuestCheckout]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
@@ -129,6 +131,11 @@ export default function PaymentPage() {
       setIsProcessing(false);
     }, 300000);
   };
+
+  const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+  if (authLoading && !isGuestCheckout && !urlGuest) {
+    return <AuthLoadingScreen />;
+  }
 
   if (isLoading) {
     return (

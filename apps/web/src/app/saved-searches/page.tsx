@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { MagnifyingGlassIcon, TrashIcon, BellIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 
 interface SavedSearch {
   id: string;
@@ -25,7 +26,7 @@ const STORAGE_KEY = 'diecast_saved_searches';
 
 export default function SavedSearchesPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,12 +35,13 @@ export default function SavedSearchesPage() {
                       user?.membershipTier === 'premium' ? 20 : 50;
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/saved-searches');
       return;
     }
     loadSavedSearches();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const loadSavedSearches = () => {
     try {
@@ -88,6 +90,12 @@ export default function SavedSearchesPage() {
     router.push(`/listings?${params.toString()}`);
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">

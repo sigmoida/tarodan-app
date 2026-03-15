@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -38,7 +39,7 @@ interface NotificationSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, logout } = useAuthStore();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -56,12 +57,13 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/settings');
       return;
     }
     loadSettings();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const loadSettings = async () => {
     try {
@@ -118,6 +120,9 @@ export default function SettingsPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }

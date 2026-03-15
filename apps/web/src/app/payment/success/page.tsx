@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { paymentsApi, api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 interface InvoiceDetails {
@@ -43,7 +44,7 @@ function getEstimatedDelivery(orderDate: string, locale: string): string {
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const paymentId = searchParams.get('paymentId');
   const isGuestCheckout = searchParams.get('guest') === 'true';
@@ -65,6 +66,8 @@ export default function PaymentSuccessPage() {
       return;
     }
 
+    if (authLoading) return;
+
     // Read guest from URL directly so we don't redirect before searchParams are ready (Next.js can delay them)
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
     const guestOk = isGuestCheckout || urlGuest;
@@ -80,7 +83,7 @@ export default function PaymentSuccessPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, isAuthenticated, isGuestCheckout, isMembershipPayment, router]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout, isMembershipPayment, router]);
 
   const fetchPayment = async () => {
     try {
@@ -160,6 +163,12 @@ export default function PaymentSuccessPage() {
       setDownloading(false);
     }
   };
+
+  const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+  const guestOk = isGuestCheckout || urlGuest;
+  if (authLoading && !guestOk) {
+    return <AuthLoadingScreen />;
+  }
 
   if (isLoading) {
     return (

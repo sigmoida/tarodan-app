@@ -17,6 +17,7 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
@@ -32,7 +33,7 @@ function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -52,11 +53,12 @@ export default function ChangePasswordPage() {
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/change-password');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +92,9 @@ export default function ChangePasswordPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }
