@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { CreditCardIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
@@ -22,7 +23,7 @@ export default function MembershipPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [listingLimits, setListingLimits] = useState<{
@@ -318,6 +319,9 @@ export default function MembershipPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     router.push('/login?redirect=/profile/membership');
     return null;

@@ -7,7 +7,7 @@ import { CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/solid';
 export default function MembershipSuccessPage() {
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}

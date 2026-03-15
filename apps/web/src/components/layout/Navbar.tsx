@@ -761,7 +761,7 @@ export default function Navbar() {
                             {autoResults?.carModels && autoResults.carModels.length > 0 && (
                               <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length) ? 'border-t border-gray-100' : ''}>
                                 {autoResults.carModels.map((m) => {
-                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + autoResults.carModels.indexOf(m);
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels ?? []).indexOf(m);
                                   return (
                                     <Link
                                       key={m.id}
@@ -786,7 +786,7 @@ export default function Navbar() {
                             {autoResults?.scales && autoResults.scales.length > 0 && (
                               <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length) ? 'border-t border-gray-100' : ''}>
                                 {autoResults.scales.map((s) => {
-                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + autoResults.scales.indexOf(s);
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales ?? []).indexOf(s);
                                   return (
                                     <Link
                                       key={s}
@@ -811,7 +811,7 @@ export default function Navbar() {
                             {autoResults?.materials && autoResults.materials.length > 0 && (
                               <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length) ? 'border-t border-gray-100' : ''}>
                                 {autoResults.materials.map((mat) => {
-                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + autoResults.materials.indexOf(mat);
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials ?? []).indexOf(mat);
                                   return (
                                     <Link
                                       key={mat.slug}
@@ -836,7 +836,7 @@ export default function Navbar() {
                             {autoResults?.conditions && autoResults.conditions.length > 0 && (
                               <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length || autoResults?.materials?.length) ? 'border-t border-gray-100' : ''}>
                                 {autoResults.conditions.map((cond) => {
-                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials?.length || 0) + autoResults.conditions.indexOf(cond);
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials?.length || 0) + (autoResults?.conditions ?? []).indexOf(cond);
                                   return (
                                     <Link
                                       key={cond.value}

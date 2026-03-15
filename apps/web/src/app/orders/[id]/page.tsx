@@ -444,7 +444,7 @@ export default function OrderDetailPage() {
   };
 
   const handleRefund = async () => {
-    toast.info(locale === 'en' ? 'Coming soon' : 'Yakında gelecektir');
+    toast(locale === 'en' ? 'Coming soon' : 'Yakında gelecektir');
   };
 
   const handleReactivate = async () => {
