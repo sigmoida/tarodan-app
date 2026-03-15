@@ -301,6 +301,21 @@ export class PaymentService {
           data: { failureReason: null },
         });
       }
+
+      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
+      if (paymentBypassExisting) {
+        return {
+          paymentId: existingPayment.id,
+          orderId: dto.orderId,
+          amount: Number(order.totalAmount),
+          paymentUrl: undefined,
+          paymentHtml: undefined,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
+      }
+
       return {
         paymentId: existingPayment.id,
         paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,

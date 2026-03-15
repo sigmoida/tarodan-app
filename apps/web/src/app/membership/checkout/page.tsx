@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi, api } from '@/lib/api';
+import { membershipApi, api, paymentsApi } from '@/lib/api';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: [
@@ -242,7 +242,28 @@ export default function MembershipCheckoutPage() {
           return;
         }
       } else if (paymentId) {
-        // Redirect to payment page (type=membership so success shows membership page, not order)
+        // Bypass modundaysa kart zaten bu sayfada girildi; ara ödeme sayfasına göndermeden burada tamamla
+        try {
+          const statusRes = await paymentsApi.getStatusLight(paymentId);
+          if (statusRes.data?.useBypass) {
+            const cardNumber = cardData.number.replace(/\D/g, '');
+            if (cardNumber) {
+              const bypassRes = await paymentsApi.bypassComplete(paymentId, cardNumber);
+              if (bypassRes.data?.success) {
+                toast.success('Üyelik ödemesi başarılı!');
+                await refreshUserData();
+                window.location.href = '/membership/success';
+                return;
+              } else {
+                toast.error('Ödeme başarısız oldu');
+                setIsProcessing(false);
+                return;
+              }
+            }
+          }
+        } catch (bypassErr: any) {
+          if (process.env.NODE_ENV === 'development') console.error('Bypass check error:', bypassErr);
+        }
         router.push(`/payment/${paymentId}?type=membership`);
         return;
       } else {

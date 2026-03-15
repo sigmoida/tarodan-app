@@ -28,8 +28,6 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentHtml, setPaymentHtml] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [membershipBypassCard, setMembershipBypassCard] = useState('');
-  const [membershipBypassSubmitting, setMembershipBypassSubmitting] = useState(false);
 
   useEffect(() => {
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
@@ -52,9 +50,18 @@ export default function PaymentPage() {
 
       setPayment(paymentData);
 
-      // Bypass modu: bu sayfada form yok; checkout’a yönlendir, ödeme orada yapılsın
       const isMembership = typeof window !== 'undefined' && window.location.search.includes('type=membership');
-      if (paymentData.useBypass && paymentData.orderId && !isMembership) {
+      // Üyelik ödemesi zaten başarılıysa başarı sayfasına gönder (aynı sayfaya döngü olmasın)
+      if (isMembership && paymentData.status === 'completed') {
+        router.replace('/membership/success');
+        return;
+      }
+      // Bypass + üyelik + bekliyor: kart checkout’ta girilsin, bu sayfa gösterilmesin
+      if (paymentData.useBypass && isMembership) {
+        router.replace('/membership/checkout');
+        return;
+      }
+      if (paymentData.useBypass && paymentData.orderId) {
         router.replace(`/checkout?orderId=${paymentData.orderId}`);
         return;
       }
@@ -62,7 +69,7 @@ export default function PaymentPage() {
         router.replace(`/trades/${paymentData.tradeId}`);
         return;
       }
-      if (paymentData.useBypass && !isMembership) {
+      if (paymentData.useBypass) {
         router.replace('/orders');
         return;
       }
@@ -209,56 +216,8 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Payment Content – bypass bu sayfada yok, checkout’a yönlendirildi */}
-        {isMembershipPayment && payment?.useBypass && payment?.status === 'pending' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-6"
-          >
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <CreditCardIcon className="w-6 h-6 text-primary-500" />
-              Üyelik ödemesini tamamlayın
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">Kart numaranızı girin (test: 0000 0000 0000 0000)</p>
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="0000 0000 0000 0000"
-              value={membershipBypassCard}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, '').slice(0, 16);
-                setMembershipBypassCard(v.replace(/(\d{4})(?=\d)/g, '$1 '));
-              }}
-              className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 font-mono mb-4"
-            />
-            <button
-              type="button"
-              disabled={membershipBypassSubmitting || !membershipBypassCard.replace(/\D/g, '')}
-              onClick={async () => {
-                setMembershipBypassSubmitting(true);
-                try {
-                  const res = await paymentsApi.bypassComplete(paymentId, membershipBypassCard.replace(/\D/g, ''));
-                  if (res.data?.success) {
-                    toast.success('Üyelik ödemesi başarılı');
-                    router.push('/membership/success');
-                  } else {
-                    toast.error('Ödeme başarısız');
-                    router.push(`/payment/fail?paymentId=${paymentId}`);
-                  }
-                } catch (err: any) {
-                  toast.error(err.response?.data?.message || 'Ödeme başarısız');
-                  router.push(`/payment/fail?paymentId=${paymentId}`);
-                } finally {
-                  setMembershipBypassSubmitting(false);
-                }
-              }}
-              className="btn-primary disabled:opacity-50"
-            >
-              {membershipBypassSubmitting ? 'İşleniyor...' : 'Ödemeyi Tamamla'}
-            </button>
-          </motion.div>
-        ) : paymentHtml ? (
+        {/* Payment Content – üyelik bypass checkout’ta yapılıyor, bu sayfada form yok */}
+        {paymentHtml ? (
           // PayTR iframe
           <motion.div
             initial={{ opacity: 0, y: 20 }}
