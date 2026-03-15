@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function getInitials(displayName: string | null | undefined, companyName?: string | null): string {
   if (companyName?.trim()) {
@@ -45,6 +45,8 @@ export default function UserAvatar({
   ring = false,
 }: UserAvatarProps) {
   const [imgError, setImgError] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const initials = getInitials(displayName, companyName);
   const isCompany = Boolean(companyName?.trim());
   const base =
@@ -53,7 +55,7 @@ export default function UserAvatar({
     ? 'bg-orange-500/20 text-orange-600'
     : 'bg-primary-500 text-white';
   const ringClass = ring ? 'ring-4 ring-white/30' : '';
-  const showImage = isValidUrl(avatarUrl) && !imgError;
+  const showImage = mounted && isValidUrl(avatarUrl) && !imgError;
 
   return (
     <div
