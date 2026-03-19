@@ -8,6 +8,7 @@ import { productsApi } from '../src/services/api';
 import { TarodanColors, BRANDS, SCALES } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
 import { safeString } from '../src/utils/safeString';
+import { isProductTradeOpen } from '../src/utils/isProductTradeOpen';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -115,8 +116,8 @@ export default function ListingsScreen() {
   };
 
   const renderProductCard = (item: any) => {
-    const isTradeEnabled = item.isTradeEnabled || item.trade_available;
-    
+    const isTradeEnabled = isProductTradeOpen(item);
+
     return (
       <TouchableOpacity
         key={item.id}

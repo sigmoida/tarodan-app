@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Text, Avatar, Button, List, Divider, Card, Badge, Snackbar } from 'react-native-paper';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -74,7 +74,9 @@ export default function ProfileScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profil</Text>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+            <Image source={require('../../assets/tarodan-logo.jpg')} style={styles.headerLogo} resizeMode="contain" />
+          </TouchableOpacity>
           <View style={{ width: 24 }} />
         </View>
 
@@ -244,11 +246,13 @@ export default function ProfileScreen() {
           {snackbarMessage}
         </Snackbar>
 
-        <SignupPrompt
-          visible={showPrompt}
-          onDismiss={() => setShowPrompt(false)}
-          type={promptType}
-        />
+        {showPrompt ? (
+          <SignupPrompt
+            visible
+            onDismiss={() => setShowPrompt(false)}
+            type={promptType}
+          />
+        ) : null}
       </View>
     );
   }
@@ -258,7 +262,9 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+          <Image source={require('../../assets/tarodan-logo.jpg')} style={styles.headerLogo} resizeMode="contain" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
@@ -475,17 +481,16 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: TarodanColors.primary,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 44,
+    paddingBottom: 14,
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+  headerLogo: {
+    width: 130,
+    height: 42,
   },
   scrollView: {
     flex: 1,
@@ -495,7 +500,7 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.background,
     margin: 16,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
@@ -518,12 +523,12 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 12,
   },
   registerButton: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 0,
   },
   benefitsSection: {
     paddingHorizontal: 16,
@@ -538,7 +543,7 @@ const styles = StyleSheet.create({
   benefitCard: {
     flexDirection: 'row',
     backgroundColor: TarodanColors.background,
-    borderRadius: 12,
+    borderRadius: 0,
     padding: 16,
     marginBottom: 12,
   },
@@ -579,7 +584,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: TarodanColors.background,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 8,
   },
   quickLinkText: {
@@ -592,7 +597,7 @@ const styles = StyleSheet.create({
     margin: 16,
     padding: 24,
     backgroundColor: TarodanColors.secondary,
-    borderRadius: 16,
+    borderRadius: 0,
   },
   premiumHeader: {
     flexDirection: 'row',
@@ -627,14 +632,14 @@ const styles = StyleSheet.create({
     color: TarodanColors.star,
   },
   premiumButton: {
-    borderRadius: 12,
+    borderRadius: 0,
   },
   // Authenticated styles
   profileCard: {
     backgroundColor: TarodanColors.background,
     margin: 16,
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 0,
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 2,
@@ -663,7 +668,7 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.surfaceVariant,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 0,
     marginTop: 8,
     alignSelf: 'flex-start',
   },
@@ -680,7 +685,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 16,
     backgroundColor: TarodanColors.background,
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 16,
     elevation: 2,
     shadowColor: '#000',
@@ -733,7 +738,7 @@ const styles = StyleSheet.create({
   },
   garageCard: {
     backgroundColor: TarodanColors.background,
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 24,
     alignItems: 'center',
     borderWidth: 2,
@@ -791,7 +796,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 8,
   },
   menuItemText: {
@@ -807,7 +812,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 24,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     backgroundColor: TarodanColors.background,
     borderWidth: 1,
     borderColor: TarodanColors.error,

@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { ProductCard } from './ProductCard';
 import { safeString } from '../../src/utils/safeString';
+import { getImageUrl } from '../../src/utils/imageUrl';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 
 interface Product {
   id: string;
@@ -41,9 +43,10 @@ export function ProductList({
         id={item.id}
         title={item.title}
         price={item.price}
-        image={item.images?.[0]?.url}
+        image={getImageUrl(item.images)}
         condition={safeString(item.condition)}
         brand={safeString(item.brand)}
+        tradeOpen={isProductTradeOpen(item as Record<string, unknown>)}
       />
     </View>
   );

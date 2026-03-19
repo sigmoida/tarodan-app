@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, FlatList, Share } from 'react-native';
 import { Text, Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Card } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
@@ -97,8 +97,49 @@ export default function CollectionDetailScreen() {
     },
   });
 
-  const collection = apiCollection || MOCK_COLLECTION;
-  const items = collection.items || MOCK_COLLECTION.items;
+  const collection = useMemo(() => {
+    const raw = apiCollection;
+    if (!raw) return null;
+    const c = raw.collection || raw.data || raw;
+    if (!c) return null;
+    return {
+      ...c,
+      owner: c.owner || c.user || {
+        id: c.userId,
+        displayName: c.userName || c.user?.displayName || 'Kullanıcı',
+        verified: !!c.user?.isVerified,
+      },
+      coverImage: c.coverImage || c.coverImageUrl,
+    };
+  }, [apiCollection]);
+
+  const items = useMemo(() => {
+    const srcItems = collection?.items || collection?.collectionItems || [];
+    if (!Array.isArray(srcItems)) return [];
+    return srcItems.map((it: any) => {
+      const p = it.product || it;
+      return {
+        id: it.id || p.id,
+        title: p.title || it.productTitle || 'Ürün',
+        brand: p.brand || it.brand,
+        scale: p.scale || it.scale,
+        year: p.year || it.year,
+        notes: it.notes || p.notes,
+        estimatedValue: it.estimatedValue || p.estimatedValue || p.price,
+        imageUrl:
+          it.imageUrl ||
+          it.productImage ||
+          p.imageUrl ||
+          p.coverImage ||
+          p.cardUrl ||
+          p.detailUrl ||
+          p.images?.[0]?.cardUrl ||
+          p.images?.[0]?.detailUrl ||
+          p.images?.[0]?.url ||
+          (typeof p.images?.[0] === 'string' ? p.images?.[0] : null),
+      };
+    });
+  }, [collection]);
 
   const handleShare = async () => {
     try {
@@ -128,7 +169,7 @@ export default function CollectionDetailScreen() {
     <View style={styles.container}>
       {/* Header Image */}
       <Image
-        source={{ uri: transformImageUrl(collection.coverImage) }}
+        source={{ uri: transformImageUrl((collection?.coverImage || MOCK_COLLECTION.coverImage) as any) }}
         style={styles.coverImage}
         resizeMode="cover"
       />
@@ -155,27 +196,27 @@ export default function CollectionDetailScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Collection Info */}
         <View style={styles.infoSection}>
-          <Text style={styles.collectionName}>{collection.name}</Text>
+          <Text style={styles.collectionName}>{collection?.name || MOCK_COLLECTION.name}</Text>
           
           {/* Owner */}
           <TouchableOpacity 
             style={styles.ownerRow}
-            onPress={() => router.push(`/seller/${collection.owner?.id}`)}
+            onPress={() => router.push(`/seller/${collection?.owner?.id || MOCK_COLLECTION.owner.id}`)}
           >
             <Avatar.Text
               size={40}
-              label={collection.owner?.displayName?.substring(0, 2).toUpperCase() || 'U'}
+              label={(collection?.owner?.displayName || MOCK_COLLECTION.owner.displayName).substring(0, 2).toUpperCase()}
               style={{ backgroundColor: TarodanColors.primary }}
             />
             <View style={styles.ownerInfo}>
               <View style={styles.ownerNameRow}>
-                <Text style={styles.ownerName}>{collection.owner?.displayName}</Text>
-                {collection.owner?.verified && (
+                <Text style={styles.ownerName}>{collection?.owner?.displayName || MOCK_COLLECTION.owner.displayName}</Text>
+                {(collection?.owner?.verified || MOCK_COLLECTION.owner.verified) && (
                   <Ionicons name="checkmark-circle" size={16} color={TarodanColors.accent} />
                 )}
               </View>
               <Text style={styles.ownerSince}>
-                Üye: {new Date(collection.owner?.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
+                Üye: {new Date((collection?.owner as any)?.memberSince || MOCK_COLLECTION.owner.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
@@ -185,44 +226,44 @@ export default function CollectionDetailScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Ionicons name="images-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection.itemCount}</Text>
+              <Text style={styles.statValue}>{collection?.itemCount ?? items.length}</Text>
               <Text style={styles.statLabel}>Model</Text>
             </View>
             <View style={styles.statItem}>
               <Ionicons name="eye-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection.viewCount}</Text>
+              <Text style={styles.statValue}>{collection?.viewCount ?? 0}</Text>
               <Text style={styles.statLabel}>Görüntülenme</Text>
             </View>
             <View style={styles.statItem}>
               <Ionicons name="heart" size={20} color={TarodanColors.error} />
-              <Text style={styles.statValue}>{isLiked ? collection.likeCount + 1 : collection.likeCount}</Text>
+              <Text style={styles.statValue}>{isLiked ? (collection?.likeCount ?? 0) + 1 : (collection?.likeCount ?? 0)}</Text>
               <Text style={styles.statLabel}>Beğeni</Text>
             </View>
             <View style={styles.statItem}>
               <Ionicons name="share-social-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection.shareCount}</Text>
+              <Text style={styles.statValue}>{collection?.shareCount ?? 0}</Text>
               <Text style={styles.statLabel}>Paylaşım</Text>
             </View>
           </View>
 
           {/* Estimated Value */}
-          {collection.estimatedValue && (
+          {(collection?.estimatedValue || 0) > 0 && (
             <View style={styles.valueCard}>
               <Ionicons name="diamond-outline" size={24} color={TarodanColors.primary} />
               <View style={styles.valueInfo}>
                 <Text style={styles.valueLabel}>Tahmini Koleksiyon Değeri</Text>
                 <Text style={styles.valueAmount}>
-                  ₺{collection.estimatedValue.toLocaleString('tr-TR')}
+                  ₺{(collection?.estimatedValue ?? 0).toLocaleString('tr-TR')}
                 </Text>
               </View>
             </View>
           )}
 
           {/* Description */}
-          <Text style={styles.description}>{collection.description}</Text>
+          <Text style={styles.description}>{collection?.description || MOCK_COLLECTION.description}</Text>
 
           {/* Tags */}
-          {collection.tags && collection.tags.length > 0 && (
+          {collection?.tags && collection.tags.length > 0 && (
             <View style={styles.tagsRow}>
               {collection.tags.map((tag: string, index: number) => (
                 <Chip 

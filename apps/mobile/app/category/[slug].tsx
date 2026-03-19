@@ -80,8 +80,8 @@ export default function CategoryScreen() {
   };
 
   const renderProductCard = (item: any) => {
-    const isTradeEnabled = item.isTradeEnabled || item.trade_available;
-    
+    const isTradeEnabled = isProductTradeOpen(item);
+
     return (
       <TouchableOpacity
         key={item.id}

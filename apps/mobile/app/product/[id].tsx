@@ -15,6 +15,7 @@ import { TarodanColors, CONDITIONS } from '../../src/theme';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '../../src/utils/productPrice';
 import { safeString } from '../../src/utils/safeString';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 
 const { width } = Dimensions.get('window');
 
@@ -569,7 +570,7 @@ export default function ProductDetailScreen() {
               Teklif Ver
             </Button>
           )}
-          {(product.tradeAvailable || product.trade_available || product.isTradeEnabled) && (
+          {isProductTradeOpen(product as Record<string, unknown>) && (
             <Button
               mode="outlined"
               onPress={handleTrade}
@@ -643,14 +644,16 @@ export default function ProductDetailScreen() {
         {snackbar.message}
       </Snackbar>
 
-      {/* Signup Prompt for Guests */}
-      {promptType && (
+      {showPrompt && promptType ? (
         <SignupPrompt
-          visible={showPrompt}
-          onDismiss={() => setShowPrompt(false)}
+          visible
+          onDismiss={() => {
+            setShowPrompt(false);
+            setPromptType(null);
+          }}
           type={promptType}
         />
-      )}
+      ) : null}
     </View>
   );
 }

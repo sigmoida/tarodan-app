@@ -203,7 +203,7 @@ export default function NewTradeScreen() {
       onPress={onToggle}
     >
       <Image
-        source={{ uri: product.images?.[0]?.url || 'https://via.placeholder.com/80' }}
+        source={{ uri: getImageUrl(product.images) }}
         style={styles.productImage}
       />
       <View style={styles.productInfo}>

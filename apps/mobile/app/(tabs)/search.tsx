@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput, Image } from 'react-native';
-import { Text, Card, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
+import { Text, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,9 +9,10 @@ import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
 import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
+const CARD_WIDTH = (width - 28) / 2;
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'En Yeni', icon: 'time-outline' },
@@ -29,6 +30,7 @@ export default function SearchScreen() {
   const [selectedBrands, setSelectedBrands] = useState<string[]>(
     params.brand ? [params.brand as string] : []
   );
+  const [manufacturer, setManufacturer] = useState((params.manufacturer as string) || '');
   const [selectedScales, setSelectedScales] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
@@ -44,23 +46,22 @@ export default function SearchScreen() {
   const recentSearchQueries = searches.map((s) => s.query);
 
   // Akıllı arama önerileri (web ile aynı)
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const { data: autocompleteData } = useQuery({
-    queryKey: ['autocomplete-rich', searchQuery],
+    queryKey: ['autocomplete-rich', debouncedQuery],
     queryFn: async () => {
       try {
-        const res = await searchApi.autocompleteRich(searchQuery);
+        const res = await searchApi.autocompleteRich(debouncedQuery);
         return res.data?.data || res.data || {};
       } catch {
         return {};
       }
     },
-    enabled: searchQuery.length >= 2,
+    enabled: debouncedQuery.length >= 1,
     staleTime: 60000,
   });
 
   const suggestionItems = useMemo(() => {
-    if (!autocompleteData || searchQuery.length < 2) return [];
+    if (!autocompleteData || debouncedQuery.length < 1) return [];
     const items: Array<{ type: string; id: string; label: string; route: string }> = [];
     (autocompleteData.products || []).slice(0, 5).forEach((p: any) =>
       items.push({ type: 'product', id: p.id, label: p.title || p.name, route: `/product/${p.id}` })
@@ -77,9 +78,12 @@ export default function SearchScreen() {
     (autocompleteData.scales || []).slice(0, 3).forEach((s: string) =>
       items.push({ type: 'scale', id: s, label: s, route: `/(tabs)/search?scale=${encodeURIComponent(s)}` })
     );
-    items.push({ type: 'search', id: '__all__', label: `"${searchQuery}" ile ara`, route: `/(tabs)/search?q=${encodeURIComponent(searchQuery)}` });
+    (autocompleteData.suggestions || []).slice(0, 5).forEach((s: string, idx: number) =>
+      items.push({ type: 'search', id: `sg-${idx}`, label: s, route: `/(tabs)/search?q=${encodeURIComponent(s)}` })
+    );
+    items.push({ type: 'search', id: '__all__', label: `"${debouncedQuery}" ile ara`, route: `/(tabs)/search?q=${encodeURIComponent(debouncedQuery)}` });
     return items;
-  }, [autocompleteData, searchQuery]);
+  }, [autocompleteData, debouncedQuery]);
 
   useEffect(() => {
     if (params.q && params.q !== searchQuery) {
@@ -89,7 +93,10 @@ export default function SearchScreen() {
     if (params.categoryId) setCategory(params.categoryId as string);
     if (params.brand) setSelectedBrands([params.brand as string]);
     if (params.scale) setSelectedScales([params.scale as string]);
-  }, [params.q, params.categoryId, params.brand, params.scale]);
+    if (params.manufacturer !== undefined) {
+      setManufacturer((params.manufacturer as string) || '');
+    }
+  }, [params.q, params.categoryId, params.brand, params.scale, params.manufacturer]);
 
   useEffect(() => {
     if (debouncedQuery && debouncedQuery.length >= 2) {
@@ -100,6 +107,7 @@ export default function SearchScreen() {
   // Debounce search
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
+    setShowRecentSearches(true);
     const timer = setTimeout(() => {
       setDebouncedQuery(text);
     }, 500);
@@ -117,10 +125,24 @@ export default function SearchScreen() {
     // Sadece değeri olan parametreleri gönder - boş string API'de 400 hatası veriyor
     const params: Record<string, any> = {};
     
-    if (debouncedQuery) params.q = debouncedQuery;
-    if (sortBy) params.sort = sortBy;
+    if (debouncedQuery) {
+      params.q = debouncedQuery;
+      params.search = debouncedQuery;
+    }
+    if (sortBy) {
+      params.sort = sortBy;
+      params.sortBy =
+        sortBy === 'newest'
+          ? 'created_desc'
+          : sortBy === 'price_asc'
+            ? 'price_asc'
+            : sortBy === 'price_desc'
+              ? 'price_desc'
+              : 'created_desc';
+    }
     if (category) params.category = category;
     if (selectedBrands.length > 0) params.brand = selectedBrands.join(',');
+    if (manufacturer.trim()) params.manufacturer = manufacturer.trim();
     if (selectedScales.length > 0) params.scale = selectedScales.join(',');
     if (selectedConditions.length > 0) params.condition = selectedConditions.join(',');
     if (priceRange[0] > 0) params.minPrice = priceRange[0];
@@ -128,7 +150,7 @@ export default function SearchScreen() {
     if (tradeOnly) params.tradeAvailable = true;
     
     return params;
-  }, [debouncedQuery, sortBy, category, selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly]);
+  }, [debouncedQuery, sortBy, category, selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly, manufacturer]);
 
   // Elasticsearch veya normal ürün arama
   const { data: products, isLoading, refetch, error } = useQuery({
@@ -138,8 +160,8 @@ export default function SearchScreen() {
       try {
         let data = [];
         
-        // Eğer arama sorgusu varsa Elasticsearch kullan
-        if (debouncedQuery && debouncedQuery.length >= 2) {
+        // Üretici filtresi varken ES üreticiyi bilmediği için REST /products kullan
+        if (debouncedQuery && debouncedQuery.length >= 2 && !manufacturer.trim()) {
           console.log('🔍 Using Elasticsearch search for:', debouncedQuery);
           const searchParams = {
             q: debouncedQuery,
@@ -203,6 +225,7 @@ export default function SearchScreen() {
     setDebouncedQuery('');
     setCategory('');
     setSelectedBrands([]);
+    setManufacturer('');
     setSelectedScales([]);
     setSelectedConditions([]);
     setPriceRange([0, 50000]);
@@ -249,21 +272,24 @@ export default function SearchScreen() {
     const imageUrl = getImageUrlFromUtils(item.images);
     const viewCount = item.viewCount || item.views || 0;
     const likeCount = item.likeCount || item.likes || 0;
-    
+    const tradeOpen = isProductTradeOpen(item);
+
     return (
-    <Card
+    <TouchableOpacity
       style={styles.productCard}
+      activeOpacity={0.85}
       onPress={() => handleProductPress(item.id)}
     >
-      <View>
-        <Card.Cover
+      <View style={styles.productImageWrap}>
+        <Image
           source={{ uri: imageUrl }}
           style={styles.productImage}
+          resizeMode="cover"
         />
-        {(item.tradeAvailable || item.trade_available) && (
+        {tradeOpen && (
           <View style={styles.tradeBadge}>
             <Ionicons name="swap-horizontal" size={12} color="#fff" />
-            <Text style={styles.tradeBadgeText}>Takas</Text>
+            <Text style={styles.tradeBadgeText}>Takas Açık</Text>
           </View>
         )}
         {item.condition === 'new' && (
@@ -282,7 +308,7 @@ export default function SearchScreen() {
           </View>
         </View>
       </View>
-      <Card.Content style={styles.productContent}>
+      <View style={styles.productContent}>
         <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.productMeta}>
           {safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}
@@ -290,8 +316,8 @@ export default function SearchScreen() {
         <Text style={styles.productPrice}>
           ₺{(item.price ?? 0).toLocaleString('tr-TR')}
         </Text>
-      </Card.Content>
-    </Card>
+      </View>
+    </TouchableOpacity>
   );
   };
 
@@ -299,11 +325,13 @@ export default function SearchScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Image 
-          source={require('../../assets/tarodan-logo.jpg')} 
-          style={{ width: 120, height: 36 }}
-          resizeMode="contain"
-        />
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+          <Image 
+            source={require('../../assets/tarodan-logo.jpg')} 
+            style={{ width: 130, height: 42 }}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -312,10 +340,13 @@ export default function SearchScreen() {
           placeholder="Model, marka veya anahtar kelime..."
           value={searchQuery}
           onChangeText={handleSearchChange}
-          onSubmitEditing={() => setDebouncedQuery(searchQuery)}
-          onIconPress={() => setDebouncedQuery(searchQuery)}
+          onSubmitEditing={() => setDebouncedQuery(searchQuery.trim())}
+          onIconPress={() => {
+            setShowRecentSearches(true);
+            setDebouncedQuery(searchQuery.trim());
+          }}
           onFocus={() => setShowRecentSearches(true)}
-          onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+          onBlur={() => setTimeout(() => setShowRecentSearches(false), 1200)}
           style={styles.searchBar}
           inputStyle={styles.searchInput}
           iconColor={TarodanColors.textSecondary}
@@ -359,7 +390,7 @@ export default function SearchScreen() {
           </View>
         )}
         {/* Akıllı arama önerileri (yazarken) */}
-        {showRecentSearches && searchQuery.length >= 2 && suggestionItems.length > 0 && (
+        {showRecentSearches && debouncedQuery.length >= 1 && suggestionItems.length > 0 && (
           <View style={styles.recentSearchesDropdown}>
             <View style={styles.recentSearchesHeader}>
               <Text style={styles.recentSearchesTitle}>Öneriler</Text>
@@ -369,7 +400,7 @@ export default function SearchScreen() {
                 key={item.id + item.label}
                 style={styles.recentSearchItem}
                 onPress={() => {
-                  addSearch(searchQuery);
+                  addSearch(debouncedQuery);
                   setShowRecentSearches(false);
                   router.push(item.route as any);
                 }}
@@ -792,7 +823,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     backgroundColor: TarodanColors.background,
-    borderRadius: 12,
+    borderRadius: 0,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -858,7 +889,7 @@ const styles = StyleSheet.create({
   searchBar: {
     backgroundColor: TarodanColors.surfaceVariant,
     elevation: 0,
-    borderRadius: 12,
+    borderRadius: 0,
   },
   searchInput: {
     fontSize: 16,
@@ -879,7 +910,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginHorizontal: 8,
     backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 8,
+    borderRadius: 0,
   },
   filterButtonText: {
     marginLeft: 8,
@@ -890,7 +921,7 @@ const styles = StyleSheet.create({
   filterBadge: {
     marginLeft: 6,
     backgroundColor: TarodanColors.primary,
-    borderRadius: 10,
+    borderRadius: 0,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
@@ -935,37 +966,45 @@ const styles = StyleSheet.create({
     color: TarodanColors.textSecondary,
   },
   listContent: {
-    padding: 16,
-    paddingTop: 8,
+    padding: 8,
+    paddingTop: 6,
   },
   listRow: {
     justifyContent: 'space-between',
   },
   productCard: {
     width: CARD_WIDTH,
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 8,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: TarodanColors.background,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  productImageWrap: {
+    width: '100%',
+    height: CARD_WIDTH,
+    position: 'relative',
+    backgroundColor: TarodanColors.backgroundSecondary,
+    overflow: 'hidden',
   },
   productImage: {
-    height: CARD_WIDTH,
+    width: '100%',
+    height: '100%',
+    borderRadius: 0,
   },
   tradeBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
+    zIndex: 2,
+    elevation: 4,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: TarodanColors.accent,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 0,
   },
   tradeBadgeText: {
     marginLeft: 4,
@@ -979,7 +1018,7 @@ const styles = StyleSheet.create({
     right: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 0,
   },
   conditionBadgeText: {
     fontSize: 10,
@@ -993,7 +1032,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 8,
+    borderRadius: 0,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
@@ -1007,6 +1046,7 @@ const styles = StyleSheet.create({
     color: TarodanColors.textSecondary,
   },
   productContent: {
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   productTitle: {
@@ -1150,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 0,
   },
   // Sort Modal
   sortModalBackdrop: {
@@ -1160,8 +1200,8 @@ const styles = StyleSheet.create({
   },
   sortModalContent: {
     backgroundColor: TarodanColors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
     padding: 20,
     paddingBottom: 40,
   },
@@ -1169,7 +1209,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     backgroundColor: TarodanColors.border,
-    borderRadius: 2,
+    borderRadius: 0,
     alignSelf: 'center',
     marginBottom: 16,
   },

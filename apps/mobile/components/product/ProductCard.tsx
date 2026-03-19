@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface ProductCardProps {
   id: string;
@@ -9,6 +10,8 @@ interface ProductCardProps {
   image?: string;
   condition?: string;
   brand?: string;
+  /** Takas açık ürün rozeti */
+  tradeOpen?: boolean;
 }
 
 export function ProductCard({
@@ -18,6 +21,7 @@ export function ProductCard({
   image,
   condition,
   brand,
+  tradeOpen,
 }: ProductCardProps) {
   const handlePress = () => {
     router.push(`/product/${id}`);
@@ -33,8 +37,14 @@ export function ProductCard({
             <Text style={styles.placeholderText}>No Image</Text>
           </View>
         )}
+        {tradeOpen && (
+          <View style={styles.tradeBadge}>
+            <Icon name="swap-horizontal" size={11} color="#fff" />
+            <Text style={styles.tradeBadgeText}>Takas</Text>
+          </View>
+        )}
         {condition && (
-          <View style={styles.badge}>
+          <View style={[styles.badge, tradeOpen && styles.badgeWhenTrade]}>
             <Text style={styles.badgeText}>{condition}</Text>
           </View>
         )}
@@ -62,6 +72,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   imageContainer: {
+    position: 'relative',
     aspectRatio: 1,
     backgroundColor: '#f3f4f6',
   },
@@ -77,6 +88,25 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#9ca3af',
   },
+  tradeBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0d9488',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 2,
+    elevation: 3,
+  },
+  tradeBadgeText: {
+    marginLeft: 4,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   badge: {
     position: 'absolute',
     top: 8,
@@ -85,6 +115,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  badgeWhenTrade: {
+    left: undefined,
+    right: 8,
   },
   badgeText: {
     color: '#fff',

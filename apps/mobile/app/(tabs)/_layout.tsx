@@ -9,7 +9,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { getUnreadCount } = useMessagesStore();
   const unreadCount = getUnreadCount();
-  const tabBarBottom = Math.max(insets.bottom, 12);
+  const tabBarBottom = Math.max(insets.bottom, 8);
 
   return (
     <Tabs

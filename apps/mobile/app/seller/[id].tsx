@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Dimensions, Image } from 'react-native';
-import { Text, Avatar, Button, Card, Chip, Divider, ActivityIndicator } from 'react-native-paper';
+import { Text, Avatar, Button, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -242,25 +242,30 @@ export default function SellerProfileScreen() {
         {activeTab === 'listings' ? (
           <View style={styles.listingsGrid}>
             {products.map((product: any) => (
-              <Card
+              <TouchableOpacity
                 key={product.id}
                 style={styles.productCard}
+                activeOpacity={0.85}
                 onPress={() => router.push(`/product/${product.id}`)}
               >
-                <Card.Cover
-                  source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
-                  style={styles.productImage}
-                />
-                {product.tradeAvailable && (
-                  <View style={styles.tradeBadge}>
-                    <Ionicons name="swap-horizontal" size={12} color="#fff" />
-                  </View>
-                )}
-                <Card.Content style={styles.productContent}>
+                <View style={styles.productImageWrap}>
+                  <Image
+                    source={{ uri: getImageUrl(product.images) }}
+                    style={styles.productImage}
+                    resizeMode="cover"
+                  />
+                  {isProductTradeOpen(product) && (
+                    <View style={styles.tradeBadge}>
+                      <Ionicons name="swap-horizontal" size={12} color="#fff" />
+                      <Text style={styles.tradeBadgeLabel}>Takas</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.productContent}>
                   <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
                   <Text style={styles.productPrice}>₺{product.price?.toLocaleString('tr-TR')}</Text>
-                </Card.Content>
-              </Card>
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
         ) : (
@@ -490,18 +495,36 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: TarodanColors.background,
   },
-  productImage: {
+  productImageWrap: {
+    width: '100%',
     height: CARD_WIDTH,
+    position: 'relative',
+    backgroundColor: TarodanColors.backgroundSecondary,
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   tradeBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: TarodanColors.accent,
-    padding: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tradeBadgeLabel: {
+    marginLeft: 4,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
   },
   productContent: {
+    paddingHorizontal: 12,
     paddingVertical: 10,
   },
   productTitle: {
