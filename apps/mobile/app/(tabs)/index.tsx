@@ -11,6 +11,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { safeString } from '../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -212,11 +213,12 @@ export default function HomeScreen() {
   };
 
   const renderProductCard = (item: any, index: number) => {
-    // API response field isimleri: images, isTradeEnabled/trade_available, viewCount, favoriteCount
     const imageUrl = getImageUrl(item.images);
     const isTradeEnabled = item.isTradeEnabled || item.trade_available;
     const viewCount = item.viewCount || item.views || 0;
-    
+    const brandLabel = safeString(item.brand, 'Marka');
+    const scaleLabel = safeString(item.scale, '1:64');
+
     return (
       <Card
         key={item.id || index}
@@ -235,14 +237,16 @@ export default function HomeScreen() {
             </View>
           )}
           <View style={styles.likesContainer}>
-            <Ionicons name="eye-outline" size={14} color={TarodanColors.textSecondary} />
+            <Ionicons name="eye-outline" size={13} color={TarodanColors.textSecondary} />
             <Text style={styles.likesText}>{viewCount}</Text>
+            <Ionicons name="heart-outline" size={13} color={TarodanColors.textSecondary} style={{ marginLeft: 6 }} />
+            <Text style={styles.likesText}>{item.likeCount || item.likes || 0}</Text>
           </View>
         </View>
         <Card.Content style={styles.productContent}>
           <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
-          <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR') || 0}</Text>
+          <Text style={styles.productMeta}>{brandLabel} • {scaleLabel}</Text>
+          <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR') ?? '0'}</Text>
         </Card.Content>
       </Card>
     );
@@ -459,7 +463,7 @@ export default function HomeScreen() {
               )}
               <TouchableOpacity 
                 style={styles.viewGarageBtn}
-                onPress={() => router.push(`/collection/${featuredCollector.id}`)}
+                onPress={() => router.push(`/collections/${featuredCollector.id}`)}
               >
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
@@ -641,7 +645,7 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={collection.id} 
                       style={styles.companyCollectionCard}
-                      onPress={() => router.push(`/collection/${collection.id}`)}
+                      onPress={() => router.push(`/collections/${collection.id}`)}
                     >
                       {collection.coverImageUrl ? (
                         <Image
@@ -700,7 +704,7 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={collection.id} 
                   style={styles.collectionCard}
-                  onPress={() => router.push(`/collection/${collection.id}`)}
+                  onPress={() => router.push(`/collections/${collection.id}`)}
                 >
                   <Image 
                     source={{ uri: collection.coverImageUrl || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Koleksiyon' }} 
@@ -1034,19 +1038,19 @@ const styles = StyleSheet.create({
   },
   likesContainer: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    bottom: 8,
+    right: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   likesText: {
-    fontSize: 12,
+    fontSize: 11,
     color: TarodanColors.textSecondary,
-    marginLeft: 4,
+    marginLeft: 2,
     fontWeight: '500',
   },
   productContent: {

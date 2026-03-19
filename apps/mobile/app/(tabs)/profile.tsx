@@ -222,18 +222,14 @@ export default function ProfileScreen() {
             <Text style={styles.premiumDescription}>
               Sınırsız ilan, takas özelliği, Digital Garage ve daha fazlası için Premium üye olun!
             </Text>
-            <View style={styles.premiumPrice}>
-              <Text style={styles.premiumPriceLabel}>Aylık sadece</Text>
-              <Text style={styles.premiumPriceValue}>₺99</Text>
-            </View>
             <Button 
               mode="contained" 
-              onPress={() => router.push('/(auth)/register')}
+              onPress={() => router.push('/membership')}
               buttonColor={TarodanColors.star}
               style={styles.premiumButton}
               icon="crown"
             >
-              Premium Ol
+              Planları İncele
             </Button>
           </View>
 

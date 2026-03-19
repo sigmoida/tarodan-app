@@ -1,12 +1,15 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TarodanColors } from '../../src/theme';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { getUnreadCount } = useMessagesStore();
   const unreadCount = getUnreadCount();
+  const tabBarBottom = Math.max(insets.bottom, 12);
 
   return (
     <Tabs
@@ -17,9 +20,9 @@ export default function TabLayout() {
           backgroundColor: TarodanColors.background,
           borderTopColor: TarodanColors.borderLight,
           borderTopWidth: 1,
-          paddingBottom: 10,
-          paddingTop: 10,
-          height: 70,
+          paddingTop: 8,
+          paddingBottom: tabBarBottom,
+          height: 56 + tabBarBottom,
           elevation: 10,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -115,17 +118,16 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   sellButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: TarodanColors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
     shadowColor: TarodanColors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 6,
   },
   badge: {

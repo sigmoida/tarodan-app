@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { api } from '../../src/services/api';
+import { api, tradesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 
@@ -83,7 +83,7 @@ export default function TradeDetailScreen() {
 
   // Accept trade mutation
   const acceptMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/accept`),
+    mutationFn: () => tradesApi.accept(String(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -96,7 +96,7 @@ export default function TradeDetailScreen() {
 
   // Reject trade mutation
   const rejectMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/reject`),
+    mutationFn: () => tradesApi.reject(String(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -109,7 +109,9 @@ export default function TradeDetailScreen() {
 
   // Counter offer mutation
   const counterMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/counter`, {
+    mutationFn: () => tradesApi.counter(String(id), {
+      initiatorItems: [],
+      receiverItems: [],
       cashAmount: parseFloat(counterCashAmount) || 0,
       message: counterMessage,
     }),
@@ -125,7 +127,7 @@ export default function TradeDetailScreen() {
 
   // Ship trade mutation
   const shipMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/ship`, { trackingNumber }),
+    mutationFn: () => tradesApi.ship(String(id), { fromAddressId: '', carrier: trackingNumber }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setShippingModalVisible(false);
@@ -139,7 +141,7 @@ export default function TradeDetailScreen() {
 
   // Confirm receipt mutation
   const confirmMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/confirm`),
+    mutationFn: () => tradesApi.confirmReceipt(String(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setSnackbar({ visible: true, message: 'Takas tamamlandı!' });
@@ -151,7 +153,7 @@ export default function TradeDetailScreen() {
 
   // Cancel trade mutation
   const cancelMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/cancel`),
+    mutationFn: () => tradesApi.cancel(String(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -184,8 +186,8 @@ export default function TradeDetailScreen() {
   const otherParty = isInitiator ? trade.receiver : trade.initiator;
   const statusInfo = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
 
-  const initiatorItems = trade.items.filter(item => item.side === 'initiator');
-  const receiverItems = trade.items.filter(item => item.side === 'receiver');
+  const initiatorItems = (trade.items || []).filter(item => item.side === 'initiator');
+  const receiverItems = (trade.items || []).filter(item => item.side === 'receiver');
 
   const myItems = isInitiator ? initiatorItems : receiverItems;
   const theirItems = isInitiator ? receiverItems : initiatorItems;
@@ -518,7 +520,7 @@ export default function TradeDetailScreen() {
           {/* Message other party */}
           <Button
             mode="text"
-            onPress={() => router.push(`/messages/new?receiverId=${otherParty.id}`)}
+            onPress={() => router.push(`/messages/new?sellerId=${otherParty.id}`)}
             icon="chatbubble-outline"
           >
             Mesaj Gönder

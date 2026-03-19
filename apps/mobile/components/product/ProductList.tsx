@@ -7,6 +7,7 @@ import {
   Text,
 } from 'react-native';
 import { ProductCard } from './ProductCard';
+import { safeString } from '../../src/utils/safeString';
 
 interface Product {
   id: string;
@@ -41,8 +42,8 @@ export function ProductList({
         title={item.title}
         price={item.price}
         image={item.images?.[0]?.url}
-        condition={item.condition}
-        brand={item.brand}
+        condition={safeString(item.condition)}
+        brand={safeString(item.brand)}
       />
     </View>
   );

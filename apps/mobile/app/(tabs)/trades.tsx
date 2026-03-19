@@ -83,6 +83,10 @@ export default function TradesScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => {
             const statusInfo = getStatusInfo(item.status);
+            const initiatorItems = (item.items || []).filter((i: any) => i.side === 'initiator');
+            const receiverItems = (item.items || []).filter((i: any) => i.side === 'receiver');
+            const myTitle = initiatorItems[0]?.product?.title || item.offeredProduct?.title || 'Ürün';
+            const theirTitle = receiverItems[0]?.product?.title || item.requestedProduct?.title || 'Ürün';
             return (
               <Card
                 style={{ marginBottom: 12 }}
@@ -98,19 +102,19 @@ export default function TradesScreen() {
                     </Text>
                   </View>
                   
-                  <Text variant="titleMedium" numberOfLines={1}>{item.offeredProduct?.title}</Text>
+                  <Text variant="titleMedium" numberOfLines={1}>{myTitle}</Text>
                   <Text variant="bodySmall" style={{ color: theme.colors.outline }}>↔</Text>
-                  <Text variant="titleMedium" numberOfLines={1}>{item.requestedProduct?.title}</Text>
+                  <Text variant="titleMedium" numberOfLines={1}>{theirTitle}</Text>
                   
                   {item.cashAmount > 0 && (
                     <Text variant="bodyMedium" style={{ color: theme.colors.primary, marginTop: 8 }}>
-                      + ₺{item.cashAmount?.toLocaleString('tr-TR')} fark
+                      + ₺{Number(item.cashAmount).toLocaleString('tr-TR')} fark
                     </Text>
                   )}
 
-                  {item.deadline && (
+                  {(item.deadline || item.responseDeadline) && (
                     <Text variant="bodySmall" style={{ color: theme.colors.error, marginTop: 4 }}>
-                      Son: {format(new Date(item.deadline), 'dd MMM HH:mm', { locale: tr })}
+                      Son: {format(new Date(item.deadline || item.responseDeadline), 'dd MMM HH:mm', { locale: tr })}
                     </Text>
                   )}
                 </Card.Content>

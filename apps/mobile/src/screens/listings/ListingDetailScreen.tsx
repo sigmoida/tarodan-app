@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useListingsStore } from '../../stores/listingsStore';
 import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
+import { safeString } from '../../utils/safeString';
 
 const { width } = Dimensions.get('window');
 
@@ -132,11 +133,11 @@ const ListingDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.quickInfo}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Marka</Text>
-              <Text style={styles.infoValue}>{listing.brand}</Text>
+              <Text style={styles.infoValue}>{safeString(listing.brand)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Ölçek</Text>
-              <Text style={styles.infoValue}>{listing.scale}</Text>
+              <Text style={styles.infoValue}>{safeString(listing.scale)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Yıl</Text>
@@ -144,7 +145,7 @@ const ListingDetailScreen = ({ route, navigation }: any) => {
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Durum</Text>
-              <Text style={styles.infoValue}>{listing.condition}</Text>
+              <Text style={styles.infoValue}>{safeString(listing.condition)}</Text>
             </View>
           </View>
 

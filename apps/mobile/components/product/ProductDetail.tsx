@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { safeString } from '../../src/utils/safeString';
 import { transformImageUrl } from '../../utils/imageUrl';
 
 const { width } = Dimensions.get('window');
@@ -86,7 +87,7 @@ export function ProductDetail({
       <View style={styles.info}>
         <Text style={styles.title}>{product.title}</Text>
         <Text style={styles.price}>
-          {product.price.toLocaleString('tr-TR')} TL
+          {(product.price ?? 0).toLocaleString('tr-TR')} TL
         </Text>
 
         {/* Specs */}
@@ -100,19 +101,19 @@ export function ProductDetail({
           {product.brand && (
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>Marka</Text>
-              <Text style={styles.specValue}>{product.brand}</Text>
+              <Text style={styles.specValue}>{safeString(product.brand)}</Text>
             </View>
           )}
           {product.model && (
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>Model</Text>
-              <Text style={styles.specValue}>{product.model}</Text>
+              <Text style={styles.specValue}>{safeString(product.model)}</Text>
             </View>
           )}
           {product.scale && (
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>Ölçek</Text>
-              <Text style={styles.specValue}>{product.scale}</Text>
+              <Text style={styles.specValue}>{safeString(product.scale)}</Text>
             </View>
           )}
         </View>
@@ -136,7 +137,7 @@ export function ProductDetail({
                 />
               ) : (
                 <Text style={styles.avatarText}>
-                  {product.seller.displayName.charAt(0).toUpperCase()}
+                  {(product.seller.displayName || 'S').charAt(0).toUpperCase()}
                 </Text>
               )}
             </View>

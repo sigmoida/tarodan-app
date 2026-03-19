@@ -53,16 +53,11 @@ export default function SellerProfileScreen() {
   const { isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'listings' | 'reviews'>('listings');
 
-  const { data: apiSeller, isLoading } = useQuery({
+  const { data: apiSeller, isLoading, isError } = useQuery({
     queryKey: ['seller', id],
     queryFn: async () => {
-      try {
-        const response = await api.get(`/users/${id}/public`);
-        return response.data.data || response.data;
-      } catch (error) {
-        console.log('⚠️ Satıcı bilgisi yüklenemedi, mock data kullanılacak');
-        return null;
-      }
+      const response = await api.get(`/users/${id}/public`);
+      return response.data.data || response.data;
     },
     retry: 1,
   });
@@ -70,19 +65,15 @@ export default function SellerProfileScreen() {
   const { data: sellerProducts } = useQuery({
     queryKey: ['seller-products', id],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products', { params: { sellerId: id } });
-        return response.data.data || response.data || [];
-      } catch {
-        return MOCK_SELLER.products;
-      }
+      const response = await api.get('/products', { params: { sellerId: id } });
+      return response.data.data || response.data || [];
     },
     enabled: !!id,
   });
 
-  const seller = apiSeller || MOCK_SELLER;
-  const products = sellerProducts || MOCK_SELLER.products;
-  const reviews = seller.reviews || MOCK_SELLER.reviews;
+  const seller = apiSeller;
+  const products = sellerProducts || [];
+  const reviews = seller?.reviews || [];
 
   const handleMessage = () => {
     if (!isAuthenticated) {
@@ -92,11 +83,21 @@ export default function SellerProfileScreen() {
     router.push(`/messages/new?sellerId=${id}`);
   };
 
-  if (isLoading && !seller) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={TarodanColors.primary} />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (isError || !seller) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={TarodanColors.error} />
+        <Text style={{ fontSize: 16, color: TarodanColors.textSecondary, marginTop: 12 }}>Satıcı bulunamadı</Text>
+        <Button mode="contained" onPress={() => router.back()} style={{ marginTop: 16 }}>Geri Dön</Button>
       </View>
     );
   }

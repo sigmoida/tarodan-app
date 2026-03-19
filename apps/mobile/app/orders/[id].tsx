@@ -8,6 +8,7 @@ import { api } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { safeString } from '../../src/utils/safeString';
 
 interface OrderDetail {
   id: string;
@@ -237,7 +238,7 @@ export default function OrderDetailScreen() {
               <View style={styles.productInfo}>
                 <Text variant="titleSmall" numberOfLines={2}>{order.product.title}</Text>
                 <Text variant="bodySmall" style={styles.conditionText}>
-                  Durum: {order.product.condition}
+                  Durum: {safeString(order.product?.condition)}
                 </Text>
                 <Text variant="titleMedium" style={styles.productPrice}>
                   {formatPrice(order.product.price)}

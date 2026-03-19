@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { View, ScrollView, Image, Dimensions, StyleSheet, TouchableOpacity, Share } from 'react-native';
-import { Text, Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider } from 'react-native-paper';
+import { Text, Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider, Modal, Portal, TextInput as PaperInput } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { productsApi, ratingsApi, userReportsApi } from '../../src/services/api';
+import { productsApi, ratingsApi, userReportsApi, offersApi, api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { Alert } from 'react-native';
 import { useCartStore } from '../../src/stores/cartStore';
@@ -13,40 +13,11 @@ import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { TarodanColors, CONDITIONS } from '../../src/theme';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '../../src/utils/productPrice';
+import { safeString } from '../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
 
-// Mock product for demo/offline mode
-const MOCK_PRODUCT = {
-  id: '1',
-  title: 'Porsche 911 GT3 RS (Silver)',
-  description: '1:18 ölçekli, orijinal kutusunda, hiç açılmamış koleksiyonluk Porsche 911 GT3 RS modeli. AutoArt üretimi, son derece detaylı iç mekan ve motor bölümü. Kapılar, kaput ve bagaj açılabilir.',
-  price: 3200,
-  brand: 'AutoArt',
-  scale: '1:18',
-  condition: 'new',
-  category: 'Spor Araba',
-  year: '2023',
-  tradeAvailable: true,
-  viewCount: 156,
-  favoriteCount: 12,
-  images: ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Porsche+911'],
-  seller: {
-    id: 's1',
-    displayName: 'Premium Collector',
-    avatarUrl: null,
-    rating: 4.8,
-    totalSales: 127,
-    memberSince: '2023-01-15',
-    responseTime: '< 1 saat',
-    verified: true,
-  },
-  reviews: [
-    { id: 'r1', userName: 'Ahmet K.', rating: 5, comment: 'Mükemmel ürün, çok iyi paketlenmişti.', date: '2024-01-05' },
-    { id: 'r2', userName: 'Mehmet Y.', rating: 4, comment: 'Güzel model, açıklamaya uygun.', date: '2024-01-02' },
-  ],
-  createdAt: '2024-01-10',
-};
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -63,6 +34,10 @@ export default function ProductDetailScreen() {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptType, setPromptType] = useState<'favorites' | 'message' | 'purchase' | 'trade' | 'collections' | null>(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const [offerLoading, setOfferLoading] = useState(false);
 
   // Check if product is in favorites when authenticated
   useEffect(() => {
@@ -72,6 +47,12 @@ export default function ProductDetailScreen() {
       });
     }
   }, [isAuthenticated, productId]);
+
+  useEffect(() => {
+    if (productId) {
+      api.post(`/products/${productId}/view`).catch(() => {});
+    }
+  }, [productId]);
 
   // Track product view for guests
   useEffect(() => {
@@ -91,44 +72,47 @@ export default function ProductDetailScreen() {
     }
   }, [id, isAuthenticated]);
 
-  // Web ile aynı endpoint: GET /products/:id
-  const { data: apiProduct, isLoading } = useQuery({
+  const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', id],
     queryFn: async () => {
-      try {
-        const response = await productsApi.getOne(productId);
-        const product = response.data.data || response.data;
-        console.log('📦 Ürün detayı yüklendi:', product?.title);
-        return product;
-      } catch (error) {
-        console.log('⚠️ Ürün detayı yüklenemedi, mock data kullanılacak');
-        return null;
-      }
+      const response = await productsApi.getOne(productId);
+      return response.data.data || response.data;
     },
     retry: 1,
   });
 
-  // Web ile aynı endpoint: GET /ratings/products/:id
   const { data: reviews } = useQuery({
     queryKey: ['product-reviews', id],
     queryFn: async () => {
-      try {
-        const response = await ratingsApi.getProductRatings(productId);
-        return response.data.data || response.data || [];
-      } catch {
-        return MOCK_PRODUCT.reviews;
-      }
+      const response = await ratingsApi.getProductRatings(productId);
+      return response.data.data || response.data || [];
     },
     enabled: !!id,
   });
 
-  // Use API data or fallback to mock
-  const product = apiProduct || MOCK_PRODUCT;
-  // Transform image URLs to use network IP instead of localhost
+  if (isLoading && !product) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Text style={styles.loadingText}>Yükleniyor...</Text>
+      </View>
+    );
+  }
+  if (isError || !product) {
+    return (
+      <View style={[styles.loadingContainer, { padding: 24 }]}>
+        <Ionicons name="alert-circle-outline" size={48} color={TarodanColors.error} />
+        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: '600', marginTop: 16 }]}>Ürün bulunamadı</Text>
+        <Button mode="contained" onPress={() => router.back()} style={{ marginTop: 16 }}>Geri Dön</Button>
+      </View>
+    );
+  }
+
   const images = product.images?.length > 0 
     ? product.images.map((img: any) => {
-        const url = typeof img === 'string' ? img : img.url;
-        return typeof img === 'string' ? transformImageUrl(url) : { ...img, url: transformImageUrl(url) };
+        if (typeof img === 'string') return transformImageUrl(img);
+        const url = img.detailUrl || img.cardUrl || img.url || img.imageUrl;
+        return { ...img, url: transformImageUrl(url) };
       })
     : ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'];
 
@@ -142,14 +126,51 @@ export default function ProductDetailScreen() {
       title: product.title,
       price: product.price,
       imageUrl: typeof images[0] === 'string' ? images[0] : images[0]?.url || getImageUrlFromUtils(product.images),
-      brand: product.brand,
-      scale: product.scale,
+      brand: safeString(product.brand),
+      scale: safeString(product.scale),
       seller: {
         id: product.seller?.id || 'unknown',
         displayName: product.seller?.displayName || 'Satıcı',
       },
     });
     setSnackbar({ visible: true, message: 'Ürün sepete eklendi!', type: 'success' });
+  };
+
+  const handleBuyNow = () => {
+    router.push(`/checkout?productId=${product.id}`);
+  };
+
+  const handleMakeOffer = () => {
+    if (!isAuthenticated) {
+      setSnackbar({ visible: true, message: 'Teklif vermek için giriş yapın', type: 'error' });
+      setTimeout(() => router.push('/(auth)/login'), 1500);
+      return;
+    }
+    if (product.seller?.id === user?.id) {
+      setSnackbar({ visible: true, message: 'Kendi ürününüze teklif veremezsiniz', type: 'error' });
+      return;
+    }
+    setOfferAmount('');
+    setOfferMessage('');
+    setShowOfferModal(true);
+  };
+
+  const submitOffer = async () => {
+    const amount = parseFloat(offerAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert('Uyarı', 'Geçerli bir teklif tutarı girin');
+      return;
+    }
+    setOfferLoading(true);
+    try {
+      await offersApi.create({ productId: product.id, amount, message: offerMessage || undefined });
+      setShowOfferModal(false);
+      setSnackbar({ visible: true, message: 'Teklifiniz gönderildi!', type: 'success' });
+    } catch (err: any) {
+      Alert.alert('Hata', err.response?.data?.message || 'Teklif gönderilemedi');
+    } finally {
+      setOfferLoading(false);
+    }
   };
 
   const handleFavorite = async () => {
@@ -201,7 +222,7 @@ export default function ProductDetailScreen() {
       setTimeout(() => router.push('/(auth)/login'), 1500);
       return;
     }
-    router.push(`/trade/create?productId=${id}`);
+    router.push(`/trade/new?productId=${id}&targetSellerId=${product.seller?.id || ''}`);
   };
 
   const handleShare = async () => {
@@ -258,15 +279,6 @@ export default function ProductDetailScreen() {
     );
   };
 
-  if (isLoading && !product) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
-      </View>
-    );
-  }
-
   const conditionInfo = getConditionInfo(product.condition);
 
   return (
@@ -314,11 +326,11 @@ export default function ProductDetailScreen() {
           scrollEventThrottle={16}
         >
           {images.map((img: any, index: number) => {
-            const uri = typeof img === 'string' ? img : img.url;
+            const uri = typeof img === 'string' ? img : (img.detailUrl || img.cardUrl || img.url || img.imageUrl);
             return (
               <Image
                 key={index}
-                source={{ uri }}
+                source={{ uri: transformImageUrl(uri) }}
                 style={styles.productImage}
                 resizeMode="contain"
               />
@@ -345,7 +357,7 @@ export default function ProductDetailScreen() {
         <View style={styles.mainContent}>
           {/* Badges */}
           <View style={styles.badgeRow}>
-            {product.tradeAvailable && (
+            {(product.tradeAvailable || product.trade_available || product.isTradeEnabled) && (
               <View style={[styles.badge, { backgroundColor: TarodanColors.accent }]}>
                 <Ionicons name="swap-horizontal" size={14} color="#fff" />
                 <Text style={styles.badgeText}>Takas Açık</Text>
@@ -358,7 +370,14 @@ export default function ProductDetailScreen() {
 
           {/* Title & Price */}
           <Text style={styles.title}>{product.title}</Text>
-          <Text style={styles.price}>₺{product.price?.toLocaleString('tr-TR')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.price}>₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</Text>
+            {isProductOnSaleDisplay(product) && (
+              <Text style={{ fontSize: 16, color: TarodanColors.textSecondary, textDecorationLine: 'line-through' }}>
+                ₺{getProductOriginalPriceForDisplay(product).toLocaleString('tr-TR')}
+              </Text>
+            )}
+          </View>
 
           {/* Quick Info */}
           <View style={styles.quickInfo}>
@@ -386,11 +405,11 @@ export default function ProductDetailScreen() {
             <View style={styles.specGrid}>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Marka</Text>
-                <Text style={styles.specValue}>{product.brand}</Text>
+                <Text style={styles.specValue}>{safeString(product.brand)}</Text>
               </View>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Ölçek</Text>
-                <Text style={styles.specValue}>{product.scale}</Text>
+                <Text style={styles.specValue}>{safeString(product.scale)}</Text>
               </View>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Durum</Text>
@@ -485,12 +504,12 @@ export default function ProductDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Değerlendirmeler</Text>
-              <TouchableOpacity onPress={() => router.push(`/product/${id}/reviews`)}>
+              <TouchableOpacity onPress={() => Alert.alert('Değerlendirmeler', 'Tüm değerlendirmeler bu üründe gösterilmektedir.')}>
                 <Text style={styles.seeAll}>Tümünü Gör</Text>
               </TouchableOpacity>
             </View>
 
-            {(Array.isArray(reviews) && reviews.length > 0 ? reviews : MOCK_PRODUCT.reviews || []).slice(0, 2).map((review: any) => (
+            {(Array.isArray(reviews) && reviews.length > 0 ? reviews : []).slice(0, 2).map((review: any) => (
               <View key={review.id} style={styles.reviewCard}>
                 <View style={styles.reviewHeader}>
                   <Text style={styles.reviewerName}>{review.userName}</Text>
@@ -512,7 +531,7 @@ export default function ProductDetailScreen() {
               </View>
             ))}
 
-            {(!Array.isArray(reviews) || reviews.length === 0) && (!MOCK_PRODUCT.reviews || MOCK_PRODUCT.reviews.length === 0) && (
+            {(!Array.isArray(reviews) || reviews.length === 0) && (
               <Text style={styles.noReviews}>Henüz değerlendirme yok</Text>
             )}
           </View>
@@ -536,10 +555,21 @@ export default function ProductDetailScreen() {
       <View style={styles.bottomBar}>
         <View style={styles.bottomPrice}>
           <Text style={styles.bottomPriceLabel}>Fiyat</Text>
-          <Text style={styles.bottomPriceValue}>₺{product.price?.toLocaleString('tr-TR')}</Text>
+          <Text style={styles.bottomPriceValue}>₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</Text>
         </View>
         <View style={styles.bottomButtons}>
-          {product.tradeAvailable && (
+          {product.seller?.id !== user?.id && (
+            <Button
+              mode="outlined"
+              onPress={handleMakeOffer}
+              style={styles.tradeButton}
+              labelStyle={styles.tradeButtonLabel}
+              icon="tag-outline"
+            >
+              Teklif Ver
+            </Button>
+          )}
+          {(product.tradeAvailable || product.trade_available || product.isTradeEnabled) && (
             <Button
               mode="outlined"
               onPress={handleTrade}
@@ -552,15 +582,53 @@ export default function ProductDetailScreen() {
           )}
           <Button
             mode="contained"
-            onPress={handleAddToCart}
+            onPress={handleBuyNow}
             buttonColor={TarodanColors.primary}
             style={styles.cartButton}
-            icon="cart"
+            icon="flash"
           >
-            Sepete Ekle
+            Hemen Al
           </Button>
         </View>
       </View>
+
+      <Portal>
+        <Modal
+          visible={showOfferModal}
+          onDismiss={() => setShowOfferModal(false)}
+          contentContainerStyle={{ backgroundColor: TarodanColors.background, margin: 20, padding: 20, borderRadius: 12 }}
+        >
+          <Text variant="titleLarge" style={{ marginBottom: 4, textAlign: 'center' }}>Teklif Ver</Text>
+          <Text variant="bodySmall" style={{ textAlign: 'center', color: TarodanColors.textLight, marginBottom: 16 }}>
+            Listelenen fiyat: ₺{Number(product?.price || 0).toLocaleString('tr-TR')}
+          </Text>
+          <PaperInput
+            label="Teklif Tutarı (₺)"
+            value={offerAmount}
+            onChangeText={setOfferAmount}
+            keyboardType="numeric"
+            mode="outlined"
+            textColor={TarodanColors.textPrimary}
+            style={{ marginBottom: 12, backgroundColor: TarodanColors.background }}
+            theme={{ colors: { onSurfaceVariant: TarodanColors.textSecondary, onSurface: TarodanColors.textPrimary } }}
+          />
+          <PaperInput
+            label="Mesajınız (opsiyonel)"
+            value={offerMessage}
+            onChangeText={setOfferMessage}
+            multiline
+            numberOfLines={3}
+            mode="outlined"
+            textColor={TarodanColors.textPrimary}
+            style={{ marginBottom: 16, backgroundColor: TarodanColors.background }}
+            theme={{ colors: { onSurfaceVariant: TarodanColors.textSecondary, onSurface: TarodanColors.textPrimary } }}
+          />
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+            <Button mode="outlined" onPress={() => setShowOfferModal(false)}>İptal</Button>
+            <Button mode="contained" onPress={submitOffer} loading={offerLoading} disabled={offerLoading}>Gönder</Button>
+          </View>
+        </Modal>
+      </Portal>
 
       <Snackbar
         visible={snackbar.visible}
@@ -862,40 +930,43 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: TarodanColors.background,
     borderTopWidth: 1,
     borderTopColor: TarodanColors.border,
   },
   bottomPrice: {
-    marginRight: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   bottomPriceLabel: {
     fontSize: 12,
     color: TarodanColors.textSecondary,
   },
   bottomPriceValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: TarodanColors.price,
   },
   bottomButtons: {
-    flex: 1,
     flexDirection: 'row',
     gap: 8,
   },
   tradeButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     borderColor: TarodanColors.primary,
+    borderWidth: 1.5,
   },
   tradeButtonLabel: {
     color: TarodanColors.primary,
+    fontSize: 13,
   },
   cartButton: {
-    flex: 2,
-    borderRadius: 12,
+    flex: 1,
+    borderRadius: 10,
   },
 });

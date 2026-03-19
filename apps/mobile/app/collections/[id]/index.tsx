@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { TarodanColors } from '../../../src/theme';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
+import { safeString } from '../../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
 
@@ -257,7 +258,7 @@ export default function CollectionDetailScreen() {
                 />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.itemMeta}>{item.brand} • {item.scale}</Text>
+                  <Text style={styles.itemMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
                   {item.year && (
                     <Text style={styles.itemYear}>Model: {item.year}</Text>
                   )}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput } from 'react-native';
+import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput, Image } from 'react-native';
 import { Text, Card, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,7 @@ import { productsApi, searchApi } from '../../src/services/api';
 import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
 import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { safeString } from '../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -24,7 +25,7 @@ export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState((params.q as string) || '');
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [sortBy, setSortBy] = useState('newest');
-  const [category, setCategory] = useState((params.category as string) || '');
+  const [category, setCategory] = useState((params.categoryId as string) || (params.category as string) || '');
   const [selectedBrands, setSelectedBrands] = useState<string[]>(
     params.brand ? [params.brand as string] : []
   );
@@ -42,7 +43,54 @@ export default function SearchScreen() {
   const { searches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
   const recentSearchQueries = searches.map((s) => s.query);
 
-  // Save search when user submits
+  // Akıllı arama önerileri (web ile aynı)
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { data: autocompleteData } = useQuery({
+    queryKey: ['autocomplete-rich', searchQuery],
+    queryFn: async () => {
+      try {
+        const res = await searchApi.autocompleteRich(searchQuery);
+        return res.data?.data || res.data || {};
+      } catch {
+        return {};
+      }
+    },
+    enabled: searchQuery.length >= 2,
+    staleTime: 60000,
+  });
+
+  const suggestionItems = useMemo(() => {
+    if (!autocompleteData || searchQuery.length < 2) return [];
+    const items: Array<{ type: string; id: string; label: string; route: string }> = [];
+    (autocompleteData.products || []).slice(0, 5).forEach((p: any) =>
+      items.push({ type: 'product', id: p.id, label: p.title || p.name, route: `/product/${p.id}` })
+    );
+    (autocompleteData.brands || []).slice(0, 4).forEach((b: any) =>
+      items.push({ type: 'brand', id: b.id || b.name, label: b.name, route: `/(tabs)/search?brand=${encodeURIComponent(b.name)}` })
+    );
+    (autocompleteData.categories || []).slice(0, 4).forEach((c: any) =>
+      items.push({ type: 'category', id: c.id, label: c.name, route: `/(tabs)/search?categoryId=${c.id}` })
+    );
+    (autocompleteData.manufacturers || []).slice(0, 4).forEach((m: any) =>
+      items.push({ type: 'manufacturer', id: m.id || m.name, label: m.name, route: `/(tabs)/search?q=${encodeURIComponent(m.name)}` })
+    );
+    (autocompleteData.scales || []).slice(0, 3).forEach((s: string) =>
+      items.push({ type: 'scale', id: s, label: s, route: `/(tabs)/search?scale=${encodeURIComponent(s)}` })
+    );
+    items.push({ type: 'search', id: '__all__', label: `"${searchQuery}" ile ara`, route: `/(tabs)/search?q=${encodeURIComponent(searchQuery)}` });
+    return items;
+  }, [autocompleteData, searchQuery]);
+
+  useEffect(() => {
+    if (params.q && params.q !== searchQuery) {
+      setSearchQuery(params.q as string);
+      setDebouncedQuery(params.q as string);
+    }
+    if (params.categoryId) setCategory(params.categoryId as string);
+    if (params.brand) setSelectedBrands([params.brand as string]);
+    if (params.scale) setSelectedScales([params.scale as string]);
+  }, [params.q, params.categoryId, params.brand, params.scale]);
+
   useEffect(() => {
     if (debouncedQuery && debouncedQuery.length >= 2) {
       addSearch(debouncedQuery);
@@ -198,36 +246,49 @@ export default function SearchScreen() {
   }, [selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly, category]);
 
   const renderProduct = ({ item }: { item: any }) => {
-    // Image URL extraction - handle both string and object formats with URL transformation
     const imageUrl = getImageUrlFromUtils(item.images);
+    const viewCount = item.viewCount || item.views || 0;
+    const likeCount = item.likeCount || item.likes || 0;
     
     return (
     <Card
       style={styles.productCard}
       onPress={() => handleProductPress(item.id)}
     >
-      <Card.Cover
-        source={{ uri: imageUrl }}
-        style={styles.productImage}
-      />
-      {item.tradeAvailable && (
-        <View style={styles.tradeBadge}>
-          <Ionicons name="swap-horizontal" size={12} color="#fff" />
-          <Text style={styles.tradeBadgeText}>Takas</Text>
+      <View>
+        <Card.Cover
+          source={{ uri: imageUrl }}
+          style={styles.productImage}
+        />
+        {(item.tradeAvailable || item.trade_available) && (
+          <View style={styles.tradeBadge}>
+            <Ionicons name="swap-horizontal" size={12} color="#fff" />
+            <Text style={styles.tradeBadgeText}>Takas</Text>
+          </View>
+        )}
+        {item.condition === 'new' && (
+          <View style={[styles.conditionBadge, { backgroundColor: TarodanColors.badgeNew }]}>
+            <Text style={styles.conditionBadgeText}>Sıfır</Text>
+          </View>
+        )}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Ionicons name="eye-outline" size={12} color={TarodanColors.textSecondary} />
+            <Text style={styles.statText}>{viewCount}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="heart-outline" size={12} color={TarodanColors.textSecondary} />
+            <Text style={styles.statText}>{likeCount}</Text>
+          </View>
         </View>
-      )}
-      {item.condition === 'new' && (
-        <View style={[styles.conditionBadge, { backgroundColor: TarodanColors.badgeNew }]}>
-          <Text style={styles.conditionBadgeText}>Sıfır</Text>
-        </View>
-      )}
+      </View>
       <Card.Content style={styles.productContent}>
         <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.productMeta}>
-          {item.brand} • {item.scale}
+          {safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}
         </Text>
         <Text style={styles.productPrice}>
-          ₺{item.price?.toLocaleString('tr-TR')}
+          ₺{(item.price ?? 0).toLocaleString('tr-TR')}
         </Text>
       </Card.Content>
     </Card>
@@ -238,7 +299,11 @@ export default function SearchScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ara</Text>
+        <Image 
+          source={require('../../assets/tarodan-logo.jpg')} 
+          style={{ width: 120, height: 36 }}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Search Bar */}
@@ -247,6 +312,8 @@ export default function SearchScreen() {
           placeholder="Model, marka veya anahtar kelime..."
           value={searchQuery}
           onChangeText={handleSearchChange}
+          onSubmitEditing={() => setDebouncedQuery(searchQuery)}
+          onIconPress={() => setDebouncedQuery(searchQuery)}
           onFocus={() => setShowRecentSearches(true)}
           onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
           style={styles.searchBar}
@@ -254,8 +321,8 @@ export default function SearchScreen() {
           iconColor={TarodanColors.textSecondary}
         />
         
-        {/* Recent Searches Dropdown */}
-        {showRecentSearches && recentSearchQueries.length > 0 && !searchQuery && (
+        {/* Recent Searches / Akıllı öneriler */}
+        {showRecentSearches && !searchQuery && recentSearchQueries.length > 0 && (
           <View style={styles.recentSearchesDropdown}>
             <View style={styles.recentSearchesHeader}>
               <Text style={styles.recentSearchesTitle}>Son Aramalar</Text>
@@ -277,6 +344,43 @@ export default function SearchScreen() {
                 >
                   <Ionicons name="close" size={18} color={TarodanColors.textLight} />
                 </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.suggestionsSection}>
+              <Text style={styles.suggestionsSectionTitle}>Popüler aramalar</Text>
+              <View style={styles.popularChips}>
+                {['Hot Wheels', '1:18 ölçek', 'Ferrari', 'Matchbox', 'Porsche'].map((q) => (
+                  <Chip key={q} style={styles.popularChip} onPress={() => handleRecentSearchSelect(q)} compact>
+                    {q}
+                  </Chip>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+        {/* Akıllı arama önerileri (yazarken) */}
+        {showRecentSearches && searchQuery.length >= 2 && suggestionItems.length > 0 && (
+          <View style={styles.recentSearchesDropdown}>
+            <View style={styles.recentSearchesHeader}>
+              <Text style={styles.recentSearchesTitle}>Öneriler</Text>
+            </View>
+            {suggestionItems.map((item) => (
+              <TouchableOpacity
+                key={item.id + item.label}
+                style={styles.recentSearchItem}
+                onPress={() => {
+                  addSearch(searchQuery);
+                  setShowRecentSearches(false);
+                  router.push(item.route as any);
+                }}
+              >
+                <Ionicons
+                  name={item.type === 'product' ? 'car-outline' : item.type === 'search' ? 'search-outline' : 'pricetag-outline'}
+                  size={18}
+                  color={TarodanColors.textSecondary}
+                />
+                <Text style={styles.recentSearchText} numberOfLines={1}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={18} color={TarodanColors.textTertiary} />
               </TouchableOpacity>
             ))}
           </View>
@@ -671,13 +775,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: TarodanColors.primary,
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 12,
     paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchSection: {
     padding: 16,
@@ -734,6 +835,25 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 14,
     color: TarodanColors.textPrimary,
+  },
+  suggestionsSection: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: TarodanColors.border,
+  },
+  suggestionsSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TarodanColors.textTertiary,
+    marginBottom: 8,
+  },
+  popularChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  popularChip: {
+    marginRight: 0,
   },
   searchBar: {
     backgroundColor: TarodanColors.surfaceVariant,
@@ -865,6 +985,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  statsRow: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  statText: {
+    fontSize: 11,
+    color: TarodanColors.textSecondary,
   },
   productContent: {
     paddingVertical: 12,

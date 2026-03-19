@@ -10,112 +10,6 @@ import { transformImageUrl } from '../../src/utils/imageUrl';
 
 const { width } = Dimensions.get('window');
 
-// Mock collections for demo
-const MOCK_COLLECTIONS = [
-  {
-    id: 'c1',
-    name: 'Ferrari Koleksiyonu',
-    description: 'Klasik ve modern Ferrari modelleri',
-    coverImage: 'https://placehold.co/400x300/e74c3c/ffffff?text=Ferrari',
-    itemCount: 24,
-    viewCount: 1250,
-    likeCount: 89,
-    owner: {
-      id: 'u1',
-      displayName: 'CarCollector',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2024-01-15',
-  },
-  {
-    id: 'c2',
-    name: 'Vintage Hot Wheels',
-    description: '1970-1990 dönemi nadir Hot Wheels modelleri',
-    coverImage: 'https://placehold.co/400x300/3498db/ffffff?text=Hot+Wheels',
-    itemCount: 156,
-    viewCount: 3450,
-    likeCount: 245,
-    owner: {
-      id: 'u2',
-      displayName: 'HotWheelsMaster',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2023-11-20',
-  },
-  {
-    id: 'c3',
-    name: 'JDM Legends',
-    description: 'Japon spor arabaları 1:18 ve 1:24 ölçek',
-    coverImage: 'https://placehold.co/400x300/2ecc71/ffffff?text=JDM',
-    itemCount: 38,
-    viewCount: 890,
-    likeCount: 67,
-    owner: {
-      id: 'u3',
-      displayName: 'JDMFan',
-      avatarUrl: null,
-      verified: false,
-    },
-    createdAt: '2024-01-02',
-  },
-  {
-    id: 'c4',
-    name: 'Porsche Through Ages',
-    description: '356\'dan 992\'ye Porsche tarihi',
-    coverImage: 'https://placehold.co/400x300/f39c12/ffffff?text=Porsche',
-    itemCount: 45,
-    viewCount: 2100,
-    likeCount: 178,
-    owner: {
-      id: 'u4',
-      displayName: 'PorscheLover',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2023-12-10',
-  },
-  {
-    id: 'c5',
-    name: 'Muscle Cars USA',
-    description: 'Amerikan kas arabaları koleksiyonu',
-    coverImage: 'https://placehold.co/400x300/9b59b6/ffffff?text=Muscle',
-    itemCount: 62,
-    viewCount: 1780,
-    likeCount: 134,
-    owner: {
-      id: 'u5',
-      displayName: 'MuscleKing',
-      avatarUrl: null,
-      verified: false,
-    },
-    createdAt: '2023-10-05',
-  },
-];
-
-const FEATURED_GARAGES = [
-  {
-    id: 'g1',
-    userName: 'Premium Collector',
-    totalItems: 245,
-    totalCollections: 8,
-    totalLikes: 1250,
-    avatarUrl: null,
-    verified: true,
-    featuredCollection: MOCK_COLLECTIONS[0],
-  },
-  {
-    id: 'g2',
-    userName: 'HotWheelsMaster',
-    totalItems: 512,
-    totalCollections: 15,
-    totalLikes: 3450,
-    avatarUrl: null,
-    verified: true,
-    featuredCollection: MOCK_COLLECTIONS[1],
-  },
-];
 
 export default function CollectionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,21 +18,18 @@ export default function CollectionsScreen() {
   const { data: apiCollections, isLoading } = useQuery({
     queryKey: ['collections', searchQuery, activeFilter],
     queryFn: async () => {
-      try {
-        const response = await api.get('/collections/browse', {
-          params: {
-            q: searchQuery || undefined,
-            sort: activeFilter === 'popular' ? 'popular' : activeFilter === 'recent' ? 'newest' : undefined,
-          },
-        });
-        return response.data.data || response.data || [];
-      } catch {
-        return null;
-      }
+      const response = await api.get('/collections/browse', {
+        params: {
+          q: searchQuery || undefined,
+          sort: activeFilter === 'popular' ? 'popular' : activeFilter === 'recent' ? 'newest' : undefined,
+        },
+      });
+      const d = response.data;
+      return d?.collections || d?.data || (Array.isArray(d) ? d : []);
     },
   });
 
-  const collections = Array.isArray(apiCollections) ? apiCollections : MOCK_COLLECTIONS;
+  const collections = Array.isArray(apiCollections) ? apiCollections : [];
 
   const filteredCollections = collections.filter((c: any) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -151,7 +42,7 @@ export default function CollectionsScreen() {
       onPress={() => router.push(`/collections/${item.id}`)}
     >
       <Image
-        source={{ uri: transformImageUrl(item.coverImage) }}
+        source={{ uri: transformImageUrl(item.coverImageUrl || item.coverImage) }}
         style={styles.collectionImage}
         resizeMode="cover"
       />
@@ -159,11 +50,11 @@ export default function CollectionsScreen() {
         <View style={styles.collectionStats}>
           <View style={styles.collectionStat}>
             <Ionicons name="images-outline" size={14} color="#fff" />
-            <Text style={styles.collectionStatText}>{item.itemCount}</Text>
+            <Text style={styles.collectionStatText}>{item.itemCount ?? 0}</Text>
           </View>
           <View style={styles.collectionStat}>
             <Ionicons name="heart" size={14} color="#fff" />
-            <Text style={styles.collectionStatText}>{item.likeCount}</Text>
+            <Text style={styles.collectionStatText}>{item.likeCount ?? 0}</Text>
           </View>
         </View>
       </View>
@@ -175,13 +66,10 @@ export default function CollectionsScreen() {
         <View style={styles.ownerRow}>
           <Avatar.Text
             size={24}
-            label={item.owner?.displayName?.substring(0, 2).toUpperCase() || 'U'}
+            label={(item.user?.displayName || item.owner?.displayName || item.userName || 'U').substring(0, 2).toUpperCase()}
             style={{ backgroundColor: TarodanColors.primary }}
           />
-          <Text style={styles.ownerName}>{item.owner?.displayName}</Text>
-          {item.owner?.verified && (
-            <Ionicons name="checkmark-circle" size={14} color={TarodanColors.accent} />
-          )}
+          <Text style={styles.ownerName}>{item.user?.displayName || item.owner?.displayName || item.userName || ''}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -239,51 +127,9 @@ export default function CollectionsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Featured Digital Garages */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🏆 Öne Çıkan Garajlar</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Tümü</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {FEATURED_GARAGES.map((garage) => (
-              <TouchableOpacity
-                key={garage.id}
-                style={styles.garageCard}
-                onPress={() => router.push(`/garage/${garage.id}`)}
-              >
-                <View style={styles.garageHeader}>
-                  <Avatar.Text
-                    size={48}
-                    label={garage.userName?.substring(0, 2).toUpperCase()}
-                    style={{ backgroundColor: TarodanColors.primary }}
-                  />
-                  {garage.verified && (
-                    <View style={styles.verifiedBadge}>
-                      <Ionicons name="checkmark-circle" size={18} color={TarodanColors.accent} />
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.garageName}>{garage.userName}</Text>
-                <View style={styles.garageStats}>
-                  <Text style={styles.garageStatText}>{garage.totalItems} model</Text>
-                  <Text style={styles.garageStatDot}>•</Text>
-                  <Text style={styles.garageStatText}>{garage.totalCollections} koleksiyon</Text>
-                </View>
-                <View style={styles.garageLikes}>
-                  <Ionicons name="heart" size={14} color={TarodanColors.error} />
-                  <Text style={styles.garageLikesText}>{garage.totalLikes}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* Collections Grid */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📚 Koleksiyonlar</Text>
+          <Text style={styles.sectionTitle}>Koleksiyonlar</Text>
           {isLoading ? (
             <ActivityIndicator size="large" color={TarodanColors.primary} style={{ marginTop: 40 }} />
           ) : (
@@ -397,59 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TarodanColors.primary,
     fontWeight: '500',
-  },
-  garageCard: {
-    backgroundColor: TarodanColors.background,
-    borderRadius: 16,
-    padding: 16,
-    marginRight: 12,
-    width: 160,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  garageHeader: {
-    position: 'relative',
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: -4,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 10,
-  },
-  garageName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginTop: 12,
-  },
-  garageStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  garageStatText: {
-    fontSize: 12,
-    color: TarodanColors.textSecondary,
-  },
-  garageStatDot: {
-    marginHorizontal: 4,
-    color: TarodanColors.textSecondary,
-  },
-  garageLikes: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 4,
-  },
-  garageLikesText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
   },
   collectionRow: {
     justifyContent: 'space-between',

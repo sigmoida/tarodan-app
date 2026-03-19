@@ -8,17 +8,20 @@ import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { canPerformAction, getUpgradeMessage } from '../../src/utils/membershipLimits';
+import { getImageUrl } from '../../src/utils/imageUrl';
 
 interface Product {
   id: string;
   title: string;
   price: number;
-  images: { url: string }[];
-  isTradeEnabled: boolean;
+  images?: any[];
+  isTradeEnabled?: boolean;
 }
 
 export default function NewTradeScreen() {
-  const { targetProductId, targetSellerId } = useLocalSearchParams();
+  const params = useLocalSearchParams<{ targetProductId?: string; targetSellerId?: string }>();
+  const targetProductId = params.targetProductId;
+  const targetSellerIdParam = params.targetSellerId;
   const { user, isAuthenticated, limits } = useAuthStore();
   const queryClient = useQueryClient();
   
@@ -32,14 +35,26 @@ export default function NewTradeScreen() {
 
   const canTrade = limits?.canTrade || false;
 
+  // When only productId is passed, fetch product to get seller id
+  const { data: targetProduct } = useQuery({
+    queryKey: ['trade-target-product', targetProductId],
+    queryFn: async () => {
+      const res = await api.get(`/products/${targetProductId}`);
+      return res.data?.data || res.data?.product || res.data;
+    },
+    enabled: !!targetProductId && !targetSellerIdParam && canTrade,
+  });
+  const targetSellerId = (targetSellerIdParam && String(targetSellerIdParam).trim()) || targetProduct?.seller?.id || '';
+
   // Fetch my tradeable products
   const { data: myProducts, isLoading: loadingMyProducts } = useQuery({
     queryKey: ['my-tradeable-products'],
     queryFn: async () => {
       const response = await api.get('/products', { 
-        params: { sellerId: user?.id, isTradeEnabled: true, status: 'active' } 
+        params: { sellerId: user?.id, tradeAvailable: true, status: 'active' } 
       });
-      return response.data?.data || response.data || [];
+      const raw = response.data?.data || response.data?.products || response.data || [];
+      return Array.isArray(raw) ? raw : [];
     },
     enabled: isAuthenticated && canTrade,
   });
@@ -49,20 +64,20 @@ export default function NewTradeScreen() {
     queryKey: ['seller-tradeable-products', targetSellerId],
     queryFn: async () => {
       const response = await api.get('/products', { 
-        params: { sellerId: targetSellerId, isTradeEnabled: true, status: 'active' } 
+        params: { sellerId: targetSellerId, tradeAvailable: true, status: 'active' } 
       });
-      return response.data?.data || response.data || [];
+      const raw = response.data?.data || response.data?.products || response.data || [];
+      return Array.isArray(raw) ? raw : [];
     },
     enabled: !!targetSellerId && canTrade,
   });
 
-  // Pre-select target product if provided
+  // Pre-select target product when their products load
   useEffect(() => {
-    if (targetProductId && theirProducts) {
-      const targetProduct = theirProducts.find((p: Product) => p.id === targetProductId);
-      if (targetProduct && !selectedTheirItems.find(p => p.id === targetProductId)) {
-        setSelectedTheirItems([targetProduct]);
-      }
+    if (!targetProductId || !theirProducts?.length) return;
+    const target = theirProducts.find((p: Product) => p.id === targetProductId);
+    if (target) {
+      setSelectedTheirItems((prev) => (prev.some((p) => p.id === targetProductId) ? prev : [target]));
     }
   }, [targetProductId, theirProducts]);
 
@@ -329,6 +344,10 @@ export default function NewTradeScreen() {
                   keyboardType="numeric"
                   mode="outlined"
                   style={styles.cashInput}
+                  textColor={TarodanColors.textPrimary}
+                  outlineColor={TarodanColors.border}
+                  activeOutlineColor={TarodanColors.primary}
+                  theme={{ colors: { onSurfaceVariant: TarodanColors.textSecondary } }}
                 />
               </Card.Content>
             </Card>
@@ -364,7 +383,7 @@ export default function NewTradeScreen() {
                 {selectedMyItems.map((product) => (
                   <View key={product.id} style={styles.summaryItem}>
                     <Image
-                      source={{ uri: product.images?.[0]?.url || 'https://via.placeholder.com/40' }}
+                      source={{ uri: getImageUrl(product.images) }}
                       style={styles.summaryImage}
                     />
                     <Text variant="bodySmall" style={styles.summaryItemTitle} numberOfLines={1}>
@@ -394,7 +413,7 @@ export default function NewTradeScreen() {
                 {selectedTheirItems.map((product) => (
                   <View key={product.id} style={styles.summaryItem}>
                     <Image
-                      source={{ uri: product.images?.[0]?.url || 'https://via.placeholder.com/40' }}
+                      source={{ uri: getImageUrl(product.images) }}
                       style={styles.summaryImage}
                     />
                     <Text variant="bodySmall" style={styles.summaryItemTitle} numberOfLines={1}>

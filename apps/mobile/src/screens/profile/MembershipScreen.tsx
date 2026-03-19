@@ -132,7 +132,7 @@ const MembershipScreen = () => {
               {plan.price > 0 ? (
                 <>
                   <Text style={[styles.planPrice, { color: plan.color }]}>
-                    ₺{plan.price.toFixed(2)}
+                    ₺{(plan.price ?? 0).toFixed(2)}
                   </Text>
                   <Text style={styles.planPeriod}>{plan.period}</Text>
                 </>

@@ -34,6 +34,7 @@ type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | '
 
 export default function OrdersScreen() {
   const { isAuthenticated } = useAuthStore();
+  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [ratingModal, setRatingModal] = useState<{
@@ -44,14 +45,13 @@ export default function OrdersScreen() {
 
   // Fetch orders
   const { data: ordersData, isLoading, refetch } = useQuery({
-    queryKey: ['orders', 'buyer', filter],
+    queryKey: ['orders', role, filter],
     queryFn: async () => {
       try {
-        const params: any = { role: 'buyer' };
+        const params: any = { role };
         if (filter !== 'all') {
           params.status = filter;
         }
-        // Web ile aynı endpoint: GET /orders
         const response = await ordersApi.getAll(params);
         return response.data?.data || response.data || [];
       } catch (error) {
@@ -151,8 +151,26 @@ export default function OrdersScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Siparişlerim</Text>
+        <Text style={styles.headerTitle}>{role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'}</Text>
         <View style={{ width: 24 }} />
+      </View>
+
+      {/* Role Toggle */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 }}>
+        <Chip
+          selected={role === 'buyer'}
+          onPress={() => { setRole('buyer'); setFilter('all'); }}
+          icon="cart-outline"
+          style={role === 'buyer' ? styles.filterChipSelected : styles.filterChip}
+          textStyle={role === 'buyer' ? styles.filterChipTextSelected : styles.filterChipText}
+        >Aldıklarım</Chip>
+        <Chip
+          selected={role === 'seller'}
+          onPress={() => { setRole('seller'); setFilter('all'); }}
+          icon="storefront-outline"
+          style={role === 'seller' ? styles.filterChipSelected : styles.filterChip}
+          textStyle={role === 'seller' ? styles.filterChipTextSelected : styles.filterChipText}
+        >Sattıklarım</Chip>
       </View>
 
       {/* Filter Chips */}

@@ -48,7 +48,7 @@ const ChatScreen = ({ route }: any) => {
     try {
       const response = await api.getMessages(listingId, tradeId);
       // Filter messages for this conversation
-      const filtered = response.messages.filter(
+      const filtered = (response.messages || []).filter(
         (msg: Message) =>
           (msg.sender_id === userId || msg.receiver_id === userId)
       );

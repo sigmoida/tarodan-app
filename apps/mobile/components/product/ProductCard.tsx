@@ -44,7 +44,7 @@ export function ProductCard({
           {title}
         </Text>
         {brand && <Text style={styles.brand}>{brand}</Text>}
-        <Text style={styles.price}>{price.toLocaleString('tr-TR')} TL</Text>
+        <Text style={styles.price}>{(price ?? 0).toLocaleString('tr-TR')} TL</Text>
       </View>
     </TouchableOpacity>
   );

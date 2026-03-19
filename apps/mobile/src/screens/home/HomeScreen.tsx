@@ -18,6 +18,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useListingsStore } from '../../stores/listingsStore';
 import { useCartStore } from '../../stores/cartStore';
+import { safeString } from '../../utils/safeString';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -56,7 +57,7 @@ const ListingCard = ({ item, onPress }: any) => (
     )}
     <View style={styles.listingInfo}>
       <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-      <Text style={styles.listingBrand}>{item.brand} • {item.scale}</Text>
+      <Text style={styles.listingBrand}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
       <Text style={styles.listingPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
     </View>
   </TouchableOpacity>
