@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme/colors';
 import { paymentsApi } from '../../src/services/api';
+import { useAuthStore } from '../../src/stores/authStore';
 
 export default function PaymentSuccessScreen() {
   const { paymentId, orderId, guest } = useLocalSearchParams<{ paymentId?: string; orderId?: string; guest?: string }>();
   const isGuest = guest === 'true';
   const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['orders'] });
+    // Satın alma sonrası stok / ilan listeleri web ile aynı şekilde tazelensin
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['listings'] });
+    queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+    queryClient.invalidateQueries({ queryKey: ['category-products'] });
+    queryClient.invalidateQueries({ queryKey: ['seller-products'] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'product',
+    });
+    if (!isGuest) {
+      void useAuthStore.getState().refreshUserData();
+    }
+  }, [queryClient, isGuest]);
 
   useEffect(() => {
     if (paymentId) {
@@ -34,6 +53,7 @@ export default function PaymentSuccessScreen() {
         data?.isMembershipPayment;
 
       if (isMembershipOrder) {
+        await useAuthStore.getState().refreshUserData();
         router.replace('/membership/success');
         return;
       }

@@ -35,6 +35,13 @@ export class OfferResponseDto {
   @ApiProperty({ example: 250.0 })
   amount: number;
 
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Satıcı karşı teklifinden sonra true: kabul/red yalnızca alıcıda',
+  })
+  buyerMustAccept?: boolean;
+
   @ApiProperty({ example: 'pending' })
   status: string;
 

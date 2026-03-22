@@ -1,7 +1,7 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
 import { Text, Card, Searchbar, ActivityIndicator, Chip, IconButton, Menu, Divider } from 'react-native-paper';
-import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
@@ -9,6 +9,8 @@ import { TarodanColors, BRANDS, SCALES } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
 import { safeString } from '../src/utils/safeString';
 import { isProductTradeOpen } from '../src/utils/isProductTradeOpen';
+import { buildProductListQueryParams } from '../src/utils/buildProductListQueryParams';
+import { formatApiErrorMessage } from '../src/utils/formatApiErrorMessage';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -19,6 +21,8 @@ const CONDITIONS = [
   { id: 'good', name: 'İyi' },
   { id: 'fair', name: 'Orta' },
 ];
+
+const PAGE_SIZE = 100;
 
 const SORT_OPTIONS = [
   { id: 'created_desc', name: 'En Yeni' },
@@ -38,6 +42,9 @@ export default function ListingsScreen() {
   }>();
   
   const [searchQuery, setSearchQuery] = useState(params.search || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() =>
+    String(params.search || '').trim()
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,33 +59,68 @@ export default function ListingsScreen() {
     sortBy: 'created_desc',
   });
 
-  const { data: listings, isLoading, refetch } = useQuery({
-    queryKey: ['listings', searchQuery, filters],
-    queryFn: async () => {
-      try {
-        const queryParams: any = {
-          limit: 100,
-          page: 1,
-        };
-        
-        if (searchQuery) queryParams.search = searchQuery;
-        if (filters.brand) queryParams.brand = filters.brand;
-        if (filters.scale) queryParams.scale = filters.scale;
-        if (filters.condition) queryParams.condition = filters.condition;
-        if (filters.minPrice) queryParams.minPrice = Number(filters.minPrice);
-        if (filters.maxPrice) queryParams.maxPrice = Number(filters.maxPrice);
-        if (filters.tradeOnly) queryParams.tradeOnly = true;
-        if (filters.sortBy) queryParams.sortBy = filters.sortBy;
-        if (params.categoryId) queryParams.categoryId = params.categoryId;
-        
-        const response = await productsApi.getAll(queryParams);
-        return response.data.data || response.data.products || [];
-      } catch (error) {
-        console.log('⚠️ Listings fetch error:', error);
-        return [];
-      }
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const categoryIdParam = Array.isArray(params.categoryId)
+    ? params.categoryId[0]
+    : params.categoryId;
+
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    isError,
+    error,
+  } = useInfiniteQuery({
+    queryKey: ['listings', debouncedSearch, filters, categoryIdParam],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const queryParams = buildProductListQueryParams({
+        page: pageParam as number,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        categoryId: categoryIdParam,
+        filters,
+      });
+
+      const response = await productsApi.getAll(queryParams);
+      const body = response.data as {
+        data?: unknown[];
+        products?: unknown[];
+        meta?: { total?: number; totalPages?: number; page?: number; limit?: number };
+      };
+      const rawItems = body?.data ?? body?.products ?? [];
+      const items = Array.isArray(rawItems) ? rawItems : [];
+      const meta = body?.meta;
+      const totalPages = meta?.totalPages;
+      const nextPage =
+        totalPages != null
+          ? pageParam < totalPages
+            ? pageParam + 1
+            : undefined
+          : items.length >= PAGE_SIZE
+            ? pageParam + 1
+            : undefined;
+      return {
+        items,
+        nextPage,
+        total: meta?.total,
+      };
     },
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
+
+  const listings = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data?.pages]
+  );
+  const totalCount = data?.pages[0]?.total;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -86,9 +128,13 @@ export default function ListingsScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const handleSearch = () => {
-    refetch();
-  };
+  const listingsErrorMessage = isError
+    ? formatApiErrorMessage(error, 'İlanlar yüklenirken bir hata oluştu.')
+    : null;
+
+  const handleSearch = useCallback(() => {
+    setDebouncedSearch(searchQuery.trim());
+  }, [searchQuery]);
 
   const clearFilters = () => {
     setFilters({
@@ -290,7 +336,16 @@ export default function ListingsScreen() {
       )}
 
       {/* Listings */}
-      {isLoading ? (
+      {listingsErrorMessage ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.error} />
+          <Text style={styles.emptyTitle}>Liste alınamadı</Text>
+          <Text style={styles.emptySubtitle}>{listingsErrorMessage}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryBtnText}>Tekrar dene</Text>
+          </TouchableOpacity>
+        </View>
+      ) : isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={TarodanColors.primary} />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
@@ -309,10 +364,28 @@ export default function ListingsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
           }
         >
-          <Text style={styles.resultsCount}>{listings.length} ilan bulundu</Text>
+          <Text style={styles.resultsCount}>
+            {listings.length} ilan gösteriliyor
+            {typeof totalCount === 'number' && totalCount > listings.length
+              ? ` (toplam ${totalCount})`
+              : ''}
+          </Text>
           <View style={styles.productsGrid}>
             {listings.map((item: any) => renderProductCard(item))}
           </View>
+          {hasNextPage ? (
+            <TouchableOpacity
+              style={styles.loadMoreBtn}
+              onPress={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? (
+                <ActivityIndicator color={TarodanColors.primary} />
+              ) : (
+                <Text style={styles.loadMoreText}>Daha fazla yükle</Text>
+              )}
+            </TouchableOpacity>
+          ) : null}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -462,6 +535,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TarodanColors.textSecondary,
     textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: TarodanColors.primary,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  loadMoreBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: TarodanColors.surfaceVariant,
+    borderRadius: 8,
+  },
+  loadMoreText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TarodanColors.primary,
   },
   listingsContainer: {
     flex: 1,

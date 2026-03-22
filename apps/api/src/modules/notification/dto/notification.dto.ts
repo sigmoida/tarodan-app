@@ -16,6 +16,7 @@ export enum NotificationType {
   OFFER_ACCEPTED = 'offer_accepted',
   OFFER_REJECTED = 'offer_rejected',
   OFFER_COUNTER = 'offer_counter',
+  OFFER_COUNTER_DECLINED = 'offer_counter_declined',
   OFFER_EXPIRED = 'offer_expired',
 
   // Product notifications

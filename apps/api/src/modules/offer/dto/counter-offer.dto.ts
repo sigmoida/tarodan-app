@@ -1,5 +1,5 @@
-import { IsNumber, Min, Max } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNumber, Min, Max, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CounterOfferDto {
@@ -12,4 +12,10 @@ export class CounterOfferDto {
   @Min(1, { message: 'Karşı teklif en az 1 TL olmalıdır' })
   @Max(9999999, { message: 'Karşı teklif en fazla 9,999,999 TL olabilir' })
   amount: number;
+
+  @ApiPropertyOptional({ description: 'İsteğe bağlı mesaj' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  message?: string;
 }

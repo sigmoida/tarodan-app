@@ -1,11 +1,28 @@
+import { useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Button } from 'react-native-paper';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
-import LottieView from 'lottie-react-native';
+import { useAuthStore } from '../../src/stores/authStore';
+
+const TIER_LABELS: Record<string, string> = {
+  basic: 'Temel',
+  premium: 'Premium',
+  business: 'Business',
+};
 
 export default function MembershipSuccessScreen() {
+  const refreshUserData = useAuthStore((s) => s.refreshUserData);
+  const params = useLocalSearchParams<{ tier?: string | string[] }>();
+  const tierRaw = Array.isArray(params.tier) ? params.tier[0] : params.tier;
+  const tierKey = (tierRaw || 'premium').toLowerCase();
+  const tierLabel = useMemo(() => TIER_LABELS[tierKey] || 'Premium', [tierKey]);
+
+  useEffect(() => {
+    refreshUserData();
+  }, [refreshUserData]);
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -15,11 +32,11 @@ export default function MembershipSuccessScreen() {
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Üyelik Aktif!</Text>
+        <Text style={styles.title}>Üyelik aktif!</Text>
 
         {/* Description */}
         <Text style={styles.description}>
-          Premium üyeliğiniz başarıyla aktifleştirildi. Artık tüm özelliklerden yararlanabilirsiniz.
+          {tierLabel} üyeliğiniz başarıyla aktifleştirildi. Planınıza göre özelliklerden yararlanabilirsiniz.
         </Text>
 
         {/* Features */}

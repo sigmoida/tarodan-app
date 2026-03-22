@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: 0e0a8e4a9700ab210346b72ca18e8950
+
 importers:
 
   .:
@@ -518,6 +520,9 @@ importers:
     devDependencies:
       '@babel/core':
         specifier: ^7.24.0
+        version: 7.28.6
+      '@babel/types':
+        specifier: ^7.28.0
         version: 7.28.6
       '@types/react':
         specifier: ~19.1.17
@@ -17375,6 +17380,7 @@ packages:
       '@babel/plugin-transform-template-literals': 7.27.1(@babel/core@7.28.6)
       '@babel/plugin-transform-unicode-regex': 7.27.1(@babel/core@7.28.6)
       '@babel/preset-typescript': 7.27.1(@babel/core@7.28.6)
+      '@babel/types': 7.28.6
       convert-source-map: 2.0.0
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)

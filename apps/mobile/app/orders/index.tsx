@@ -8,17 +8,19 @@ import { ordersApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
-import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { apiStatusToUi, uiFilterToApiStatusParam, type UiOrderStatus } from '../../src/utils/orderStatus';
+import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
 interface Order {
   id: string;
   orderNumber: string;
-  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled' | 'refunded';
+  status: UiOrderStatus;
   totalAmount: number;
   product: {
     id: string;
     title: string;
     images?: Array<{ url: string }>;
+    imageUrl?: string;
   };
   seller: {
     id: string;
@@ -44,20 +46,34 @@ export default function OrdersScreen() {
   }>({ visible: false, type: 'product', order: null });
 
   // Fetch orders
-  const { data: ordersData, isLoading, refetch } = useQuery({
+  const { data: ordersData, isLoading, refetch, error: ordersError } = useQuery({
     queryKey: ['orders', role, filter],
     queryFn: async () => {
-      try {
-        const params: any = { role };
-        if (filter !== 'all') {
-          params.status = filter;
-        }
-        const response = await ordersApi.getAll(params);
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        console.log('Failed to fetch orders');
-        return [];
+      const params: Record<string, string | number> = { role, limit: 100, page: 1 };
+      const apiStatus = uiFilterToApiStatusParam(filter);
+      if (apiStatus) params.status = apiStatus;
+
+      const response = await ordersApi.getAll(params);
+      const raw = response.data?.data ?? response.data;
+      const list = Array.isArray(raw) ? raw : [];
+
+      const normalized: Order[] = list.map((rawOrder: any) => ({
+        ...rawOrder,
+        status: apiStatusToUi(rawOrder.status),
+        totalAmount: Number(rawOrder.totalAmount ?? rawOrder.amount ?? 0),
+        product: {
+          ...(rawOrder.product || {}),
+          id: rawOrder.product?.id ?? '',
+          title: rawOrder.product?.title ?? '',
+          images: rawOrder.product?.images,
+          imageUrl: rawOrder.product?.imageUrl,
+        },
+      }));
+
+      if (filter === 'processing') {
+        return normalized.filter((o) => o.status === 'processing');
       }
+      return normalized;
     },
     enabled: isAuthenticated,
   });
@@ -79,7 +95,7 @@ export default function OrdersScreen() {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: Order['status']) => {
+  const getStatusColor = (status: UiOrderStatus) => {
     switch (status) {
       case 'pending': return TarodanColors.warning;
       case 'paid': return TarodanColors.info;
@@ -93,9 +109,9 @@ export default function OrdersScreen() {
     }
   };
 
-  const getStatusText = (status: Order['status']) => {
+  const getStatusText = (status: UiOrderStatus) => {
     switch (status) {
-      case 'pending': return 'Beklemede';
+      case 'pending': return 'Ödeme bekliyor';
       case 'paid': return 'Ödendi';
       case 'processing': return 'Hazırlanıyor';
       case 'shipped': return 'Kargoda';
@@ -139,11 +155,6 @@ export default function OrdersScreen() {
     );
   }
 
-  const filteredOrders = orders.filter(order => {
-    if (filter === 'all') return true;
-    return order.status === filter;
-  });
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -184,22 +195,31 @@ export default function OrdersScreen() {
               style={[styles.filterChip, filter === f && styles.filterChipSelected]}
               textStyle={filter === f ? styles.filterChipTextSelected : styles.filterChipText}
             >
-              {f === 'all' ? 'Tümü' : getStatusText(f as Order['status'])}
+              {f === 'all' ? 'Tümü' : getStatusText(f as UiOrderStatus)}
             </Chip>
           ))}
         </ScrollView>
       </View>
 
       {/* Orders */}
-      {isLoading && orders.length === 0 ? (
+      {ordersError ? (
+        <View style={styles.emptyContainer}>
+          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+            Siparişler yüklenemedi. Lütfen tekrar deneyin.
+          </Text>
+          <Button mode="contained" onPress={() => refetch()} style={{ marginTop: 12 }}>
+            Yenile
+          </Button>
+        </View>
+      ) : isLoading && orders.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={TarodanColors.primary} />
         </View>
-      ) : filteredOrders.length === 0 ? (
+      ) : orders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={80} color={TarodanColors.textLight} />
           <Text variant="titleMedium" style={styles.emptyTitle}>
-            {filter === 'all' ? 'Henüz siparişiniz yok' : `${getStatusText(filter as Order['status'])} siparişiniz yok`}
+            {filter === 'all' ? 'Henüz siparişiniz yok' : `${getStatusText(filter as UiOrderStatus)} siparişiniz yok`}
           </Text>
           <Text variant="bodyMedium" style={styles.emptySubtitle}>
             Alışverişe başlayın!
@@ -215,7 +235,7 @@ export default function OrdersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
           }
         >
-          {filteredOrders.map((order) => (
+          {orders.map((order) => (
             <Card key={order.id} style={styles.orderCard}>
               <TouchableOpacity onPress={() => router.push(`/orders/${order.id}`)}>
                 <View style={styles.orderHeader}>
@@ -231,7 +251,7 @@ export default function OrdersScreen() {
 
                 <View style={styles.orderContent}>
                   <Image
-                    source={{ uri: getImageUrlFromUtils(order.product.images) || 'https://via.placeholder.com/80' }}
+                    source={{ uri: getOrderProductImageUri(order.product) }}
                     style={styles.productImage}
                   />
                   <View style={styles.productInfo}>

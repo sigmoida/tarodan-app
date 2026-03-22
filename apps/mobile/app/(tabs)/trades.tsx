@@ -8,29 +8,60 @@ import { tr } from 'date-fns/locale';
 import { tradesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 
-const TRADE_STATUSES = {
+const TRADE_STATUSES: Record<string, { label: string; color: string }> = {
   pending: { label: 'Bekliyor', color: '#FFC107' },
   accepted: { label: 'Kabul Edildi', color: '#4CAF50' },
   rejected: { label: 'Reddedildi', color: '#F44336' },
-  shipped: { label: 'Kargoda', color: '#2196F3' },
-  delivered: { label: 'Teslim Edildi', color: '#9C27B0' },
-  confirmed: { label: 'Tamamlandı', color: '#4CAF50' },
+  initiator_shipped: { label: 'Kargoda', color: '#2196F3' },
+  receiver_shipped: { label: 'Kargoda', color: '#2196F3' },
+  both_shipped: { label: 'Kargoda', color: '#2196F3' },
+  initiator_received: { label: 'Teslim', color: '#9C27B0' },
+  receiver_received: { label: 'Teslim', color: '#9C27B0' },
+  completed: { label: 'Tamamlandı', color: '#4CAF50' },
   cancelled: { label: 'İptal', color: '#9E9E9E' },
   disputed: { label: 'İtiraz', color: '#FF5722' },
+  countered: { label: 'Karşı Teklif', color: '#2563EB' },
 };
+
+/** API TradeStatus ile uyumlu; shipped/confirmed yok (400 veriyordu) */
+const SHIPPING_STATUSES = new Set([
+  'initiator_shipped',
+  'receiver_shipped',
+  'both_shipped',
+  'initiator_received',
+  'receiver_received',
+]);
+
+type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed';
 
 export default function TradesScreen() {
   const theme = useTheme();
   const { isAuthenticated } = useAuthStore();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState<TradesTabFilter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Web ile aynı endpoint: GET /trades
-  const { data: trades, isLoading, refetch } = useQuery({
+  // GET /trades → { trades, total, page, pageSize } (data değil)
+  const { data: tradesPayload, isLoading, isError, refetch } = useQuery({
     queryKey: ['trades', filter],
-    queryFn: () => tradesApi.getAll({ status: filter === 'all' ? undefined : filter }).then(res => res.data),
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (filter === 'pending') params.status = 'pending';
+      if (filter === 'completed') params.status = 'completed';
+      const res = await tradesApi.getAll(params);
+      const body = res.data as { trades?: unknown[]; data?: unknown[] } | undefined;
+      let list = body?.trades ?? body?.data ?? [];
+      if (!Array.isArray(list)) list = [];
+      if (filter === 'shipping') {
+        list = list.filter(
+          (t: { status?: string }) => t?.status && SHIPPING_STATUSES.has(t.status),
+        );
+      }
+      return { trades: list };
+    },
     enabled: isAuthenticated,
   });
+
+  const tradesList = tradesPayload?.trades ?? [];
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -53,7 +84,7 @@ export default function TradesScreen() {
   }
 
   const getStatusInfo = (status: string) => {
-    return TRADE_STATUSES[status as keyof typeof TRADE_STATUSES] || { label: status, color: '#9E9E9E' };
+    return TRADE_STATUSES[status] || { label: status, color: '#9E9E9E' };
   };
 
   return (
@@ -62,31 +93,40 @@ export default function TradesScreen() {
       <View style={{ padding: 16 }}>
         <SegmentedButtons
           value={filter}
-          onValueChange={setFilter}
+          onValueChange={(v) => setFilter(v as TradesTabFilter)}
           buttons={[
             { value: 'all', label: 'Tümü' },
             { value: 'pending', label: 'Bekleyen' },
-            { value: 'shipped', label: 'Kargoda' },
-            { value: 'confirmed', label: 'Tamamlanan' },
+            { value: 'shipping', label: 'Kargoda' },
+            { value: 'completed', label: 'Tamamlanan' },
           ]}
           density="small"
         />
       </View>
 
-      {isLoading ? (
+      {isError ? (
+        <View style={{ padding: 24, alignItems: 'center' }}>
+          <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 8 }}>
+            Takaslar yüklenemedi. Çekerek yenileyin.
+          </Text>
+          <Button mode="contained" onPress={() => refetch()}>
+            Yeniden dene
+          </Button>
+        </View>
+      ) : isLoading ? (
         <ActivityIndicator style={{ marginTop: 32 }} />
       ) : (
         <FlatList
-          data={trades?.data || []}
+          data={tradesList}
           contentContainerStyle={{ padding: 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => {
             const statusInfo = getStatusInfo(item.status);
-            const initiatorItems = (item.items || []).filter((i: any) => i.side === 'initiator');
-            const receiverItems = (item.items || []).filter((i: any) => i.side === 'receiver');
-            const myTitle = initiatorItems[0]?.product?.title || item.offeredProduct?.title || 'Ürün';
-            const theirTitle = receiverItems[0]?.product?.title || item.requestedProduct?.title || 'Ürün';
+            const ini = item.initiatorItems || [];
+            const rec = item.receiverItems || [];
+            const myTitle = ini[0]?.productTitle || 'Ürün';
+            const theirTitle = rec[0]?.productTitle || 'Ürün';
             return (
               <Card
                 style={{ marginBottom: 12 }}
@@ -106,9 +146,9 @@ export default function TradesScreen() {
                   <Text variant="bodySmall" style={{ color: theme.colors.outline }}>↔</Text>
                   <Text variant="titleMedium" numberOfLines={1}>{theirTitle}</Text>
                   
-                  {item.cashAmount > 0 && (
+                  {item.cashAmount != null && Number(item.cashAmount) !== 0 && (
                     <Text variant="bodyMedium" style={{ color: theme.colors.primary, marginTop: 8 }}>
-                      + ₺{Number(item.cashAmount).toLocaleString('tr-TR')} fark
+                      Nakit fark: ₺{Math.abs(Number(item.cashAmount)).toLocaleString('tr-TR')}
                     </Text>
                   )}
 

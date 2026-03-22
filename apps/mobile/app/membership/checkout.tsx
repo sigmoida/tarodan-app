@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi, paymentsApi } from '../../src/services/api';
+import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+
+/** API subscribe spreads UserMembership + paymentId/paymentUrl at root — never use root `id` (that is membership row id). */
+function pickPaymentFromSubscribeResponse(data: {
+  paymentId?: string;
+  paymentUrl?: string;
+  payment?: { id?: string; paymentId?: string; paymentUrl?: string };
+} | null | undefined) {
+  if (!data) return { paymentId: undefined as string | undefined, paymentUrl: undefined as string | undefined };
+  const nested = data.payment;
+  const paymentId = data.paymentId ?? nested?.paymentId;
+  const paymentUrl = data.paymentUrl ?? nested?.paymentUrl;
+  return { paymentId, paymentUrl };
+}
 
 const TIER_NAMES: Record<string, string> = {
   basic: 'Temel',
@@ -35,9 +49,31 @@ interface PlatformSettings {
   yearly_discount_percentage?: number;
 }
 
+const PAID_TIER_TYPES = new Set(['basic', 'premium', 'business']);
+
+function sanitizeMembershipPrice(price: number | undefined, defaultPrice: number): number {
+  if (price == null || Number.isNaN(Number(price))) return defaultPrice;
+  const n = Number(price);
+  if (n > 10000) {
+    const inTL = n / 100;
+    if (inTL >= 1 && inTL <= 10000) return Math.round(inTL * 100) / 100;
+  }
+  if (n >= 1 && n <= 10000) return n;
+  return defaultPrice;
+}
+
 export default function MembershipCheckoutScreen() {
-  const { tier, period } = useLocalSearchParams<{ tier: string; period: string }>();
-  const { isAuthenticated } = useAuthStore();
+  const params = useLocalSearchParams<{
+    tier?: string | string[];
+    period?: string | string[];
+    required?: string | string[];
+  }>();
+  const { isAuthenticated, refreshUserData } = useAuthStore();
+
+  const tierParam = Array.isArray(params.tier) ? params.tier[0] : params.tier;
+  const periodParam = Array.isArray(params.period) ? params.period[0] : params.period;
+  const requiredFlow =
+    (Array.isArray(params.required) ? params.required[0] : params.required) === 'true';
 
   const [settings, setSettings] = useState<PlatformSettings>({});
   const [cardHolder, setCardHolder] = useState('');
@@ -48,10 +84,12 @@ export default function MembershipCheckoutScreen() {
   const [loading, setLoading] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(true);
 
-  const tierType = (tier || 'premium') as string;
-  const billingPeriod = (period === 'yearly' ? 'yearly' : 'monthly') as 'monthly' | 'yearly';
+  const tierType =
+    tierParam && PAID_TIER_TYPES.has(tierParam) ? tierParam : 'premium';
+  const billingPeriod = (periodParam === 'yearly' ? 'yearly' : 'monthly') as 'monthly' | 'yearly';
   const color = TIER_COLORS[tierType] || TarodanColors.primary;
   const tierName = TIER_NAMES[tierType] || 'Premium';
+  const invalidPaidTier = tierParam != null && tierParam !== '' && !PAID_TIER_TYPES.has(tierParam);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -65,11 +103,41 @@ export default function MembershipCheckoutScreen() {
     setFetchingPrice(true);
     try {
       const res = await api.get('/admin/settings/public');
-      setSettings(res.data || {});
+      const raw = res.data || {};
+      setSettings({
+        basic_monthly_price: sanitizeMembershipPrice(raw.basic_monthly_price, 49),
+        basic_yearly_price: sanitizeMembershipPrice(raw.basic_yearly_price, 490),
+        premium_monthly_price: sanitizeMembershipPrice(raw.premium_monthly_price, 99),
+        premium_yearly_price: sanitizeMembershipPrice(raw.premium_yearly_price, 960),
+        business_monthly_price: sanitizeMembershipPrice(raw.business_monthly_price, 499),
+        business_yearly_price: sanitizeMembershipPrice(raw.business_yearly_price, 4790),
+        yearly_discount_percentage: raw.yearly_discount_percentage ?? 20,
+      });
     } catch {
-      // defaults will be used
+      setSettings({
+        basic_monthly_price: 49,
+        basic_yearly_price: 490,
+        premium_monthly_price: 99,
+        premium_yearly_price: 960,
+        business_monthly_price: 499,
+        business_yearly_price: 4790,
+        yearly_discount_percentage: 20,
+      });
     } finally {
       setFetchingPrice(false);
+    }
+  };
+
+  const getDefaultMonthly = (): number => {
+    switch (tierType) {
+      case 'basic':
+        return 49;
+      case 'premium':
+        return 99;
+      case 'business':
+        return 499;
+      default:
+        return 99;
     }
   };
 
@@ -85,15 +153,6 @@ export default function MembershipCheckoutScreen() {
       return Math.round(monthlyPrice * 12 * (1 - discount / 100));
     }
     return monthlyPrice;
-  };
-
-  const getDefaultMonthly = (): number => {
-    switch (tierType) {
-      case 'basic': return 49;
-      case 'premium': return 99;
-      case 'business': return 499;
-      default: return 99;
-    }
   };
 
   const price = getPrice();
@@ -114,8 +173,21 @@ export default function MembershipCheckoutScreen() {
 
   const handleSubscribe = async () => {
     const rawCard = cardNumber.replace(/\s/g, '');
+    if (!cardHolder.trim()) {
+      Alert.alert('Uyarı', 'Kart üzerindeki isim soyisim zorunludur.');
+      return;
+    }
     if (rawCard.length < 15) {
       Alert.alert('Hata', 'Geçerli bir kart numarası giriniz.');
+      return;
+    }
+    const exp = cardExpiry.replace(/\D/g, '');
+    if (exp.length < 4) {
+      Alert.alert('Uyarı', 'Son kullanma tarihini AA/YY formatında girin.');
+      return;
+    }
+    if (!cardCvv.trim() || cardCvv.length < 3) {
+      Alert.alert('Uyarı', 'CVV kodunu girin.');
       return;
     }
     if (!agreedToTerms) {
@@ -130,45 +202,115 @@ export default function MembershipCheckoutScreen() {
         billingPeriod: billingPeriod as 'monthly' | 'yearly',
       });
 
-      const payment = subscribeRes.data?.payment || subscribeRes.data;
-      const paymentId = payment?.id || payment?.paymentId;
-      const paymentUrl = payment?.paymentUrl;
+      const root = subscribeRes.data as Record<string, unknown> | undefined;
+      const payload = (root?.data ?? root) as {
+        paymentId?: string;
+        paymentUrl?: string;
+        payment?: { id?: string; paymentId?: string; paymentUrl?: string };
+      };
+
+      const { paymentId, paymentUrl } = pickPaymentFromSubscribeResponse(payload);
+
+      if (paymentUrl && paymentUrl.startsWith('http')) {
+        try {
+          const can = await Linking.canOpenURL(paymentUrl);
+          if (can) {
+            await Linking.openURL(paymentUrl);
+            return;
+          }
+        } catch {
+          /* fall through to paymentId flow */
+        }
+      }
 
       if (!paymentId) {
-        router.replace('/membership/success');
+        if (PAID_TIER_TYPES.has(tierType)) {
+          Alert.alert(
+            'Ödeme',
+            'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin veya destek ile iletişime geçin.',
+          );
+          await refreshUserData();
+          return;
+        }
+        await refreshUserData();
+        router.replace(`/membership/success?tier=${tierType}` as any);
         return;
       }
 
-      const statusRes = await paymentsApi.getStatusLight(paymentId);
-      const statusData = statusRes.data?.data || statusRes.data;
+      let statusData: { status?: string; useBypass?: boolean } | undefined;
+      try {
+        const statusRes = await paymentsApi.getStatusLight(paymentId);
+        statusData = (statusRes.data as { data?: typeof statusData })?.data || statusRes.data;
+      } catch {
+        router.replace(`/payment/${paymentId}?type=membership` as any);
+        return;
+      }
+
       const status = statusData?.status;
       const useBypass = statusData?.useBypass;
 
       if (status === 'completed' || status === 'success') {
-        router.replace('/membership/success');
+        await refreshUserData();
+        router.replace(`/membership/success?tier=${tierType}` as any);
         return;
       }
 
       if (useBypass) {
         try {
           await paymentsApi.bypassComplete(paymentId, rawCard);
-          router.replace('/membership/success');
-        } catch (bypassErr: any) {
-          const msg = bypassErr?.response?.data?.message || bypassErr?.message || 'Ödeme tamamlanamadı.';
+          await refreshUserData();
+          router.replace(`/membership/success?tier=${tierType}` as any);
+        } catch (bypassErr: unknown) {
+          const msg = formatApiErrorMessage(bypassErr, 'Ödeme tamamlanamadı.');
           Alert.alert('Ödeme Hatası', msg);
         }
-      } else if (paymentUrl) {
-        router.replace(`/payment/${paymentId}` as any);
       } else {
-        router.replace(`/payment/${paymentId}` as any);
+        router.replace(`/payment/${paymentId}?type=membership` as any);
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Abonelik oluşturulamadı.';
+    } catch (err: unknown) {
+      const msg = formatApiErrorMessage(err, 'Abonelik oluşturulamadı.');
       Alert.alert('Hata', msg);
     } finally {
       setLoading(false);
     }
   };
+
+  if (invalidPaidTier) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={[styles.header, { justifyContent: 'flex-start', gap: 12 }]}>
+          <TouchableOpacity
+            onPress={() =>
+              router.replace((requiredFlow ? '/membership?required=true' : '/membership') as any)
+            }
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Plan seçimi</Text>
+        </View>
+        <View style={{ padding: 24, alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, color: TarodanColors.textSecondary, textAlign: 'center' }}>
+            Geçersiz üyelik planı. Lütfen listeden bir plan seçin.
+          </Text>
+          <TouchableOpacity
+            style={[styles.payButton, { marginTop: 24, backgroundColor: TarodanColors.primary }]}
+            onPress={() =>
+              router.replace((requiredFlow ? '/membership?required=true' : '/membership') as any)
+            }
+          >
+            <Text style={styles.payButtonText}>Planlara dön</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const cardDigits = cardNumber.replace(/\s/g, '');
+  const expiryOk = cardExpiry.replace(/\D/g, '').length >= 4;
+  const cvvOk = cardCvv.trim().length >= 3;
+  const formComplete =
+    cardHolder.trim().length > 0 && cardDigits.length >= 15 && expiryOk && cvvOk && agreedToTerms;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -308,10 +450,10 @@ export default function MembershipCheckoutScreen() {
             style={[
               styles.payButton,
               { backgroundColor: color },
-              (loading || cardNumber.replace(/\s/g, '').length < 15 || !agreedToTerms) && styles.payButtonDisabled,
+              (loading || !formComplete) && styles.payButtonDisabled,
             ]}
             onPress={handleSubscribe}
-            disabled={loading || cardNumber.replace(/\s/g, '').length < 15 || !agreedToTerms}
+            disabled={loading || !formComplete}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" />

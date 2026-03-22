@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput, Image } from 'react-native';
 import { Text, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { productsApi, searchApi } from '../../src/services/api';
@@ -11,8 +11,14 @@ import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
 import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 28) / 2;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SEARCH_LIST_H_PAD = 12;
+const SEARCH_GRID_GAP = 6;
+const SEARCH_NUM_COLUMNS = SCREEN_WIDTH >= 400 ? 3 : 2;
+const CARD_WIDTH =
+  (SCREEN_WIDTH - SEARCH_LIST_H_PAD * 2 - SEARCH_GRID_GAP * (SEARCH_NUM_COLUMNS - 1)) /
+  SEARCH_NUM_COLUMNS;
+const SEARCH_PAGE_SIZE = 100;
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'En Yeni', icon: 'time-outline' },
@@ -21,14 +27,37 @@ const SORT_OPTIONS = [
   { value: 'popular', label: 'Popüler', icon: 'star-outline' },
 ];
 
+/** Marka çipi `id` tutar; API / ES tam marka adı (örn. Matchbox) ister. */
+function resolveBrandIdFromParam(raw: string): string {
+  const decoded = decodeURIComponent(raw).trim();
+  const byId = BRANDS.find((b) => b.id === decoded);
+  if (byId) return byId.id;
+  const byName = BRANDS.find((b) => b.name.toLowerCase() === decoded.toLowerCase());
+  if (byName) return byName.id;
+  return decoded;
+}
+
+function brandNamesForApi(brandIds: string[]): string | undefined {
+  const names = brandIds
+    .map((id) => {
+      const byId = BRANDS.find((b) => b.id === id);
+      if (byId) return byId.name;
+      return BRANDS.find((b) => b.name.toLowerCase() === id.toLowerCase())?.name;
+    })
+    .filter(Boolean) as string[];
+  if (names.length === 0) return undefined;
+  // ProductQueryDto tek `brand`; ES `brandName.keyword` tam eşleşme — çoklu seçimde ilki
+  return names[0];
+}
+
 export default function SearchScreen() {
   const params = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState((params.q as string) || '');
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [sortBy, setSortBy] = useState('newest');
   const [category, setCategory] = useState((params.categoryId as string) || (params.category as string) || '');
-  const [selectedBrands, setSelectedBrands] = useState<string[]>(
-    params.brand ? [params.brand as string] : []
+  const [selectedBrands, setSelectedBrands] = useState<string[]>(() =>
+    params.brand ? [resolveBrandIdFromParam(params.brand as string)] : []
   );
   const [manufacturer, setManufacturer] = useState((params.manufacturer as string) || '');
   const [selectedScales, setSelectedScales] = useState<string[]>([]);
@@ -91,7 +120,7 @@ export default function SearchScreen() {
       setDebouncedQuery(params.q as string);
     }
     if (params.categoryId) setCategory(params.categoryId as string);
-    if (params.brand) setSelectedBrands([params.brand as string]);
+    if (params.brand) setSelectedBrands([resolveBrandIdFromParam(params.brand as string)]);
     if (params.scale) setSelectedScales([params.scale as string]);
     if (params.manufacturer !== undefined) {
       setManufacturer((params.manufacturer as string) || '');
@@ -104,14 +133,14 @@ export default function SearchScreen() {
     }
   }, [debouncedQuery]);
 
-  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
     setShowRecentSearches(true);
-    const timer = setTimeout(() => {
-      setDebouncedQuery(text);
-    }, 500);
-    return () => clearTimeout(timer);
   }, []);
 
   // Handle recent search selection
@@ -125,12 +154,8 @@ export default function SearchScreen() {
     // Sadece değeri olan parametreleri gönder - boş string API'de 400 hatası veriyor
     const params: Record<string, any> = {};
     
-    if (debouncedQuery) {
-      params.q = debouncedQuery;
-      params.search = debouncedQuery;
-    }
+    if (debouncedQuery) params.search = debouncedQuery;
     if (sortBy) {
-      params.sort = sortBy;
       params.sortBy =
         sortBy === 'newest'
           ? 'created_desc'
@@ -138,83 +163,143 @@ export default function SearchScreen() {
             ? 'price_asc'
             : sortBy === 'price_desc'
               ? 'price_desc'
-              : 'created_desc';
+              : sortBy === 'popular'
+                ? 'view_count_desc'
+                : 'created_desc';
     }
-    if (category) params.category = category;
-    if (selectedBrands.length > 0) params.brand = selectedBrands.join(',');
+    if (category) params.categoryId = category;
+    const apiBrand = brandNamesForApi(selectedBrands);
+    if (apiBrand) params.brand = apiBrand;
     if (manufacturer.trim()) params.manufacturer = manufacturer.trim();
-    if (selectedScales.length > 0) params.scale = selectedScales.join(',');
-    if (selectedConditions.length > 0) params.condition = selectedConditions.join(',');
+    if (selectedScales.length > 0) params.scale = selectedScales[0];
+    if (selectedConditions.length > 0) params.condition = selectedConditions[0];
     if (priceRange[0] > 0) params.minPrice = priceRange[0];
     if (priceRange[1] < 50000) params.maxPrice = priceRange[1];
-    if (tradeOnly) params.tradeAvailable = true;
-    
+    // API ProductQueryDto / search: tradeOnly (tradeAvailable sunucuda yok)
+    if (tradeOnly) params.tradeOnly = true;
+
     return params;
   }, [debouncedQuery, sortBy, category, selectedBrands, selectedScales, selectedConditions, priceRange, tradeOnly, manufacturer]);
 
-  // Elasticsearch veya normal ürün arama
-  const { data: products, isLoading, refetch, error } = useQuery({
-    queryKey: ['products', queryParams],
-    queryFn: async () => {
-      console.log('🔍 Search API çağrılıyor, params:', JSON.stringify(queryParams));
+  // Elasticsearch veya normal ürün arama (sayfalı; API varsayılan limit 20 — açıkça 100 + page)
+  const {
+    data: searchPages,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error,
+  } = useInfiniteQuery({
+    queryKey: ['products', 'search', queryParams],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const page = pageParam as number;
       try {
-        let data = [];
-        
+        let items: any[] = [];
+        let nextPage: number | undefined;
+
         // Üretici filtresi varken ES üreticiyi bilmediği için REST /products kullan
         if (debouncedQuery && debouncedQuery.length >= 2 && !manufacturer.trim()) {
-          console.log('🔍 Using Elasticsearch search for:', debouncedQuery);
-          const searchParams = {
+          const searchParams: Record<string, unknown> = {
             q: debouncedQuery,
             categoryId: category || undefined,
             minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
             maxPrice: priceRange[1] < 50000 ? priceRange[1] : undefined,
-            condition: selectedConditions.length > 0 ? selectedConditions[0] : undefined,
-            sortBy: sortBy === 'newest' ? 'newest' : sortBy === 'price_asc' ? 'price_asc' : sortBy === 'price_desc' ? 'price_desc' : 'relevance',
-            pageSize: 50,
+            condition: selectedConditions[0],
+            sortBy:
+              sortBy === 'newest'
+                ? 'newest'
+                : sortBy === 'price_asc'
+                  ? 'price_asc'
+                  : sortBy === 'price_desc'
+                    ? 'price_desc'
+                    : sortBy === 'popular'
+                      ? 'view_count_desc'
+                      : 'relevance',
+            pageSize: SEARCH_PAGE_SIZE,
+            page,
+            tradeOnly: tradeOnly ? true : undefined,
+            brand: brandNamesForApi(selectedBrands),
+            scale: selectedScales.length > 0 ? selectedScales[0] : undefined,
+            manufacturer: manufacturer.trim() || undefined,
           };
-          
-          const res = await searchApi.products(searchParams);
-          // Elasticsearch yanıtı: { results: [...], total, page, pageSize, took }
-          data = res.data?.results || res.data?.data || [];
-          console.log('🔍 Elasticsearch results:', data.length);
+          const res = await searchApi.products(searchParams as Parameters<typeof searchApi.products>[0]);
+          const body = res.data as {
+            results?: unknown[];
+            data?: unknown[];
+            total?: number;
+            page?: number;
+            pageSize?: number;
+          };
+          const raw = body?.results || body?.data || [];
+          items = Array.isArray(raw) ? raw : [];
+          const total = body?.total ?? items.length;
+          const totalPages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
+          nextPage = page < totalPages ? page + 1 : undefined;
         } else {
-          // Normal ürün listesi
-          const res = await productsApi.getAll(queryParams);
-          
-          // API response parsing
+          const restParams: Record<string, unknown> = {
+            ...queryParams,
+            limit: SEARCH_PAGE_SIZE,
+            page,
+          };
+          const res = await productsApi.getAll(restParams);
+          const responseData = res.data as {
+            data?: unknown[];
+            products?: unknown[];
+            items?: unknown[];
+            meta?: { total?: number; totalPages?: number };
+          };
           if (Array.isArray(res.data)) {
-            data = res.data;
-          } else if (res.data?.data && Array.isArray(res.data.data)) {
-            data = res.data.data;
-          } else if (res.data?.products && Array.isArray(res.data.products)) {
-            data = res.data.products;
-          } else if (res.data?.items && Array.isArray(res.data.items)) {
-            data = res.data.items;
+            items = res.data;
+          } else if (responseData?.data && Array.isArray(responseData.data)) {
+            items = responseData.data;
+          } else if (responseData?.products && Array.isArray(responseData.products)) {
+            items = responseData.products;
+          } else if (responseData?.items && Array.isArray(responseData.items)) {
+            items = responseData.items;
           }
+          const meta = responseData?.meta;
+          const totalPages = meta?.totalPages;
+          nextPage =
+            totalPages != null
+              ? page < totalPages
+                ? page + 1
+                : undefined
+              : items.length >= SEARCH_PAGE_SIZE
+                ? page + 1
+                : undefined;
         }
-        
-        // Trade-only filter (client-side)
-        if (tradeOnly) {
-          data = data.filter((p: any) => p.tradeAvailable || p.isTradeEnabled);
-        }
-        
-        console.log('🔍 Final products count:', data.length);
-        return data;
-      } catch (err: any) {
-        console.log('❌ Search API error:', err.message);
-        // Fallback to normal products API if elasticsearch fails
+
+        return { items, nextPage };
+      } catch (err: unknown) {
+        console.log('❌ Search API error:', err instanceof Error ? err.message : err);
         try {
-          const res = await productsApi.getAll(queryParams);
-          return res.data?.data || res.data?.products || res.data || [];
+          const res = await productsApi.getAll({
+            ...queryParams,
+            limit: SEARCH_PAGE_SIZE,
+            page,
+          });
+          const responseData = res.data as { data?: unknown[]; products?: unknown[]; meta?: { totalPages?: number } };
+          let items: any[] = [];
+          if (Array.isArray(res.data)) items = res.data;
+          else if (responseData?.data && Array.isArray(responseData.data)) items = responseData.data;
+          else if (responseData?.products && Array.isArray(responseData.products)) items = responseData.products;
+          const tp = responseData?.meta?.totalPages;
+          const nextPage =
+            tp != null ? (page < tp ? page + 1 : undefined) : items.length >= SEARCH_PAGE_SIZE ? page + 1 : undefined;
+          return { items, nextPage };
         } catch {
-          return [];
+          return { items: [], nextPage: undefined };
         }
       }
     },
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
 
-  // Log state changes
-  console.log('📊 Current state - products:', products?.length || 0, 'isLoading:', isLoading, 'error:', error?.message);
+  const products = useMemo(
+    () => searchPages?.pages.flatMap((p) => p.items) ?? [],
+    [searchPages?.pages]
+  );
 
   const handleProductPress = (productId: string) => {
     router.push(`/product/${productId}`);
@@ -288,8 +373,8 @@ export default function SearchScreen() {
         />
         {tradeOpen && (
           <View style={styles.tradeBadge}>
-            <Ionicons name="swap-horizontal" size={12} color="#fff" />
-            <Text style={styles.tradeBadgeText}>Takas Açık</Text>
+            <Ionicons name="swap-horizontal" size={11} color="#fff" />
+            <Text style={styles.tradeBadgeText}>Takas</Text>
           </View>
         )}
         {item.condition === 'new' && (
@@ -418,49 +503,51 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {/* Filter & Sort Row */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity 
-          style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
-        >
-          <Ionicons name="filter-outline" size={20} color={TarodanColors.textPrimary} />
-          <Text style={styles.filterButtonText}>Filtrele</Text>
-          {activeFiltersCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+      {/* Filtre / sırala + hızlı çipler — tek blok, sıkı dikey boşluk */}
+      <View style={styles.toolbarBlock}>
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="filter-outline" size={18} color={TarodanColors.primary} />
+            <Text style={styles.filterButtonText}>Filtrele</Text>
+            {activeFiltersCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.filterButton}
-          onPress={() => setSortModalVisible(true)}
-        >
-          <Ionicons name="swap-vertical-outline" size={20} color={TarodanColors.textPrimary} />
-          <Text style={styles.filterButtonText}>
-            {SORT_OPTIONS.find(s => s.value === sortBy)?.label || 'Sırala'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setSortModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="swap-vertical-outline" size={18} color={TarodanColors.primary} />
+            <Text style={styles.filterButtonText} numberOfLines={1}>
+              {SORT_OPTIONS.find((s) => s.value === sortBy)?.label || 'Sırala'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Quick Filters */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.quickFilters}
-        contentContainerStyle={styles.quickFiltersContent}
-      >
-        <Chip
-          mode={tradeOnly ? 'flat' : 'outlined'}
-          selected={tradeOnly}
-          onPress={() => setTradeOnly(!tradeOnly)}
-          style={[styles.quickChip, tradeOnly && styles.quickChipActive]}
-          textStyle={tradeOnly ? styles.quickChipTextActive : undefined}
-          icon={tradeOnly ? 'check' : 'swap-horizontal'}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.quickFilters}
+          contentContainerStyle={styles.quickFiltersContent}
         >
-          Takaslı
-        </Chip>
+          <Chip
+            mode={tradeOnly ? 'flat' : 'outlined'}
+            selected={tradeOnly}
+            onPress={() => setTradeOnly(!tradeOnly)}
+            style={[styles.quickChip, tradeOnly && styles.quickChipActive]}
+            textStyle={tradeOnly ? styles.quickChipTextActive : styles.quickChipText}
+            icon={tradeOnly ? 'check' : 'swap-horizontal'}
+          >
+            Takaslı
+          </Chip>
         {selectedBrands.map(brandId => {
           const brand = BRANDS.find(b => b.id === brandId);
           return (
@@ -491,15 +578,18 @@ export default function SearchScreen() {
           </Chip>
         )}
         {activeFiltersCount > 0 && (
-          <Chip 
-            mode="outlined" 
+          <Chip
+            mode="outlined"
             onPress={clearAllFilters}
             icon="close"
+            style={styles.quickChip}
+            textStyle={styles.quickChipText}
           >
             Temizle
           </Chip>
         )}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Results Count */}
       <View style={styles.resultsCount}>
@@ -517,12 +607,23 @@ export default function SearchScreen() {
       ) : (
         <FlatList
           data={products || []}
-          numColumns={2}
+          numColumns={SEARCH_NUM_COLUMNS}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.listRow}
+          columnWrapperStyle={SEARCH_NUM_COLUMNS > 1 ? styles.listRow : undefined}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderProduct}
           showsVerticalScrollIndicator={false}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.35}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator color={TarodanColors.primary} />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={64} color={TarodanColors.textLight} />
@@ -887,41 +988,47 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: '#FFFFFF',
     elevation: 0,
-    borderRadius: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
   },
   searchInput: {
     fontSize: 16,
+    color: TarodanColors.textPrimary,
+    minHeight: 22,
   },
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: TarodanColors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 4,
+    gap: 8,
   },
   filterButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginHorizontal: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    backgroundColor: TarodanColors.primaryLight,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
   },
   filterButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
     color: TarodanColors.textPrimary,
+    flexShrink: 1,
   },
   filterBadge: {
     marginLeft: 6,
     backgroundColor: TarodanColors.primary,
-    borderRadius: 0,
+    borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
@@ -933,24 +1040,37 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   quickFilters: {
-    backgroundColor: TarodanColors.background,
-    minHeight: 56,
+    backgroundColor: 'transparent',
+    maxHeight: 42,
+    minHeight: 38,
   },
   quickFiltersContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    paddingHorizontal: 10,
+    paddingTop: 0,
+    paddingBottom: 2,
+    gap: 6,
     alignItems: 'center',
   },
   quickChip: {
-    marginRight: 8,
+    marginRight: 4,
     height: 36,
+  },
+  quickChipOutlined: {
+    borderColor: TarodanColors.primary,
+    borderWidth: 1.5,
+    backgroundColor: TarodanColors.primaryLight,
   },
   quickChipActive: {
     backgroundColor: TarodanColors.primary,
   },
+  quickChipText: {
+    color: TarodanColors.secondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   quickChipTextActive: {
     color: '#fff',
+    fontWeight: '600',
   },
   activeChip: {
     marginRight: 8,
@@ -966,15 +1086,18 @@ const styles = StyleSheet.create({
     color: TarodanColors.textSecondary,
   },
   listContent: {
-    padding: 8,
-    paddingTop: 6,
+    paddingHorizontal: SEARCH_LIST_H_PAD,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
   listRow: {
     justifyContent: 'space-between',
+    marginBottom: SEARCH_GRID_GAP,
+    gap: SEARCH_GRID_GAP,
   },
   productCard: {
     width: CARD_WIDTH,
-    marginBottom: 8,
+    marginBottom: 0,
     borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: TarodanColors.background,
@@ -983,7 +1106,7 @@ const styles = StyleSheet.create({
   },
   productImageWrap: {
     width: '100%',
-    height: CARD_WIDTH,
+    height: Math.round(CARD_WIDTH * 0.88),
     position: 'relative',
     backgroundColor: TarodanColors.backgroundSecondary,
     overflow: 'hidden',
@@ -995,22 +1118,23 @@ const styles = StyleSheet.create({
   },
   tradeBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: 6,
+    left: 6,
     zIndex: 2,
     elevation: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.accent,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 0,
+    backgroundColor: '#047857',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   tradeBadgeText: {
-    marginLeft: 4,
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff',
+    marginLeft: 3,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   conditionBadge: {
     position: 'absolute',
@@ -1046,11 +1170,11 @@ const styles = StyleSheet.create({
     color: TarodanColors.textSecondary,
   },
   productContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   productTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: TarodanColors.textPrimary,
     marginBottom: 4,

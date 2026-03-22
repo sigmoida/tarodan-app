@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -14,12 +13,14 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme/colors';
 import { useAuthStore } from '../src/stores/authStore';
-import { offersApi } from '../src/services/api';
+import { offersApi, ordersApi } from '../src/services/api';
 import { transformImageUrl } from '../src/utils/imageUrl';
+import { formatApiErrorMessage } from '../src/utils/formatApiErrorMessage';
 
 interface Offer {
   id: string;
@@ -36,6 +37,7 @@ interface Offer {
     price: number;
     imageUrl?: string;
     images?: { cardUrl?: string }[];
+    categoryId?: string | null;
   };
   buyer?: { id: string; displayName: string; avatarUrl?: string };
   seller?: { id: string; displayName: string; avatarUrl?: string };
@@ -83,24 +85,57 @@ function formatPrice(n: number): string {
 }
 
 export default function OffersScreen() {
+  const queryClient = useQueryClient();
+  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  const tabFromUrl = (Array.isArray(params.tab) ? params.tab[0] : params.tab)?.toLowerCase();
+
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<TabType>('received');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    tabFromUrl === 'sent' ? 'sent' : 'received',
+  );
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [estimatedNetByOfferId, setEstimatedNetByOfferId] = useState<Record<string, number>>({});
 
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterOfferId, setCounterOfferId] = useState<string | null>(null);
   const [counterAmount, setCounterAmount] = useState('');
+
+  const [buyerCounterModalVisible, setBuyerCounterModalVisible] = useState(false);
+  const [buyerCounterOfferId, setBuyerCounterOfferId] = useState<string | null>(null);
+  const [buyerCounterRefAmount, setBuyerCounterRefAmount] = useState<number | null>(null);
+  const [buyerCounterAmount, setBuyerCounterAmount] = useState('');
+
+  useEffect(() => {
+    if (tabFromUrl === 'sent' || tabFromUrl === 'received') {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
+  const setTab = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    router.replace(`/offers?tab=${tab}`);
+  }, []);
+
+  const invalidateOfferRelatedCaches = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['offers'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'product',
+    });
+    queryClient.invalidateQueries({ queryKey: ['listings'] });
+    queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+  }, [queryClient]);
 
   const fetchOffers = useCallback(async () => {
     try {
       const res = await offersApi.getAll({ type: activeTab });
       const data = res.data?.data || res.data?.offers || [];
       setOffers(data);
-    } catch {
-      Alert.alert('Hata', 'Teklifler yüklenirken bir hata oluştu');
+    } catch (err) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklifler yüklenirken bir hata oluştu'));
     }
   }, [activeTab]);
 
@@ -120,14 +155,51 @@ export default function OffersScreen() {
     setRefreshing(false);
   }, [fetchOffers]);
 
+  useEffect(() => {
+    const pendingReceivedOffers =
+      activeTab === 'received'
+        ? offers.filter((o) => o.status === 'pending' && !o.buyerMustAccept)
+        : [];
+    if (pendingReceivedOffers.length === 0) {
+      setEstimatedNetByOfferId({});
+      return;
+    }
+    let cancelled = false;
+    ordersApi
+      .getCommissionPreviewBatch(
+        pendingReceivedOffers.map((o) => ({
+          amount: Number(o.amount),
+          categoryId: o.product?.categoryId ?? null,
+        })),
+      )
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.results && Array.isArray(res.data.results)) {
+          const map: Record<string, number> = {};
+          pendingReceivedOffers.forEach((o, i) => {
+            const r = res.data.results[i];
+            if (r != null && typeof r.sellerNetAmount === 'number') map[o.id] = r.sellerNetAmount;
+          });
+          setEstimatedNetByOfferId(map);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEstimatedNetByOfferId({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, offers]);
+
   const handleAccept = async (offerId: string) => {
     setActionLoading(offerId);
     try {
       await offersApi.accept(offerId);
+      invalidateOfferRelatedCaches();
       Alert.alert('Başarılı', 'Teklif kabul edildi');
       await fetchOffers();
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Teklif kabul edilirken hata oluştu');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif kabul edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -137,10 +209,11 @@ export default function OffersScreen() {
     setActionLoading(offerId);
     try {
       await offersApi.reject(offerId);
+      invalidateOfferRelatedCaches();
       Alert.alert('Başarılı', 'Teklif reddedildi');
       await fetchOffers();
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Teklif reddedilirken hata oluştu');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif reddedilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -150,10 +223,11 @@ export default function OffersScreen() {
     setActionLoading(offerId);
     try {
       await offersApi.cancel(offerId);
+      invalidateOfferRelatedCaches();
       Alert.alert('Başarılı', 'Teklif iptal edildi');
       await fetchOffers();
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Teklif iptal edilirken hata oluştu');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif iptal edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -176,13 +250,51 @@ export default function OffersScreen() {
     setCounterModalVisible(false);
     try {
       await offersApi.counter(counterOfferId, amount);
+      invalidateOfferRelatedCaches();
       Alert.alert('Başarılı', 'Karşı teklif gönderildi');
       await fetchOffers();
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Karşı teklif gönderilirken hata oluştu');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
     } finally {
       setActionLoading(null);
       setCounterOfferId(null);
+    }
+  };
+
+  const openBuyerCounterModal = (offer: Offer) => {
+    setBuyerCounterOfferId(offer.id);
+    setBuyerCounterRefAmount(Number(offer.amount));
+    setBuyerCounterAmount('');
+    setBuyerCounterModalVisible(true);
+  };
+
+  const handleBuyerCounter = async () => {
+    if (!buyerCounterOfferId || buyerCounterRefAmount == null) return;
+    const amount = parseFloat(buyerCounterAmount.replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Hata', 'Geçerli bir tutar girin');
+      return;
+    }
+    if (amount >= buyerCounterRefAmount) {
+      Alert.alert(
+        'Hata',
+        `Satıcının karşı teklifi ₺${buyerCounterRefAmount.toLocaleString('tr-TR')}. Yeni tutar bundan düşük olmalıdır.`,
+      );
+      return;
+    }
+    setActionLoading(buyerCounterOfferId);
+    setBuyerCounterModalVisible(false);
+    try {
+      await offersApi.buyerCounter(buyerCounterOfferId, amount);
+      invalidateOfferRelatedCaches();
+      Alert.alert('Başarılı', 'Karşı teklifiniz gönderildi; satıcı yanıtlayacak');
+      await fetchOffers();
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
+    } finally {
+      setActionLoading(null);
+      setBuyerCounterOfferId(null);
+      setBuyerCounterRefAmount(null);
     }
   };
 
@@ -217,6 +329,10 @@ export default function OffersScreen() {
     const otherUser = activeTab === 'received' ? offer.buyer : offer.seller;
     const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;
     const isActionLoading = actionLoading === offer.id;
+    const estimatedNet =
+      activeTab === 'received' && offer.status === 'pending' && !offer.buyerMustAccept
+        ? estimatedNetByOfferId[offer.id]
+        : undefined;
 
     return (
       <View style={styles.card}>
@@ -249,6 +365,13 @@ export default function OffersScreen() {
             <Text style={styles.amountLabel}>Teklif Tutarı</Text>
             <Text style={styles.amountValue}>{formatPrice(offer.amount)}</Text>
           </View>
+
+          {estimatedNet != null && (
+            <View style={styles.netBox}>
+              <Text style={styles.netLabel}>Tahmini net (satıcı)</Text>
+              <Text style={styles.netValue}>{formatPrice(estimatedNet)}</Text>
+            </View>
+          )}
 
           {timeRemaining && (
             <View style={styles.timeBox}>
@@ -294,7 +417,14 @@ export default function OffersScreen() {
         {/* Actions */}
         {offer.status === 'pending' && (
           <View style={styles.actionsRow}>
-            {activeTab === 'received' ? (
+            {activeTab === 'received' && offer.buyerMustAccept ? (
+              <View style={styles.waitingBanner}>
+                <Ionicons name="time-outline" size={18} color="#B45309" />
+                <Text style={styles.waitingBannerText}>
+                  Alıcının karşı teklifinizi kabul veya reddetmesi bekleniyor.
+                </Text>
+              </View>
+            ) : activeTab === 'received' ? (
               <>
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.acceptBtn]}
@@ -325,6 +455,39 @@ export default function OffersScreen() {
                 >
                   <Ionicons name="swap-horizontal" size={16} color="#fff" />
                   <Text style={styles.actionBtnText}>Karşı Teklif</Text>
+                </TouchableOpacity>
+              </>
+            ) : offer.buyerMustAccept ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.acceptBtn]}
+                  onPress={() => handleAccept(offer.id)}
+                  disabled={isActionLoading}
+                >
+                  {isActionLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Text style={styles.actionBtnText}>Karşı teklifi kabul et</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.rejectBtn]}
+                  onPress={() => handleReject(offer.id)}
+                  disabled={isActionLoading}
+                >
+                  <Ionicons name="close" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Reddet</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.counterBtn]}
+                  onPress={() => openBuyerCounterModal(offer)}
+                  disabled={isActionLoading}
+                >
+                  <Ionicons name="trending-down" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Daha düşük teklif</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -402,7 +565,7 @@ export default function OffersScreen() {
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'received' && styles.tabActive]}
-          onPress={() => setActiveTab('received')}
+          onPress={() => setTab('received')}
         >
           <Ionicons
             name="mail-open-outline"
@@ -415,7 +578,7 @@ export default function OffersScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'sent' && styles.tabActive]}
-          onPress={() => setActiveTab('sent')}
+          onPress={() => setTab('sent')}
         >
           <Ionicons
             name="paper-plane-outline"
@@ -447,7 +610,7 @@ export default function OffersScreen() {
         />
       )}
 
-      {/* Counter modal */}
+      {/* Counter modal (satıcı) */}
       <Modal visible={counterModalVisible} transparent animationType="fade" onRequestClose={() => setCounterModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -470,6 +633,47 @@ export default function OffersScreen() {
                 <Text style={styles.modalCancelBtnText}>Vazgeç</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.modalConfirmBtn]} onPress={handleCounter}>
+                <Text style={styles.modalConfirmBtnText}>Gönder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Alıcı karşı teklifi (satıcı tutarından düşük) */}
+      <Modal
+        visible={buyerCounterModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBuyerCounterModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Daha düşük teklif</Text>
+            <Text style={styles.modalSubtitle}>
+              Satıcının karşı teklifi:{' '}
+              {buyerCounterRefAmount != null
+                ? `₺${buyerCounterRefAmount.toLocaleString('tr-TR')}`
+                : '—'}
+              . Bu tutarın altında, ilan fiyatının en az %50 kadarına uygun bir teklif yazın.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Yeni tutar (₺)"
+              placeholderTextColor={TarodanColors.textTertiary}
+              keyboardType="numeric"
+              value={buyerCounterAmount}
+              onChangeText={setBuyerCounterAmount}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setBuyerCounterModalVisible(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Vazgeç</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, styles.modalConfirmBtn]} onPress={handleBuyerCounter}>
                 <Text style={styles.modalConfirmBtnText}>Gönder</Text>
               </TouchableOpacity>
             </View>
@@ -650,6 +854,7 @@ const styles = StyleSheet.create({
   // Amount
   amountRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
     marginTop: 12,
@@ -671,6 +876,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: TarodanColors.primary,
+  },
+  netBox: {
+    backgroundColor: '#D1FAE5',
+    borderWidth: 1,
+    borderColor: '#6EE7B7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+  netLabel: {
+    fontSize: 10,
+    color: TarodanColors.textTertiary,
+    marginBottom: 2,
+  },
+  netValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
   },
   timeBox: {
     flexDirection: 'row',
@@ -752,6 +977,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
+  },
+  waitingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    minWidth: '100%',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  waitingBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 18,
   },
   actionBtn: {
     flexDirection: 'row',

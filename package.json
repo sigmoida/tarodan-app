@@ -52,5 +52,14 @@
   },
   "dependencies": {
     "openai": "^6.25.0"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "react-native-worklets": {
+        "dependencies": {
+          "@babel/types": "^7.28.0"
+        }
+      }
+    }
   }
 }

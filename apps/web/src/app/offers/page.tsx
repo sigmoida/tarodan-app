@@ -30,6 +30,8 @@ import { useTranslation } from '@/i18n/LanguageContext';
 interface Offer {
   id: string;
   amount: number;
+  /** Satıcı karşı teklifinden sonra kabul/red sırası alıcıda */
+  buyerMustAccept?: boolean;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired';
   orderId?: string | null;
   orderStatus?: string | null;
@@ -78,6 +80,9 @@ function OffersPageContent() {
   };
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [estimatedNetByOfferId, setEstimatedNetByOfferId] = useState<Record<string, number>>({});
+  const [buyerCounterOpen, setBuyerCounterOpen] = useState(false);
+  const [buyerCounterOffer, setBuyerCounterOffer] = useState<Offer | null>(null);
+  const [buyerCounterAmt, setBuyerCounterAmt] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -108,7 +113,10 @@ function OffersPageContent() {
 
   const invalidateOffers = () => queryClient.invalidateQueries({ queryKey: ['offers'] });
 
-  const pendingReceivedOffers = activeTab === 'received' ? offers.filter((o) => o.status === 'pending') : [];
+  const pendingReceivedOffers =
+    activeTab === 'received'
+      ? offers.filter((o) => o.status === 'pending' && !o.buyerMustAccept)
+      : [];
   useEffect(() => {
     if (pendingReceivedOffers.length === 0) {
       setEstimatedNetByOfferId({});
@@ -165,6 +173,40 @@ function OffersPageContent() {
       await invalidateOffers();
     } catch (err: any) {
       alert(err.response?.data?.message || (locale === 'en' ? 'Failed to cancel offer' : 'Teklif iptal edilirken hata oluştu'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openBuyerCounterModal = (offer: Offer) => {
+    setBuyerCounterOffer(offer);
+    setBuyerCounterAmt('');
+    setBuyerCounterOpen(true);
+  };
+
+  const submitBuyerCounter = async () => {
+    if (!buyerCounterOffer) return;
+    const amount = parseFloat(buyerCounterAmt.replace(',', '.'));
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
+      return;
+    }
+    if (amount >= Number(buyerCounterOffer.amount)) {
+      alert(
+        locale === 'en'
+          ? `Your offer must be below the seller's counter (₺${Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}).`
+          : `Satıcının karşı teklifinden (₺${Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}) düşük olmalıdır.`,
+      );
+      return;
+    }
+    setActionLoading(buyerCounterOffer.id);
+    try {
+      await api.post(`/offers/${buyerCounterOffer.id}/buyer-counter`, { amount });
+      setBuyerCounterOpen(false);
+      setBuyerCounterOffer(null);
+      await invalidateOffers();
+    } catch (err: any) {
+      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
     } finally {
       setActionLoading(null);
     }
@@ -522,8 +564,14 @@ function OffersPageContent() {
 
                           {/* Actions */}
                           {offer.status === 'pending' && (
-                            <div className="flex gap-2">
-                              {activeTab === 'received' ? (
+                            <div className="flex flex-wrap items-center gap-2 justify-end">
+                              {activeTab === 'received' && offer.buyerMustAccept ? (
+                                <span className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded">
+                                  {locale === 'en'
+                                    ? 'Waiting for the buyer to accept or decline your counter offer.'
+                                    : 'Alıcının karşı teklifinizi kabul veya reddetmesi bekleniyor.'}
+                                </span>
+                              ) : activeTab === 'received' ? (
                                 <>
                                   <button
                                     onClick={() => handleAccept(offer.id)}
@@ -544,6 +592,38 @@ function OffersPageContent() {
                                   >
                                     <XMarkIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Reject' : 'Reddet'}
+                                  </button>
+                                </>
+                              ) : offer.buyerMustAccept ? (
+                                <>
+                                  <button
+                                    onClick={() => handleAccept(offer.id)}
+                                    disabled={actionLoading === offer.id}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded text-sm font-medium transition-colors"
+                                  >
+                                    {actionLoading === offer.id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <CheckIcon className="w-4 h-4" />
+                                    )}
+                                    {locale === 'en' ? 'Accept counter offer' : 'Karşı teklifi kabul et'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(offer.id)}
+                                    disabled={actionLoading === offer.id}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors"
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                    {locale === 'en' ? 'Decline' : 'Reddet'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openBuyerCounterModal(offer)}
+                                    disabled={actionLoading === offer.id}
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded text-sm font-medium transition-colors"
+                                  >
+                                    <ArrowTrendingDownIcon className="w-4 h-4" />
+                                    {locale === 'en' ? 'Lower offer' : 'Daha düşük teklif'}
                                   </button>
                                 </>
                               ) : (
@@ -592,6 +672,51 @@ function OffersPageContent() {
           </div>
         )}
       </div>
+
+      {buyerCounterOpen && buyerCounterOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {locale === 'en' ? 'Counter with a lower amount' : 'Daha düşük teklif'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {locale === 'en' ? "Seller's counter:" : 'Satıcının karşı teklifi:'}{' '}
+              <strong>₺{Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}</strong>.{' '}
+              {locale === 'en'
+                ? 'Enter an amount below that and at least 50% of the listing price (server validates).'
+                : 'Bu tutarın altında, ilan fiyatının en az %50 kadarına uygun bir teklif girin.'}
+            </p>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
+              placeholder={locale === 'en' ? 'Amount (TRY)' : 'Tutar (₺)'}
+              value={buyerCounterAmt}
+              onChange={(e) => setBuyerCounterAmt(e.target.value)}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                onClick={() => {
+                  setBuyerCounterOpen(false);
+                  setBuyerCounterOffer(null);
+                }}
+              >
+                {locale === 'en' ? 'Cancel' : 'Vazgeç'}
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={actionLoading === buyerCounterOffer.id}
+                onClick={() => submitBuyerCounter()}
+              >
+                {locale === 'en' ? 'Send' : 'Gönder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, ScrollView, Image, Dimensions, StyleSheet, TouchableOpacity, Share } from 'react-native';
 import { Text, Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider, Modal, Portal, TextInput as PaperInput } from 'react-native-paper';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { productsApi, ratingsApi, userReportsApi, offersApi, api } from '../../src/services/api';
@@ -16,11 +16,13 @@ import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../sr
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '../../src/utils/productPrice';
 import { safeString } from '../../src/utils/safeString';
 import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
+import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 
 const { width } = Dimensions.get('window');
 
 
 export default function ProductDetailScreen() {
+  const queryClient = useQueryClient();
   const { id } = useLocalSearchParams();
   const productId = String(id);
   const { isAuthenticated, user } = useAuthStore();
@@ -165,10 +167,11 @@ export default function ProductDetailScreen() {
     setOfferLoading(true);
     try {
       await offersApi.create({ productId: product.id, amount, message: offerMessage || undefined });
+      queryClient.invalidateQueries({ queryKey: ['offers'] });
       setShowOfferModal(false);
       setSnackbar({ visible: true, message: 'Teklifiniz gönderildi!', type: 'success' });
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Teklif gönderilemedi');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif gönderilemedi'));
     } finally {
       setOfferLoading(false);
     }
@@ -223,7 +226,9 @@ export default function ProductDetailScreen() {
       setTimeout(() => router.push('/(auth)/login'), 1500);
       return;
     }
-    router.push(`/trade/new?productId=${id}&targetSellerId=${product.seller?.id || ''}`);
+    router.push(
+      `/trade/new?listing=${id}&productId=${id}&targetSellerId=${product.seller?.id || ''}`,
+    );
   };
 
   const handleShare = async () => {
@@ -281,6 +286,21 @@ export default function ProductDetailScreen() {
   };
 
   const conditionInfo = getConditionInfo(product.condition);
+
+  /** Web listings/[id] ile aynı: müsait adet (rezerve düşülmüş) */
+  const stockDisplay = (() => {
+    const avail = product.availableQuantity;
+    const qty = product.quantity;
+    if (avail !== undefined && avail !== null) {
+      if (avail <= 0) return 'Tükendi';
+      return `${avail} adet`;
+    }
+    if (qty !== undefined && qty !== null) {
+      if (qty <= 0) return 'Tükendi';
+      return `${qty} adet`;
+    }
+    return 'Sınırsız';
+  })();
 
   return (
     <View style={styles.container}>
@@ -432,6 +452,10 @@ export default function ProductDetailScreen() {
                   <Text style={styles.specValue}>{product.year}</Text>
                 </View>
               )}
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Stok</Text>
+                <Text style={styles.specValue}>{stockDisplay}</Text>
+              </View>
             </View>
           </View>
 

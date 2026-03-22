@@ -61,7 +61,7 @@ export default function HomeScreen() {
     queryKey: ['products'],
     queryFn: async () => {
       try {
-        const response = await productsApi.getAll({ limit: 20 });
+        const response = await productsApi.getAll({ limit: 100, page: 1 });
         // Web ile aynı response yapısını destekle
         const products = response.data.data || response.data.products || response.data || [];
         console.log('📦 Ürünler yüklendi:', Array.isArray(products) ? products.length : 0);

@@ -913,6 +913,8 @@ model Offer {
   amount    Decimal     @db.Decimal(10, 2)
   message   String?
   status    OfferStatus @default(pending)
+  /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
+  buyerMustAccept Boolean @default(false) @map("buyer_must_accept")
   expiresAt DateTime    @map("expires_at")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")

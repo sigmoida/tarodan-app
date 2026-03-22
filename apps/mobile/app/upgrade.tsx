@@ -1,10 +1,8 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Card, Button, Chip, RadioButton, Divider, ActivityIndicator } from 'react-native-paper';
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
 import { TarodanColors } from '../src/theme';
 
@@ -56,34 +54,10 @@ const COMPARISON = [
 ];
 
 export default function UpgradeScreen() {
-  const { isAuthenticated, user, refreshUserData } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
 
   const isPremium = user?.membershipTier === 'premium';
-
-  // Subscribe mutation
-  const subscribeMutation = useMutation({
-    mutationFn: async (planId: string) => {
-      return api.post('/subscriptions/create', { planId });
-    },
-    onSuccess: (response) => {
-      // In a real app, this would redirect to a payment gateway
-      const paymentUrl = response.data?.paymentUrl;
-      if (paymentUrl) {
-        Linking.openURL(paymentUrl);
-      } else {
-        Alert.alert(
-          'Ödeme',
-          'Ödeme sayfasına yönlendiriliyorsunuz...',
-          [{ text: 'Tamam' }]
-        );
-      }
-      refreshUserData();
-    },
-    onError: () => {
-      Alert.alert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
-    },
-  });
 
   const handleSubscribe = () => {
     if (!isAuthenticated) {
@@ -91,8 +65,8 @@ export default function UpgradeScreen() {
       return;
     }
 
-    const plan = PLANS[selectedPlan];
-    subscribeMutation.mutate(plan.id);
+    const period = selectedPlan === 'annual' ? 'yearly' : 'monthly';
+    router.push(`/membership/checkout?tier=premium&period=${period}`);
   };
 
   const plan = PLANS[selectedPlan];
@@ -202,7 +176,6 @@ export default function UpgradeScreen() {
               style={styles.subscribeButton}
               contentStyle={styles.subscribeButtonContent}
               onPress={handleSubscribe}
-              loading={subscribeMutation.isPending}
             >
               {selectedPlan === 'annual' 
                 ? `Yıllık ₺${PLANS.annual.price} ile Başla`

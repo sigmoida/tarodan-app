@@ -42,7 +42,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
 };
 
 export default function PaymentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, type: paymentFlowType } = useLocalSearchParams<{ id: string; type?: string }>();
   const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +61,15 @@ export default function PaymentDetailScreen() {
       setPayment(data);
 
       if (data?.status === 'completed') {
+        const isMembershipFlow =
+          paymentFlowType === 'membership' ||
+          data?.metadata?.type === 'membership' ||
+          data?.orderType === 'membership' ||
+          data?.isMembershipPayment;
+        if (isMembershipFlow) {
+          router.replace('/membership/success');
+          return;
+        }
         router.replace(`/payment/success?paymentId=${id}&orderId=${data.orderId || ''}`);
         return;
       }

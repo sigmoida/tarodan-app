@@ -352,6 +352,12 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>Siparişlerim</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/offers')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E8EAF6' }]}>
+                <Ionicons name="pricetag-outline" size={22} color="#5C6BC0" />
+              </View>
+              <Text style={styles.quickActionText}>Tekliflerim</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/favorites')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FCE4EC' }]}>
                 <Ionicons name="heart" size={22} color="#E91E63" />
@@ -397,6 +403,12 @@ export default function ProfileScreen() {
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Hesap Ayarları</Text>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/offers')}>
+            <Ionicons name="pricetag-outline" size={22} color={TarodanColors.textSecondary} />
+            <Text style={styles.menuItemText}>Tekliflerim</Text>
+            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+          </TouchableOpacity>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/addresses')}>
             <Ionicons name="location-outline" size={22} color={TarodanColors.textSecondary} />
@@ -407,7 +419,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
-            {user?.membershipTier === 'Premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
+            {user?.membershipTier === 'premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 

@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { listingsApi, tradesApi, userApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
-import { canPerformAction, getUpgradeMessage } from '../../src/utils/membershipLimits';
+import { getUpgradeMessage } from '../../src/utils/membershipLimits';
 import { getImageUrl } from '../../src/utils/imageUrl';
+import { getProductEffectivePrice } from '../../src/utils/productPrice';
+import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 
 interface Product {
   id: string;
@@ -16,15 +18,31 @@ interface Product {
   price: number;
   images?: any[];
   isTradeEnabled?: boolean;
+  status?: string;
+}
+
+function firstQueryParam(v?: string | string[]) {
+  if (v == null) return undefined;
+  return Array.isArray(v) ? v[0] : v;
 }
 
 export default function NewTradeScreen() {
-  const params = useLocalSearchParams<{ targetProductId?: string; targetSellerId?: string }>();
-  const targetProductId = params.targetProductId;
-  const targetSellerIdParam = params.targetSellerId;
-  const { user, isAuthenticated, limits } = useAuthStore();
+  const params = useLocalSearchParams<{
+    listing?: string | string[];
+    productId?: string | string[];
+    targetProductId?: string | string[];
+    targetSellerId?: string | string[];
+  }>();
+  /** Web: `?listing=` — mobil ürün sayfası `listing` + `productId` gönderir */
+  const listingId =
+    firstQueryParam(params.listing) ||
+    firstQueryParam(params.productId) ||
+    firstQueryParam(params.targetProductId);
+  const targetSellerIdParam = (firstQueryParam(params.targetSellerId) || '').trim();
+
+  const { user, isAuthenticated, limits, refreshUserData } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [step, setStep] = useState(1); // 1: Select my items, 2: Select their items, 3: Review
   const [selectedMyItems, setSelectedMyItems] = useState<Product[]>([]);
   const [selectedTheirItems, setSelectedTheirItems] = useState<Product[]>([]);
@@ -33,38 +51,48 @@ export default function NewTradeScreen() {
   const [message, setMessage] = useState('');
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
 
-  const canTrade = limits?.canTrade || false;
+  /** Web trades/new ile aynı: limits yüklüyse onu kullan; değilse üyelik kademesi */
+  const canTrade =
+    limits != null
+      ? !!limits.canTrade
+      : ['basic', 'premium', 'business'].includes((user?.membershipTier ?? '').toLowerCase());
 
-  // When only productId is passed, fetch product to get seller id
   const { data: targetProduct } = useQuery({
-    queryKey: ['trade-target-product', targetProductId],
+    queryKey: ['trade-target-listing', listingId],
     queryFn: async () => {
-      const res = await api.get(`/products/${targetProductId}`);
-      return res.data?.data || res.data?.product || res.data;
+      const res = await listingsApi.getOne(listingId!);
+      return res.data?.product || res.data?.data || res.data;
     },
-    enabled: !!targetProductId && !targetSellerIdParam && canTrade,
+    enabled: !!listingId && !targetSellerIdParam && canTrade,
   });
-  const targetSellerId = (targetSellerIdParam && String(targetSellerIdParam).trim()) || targetProduct?.seller?.id || '';
 
-  // Fetch my tradeable products
+  const targetSellerId =
+    targetSellerIdParam || targetProduct?.seller?.id || targetProduct?.sellerId || '';
+
   const { data: myProducts, isLoading: loadingMyProducts } = useQuery({
-    queryKey: ['my-tradeable-products'],
+    queryKey: ['my-tradeable-products', user?.id],
     queryFn: async () => {
-      const response = await api.get('/products', { 
-        params: { sellerId: user?.id, tradeAvailable: true, status: 'active' } 
-      });
+      const response = await userApi.getMyProducts({ status: 'active' });
       const raw = response.data?.data || response.data?.products || response.data || [];
-      return Array.isArray(raw) ? raw : [];
+      const list = Array.isArray(raw) ? raw : [];
+      return list.filter(
+        (p: Product) =>
+          p.status === 'active' &&
+          p.isTradeEnabled !== false &&
+          listingId &&
+          p.id !== listingId,
+      );
     },
-    enabled: isAuthenticated && canTrade,
+    enabled: isAuthenticated && canTrade && !!user?.id,
   });
 
-  // Fetch target seller's tradeable products
   const { data: theirProducts, isLoading: loadingTheirProducts } = useQuery({
     queryKey: ['seller-tradeable-products', targetSellerId],
     queryFn: async () => {
-      const response = await api.get('/products', { 
-        params: { sellerId: targetSellerId, tradeAvailable: true, status: 'active' } 
+      const response = await listingsApi.getAll({
+        sellerId: targetSellerId,
+        tradeAvailable: true,
+        status: 'active',
       });
       const raw = response.data?.data || response.data?.products || response.data || [];
       return Array.isArray(raw) ? raw : [];
@@ -72,41 +100,62 @@ export default function NewTradeScreen() {
     enabled: !!targetSellerId && canTrade,
   });
 
-  // Pre-select target product when their products load
   useEffect(() => {
-    if (!targetProductId || !theirProducts?.length) return;
-    const target = theirProducts.find((p: Product) => p.id === targetProductId);
+    if (!listingId || !theirProducts?.length) return;
+    const target = theirProducts.find((p: Product) => p.id === listingId);
     if (target) {
-      setSelectedTheirItems((prev) => (prev.some((p) => p.id === targetProductId) ? prev : [target]));
+      setSelectedTheirItems((prev) => (prev.some((p) => p.id === listingId) ? prev : [target]));
     }
-  }, [targetProductId, theirProducts]);
+  }, [listingId, theirProducts]);
 
-  // Create trade mutation
+  const invalidateTradeRelatedQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['trades'] });
+    queryClient.invalidateQueries({ queryKey: ['my-tradeable-products'] });
+    queryClient.invalidateQueries({ queryKey: ['seller-tradeable-products'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'product',
+    });
+    queryClient.invalidateQueries({ queryKey: ['listings'] });
+    queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+  };
+
   const createTradeMutation = useMutation({
     mutationFn: async () => {
-      const cashValue = parseFloat(cashAmount) || 0;
-      return api.post('/trades', {
+      const cashVal = parseFloat(cashAmount.replace(',', '.')) || 0;
+      let finalCash: number | undefined;
+      if (cashVal > 0) {
+        finalCash = cashDirection === 'offer' ? cashVal : -cashVal;
+      }
+      return tradesApi.create({
         receiverId: targetSellerId,
-        initiatorItems: selectedMyItems.map(p => ({ productId: p.id, quantity: 1 })),
-        receiverItems: selectedTheirItems.map(p => ({ productId: p.id, quantity: 1 })),
-        cashAmount: cashDirection === 'offer' ? cashValue : -cashValue,
-        message,
+        initiatorItems: selectedMyItems.map((p) => ({ productId: p.id, quantity: 1 })),
+        receiverItems: selectedTheirItems.map((p) => ({ productId: p.id, quantity: 1 })),
+        cashAmount: finalCash,
+        message: message.trim() || undefined,
       });
     },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
+    onSuccess: () => {
+      invalidateTradeRelatedQueries();
       setSnackbar({ visible: true, message: 'Takas teklifi gönderildi!' });
-      setTimeout(() => router.replace(`/trade/${response.data.id}`), 1500);
+      setTimeout(() => router.replace('/trades'), 1200);
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'Takas teklifi gönderilemedi' });
+    onError: async (error: unknown) => {
+      const msg = formatApiErrorMessage(error, 'Takas teklifi gönderilemedi');
+      if (
+        msg.includes('Takas özelliği') ||
+        msg.includes('üyeliğinizde mevcut değil') ||
+        msg.includes('takas özelliğine sahip değil')
+      ) {
+        await refreshUserData();
+      }
+      setSnackbar({ visible: true, message: msg });
     },
   });
 
-  // Calculate values
-  const myTotal = selectedMyItems.reduce((sum, p) => sum + (p.price || 0), 0);
-  const theirTotal = selectedTheirItems.reduce((sum, p) => sum + (p.price || 0), 0);
-  const cashValue = parseFloat(cashAmount) || 0;
+  const myTotal = selectedMyItems.reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
+  const theirTotal = selectedTheirItems.reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
+  const cashValue = parseFloat(cashAmount.replace(',', '.')) || 0;
   const effectiveCash = cashDirection === 'offer' ? cashValue : -cashValue;
   const finalDiff = theirTotal - myTotal - effectiveCash;
 
@@ -147,8 +196,8 @@ export default function NewTradeScreen() {
             </View>
           </View>
           
-          <Button mode="contained" onPress={() => router.push('/upgrade')} style={styles.upgradeButton}>
-            Premium'a Yükselt
+          <Button mode="contained" onPress={() => router.push('/membership')} style={styles.upgradeButton}>
+            Üyelik Planları
           </Button>
           <Button mode="text" onPress={() => router.back()}>
             Geri Dön
@@ -185,8 +234,9 @@ export default function NewTradeScreen() {
   };
 
   const handleSubmit = () => {
-    if (selectedMyItems.length === 0) {
-      Alert.alert('Hata', 'En az bir ürün seçmelisiniz');
+    const cashVal = parseFloat(cashAmount.replace(',', '.')) || 0;
+    if (selectedMyItems.length === 0 && cashVal <= 0) {
+      Alert.alert('Hata', 'En az bir ürün seçin veya nakit farkı girin');
       return;
     }
     if (selectedTheirItems.length === 0) {
@@ -211,7 +261,7 @@ export default function NewTradeScreen() {
           {product.title}
         </Text>
         <Text variant="bodySmall" style={styles.productPrice}>
-          ₺{product.price?.toLocaleString('tr-TR')}
+          ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
         </Text>
       </View>
       <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
@@ -278,11 +328,7 @@ export default function NewTradeScreen() {
             )}
 
             <View style={styles.stepActions}>
-              <Button
-                mode="contained"
-                disabled={selectedMyItems.length === 0}
-                onPress={() => setStep(2)}
-              >
+              <Button mode="contained" onPress={() => setStep(2)}>
                 Devam ({selectedMyItems.length} seçili)
               </Button>
             </View>

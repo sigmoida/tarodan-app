@@ -205,13 +205,14 @@ export class OfferService {
    * Accept an offer
    * POST /offers/:id/accept
    * Business Rules:
-   * - Only seller can accept
+   * - Normal teklif: yalnızca satıcı kabul eder
+   * - Karşı teklif (buyerMustAccept): yalnızca alıcı kabul eder
    * - Uses FOR UPDATE to lock offer and product rows
    * - Auto-reject other pending offers for same product
    * - Creates order with pending_payment status
    * - Emits offer.accepted event
    */
-  async accept(offerId: string, sellerId: string) {
+  async accept(offerId: string, userId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
@@ -233,8 +234,14 @@ export class OfferService {
         throw new NotFoundException('Teklif bulunamadı');
       }
 
-      // Only seller can accept
-      if (offerData.sellerId !== sellerId) {
+      const mustBuyerAccept = Boolean(offerData.buyerMustAccept);
+      if (mustBuyerAccept) {
+        if (offerData.buyerId !== userId) {
+          throw new ForbiddenException(
+            'Bu karşı teklifi yalnızca alıcı kabul edebilir',
+          );
+        }
+      } else if (offerData.sellerId !== userId) {
         throw new ForbiddenException('Bu teklifi kabul etme yetkiniz yok');
       }
 
@@ -381,7 +388,7 @@ export class OfferService {
    * Reject an offer
    * POST /offers/:id/reject
    */
-  async reject(offerId: string, sellerId: string) {
+  async reject(offerId: string, userId: string) {
     const offer = await this.prisma.offer.findUnique({
       where: { id: offerId },
     });
@@ -390,8 +397,14 @@ export class OfferService {
       throw new NotFoundException('Teklif bulunamadı');
     }
 
-    // Only seller can reject
-    if (offer.sellerId !== sellerId) {
+    const mustBuyerAccept = Boolean(offer.buyerMustAccept);
+    if (mustBuyerAccept) {
+      if (offer.buyerId !== userId) {
+        throw new ForbiddenException(
+          'Bu karşı teklifi yalnızca alıcı reddedebilir',
+        );
+      }
+    } else if (offer.sellerId !== userId) {
       throw new ForbiddenException('Bu teklifi reddetme yetkiniz yok');
     }
 
@@ -420,16 +433,26 @@ export class OfferService {
       },
     });
 
-    // Send notification to buyer that offer was rejected
     try {
-      await this.notificationService.createInAppNotification(
-        rejectedOffer.buyerId,
-        NotificationType.OFFER_REJECTED,
-        {
-          productId: rejectedOffer.productId,
-          productTitle: rejectedOffer.product.title,
-        },
-      );
+      if (mustBuyerAccept) {
+        await this.notificationService.createInAppNotification(
+          rejectedOffer.sellerId,
+          NotificationType.OFFER_COUNTER_DECLINED,
+          {
+            productId: rejectedOffer.productId,
+            productTitle: rejectedOffer.product.title,
+          },
+        );
+      } else {
+        await this.notificationService.createInAppNotification(
+          rejectedOffer.buyerId,
+          NotificationType.OFFER_REJECTED,
+          {
+            productId: rejectedOffer.productId,
+            productTitle: rejectedOffer.product.title,
+          },
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to send offer rejected notification: ${error}`);
     }
@@ -463,6 +486,12 @@ export class OfferService {
         throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
       }
 
+      if (offer.buyerMustAccept) {
+        throw new BadRequestException(
+          'Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez',
+        );
+      }
+
       // Check expiration
       if (new Date() > offer.expiresAt) {
         await tx.offer.update({
@@ -491,18 +520,19 @@ export class OfferService {
         data: { status: OfferStatus.rejected },
       });
 
-      // Create new counter-offer (buyer and seller swap roles conceptually)
-      // The seller is essentially making a "take it or leave it" offer
+      // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
 
       const counterOffer = await tx.offer.create({
         data: {
           productId: offer.productId,
-          buyerId: offer.buyerId, // Original buyer
-          sellerId: offer.sellerId, // Original seller
+          buyerId: offer.buyerId,
+          sellerId: offer.sellerId,
           amount: dto.amount,
+          message: dto.message ?? null,
           status: OfferStatus.pending,
+          buyerMustAccept: true,
           expiresAt,
         },
         include: {
@@ -521,6 +551,114 @@ export class OfferService {
       });
 
       return await this.formatOfferResponse(counterOffer);
+    });
+  }
+
+  /**
+   * Alıcı, satıcının karşı teklifine daha düşük bir tutarla yanıt verir.
+   * Yeni kayıtta sıra yine satıcıda (buyerMustAccept: false) → satıcı kabul/red/karşı teklif verebilir.
+   * Böylece satıcı↔alıcı karşı teklif zinciri teorik olarak sürebilir (süre dolana kadar).
+   * POST /offers/:id/buyer-counter
+   */
+  async buyerCounter(offerId: string, buyerId: string, dto: CounterOfferDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const offer = await tx.offer.findUnique({
+        where: { id: offerId },
+        include: { product: true },
+      });
+
+      if (!offer) {
+        throw new NotFoundException('Teklif bulunamadı');
+      }
+
+      if (!offer.buyerMustAccept) {
+        throw new BadRequestException(
+          'Alıcı karşı teklifi yalnızca satıcının son karşı teklifine yanıt olarak verilebilir',
+        );
+      }
+
+      if (offer.buyerId !== buyerId) {
+        throw new ForbiddenException('Bu teklife alıcı karşı teklifi verme yetkiniz yok');
+      }
+
+      if (offer.status !== OfferStatus.pending) {
+        throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
+      }
+
+      if (new Date() > offer.expiresAt) {
+        await tx.offer.update({
+          where: { id: offerId },
+          data: { status: OfferStatus.expired },
+        });
+        throw new BadRequestException('Bu teklifin süresi dolmuş');
+      }
+
+      const productPrice = Number(offer.product.price);
+      const minOffer = productPrice * (this.minOfferPercentage / 100);
+      const sellerCounterAmount = Number(offer.amount);
+
+      if (dto.amount >= sellerCounterAmount) {
+        throw new BadRequestException(
+          'Alıcı karşı teklifi, satıcının karşı teklifinden düşük olmalıdır',
+        );
+      }
+
+      if (dto.amount < minOffer) {
+        throw new BadRequestException(
+          `Teklif tutarı çok düşük. Ürün fiyatı: ${productPrice.toFixed(2)} TL. ` +
+            `Minimum: ${minOffer.toFixed(2)} TL (fiyatın %${this.minOfferPercentage}'i).`,
+        );
+      }
+
+      await tx.offer.update({
+        where: { id: offerId },
+        data: { status: OfferStatus.rejected },
+      });
+
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
+
+      const newOffer = await tx.offer.create({
+        data: {
+          productId: offer.productId,
+          buyerId: offer.buyerId,
+          sellerId: offer.sellerId,
+          amount: dto.amount,
+          message: dto.message ?? null,
+          status: OfferStatus.pending,
+          buyerMustAccept: false,
+          expiresAt,
+        },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            },
+          },
+          buyer: {
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          },
+          seller: {
+            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          },
+        },
+      });
+
+      try {
+        await this.notificationService.createInAppNotification(
+          offer.sellerId,
+          NotificationType.OFFER_RECEIVED,
+          {
+            productId: offer.productId,
+            productTitle: offer.product.title,
+            amount: dto.amount,
+          },
+        );
+      } catch (e) {
+        this.logger.error(`buyerCounter notification: ${e}`);
+      }
+
+      return await this.formatOfferResponse(newOffer);
     });
   }
 
@@ -810,6 +948,7 @@ export class OfferService {
       id: offer.id,
       amount: Number(offer.amount),
       message: offer.message ?? null,
+      buyerMustAccept: Boolean(offer.buyerMustAccept),
       status: isExpired ? OfferStatus.expired : offer.status,
       expiresAt: offer.expiresAt,
       isExpired,

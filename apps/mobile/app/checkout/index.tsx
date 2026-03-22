@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TextInput, FlatList } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { api, ordersApi, addressesApi, paymentsApi, productsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
+import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 
 interface ShippingAddress {
   fullName: string;
@@ -130,11 +131,46 @@ export default function CheckoutScreen() {
     }
   }, [isAuthenticated]);
 
+  const fetchQuote = useCallback(async () => {
+    const productIds =
+      isDirectBuy && params.productId
+        ? [{ productId: String(params.productId), quantity: 1 }]
+        : items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
+
+    if (productIds.length === 0) return;
+
+    setQuoteLoading(true);
+    try {
+      const res = await ordersApi.getQuote({ items: productIds });
+      const q = res.data?.data || res.data;
+      const pricing = q?.pricing;
+      if (pricing) {
+        setQuote({
+          subtotal: pricing.subtotal ?? pricing.itemsSubtotal ?? 0,
+          shipping: pricing.shippingAmount ?? pricing.shipping ?? 0,
+          buyerFee: pricing.buyerFeeAmount ?? pricing.buyerFee ?? 0,
+          total: pricing.totalAmount ?? pricing.total ?? 0,
+        });
+      } else if (q) {
+        setQuote({
+          subtotal: q.itemsSubtotal ?? q.subtotal ?? 0,
+          shipping: q.shippingAmount ?? q.shipping ?? 0,
+          buyerFee: q.buyerFeeAmount ?? q.buyerFee ?? 0,
+          total: q.totalAmount ?? q.total ?? 0,
+        });
+      }
+    } catch {
+      // quote is optional, fall back to local calc
+    } finally {
+      setQuoteLoading(false);
+    }
+  }, [isDirectBuy, params.productId, items]);
+
   useEffect(() => {
     if (checkoutItems.length > 0) {
       fetchQuote();
     }
-  }, [directProduct, items.length]);
+  }, [checkoutItems.length, directProduct?.id, fetchQuote]);
 
   useEffect(() => {
     const city = getActiveCity();
@@ -173,32 +209,6 @@ export default function CheckoutScreen() {
       // silent
     } finally {
       setAddressesLoading(false);
-    }
-  };
-
-  const fetchQuote = async () => {
-    const productIds = isDirectBuy && params.productId
-      ? [{ productId: params.productId, quantity: 1 }]
-      : items.map(i => ({ productId: i.productId, quantity: i.quantity }));
-
-    if (productIds.length === 0) return;
-
-    setQuoteLoading(true);
-    try {
-      const res = await ordersApi.getQuote({ items: productIds });
-      const q = res.data?.data || res.data;
-      if (q) {
-        setQuote({
-          subtotal: q.itemsSubtotal ?? q.subtotal ?? 0,
-          shipping: q.shippingAmount ?? q.shipping ?? 0,
-          buyerFee: q.buyerFeeAmount ?? q.buyerFee ?? 0,
-          total: q.totalAmount ?? q.total ?? 0,
-        });
-      }
-    } catch {
-      // quote is optional, fall back to local calc
-    } finally {
-      setQuoteLoading(false);
     }
   };
 
@@ -322,11 +332,21 @@ export default function CheckoutScreen() {
         setShowNewAddressForm(false);
         setShippingAddress({ fullName: '', phone: '', city: '', district: '', address: '', zipCode: '' });
       }
-    } catch (err: any) {
-      Alert.alert('Hata', err.response?.data?.message || 'Adres kaydedilemedi');
+    } catch (err: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(err, 'Adres kaydedilemedi'));
     }
   };
 
+  const resolveOrderIdFromResponse = (orderRes: { data?: Record<string, unknown> }): string | null => {
+    const root = orderRes.data;
+    const d = (root?.data ?? root) as Record<string, unknown> | undefined;
+    if (!d || typeof d !== 'object') return null;
+    const orderObj = d.order as { id?: string } | undefined;
+    const id = d.orderId ?? d.id ?? orderObj?.id;
+    return typeof id === 'string' ? id : null;
+  };
+
+  /** Web `checkout/page.tsx` ile aynı: her sepet satırı için sipariş oluştur; ödeme yanıtında çıkılır (çoğu ortamda tek ödeme oturumu). */
   const handleCheckout = async () => {
     if (checkoutItems.length === 0) {
       Alert.alert('Hata', 'Sepetiniz boş');
@@ -335,87 +355,93 @@ export default function CheckoutScreen() {
 
     setLoading(true);
     try {
-      let orderId: string | null = null;
+      for (const line of checkoutItems) {
+        const productId = line.productId;
+        let orderId: string | null = null;
 
-      const productId = checkoutItems[0].productId;
-
-      if (isAuthenticated) {
-        // Authenticated: directBuy
-        const orderPayload: any = { productId };
-        if (selectedAddressId && !showNewAddressForm) {
-          orderPayload.shippingAddressId = selectedAddressId;
+        if (isAuthenticated) {
+          const orderPayload: Record<string, unknown> = { productId };
+          if (selectedAddressId && !showNewAddressForm) {
+            orderPayload.shippingAddressId = selectedAddressId;
+          } else {
+            orderPayload.shippingAddress = {
+              fullName: shippingAddress.fullName.trim(),
+              phone: shippingAddress.phone.trim(),
+              city: shippingAddress.city.trim(),
+              district: shippingAddress.district.trim(),
+              address: shippingAddress.address.trim(),
+              zipCode: shippingAddress.zipCode?.trim() || undefined,
+            };
+          }
+          const orderRes = await ordersApi.directBuy(orderPayload as Parameters<typeof ordersApi.directBuy>[0]);
+          orderId = resolveOrderIdFromResponse(orderRes);
         } else {
-          orderPayload.shippingAddress = {
-            fullName: shippingAddress.fullName.trim(),
-            phone: shippingAddress.phone.trim(),
-            city: shippingAddress.city.trim(),
-            district: shippingAddress.district.trim(),
-            address: shippingAddress.address.trim(),
-            zipCode: shippingAddress.zipCode?.trim() || undefined,
+          const orderPayload = {
+            productId,
+            email: guestEmail.trim().toLowerCase(),
+            phone: guestPhone.trim(),
+            guestName: guestName.trim(),
+            shippingAddress: {
+              fullName: shippingAddress.fullName.trim(),
+              phone: (shippingAddress.phone?.trim() || guestPhone.trim()),
+              city: shippingAddress.city.trim(),
+              district: shippingAddress.district.trim(),
+              address: shippingAddress.address.trim(),
+              zipCode: shippingAddress.zipCode?.trim() || undefined,
+            },
           };
+          const orderRes = await ordersApi.createGuest(orderPayload);
+          orderId = resolveOrderIdFromResponse(orderRes);
         }
-        const orderRes = await ordersApi.directBuy(orderPayload);
-        const orderData = orderRes.data?.data || orderRes.data;
-        orderId = orderData?.id || orderData?.orderId;
-      } else {
-        // Guest checkout
-        const orderPayload = {
-          productId,
-          email: guestEmail.trim().toLowerCase(),
-          phone: guestPhone.trim(),
-          guestName: guestName.trim(),
-          shippingAddress: {
-            fullName: shippingAddress.fullName.trim(),
-            phone: (shippingAddress.phone?.trim() || guestPhone.trim()),
-            city: shippingAddress.city.trim(),
-            district: shippingAddress.district.trim(),
-            address: shippingAddress.address.trim(),
-            zipCode: shippingAddress.zipCode?.trim() || undefined,
-          },
-        };
-        const orderRes = await ordersApi.createGuest(orderPayload);
-        const orderData = orderRes.data?.data || orderRes.data;
-        orderId = orderData?.id || orderData?.orderId;
-      }
 
-      if (!orderId) {
-        Alert.alert('Hata', 'Sipariş oluşturulamadı');
-        return;
-      }
-
-      // Initiate payment
-      const payRes = await paymentsApi.initiate(orderId, 'paytr');
-      const payData = payRes.data?.data || payRes.data;
-      const paymentId = payData?.paymentId || payData?.id;
-
-      if (payData?.useBypass && paymentId) {
-        const rawCard = cardNumber.replace(/\s/g, '');
-        if (!rawCard) {
-          try { await paymentsApi.confirmFailed(paymentId); } catch {}
-          Alert.alert('Hata', 'Kart numarası giriniz.');
-          setStep(2);
+        if (!orderId) {
+          Alert.alert(
+            'Hata',
+            'Sipariş oluşturuldu ancak ödeme başlatılamadı. Siparişlerim sayfasından ödemeyi tamamlayabilirsiniz.',
+          );
+          router.replace('/orders');
           return;
         }
-        await paymentsApi.bypassComplete(paymentId, rawCard);
-        if (!isDirectBuy) clearCart();
-        const guestParam = !isAuthenticated ? '&guest=true' : '';
-        router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
-        return;
-      }
 
-      if (!isDirectBuy) clearCart();
-      if (paymentId) {
-        const guestParam = !isAuthenticated ? '&guest=true' : '';
-        router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
-      } else {
+        const payRes = await paymentsApi.initiate(orderId, 'paytr');
+        const payData = (payRes.data as Record<string, unknown> | undefined)?.data ?? payRes.data;
+        const paymentId =
+          (payData as Record<string, unknown> | undefined)?.paymentId ??
+          (payData as Record<string, unknown> | undefined)?.id;
+
+        if (payData && (payData as { useBypass?: boolean }).useBypass && paymentId) {
+          const rawCard = cardNumber.replace(/\s/g, '');
+          if (!rawCard) {
+            try {
+              await paymentsApi.confirmFailed(String(paymentId));
+            } catch {
+              /* ignore */
+            }
+            Alert.alert('Hata', 'Kart numarası giriniz.');
+            setStep(2);
+            return;
+          }
+          await paymentsApi.bypassComplete(String(paymentId), rawCard);
+          if (!isDirectBuy) clearCart();
+          const guestParam = !isAuthenticated ? '&guest=true' : '';
+          router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
+          return;
+        }
+
+        if (!isDirectBuy) clearCart();
+        if (paymentId) {
+          const guestParam = !isAuthenticated ? '&guest=true' : '';
+          router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
+          return;
+        }
+
         Alert.alert('Sipariş Oluşturuldu', 'Siparişiniz başarıyla alındı.', [
           { text: 'Tamam', onPress: () => router.replace('/') },
         ]);
+        return;
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.message;
-      const errorMessage = Array.isArray(msg) ? msg.join(', ') : (msg || error.response?.data?.error || 'Sipariş oluşturulamadı');
-      Alert.alert('Hata', errorMessage);
+    } catch (error: unknown) {
+      Alert.alert('Hata', formatApiErrorMessage(error, 'Sipariş oluşturulamadı'));
     } finally {
       setLoading(false);
     }
@@ -584,16 +610,18 @@ export default function CheckoutScreen() {
             placeholder="Şehir ara..."
             placeholderTextColor={TarodanColors.textTertiary}
           />
-          <FlatList
-            data={filteredCities}
-            keyExtractor={(item) => item}
+          <ScrollView
             style={styles.cityList}
+            nestedScrollEnabled
             keyboardShouldPersistTaps="handled"
-            renderItem={({ item: city }) => (
+            showsVerticalScrollIndicator
+          >
+            {filteredCities.map((city) => (
               <TouchableOpacity
+                key={city}
                 style={[styles.cityItem, shippingAddress.city === city && styles.cityItemActive]}
                 onPress={() => {
-                  setShippingAddress(s => ({ ...s, city }));
+                  setShippingAddress((s) => ({ ...s, city }));
                   setShowCityPicker(false);
                   setCitySearch('');
                 }}
@@ -605,8 +633,8 @@ export default function CheckoutScreen() {
                   <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
                 )}
               </TouchableOpacity>
-            )}
-          />
+            ))}
+          </ScrollView>
         </View>
       )}
 

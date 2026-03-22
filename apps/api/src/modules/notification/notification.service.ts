@@ -90,6 +90,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '🔄',
     link: '/listings/{{productId}}',
   },
+  [NotificationType.OFFER_COUNTER_DECLINED]: {
+    title: 'Karşı Teklif Reddedildi',
+    message: '{{productTitle}} için alıcı karşı teklifinizi kabul etmedi.',
+    icon: '❌',
+    link: '/listings/{{productId}}',
+  },
   [NotificationType.OFFER_EXPIRED]: {
     title: 'Teklifin Süresi Doldu',
     message: '{{productTitle}} için teklifinizin süresi doldu.',
