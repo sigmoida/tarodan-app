@@ -939,6 +939,35 @@ export class NotificationService {
   }
 
   /**
+   * Misafir checkout — 6 haneli OTP e-postası (kayıtlı hesap doğrulamasından bağımsız)
+   */
+  async sendGuestCheckoutVerificationCode(email: string, code: string, ttlSeconds: number) {
+    const subject = 'Misafir sipariş doğrulama kodu - Tarodan';
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 40px 20px;">
+        <div style="background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h1 style="color: #f97316; font-size: 24px; margin: 0 0 16px;">Tarodan</h1>
+          <p style="color: #374151; font-size: 16px; line-height: 1.6;">Misafir alışverişinizi tamamlamak için doğrulama kodunuz:</p>
+          <p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #111827; margin: 24px 0;">${code}</p>
+          <p style="color: #6b7280; font-size: 14px;">Bu kod <strong>${Math.ceil(ttlSeconds / 60)} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>
+        </div>
+      </div>
+    `;
+
+    let result: { success: boolean; error?: string };
+    if (this.sendGridProvider.isConfigured()) {
+      result = await this.sendGridProvider.sendEmail({ to: email, subject, html });
+    } else if (this.smtpProvider.isConfigured()) {
+      result = await this.smtpProvider.sendEmail({ to: email, subject, html });
+    } else {
+      this.logger.warn('No email provider for guest checkout OTP');
+      result = { success: false, error: 'No email provider configured' };
+    }
+
+    return result;
+  }
+
+  /**
    * Check if providers are configured
    */
   getProviderStatus() {

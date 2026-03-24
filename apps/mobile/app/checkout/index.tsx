@@ -76,6 +76,8 @@ export default function CheckoutScreen() {
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmailVerificationCode, setGuestEmailVerificationCode] = useState('');
+  const [guestOtpSending, setGuestOtpSending] = useState(false);
 
   // New address form (for both guest and authenticated "add new")
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -269,6 +271,10 @@ export default function CheckoutScreen() {
       Alert.alert('Uyarı', 'Geçerli bir telefon numarası girin');
       return false;
     }
+    if (!/^\d{6}$/.test(guestEmailVerificationCode.replace(/\D/g, ''))) {
+      Alert.alert('Uyarı', 'E-posta doğrulama kodunu girin (6 hane)');
+      return false;
+    }
     return validateAddressForm();
   };
 
@@ -381,6 +387,7 @@ export default function CheckoutScreen() {
             email: guestEmail.trim().toLowerCase(),
             phone: guestPhone.trim(),
             guestName: guestName.trim(),
+            emailVerificationCode: guestEmailVerificationCode.replace(/\D/g, '').slice(0, 6),
             shippingAddress: {
               fullName: shippingAddress.fullName.trim(),
               phone: (shippingAddress.phone?.trim() || guestPhone.trim()),
@@ -698,6 +705,44 @@ export default function CheckoutScreen() {
         placeholderTextColor={TarodanColors.textTertiary}
         keyboardType="email-address"
         autoCapitalize="none"
+      />
+
+      <Text style={styles.inputLabel}>E-posta doğrulama *</Text>
+      <TouchableOpacity
+        style={[styles.secondaryButton, guestOtpSending && { opacity: 0.6 }]}
+        disabled={guestOtpSending || !guestEmail.trim()}
+        onPress={async () => {
+          const em = guestEmail.trim().toLowerCase();
+          if (!em.includes('@')) {
+            Alert.alert('Uyarı', 'Geçerli bir e-posta girin');
+            return;
+          }
+          setGuestOtpSending(true);
+          try {
+            await ordersApi.sendGuestVerificationCode({
+              email: em,
+              expectedCheckoutCount: Math.max(1, checkoutItems.length),
+            });
+            Alert.alert('Bilgi', 'Doğrulama kodu e-postanıza gönderildi.');
+          } catch (err: unknown) {
+            Alert.alert('Hata', formatApiErrorMessage(err, 'Kod gönderilemedi'));
+          } finally {
+            setGuestOtpSending(false);
+          }
+        }}
+      >
+        <Text style={styles.secondaryButtonText}>
+          {guestOtpSending ? 'Gönderiliyor…' : 'Kod gönder'}
+        </Text>
+      </TouchableOpacity>
+      <TextInput
+        style={[styles.textInput, { marginTop: 8, letterSpacing: 4 }]}
+        value={guestEmailVerificationCode}
+        onChangeText={(t) => setGuestEmailVerificationCode(t.replace(/\D/g, '').slice(0, 6))}
+        placeholder="6 haneli kod"
+        placeholderTextColor={TarodanColors.textTertiary}
+        keyboardType="number-pad"
+        maxLength={6}
       />
 
       <Text style={styles.inputLabel}>Telefon *</Text>
@@ -1347,6 +1392,21 @@ const styles = StyleSheet.create({
     color: '#B45309',
     marginLeft: 8,
     lineHeight: 18,
+  },
+  secondaryButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: TarodanColors.primary,
+    backgroundColor: TarodanColors.surfaceVariant,
+    marginTop: 4,
+  },
+  secondaryButtonText: {
+    color: TarodanColors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   loginLink: {
     flexDirection: 'row',

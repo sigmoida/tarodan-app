@@ -8,11 +8,22 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
-import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto, CheckoutQuoteDto } from './dto';
+import {
+  CreateOrderDto,
+  OrderQueryDto,
+  UpdateOrderStatusDto,
+  CancelOrderDto,
+  GuestCheckoutDto,
+  GuestOrderTrackDto,
+  DirectBuyDto,
+  CheckoutQuoteDto,
+  GuestSendVerificationCodeDto,
+} from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
@@ -49,6 +60,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
     private readonly cache: CacheService,
+    private readonly configService: ConfigService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
@@ -1255,11 +1267,157 @@ export class OrderService {
     }
   }
 
+  private normalizeGuestCheckoutEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private guestCheckoutOtpKey(normEmail: string): string {
+    return `guest:checkout:otp:v1:${normEmail}`;
+  }
+
+  private guestCheckoutOtpRateKey(normEmail: string): string {
+    return `guest:checkout:rl:v1:${normEmail}`;
+  }
+
+  private guestCheckoutOtpPepper(): string {
+    return (
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'guest-checkout-otp-dev-only'
+    );
+  }
+
+  private hashGuestCheckoutOtp(normEmail: string, code: string): string {
+    return createHash('sha256')
+      .update(`${this.guestCheckoutOtpPepper()}:${normEmail}:${code}`, 'utf8')
+      .digest('hex');
+  }
+
+  /**
+   * Misafir checkout öncesi e-posta OTP gönderir (Redis + e-posta).
+   * expectedCheckoutCount: sepetteki misafir sipariş satırı sayısı (her başarılı guest checkout bir hak tüketir).
+   */
+  async sendGuestCheckoutVerificationCode(dto: GuestSendVerificationCodeDto): Promise<{
+    success: boolean;
+    expiresInSeconds: number;
+  }> {
+    const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    const windowSec = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC', '900'),
+      10,
+    );
+    const maxSends = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_SEND_PER_WINDOW', '3'),
+      10,
+    );
+    const ttlSec = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_TTL_SEC', '600'),
+      10,
+    );
+    const maxVerifyAttempts = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_VERIFY_ATTEMPTS', '5'),
+      10,
+    );
+
+    const now = Date.now();
+    const rlKey = this.guestCheckoutOtpRateKey(normEmail);
+    const prevSends = (await this.cache.get<number[]>(rlKey)) || [];
+    const windowMs = Math.max(60, windowSec) * 1000;
+    const recentSends = prevSends.filter((t) => now - t < windowMs);
+    if (recentSends.length >= maxSends) {
+      throw new BadRequestException(
+        'Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.',
+      );
+    }
+    recentSends.push(now);
+    await this.cache.set(rlKey, recentSends, { ttl: windowSec });
+
+    const consumptions = Math.min(
+      20,
+      Math.max(1, dto.expectedCheckoutCount ?? 1),
+    );
+    const codeNum = randomInt(0, 1_000_000);
+    const code = String(codeNum).padStart(6, '0');
+    const h = this.hashGuestCheckoutOtp(normEmail, code);
+
+    const sendResult = await this.notificationService.sendGuestCheckoutVerificationCode(
+      normEmail,
+      code,
+      ttlSec,
+    );
+    if (!sendResult.success) {
+      throw new BadRequestException(
+        sendResult.error || 'Doğrulama kodu e-postası gönderilemedi',
+      );
+    }
+
+    const otpKey = this.guestCheckoutOtpKey(normEmail);
+    await this.cache.set(
+      otpKey,
+      { h, a: 0, c: consumptions, v: maxVerifyAttempts },
+      { ttl: ttlSec },
+    );
+
+    return { success: true, expiresInSeconds: ttlSec };
+  }
+
+  private async consumeGuestCheckoutOtp(normEmail: string, code: string): Promise<void> {
+    const otpKey = this.guestCheckoutOtpKey(normEmail);
+    const record = await this.cache.get<{
+      h: string;
+      a: number;
+      c: number;
+      v?: number;
+    }>(otpKey);
+
+    if (!record?.h) {
+      throw new BadRequestException('Doğrulama kodu geçersiz veya süresi dolmuş');
+    }
+
+    const maxWrong = record.v ?? 5;
+    if (record.a >= maxWrong) {
+      await this.cache.del(otpKey);
+      throw new BadRequestException('Çok fazla hatalı deneme. Yeni kod isteyin.');
+    }
+
+    const expectedHex = this.hashGuestCheckoutOtp(normEmail, code.trim());
+    const aBuf = Buffer.from(record.h, 'hex');
+    const bBuf = Buffer.from(expectedHex, 'hex');
+    const match =
+      aBuf.length === bBuf.length &&
+      aBuf.length > 0 &&
+      timingSafeEqual(aBuf, bBuf);
+
+    const ttlLeft = await this.cache.ttl(otpKey);
+
+    if (!match) {
+      record.a += 1;
+      if (record.a >= maxWrong) {
+        await this.cache.del(otpKey);
+      } else if (ttlLeft > 0) {
+        await this.cache.set(otpKey, record, { ttl: ttlLeft });
+      }
+      throw new BadRequestException('Doğrulama kodu hatalı');
+    }
+
+    record.c -= 1;
+    if (record.c <= 0) {
+      await this.cache.del(otpKey);
+    } else if (ttlLeft > 0) {
+      await this.cache.set(otpKey, { h: record.h, a: 0, c: record.c, v: maxWrong }, { ttl: ttlLeft });
+    } else {
+      await this.cache.del(otpKey);
+    }
+  }
+
   /**
    * Guest checkout - Create order without registration
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
+    const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
+
     const result = await this.prisma.$transaction(async (tx) => {
       const lockedRows = await tx.$queryRaw<{ id: string }[]>`
         SELECT p.id
@@ -1391,7 +1549,7 @@ export class OrderService {
       // Build guest shippingAddress JSON; add billing when provided and different
       const guestShippingJson: Record<string, unknown> = {
         guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
-        guestEmail: dto.email?.trim(),
+        guestEmail: normEmail,
         guestPhone: dto.phone?.trim(),
         fullName: dto.shippingAddress.fullName.trim(),
         phone: dto.shippingAddress.phone.trim(),

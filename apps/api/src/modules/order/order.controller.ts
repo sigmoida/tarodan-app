@@ -29,6 +29,7 @@ import {
   OrderResponseDto,
   PaginatedOrdersDto,
   GuestCheckoutDto,
+  GuestSendVerificationCodeDto,
   GuestOrderTrackDto,
   DirectBuyDto,
   DirectBuyResponseDto,
@@ -93,6 +94,18 @@ export class OrderController {
       throw new BadRequestException('items array required (max 50)');
     }
     return this.orderService.getCommissionPreviewBatch(userId, body.items);
+  }
+
+  /**
+   * POST /orders/guest/send-verification-code — misafir checkout e-posta OTP (her seferinde)
+   */
+  @Post('guest/send-verification-code')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send guest checkout email verification code' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Code sent (or generic success)' })
+  async sendGuestCheckoutVerificationCode(@Body() dto: GuestSendVerificationCodeDto) {
+    return this.orderService.sendGuestCheckoutVerificationCode(dto);
   }
 
   /**

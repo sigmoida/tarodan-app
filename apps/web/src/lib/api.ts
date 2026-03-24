@@ -228,11 +228,14 @@ export const ordersApi = {
       zipCode?: string;
     };
   }) => api.post('/orders/buy', data),
+  sendGuestVerificationCode: (data: { email: string; expectedCheckoutCount?: number }) =>
+    api.post<{ success: boolean; expiresInSeconds: number }>('/orders/guest/send-verification-code', data),
   createGuest: (data: {
     productId: string;
     email: string;
     phone: string;
     guestName: string;
+    emailVerificationCode: string;
     shippingAddress: {
       fullName: string;
       phone: string;

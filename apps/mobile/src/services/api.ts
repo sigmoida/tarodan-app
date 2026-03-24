@@ -135,11 +135,14 @@ export const ordersApi = {
     api.get(`/orders/${id}`),
   create: (data: any) =>
     api.post('/orders', data),
+  sendGuestVerificationCode: (data: { email: string; expectedCheckoutCount?: number }) =>
+    api.post<{ success: boolean; expiresInSeconds: number }>('/orders/guest/send-verification-code', data),
   createGuest: (data: {
     productId: string;
     email: string;
     phone: string;
     guestName: string;
+    emailVerificationCode: string;
     shippingAddress: {
       fullName: string;
       phone: string;

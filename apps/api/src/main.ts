@@ -1,5 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, ConsoleLogger } from '@nestjs/common';
+
+/** Her route için RouterExplorer / RoutesResolver satırlarını susturur; `NEST_VERBOSE_ROUTES=true` ile eski davranış. */
+class QuietRouteNestLogger extends ConsoleLogger {
+  private static readonly SKIP = new Set(['RouterExplorer', 'RoutesResolver']);
+
+  log(message: unknown, context?: string) {
+    if (context && QuietRouteNestLogger.SKIP.has(context)) {
+      return;
+    }
+    super.log(message, context);
+  }
+}
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -13,6 +25,10 @@ async function bootstrap() {
     // IMPORTANT: Disable default body parser so our custom parsers work for Iyzico callbacks
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable default parser
+      logger:
+        process.env.NEST_VERBOSE_ROUTES === 'true'
+          ? new ConsoleLogger()
+          : new QuietRouteNestLogger(),
     });
 
     // Custom Body Parsers (Critical for Iyzico 3DS callbacks which use x-www-form-urlencoded)

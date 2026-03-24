@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -81,6 +81,12 @@ export default function CheckoutPage() {
   const [guestPhone, setGuestPhone] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhoneCountryCode, setGuestPhoneCountryCode] = useState('+90');
+  const [guestEmailVerificationCode, setGuestEmailVerificationCode] = useState('');
+  const [guestOtpSending, setGuestOtpSending] = useState(false);
+  /** Normalize edilmiş e-posta — bu adrese kod başarıyla gönderildiyse set edilir (e-posta değişince sıfırlanır). */
+  const [guestOtpSentForEmail, setGuestOtpSentForEmail] = useState<string | null>(null);
+  const [guestOtpModalOpen, setGuestOtpModalOpen] = useState(false);
+  const guestOtpInputRef = useRef<HTMLInputElement>(null);
 
   // New address form
   const [newAddress, setNewAddress] = useState<Omit<Address, 'id'>>({
@@ -269,6 +275,133 @@ export default function CheckoutPage() {
   const displayTotal = quote?.pricing?.totalAmount ?? Math.max(0, subtotal + shippingCost);
   const grandTotal = displayTotal;
 
+  useEffect(() => {
+    const n = guestEmail.trim().toLowerCase();
+    if (!guestOtpSentForEmail) return;
+    if (!n || n !== guestOtpSentForEmail) {
+      setGuestOtpSentForEmail(null);
+      setGuestEmailVerificationCode('');
+      setGuestOtpModalOpen(false);
+    }
+  }, [guestEmail, guestOtpSentForEmail]);
+
+  useEffect(() => {
+    if (!guestOtpModalOpen) return;
+    const focusTimer = window.setTimeout(() => guestOtpInputRef.current?.focus(), 100);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setGuestOtpModalOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [guestOtpModalOpen]);
+
+  const requestGuestCheckoutOtp = useCallback(
+    async (em: string): Promise<boolean> => {
+      setGuestOtpSending(true);
+      try {
+        await ordersApi.sendGuestVerificationCode({
+          email: em,
+          expectedCheckoutCount: Math.max(1, checkoutItems.length),
+        });
+        setGuestOtpSentForEmail(em);
+        return true;
+      } catch (e: any) {
+        const msg =
+          e?.response?.data?.message ??
+          (Array.isArray(e?.response?.data?.message) ? e.response.data.message.join(', ') : null);
+        toast.error(typeof msg === 'string' ? msg : t('checkout.guestEmailSendCodeFailed'));
+        return false;
+      } finally {
+        setGuestOtpSending(false);
+      }
+    },
+    [checkoutItems.length, t],
+  );
+
+  const handleAddressStepContinue = async () => {
+    const authAddressOk =
+      !!selectedAddressId ||
+      !!(
+        newAddress.fullName &&
+        newAddress.phone &&
+        newAddress.city &&
+        newAddress.district &&
+        newAddress.address
+      );
+    const billingOk =
+      billingSameAsShipping ||
+      !!(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address);
+
+    if (isAuthenticated) {
+      if (!authAddressOk) {
+        toast.error(
+          locale === 'en'
+            ? 'Please select or enter a complete shipping address'
+            : 'Lütfen teslimat adresini seçin veya eksiksiz doldurun',
+        );
+        return;
+      }
+      if (!billingOk) {
+        toast.error(
+          locale === 'en' ? 'Please complete the billing address' : 'Lütfen fatura adresini doldurun',
+        );
+        return;
+      }
+      setStep(2);
+      return;
+    }
+
+    if (!billingOk) {
+      toast.error(
+        locale === 'en' ? 'Please complete the billing address' : 'Lütfen fatura adresini doldurun',
+      );
+      return;
+    }
+    if (!guestName?.trim() || !guestEmail?.trim() || !guestPhone?.trim()) {
+      toast.error(
+        locale === 'en' ? 'Please fill in your name, email and phone' : 'Lütfen ad, e-posta ve telefon girin',
+      );
+      return;
+    }
+    if (
+      !newAddress.fullName ||
+      !newAddress.city ||
+      !newAddress.district ||
+      !newAddress.address
+    ) {
+      toast.error(
+        locale === 'en'
+          ? 'Please complete the delivery address'
+          : 'Lütfen teslimat adresini eksiksiz doldurun',
+      );
+      return;
+    }
+
+    const em = guestEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      toast.error(t('checkout.enterEmail'));
+      return;
+    }
+
+    setGuestOtpModalOpen(true);
+    if (guestOtpSentForEmail !== em) {
+      const sent = await requestGuestCheckoutOtp(em);
+      if (sent) toast.success(t('checkout.guestEmailCodeSent'));
+    }
+  };
+
+  const confirmGuestOtpModal = () => {
+    const digits = guestEmailVerificationCode.replace(/\D/g, '');
+    if (!/^\d{6}$/.test(digits)) {
+      toast.error(t('checkout.guestEmailOtpRequired'));
+      return;
+    }
+    setGuestOtpModalOpen(false);
+    setStep(2);
+  };
 
   useEffect(() => {
     if (directProductId) {
@@ -624,6 +757,12 @@ export default function CheckoutPage() {
             setIsLoading(false);
             return;
           }
+          const otpDigits = guestEmailVerificationCode.replace(/\D/g, '');
+          if (!/^\d{6}$/.test(otpDigits)) {
+            toast.error(t('checkout.guestEmailOtpRequired'));
+            setIsLoading(false);
+            return;
+          }
         }
 
         if (!email) {
@@ -797,6 +936,7 @@ export default function CheckoutPage() {
               email: string;
               phone: string;
               guestName: string;
+              emailVerificationCode: string;
               shippingAddress: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
               billingAddress?: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string };
             } = {
@@ -804,6 +944,7 @@ export default function CheckoutPage() {
               email: contactEmail,
               phone: formattedContactPhone,
               guestName: contactName,
+              emailVerificationCode: guestEmailVerificationCode.replace(/\D/g, '').slice(0, 6),
               shippingAddress: {
                 ...shippingAddress,
                 phone: formattedAddrPhone,
@@ -999,6 +1140,7 @@ export default function CheckoutPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -1194,6 +1336,7 @@ export default function CheckoutPage() {
                         required
                       />
                     </div>
+
                     <div className="flex">
                       <select
                         value={guestPhoneCountryCode}
@@ -1363,13 +1506,22 @@ export default function CheckoutPage() {
 
                 <div className="mt-6 flex justify-end">
                   <button
-                    onClick={() => setStep(2)}
+                    type="button"
+                    onClick={() => void handleAddressStepContinue()}
                     disabled={
                       isAuthenticated
                         ? (!selectedAddressId && !(newAddress.fullName && newAddress.phone && newAddress.city && newAddress.district && newAddress.address)) ||
                         (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
-                        : !(guestName && guestEmail && guestPhone && newAddress.fullName && newAddress.city && newAddress.district && newAddress.address) ||
-                        (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address))
+                        : (!(
+                            guestName &&
+                            guestEmail &&
+                            guestPhone &&
+                            newAddress.fullName &&
+                            newAddress.city &&
+                            newAddress.district &&
+                            newAddress.address
+                          ) ||
+                        (!billingSameAsShipping && !(newBillingAddress.fullName && newBillingAddress.city && newBillingAddress.address)))
                     }
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1842,5 +1994,87 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+
+    {guestOtpModalOpen && !isAuthenticated ? (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[1px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="guest-otp-modal-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setGuestOtpModalOpen(false);
+        }}
+      >
+        <div
+          className="w-full max-w-md rounded-xl bg-white shadow-xl border border-gray-200 p-6 space-y-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <h2 id="guest-otp-modal-title" className="text-lg font-semibold text-gray-900">
+              {t('checkout.guestEmailVerifyTitle')}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setGuestOtpModalOpen(false)}
+              className="p-1 rounded-lg text-gray-500 hover:bg-gray-100"
+              aria-label={locale === 'en' ? 'Close' : 'Kapat'}
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-sm text-gray-600">{t('checkout.guestEmailModalBody')}</p>
+          <p className="text-xs font-medium text-primary-600 break-all">{guestEmail.trim()}</p>
+          {guestOtpSending && guestOtpSentForEmail !== guestEmail.trim().toLowerCase() ? (
+            <p className="text-sm text-gray-500">{t('checkout.guestEmailModalSending')}</p>
+          ) : null}
+          <input
+            ref={guestOtpInputRef}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder={t('checkout.guestEmailOtpPlaceholder')}
+            value={guestEmailVerificationCode}
+            onChange={(e) =>
+              setGuestEmailVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && /^\d{6}$/.test(guestEmailVerificationCode.replace(/\D/g, ''))) {
+                confirmGuestOtpModal();
+              }
+            }}
+            className="input w-full text-center tracking-[0.35em] font-mono text-xl"
+            maxLength={6}
+            disabled={guestOtpSending && guestOtpSentForEmail !== guestEmail.trim().toLowerCase()}
+          />
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              disabled={guestOtpSending || !guestEmail.trim()}
+              onClick={async () => {
+                const em = guestEmail.trim().toLowerCase();
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+                  toast.error(t('checkout.enterEmail'));
+                  return;
+                }
+                const ok = await requestGuestCheckoutOtp(em);
+                if (ok) toast.success(t('checkout.guestEmailCodeSent'));
+              }}
+              className="btn-secondary text-sm disabled:opacity-50"
+            >
+              {guestOtpSending ? '…' : t('checkout.guestEmailSendCode')}
+            </button>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => setGuestOtpModalOpen(false)} className="btn-secondary">
+              {t('checkout.guestEmailModalCancel')}
+            </button>
+            <button type="button" onClick={confirmGuestOtpModal} className="btn-primary">
+              {t('checkout.guestEmailModalConfirm')}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsOptional, IsPhoneNumber, ValidateNested, IsUUID, IsNumber, Min } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsOptional, ValidateNested, IsUUID, IsNumber, Min, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -44,6 +44,12 @@ export class GuestCheckoutDto {
   @IsEmail({}, { message: 'Geçerli bir e-posta adresi girin' })
   @IsNotEmpty()
   email: string;
+
+  @ApiProperty({ example: '123456', description: '6-digit code from email (misafir checkout doğrulama)' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{6}$/, { message: 'Doğrulama kodu 6 haneli olmalıdır' })
+  emailVerificationCode: string;
 
   @ApiProperty({ example: '+905551234567', description: 'Guest phone number' })
   @IsString()

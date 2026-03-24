@@ -1,4 +1,7 @@
+import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { createHash } from 'crypto';
 import { OrderService } from './order.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
@@ -90,6 +93,7 @@ describe('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
         OrderService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: EventService, useValue: { emitOrderCreated: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         {
@@ -146,5 +150,120 @@ describe('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
     expect(second.existingOrder).toBe(true);
     expect(mockTx.order.findFirst).toHaveBeenCalledTimes(2);
     expect(mockTx.order.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrderService guest checkout OTP (1.12)', () => {
+  let service: OrderService;
+  let mockCache: { get: jest.Mock; set: jest.Mock; del: jest.Mock; ttl: jest.Mock };
+  let mockNotification: { sendGuestCheckoutVerificationCode: jest.Mock };
+  let mockPrisma: { $transaction: jest.Mock };
+
+  beforeEach(async () => {
+    mockCache = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+      ttl: jest.fn(),
+    };
+    mockNotification = {
+      sendGuestCheckoutVerificationCode: jest.fn().mockResolvedValue({ success: true }),
+    };
+    mockPrisma = { $transaction: jest.fn() };
+
+    const mockConfig = {
+      get: jest.fn((key: string, def?: string) => {
+        if (key === 'GUEST_CHECKOUT_OTP_SECRET') return 'test-pepper';
+        return def;
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: CacheService, useValue: mockCache },
+        { provide: ConfigService, useValue: mockConfig },
+        { provide: EventService, useValue: {} },
+        { provide: NotificationService, useValue: mockNotification },
+        { provide: DiscountService, useValue: {} },
+        { provide: DiscountCalculator, useValue: {} },
+        {
+          provide: SuratCargoService,
+          useValue: { isIntegrationEnabled: () => false },
+        },
+      ],
+    }).compile();
+
+    service = module.get(OrderService);
+  });
+
+  const minimalGuestDto = {
+    productId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    email: 'guest@test.com',
+    phone: '+905551234567',
+    guestName: 'Guest User',
+    emailVerificationCode: '123456',
+    shippingAddress: {
+      fullName: 'Guest User',
+      phone: '+905551234567',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      address: 'Test cad. 1',
+    },
+  };
+
+  it('sendGuestCheckoutVerificationCode blocks when rate limit exceeded', async () => {
+    const now = Date.now();
+    mockCache.get.mockResolvedValue([now - 1000, now - 2000, now - 3000]);
+
+    await expect(
+      service.sendGuestCheckoutVerificationCode({ email: ' A@B.COM ' }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockNotification.sendGuestCheckoutVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it('sendGuestCheckoutVerificationCode sends email and stores hashed OTP with consumptions', async () => {
+    mockCache.get.mockResolvedValue(null);
+
+    await service.sendGuestCheckoutVerificationCode({
+      email: 'guest@test.com',
+      expectedCheckoutCount: 3,
+    });
+
+    expect(mockNotification.sendGuestCheckoutVerificationCode).toHaveBeenCalledWith(
+      'guest@test.com',
+      expect.stringMatching(/^\d{6}$/),
+      600,
+    );
+
+    const otpSet = mockCache.set.mock.calls.find((c: unknown[]) =>
+      String(c[0]).includes('guest:checkout:otp:v1:'),
+    );
+    expect(otpSet).toBeDefined();
+    expect(otpSet![1].c).toBe(3);
+    expect(typeof otpSet![1].h).toBe('string');
+  });
+
+  it('guestCheckout does not run transaction when OTP record missing', async () => {
+    mockCache.get.mockResolvedValue(null);
+
+    await expect(service.guestCheckout(minimalGuestDto as any)).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('guestCheckout rejects wrong code and does not start transaction', async () => {
+    const wrongHash = createHash('sha256')
+      .update('test-pepper:guest@test.com:999999', 'utf8')
+      .digest('hex');
+    mockCache.get.mockResolvedValue({ h: wrongHash, a: 0, c: 1, v: 5 });
+    mockCache.ttl.mockResolvedValue(300);
+
+    await expect(service.guestCheckout(minimalGuestDto as any)).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockCache.set).toHaveBeenCalled();
   });
 });

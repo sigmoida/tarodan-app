@@ -31,6 +31,17 @@ export class OrderEndpoints {
     return response.data;
   }
 
+  async sendGuestVerificationCode(body: {
+    email: string;
+    expectedCheckoutCount?: number;
+  }): Promise<{ success: boolean; expiresInSeconds: number }> {
+    const response = await this.client.post<{ success: boolean; expiresInSeconds: number }>(
+      '/orders/guest/send-verification-code',
+      body,
+    );
+    return response.data;
+  }
+
   async guestCheckout(data: GuestCheckoutDto): Promise<Order> {
     const response = await this.client.post<Order>('/orders/guest', data);
     return response.data;
