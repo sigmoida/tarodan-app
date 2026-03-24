@@ -2821,12 +2821,12 @@ export class PaymentService {
   }
 
   /**
-   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 10) içinde ödenmezse
+   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 30) içinde ödenmezse
    * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
       10,
     );
     const cutoff = new Date();
@@ -2900,7 +2900,7 @@ export class PaymentService {
    */
   async cancelExpiredPayments() {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
       10,
     );
     const timeoutDate = new Date();
