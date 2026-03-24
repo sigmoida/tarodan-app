@@ -6,6 +6,7 @@ import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
 import { DiscountModule } from '../discount';
 import { StorageModule } from '../storage/storage.module';
+import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { StorageModule } from '../storage/storage.module';
     forwardRef(() => NotificationModule),
     DiscountModule,
     StorageModule,
+    SuratCargoModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

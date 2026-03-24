@@ -8,6 +8,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
@@ -19,6 +20,9 @@ import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { DiscountService, DiscountCalculator } from '../discount';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
+import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
 
 /**
  * Commission calculation result interface
@@ -49,6 +53,7 @@ export class OrderService {
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly discountCalculator: DiscountCalculator,
+    private readonly suratCargoService: SuratCargoService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -266,6 +271,63 @@ export class OrderService {
       }),
     );
     return { results };
+  }
+
+  private buildSuratIdempotencyKey(parts: string[]): string {
+    return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
+  }
+
+  /**
+   * Sürat gönderi oluşturma (edge case 1.7): SURAT_CARGO_ENABLED=true iken order.create öncesi fail-fast.
+   */
+  private async assertSuratShipmentSucceeded(ctx: {
+    correlationId: string;
+    idempotencyKey: string;
+    recipientFullName: string;
+    recipientPhone: string;
+    recipientCity: string;
+    recipientDistrict: string;
+    recipientAddressLine: string;
+    productId: string;
+    productTitle?: string;
+    orderNumberPreview: string;
+  }): Promise<void> {
+    if (!this.suratCargoService.isIntegrationEnabled()) {
+      return;
+    }
+
+    const result = await this.suratCargoService.submitShipmentWithRetry({
+      idempotencyKey: ctx.idempotencyKey,
+      correlationId: ctx.correlationId,
+      payload: {
+        externalReference: ctx.idempotencyKey,
+        recipientFullName: ctx.recipientFullName,
+        recipientPhone: ctx.recipientPhone,
+        recipientCity: ctx.recipientCity,
+        recipientDistrict: ctx.recipientDistrict,
+        recipientAddressLine: ctx.recipientAddressLine,
+        productId: ctx.productId,
+        productTitle: ctx.productTitle,
+        orderNumberPreview: ctx.orderNumberPreview,
+      },
+    });
+
+    if (result.ok) {
+      return;
+    }
+    const failure = result as SuratShipmentFailure;
+    this.logger.warn({
+      msg: 'Surat shipment failed before order persist',
+      correlationId: ctx.correlationId,
+      idempotencyKey: ctx.idempotencyKey,
+      failure,
+    });
+    if (failure.kind === 'business') {
+      this.logger.warn(`Surat business message: ${failure.suratMessage}`);
+    } else if (failure.cause?.stack) {
+      this.logger.warn(failure.cause.stack);
+    }
+    mapSuratFailureToHttpException(failure);
   }
 
   /**
@@ -800,6 +862,31 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const suratIdempotencyKey =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([
+          buyerId,
+          dto.productId,
+          String(shippingAddressId || ''),
+          dto.shippingAddress
+            ? `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`
+            : '',
+          dto.couponCode || '',
+        ]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: suratIdempotencyKey,
+        recipientFullName: shippingAddress.fullName,
+        recipientPhone: shippingAddress.phone,
+        recipientCity: shippingAddress.city,
+        recipientDistrict: shippingAddress.district,
+        recipientAddressLine: shippingAddress.address,
+        productId: dto.productId,
+        productTitle: product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
       await tx.product.update({
         where: { id: dto.productId },
@@ -817,6 +904,9 @@ export class OrderService {
         address: shippingAddress.address,
         zipCode: shippingAddress.zipCode,
       };
+      if (this.suratCargoService.isIntegrationEnabled()) {
+        shippingAddressJson.suratIdempotencyKey = suratIdempotencyKey;
+      }
       if (billingAddress !== shippingAddress) {
         (shippingAddressJson as any).billingAddress = {
           fullName: billingAddress.fullName,
@@ -1019,8 +1109,41 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const suratIdempotencyKeyOffer =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([buyerId, dto.offerId, dto.shippingAddressId]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: suratIdempotencyKeyOffer,
+        recipientFullName: shippingAddress.fullName,
+        recipientPhone: shippingAddress.phone,
+        recipientCity: shippingAddress.city,
+        recipientDistrict: shippingAddress.district,
+        recipientAddressLine: shippingAddress.address,
+        productId: offer.productId,
+        productTitle: offer.product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Buyer fee is added to order total
       const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount;
+
+      const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
+        ? {
+            id: shippingAddress.id,
+            title: shippingAddress.title,
+            fullName: shippingAddress.fullName,
+            phone: shippingAddress.phone,
+            city: shippingAddress.city,
+            district: shippingAddress.district,
+            address: shippingAddress.address,
+            zipCode: shippingAddress.zipCode,
+          }
+        : undefined;
+      if (offerShippingJson && this.suratCargoService.isIntegrationEnabled()) {
+        offerShippingJson.suratIdempotencyKey = suratIdempotencyKeyOffer;
+      }
 
       // Create order
       const order = await tx.order.create({
@@ -1036,16 +1159,7 @@ export class OrderService {
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: dto.shippingAddressId,
-          shippingAddress: shippingAddress ? {
-            id: shippingAddress.id,
-            title: shippingAddress.title,
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
-          } : undefined,
+          shippingAddress: offerShippingJson as Prisma.InputJsonValue | undefined,
         },
         include: {
           product: {
@@ -1252,6 +1366,28 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const guestSuratKey =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([
+          dto.email?.trim() || '',
+          dto.productId,
+          dto.offerId || '',
+          `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`,
+        ]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: guestSuratKey,
+        recipientFullName: dto.shippingAddress.fullName.trim(),
+        recipientPhone: dto.shippingAddress.phone.trim(),
+        recipientCity: dto.shippingAddress.city.trim(),
+        recipientDistrict: dto.shippingAddress.district.trim(),
+        recipientAddressLine: dto.shippingAddress.address.trim(),
+        productId: dto.productId,
+        productTitle: product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Build guest shippingAddress JSON; add billing when provided and different
       const guestShippingJson: Record<string, unknown> = {
         guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
@@ -1265,6 +1401,9 @@ export class OrderService {
         zipCode: dto.shippingAddress.zipCode?.trim() || null,
         isGuestOrder: true,
       };
+      if (this.suratCargoService.isIntegrationEnabled()) {
+        guestShippingJson.suratIdempotencyKey = guestSuratKey;
+      }
       if (dto.billingAddress?.fullName?.trim() && dto.billingAddress?.city?.trim() && dto.billingAddress?.address?.trim()) {
         (guestShippingJson as any).billingAddress = {
           fullName: dto.billingAddress.fullName.trim(),

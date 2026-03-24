@@ -76,6 +76,13 @@ export class GuestCheckoutDto {
   @Min(0)
   @IsOptional()
   price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Idempotency key for carrier shipment when Sürat integration is enabled',
+  })
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 export class GuestOrderTrackDto {

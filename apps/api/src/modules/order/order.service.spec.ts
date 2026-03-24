@@ -6,6 +6,7 @@ import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { DiscountService } from '../discount/discount.service';
 import { DiscountCalculator } from '../discount/discount-calculator';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { DirectBuyDto } from './dto';
 import { OrderStatus, ProductStatus } from '@prisma/client';
 
@@ -96,6 +97,13 @@ describe('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
           useValue: { validateCoupon: jest.fn(), recordUsage: jest.fn() },
         },
         { provide: DiscountCalculator, useValue: {} },
+        {
+          provide: SuratCargoService,
+          useValue: {
+            isIntegrationEnabled: () => false,
+            submitShipmentWithRetry: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

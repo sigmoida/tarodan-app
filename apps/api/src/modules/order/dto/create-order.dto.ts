@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional } from 'class-validator';
+import { IsUUID, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -25,4 +25,12 @@ export class CreateOrderDto {
   @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
   billingAddressId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Idempotency key for Sürat gönderi oluşturma (SURAT_CARGO_ENABLED=true iken)',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  idempotencyKey?: string;
 }
