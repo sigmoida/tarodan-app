@@ -20,6 +20,12 @@ export class PaymentSchedulerService {
     this.logger.log('Checking for expired reservations and payments...');
 
     try {
+      const reconcile = await this.paymentService.reconcilePendingPaytrPayments();
+      if (reconcile.completed > 0) {
+        this.logger.log(
+          `PayTR reconcile: completed ${reconcile.completed} of ${reconcile.checked} checked payment(s)`,
+        );
+      }
       const released = await this.paymentService.releaseExpiredOrderReservations();
       if (released.count > 0) {
         this.logger.log(`Released ${released.count} expired order reservation(s)`);

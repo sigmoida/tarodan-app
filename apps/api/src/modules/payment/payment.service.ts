@@ -1377,8 +1377,9 @@ export class PaymentService {
   /**
    * Process successful payment
    * Requirement: Queue job publishing after payment (3.1)
+   * @returns true if this invocation completed the payment; false if already completed (idempotent / race with callback).
    */
-  private async processSuccessfulPayment(payment: any, transactionId?: string) {
+  private async processSuccessfulPayment(payment: any, transactionId?: string): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
@@ -1387,17 +1388,6 @@ export class PaymentService {
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
 
-      // Update payment status
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-        },
-      });
-
-      // Log payment completion (will be done after transaction)
-      // Store in metadata for now, will log to audit after transaction
       const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat({
         action: 'payment.completed',
         timestamp: new Date().toISOString(),
@@ -1406,15 +1396,27 @@ export class PaymentService {
         transactionId: transactionId || payment.providerPaymentId,
       });
 
-      await tx.payment.update({
-        where: { id: payment.id },
+      const newMetadata = {
+        ...(payment.metadata as any || {}),
+        auditHistory,
+      };
+
+      const claimed = await tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: PaymentStatus.pending,
+        },
         data: {
-          metadata: {
-            ...(payment.metadata as any || {}),
-            auditHistory,
-          },
+          status: PaymentStatus.completed,
+          paidAt: new Date(),
+          providerPaymentId: transactionId || payment.providerPaymentId,
+          metadata: newMetadata as object,
         },
       });
+
+      if (claimed.count === 0) {
+        return null;
+      }
 
       // Update order status to PREPARING (first state after purchase; seller will then mark shipped when sent)
       await tx.order.update({
@@ -1656,6 +1658,13 @@ export class PaymentService {
       return { order, productIdsToInvalidate };
     });
 
+    if (!result) {
+      this.logger.log(
+        `processSuccessfulPayment: payment ${payment.id} already completed — skipping duplicate success handling`,
+      );
+      return false;
+    }
+
     const resultOrder = result.order;
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
@@ -1724,6 +1733,8 @@ export class PaymentService {
         this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
       }
     }
+
+    return true;
   }
 
   /**
@@ -1839,16 +1850,19 @@ export class PaymentService {
    * Handle successful trade cash payment separately from order payments.
    * Updates TradeCashPayment status to completed; does NOT touch orders/products.
    */
-  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
+  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string): Promise<boolean> {
+    const didComplete = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.pending },
         data: {
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
           paidAt: new Date(),
         },
       });
+      if (claimed.count === 0) {
+        return false;
+      }
 
       await tx.tradeCashPayment.update({
         where: { id: payment.tradeCashPaymentId },
@@ -1858,9 +1872,13 @@ export class PaymentService {
           paidAt: new Date(),
         },
       });
+      return true;
     });
 
-    this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+    if (didComplete) {
+      this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+    }
+    return didComplete;
   }
 
   /**
@@ -2818,6 +2836,95 @@ export class PaymentService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * PayTR callback sunucuya ulaşmadan ödeme başarılı olduysa: durum-sorgu ile doğrula ve tamamla (1.4).
+   * PAYTR_RECONCILIATION_ENABLED=false ile kapatılabilir.
+   */
+  async reconcilePendingPaytrPayments(): Promise<{ checked: number; completed: number }> {
+    const enabled = this.configService.get('PAYTR_RECONCILIATION_ENABLED');
+    if (enabled === 'false' || enabled === '0') {
+      return { checked: 0, completed: 0 };
+    }
+
+    const minAgeMin = parseInt(
+      this.configService.get('PAYTR_RECONCILIATION_MIN_AGE_MINUTES') || '3',
+      10,
+    );
+    const batch = parseInt(this.configService.get('PAYTR_RECONCILIATION_BATCH_LIMIT') || '40', 10);
+    const tolerance = parseFloat(this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05');
+
+    const cutoff = new Date();
+    cutoff.setMinutes(cutoff.getMinutes() - minAgeMin);
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: 'paytr',
+        status: PaymentStatus.pending,
+        providerConversationId: { not: null },
+        order: { status: OrderStatus.pending_payment },
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        order: { select: { id: true, status: true, totalAmount: true } },
+      },
+      take: batch,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let checked = 0;
+    let completed = 0;
+
+    for (const row of candidates) {
+      checked++;
+      const oid = row.providerConversationId as string;
+      try {
+        const inquiry = await this.paytrService.queryPaymentStatus(oid);
+        if (!inquiry.ok) {
+          continue;
+        }
+
+        const ourAmount = Number(row.amount);
+        if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+          this.logger.warn(
+            `PayTR reconcile amount mismatch payment=${row.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+          );
+          continue;
+        }
+
+        const full = await this.prisma.payment.findUnique({
+          where: { id: row.id },
+          include: {
+            order: { include: { buyer: true, seller: true, product: true } },
+            tradeCashPayment: true,
+          },
+        });
+
+        if (
+          !full ||
+          full.status !== PaymentStatus.pending ||
+          full.order?.status !== OrderStatus.pending_payment
+        ) {
+          continue;
+        }
+
+        const txnRef =
+          inquiry.paymentDate != null && inquiry.paymentDate !== ''
+            ? `paytr:${oid}:${inquiry.paymentDate}`
+            : `paytr:${oid}`;
+
+        const did = await this.processSuccessfulPayment(full, txnRef);
+        if (did) {
+          completed++;
+          this.logger.log(`PayTR reconcile completed payment ${row.id} oid=${oid}`);
+        }
+      } catch (error: any) {
+        this.logger.error(`PayTR reconcile failed payment ${row.id}: ${error?.message}`);
+      }
+    }
+
+    return { checked, completed };
   }
 
   /**

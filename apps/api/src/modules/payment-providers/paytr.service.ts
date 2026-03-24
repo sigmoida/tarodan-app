@@ -80,6 +80,21 @@ export interface PayTRRefundResponse {
   return_amount?: number;
 }
 
+/** PayTR durum-sorgu: başarılı yanıt (status === 'success') */
+export type PayTRStatusInquirySuccess = {
+  ok: true;
+  /** Müşterinin ödediği tutar (TL), payment_total alanından */
+  paymentTotalTl: number;
+  /** Sipariş tutarı (TL), payment_amount */
+  paymentAmountTl: number;
+  paymentDate?: string;
+  currency: string;
+};
+
+export type PayTRStatusInquiryResult =
+  | PayTRStatusInquirySuccess
+  | { ok: false; errNo?: string; errMsg?: string };
+
 // =============================================================================
 // PAYTR SERVICE
 // =============================================================================
@@ -215,6 +230,110 @@ export class PayTRService {
       this.logger.error('PayTR API error:', error);
       throw new BadRequestException(error.message || 'PayTR bağlantı hatası');
     }
+  }
+
+  // ==========================================================================
+  // STATUS INQUIRY (durum-sorgu) — callback kaçırılan başarılı ödemeler için
+  // https://dev.paytr.com/en/durum-sorgu
+  // ==========================================================================
+
+  /**
+   * PayTR merchant durum sorgu: merchant_oid için başarılı ödeme var mı ve tutarlar.
+   * Token: base64(HMAC-SHA256(merchant_id + merchant_oid + merchant_salt, merchant_key))
+   */
+  async queryPaymentStatus(merchantOid: string): Promise<PayTRStatusInquiryResult> {
+    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+      this.logger.warn('PayTR status inquiry skipped: credentials missing');
+      return { ok: false, errMsg: 'PayTR not configured' };
+    }
+    if (!merchantOid?.trim()) {
+      return { ok: false, errMsg: 'merchant_oid required' };
+    }
+
+    const hashStr = this.merchantId + merchantOid + this.merchantSalt;
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(hashStr)
+      .digest('base64');
+
+    const formData = new URLSearchParams({
+      merchant_id: this.merchantId,
+      merchant_oid: merchantOid,
+      paytr_token: paytrToken,
+    });
+
+    try {
+      const response = await fetch('https://www.paytr.com/odeme/durum-sorgu', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+
+      const rawText = await response.text();
+      if (!rawText?.trim()) {
+        this.logger.error(`PayTR durum-sorgu boş yanıt HTTP ${response.status}`);
+        return { ok: false, errMsg: `Empty response HTTP ${response.status}` };
+      }
+
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(rawText) as Record<string, unknown>;
+      } catch {
+        this.logger.error(`PayTR durum-sorgu JSON değil: ${rawText.slice(0, 200)}`);
+        return { ok: false, errMsg: 'Invalid JSON from PayTR' };
+      }
+
+      const statusVal = (data.status ?? data.Status) as string | undefined;
+      if (statusVal !== 'success') {
+        return {
+          ok: false,
+          errNo: data.err_no != null ? String(data.err_no) : undefined,
+          errMsg: String(data.err_msg ?? 'PayTR status inquiry failed'),
+        };
+      }
+
+      const paymentTotalTl = PayTRService.parsePaytrMoneyString(
+        (data.payment_total as string | undefined) ?? (data.PaymentTotal as string | undefined),
+      );
+      const paymentAmountTl = PayTRService.parsePaytrMoneyString(
+        (data.payment_amount as string | undefined) ?? (data.PaymentAmount as string | undefined),
+      );
+
+      if (paymentTotalTl === null) {
+        this.logger.warn(`PayTR durum-sorgu payment_total parse edilemedi: ${JSON.stringify(data)}`);
+        return { ok: false, errMsg: 'Could not parse payment_total' };
+      }
+      const amountTl = paymentAmountTl ?? paymentTotalTl;
+
+      const paymentDateRaw = data.payment_date ?? data.PaymentDate;
+      const paymentDate =
+        paymentDateRaw !== undefined && paymentDateRaw !== null
+          ? String(paymentDateRaw)
+          : undefined;
+
+      const currency = String(data.currency ?? data.Currency ?? 'TL');
+
+      return {
+        ok: true,
+        paymentTotalTl,
+        paymentAmountTl: amountTl,
+        paymentDate,
+        currency,
+      };
+    } catch (error: any) {
+      this.logger.error(`PayTR durum-sorgu hatası: ${error?.message}`);
+      return { ok: false, errMsg: error?.message || 'PayTR status inquiry error' };
+    }
+  }
+
+  /** PayTR dökümanındaki gibi ondalık ayırıcı virgül olabilir (örn. "10,8") */
+  static parsePaytrMoneyString(value: string | undefined): number | null {
+    if (value === undefined || value === null) return null;
+    const s = String(value).trim().replace(/\s/g, '').replace(',', '.');
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
   }
 
   // ==========================================================================
