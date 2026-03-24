@@ -601,8 +601,16 @@ export class OrderService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Get product with seller info - using Prisma instead of raw SQL
-      // Transaction provides isolation for concurrent purchases
+      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT p.id
+        FROM products p
+        WHERE p.id = ${dto.productId}
+        FOR UPDATE
+      `;
+      if (!lockedRows?.length) {
+        throw new NotFoundException('Ürün bulunamadı');
+      }
+
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
         include: {
@@ -1139,7 +1147,16 @@ export class OrderService {
    */
   async guestCheckout(dto: GuestCheckoutDto) {
     const result = await this.prisma.$transaction(async (tx) => {
-      // Get product
+      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT p.id
+        FROM products p
+        WHERE p.id = ${dto.productId}
+        FOR UPDATE
+      `;
+      if (!lockedRows?.length) {
+        throw new NotFoundException('Ürün bulunamadı');
+      }
+
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
         include: {
