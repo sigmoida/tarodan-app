@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PaymentService } from '../payment/payment.service';
 import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
+import { resolveShippingDestinationCity } from './shipping-destination.util';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
 @Injectable()
@@ -238,18 +239,17 @@ export class ShippingService {
       throw new BadRequestException('Satıcı adresi bulunamadı');
     }
 
-    // Get shipping address from JSON field or by ID
-    let shippingCity: string;
+    let shippingAddrRow: { city: string | null } | null = null;
     if (order.shippingAddressId) {
-      const shippingAddr = await this.prisma.address.findUnique({
+      shippingAddrRow = await this.prisma.address.findUnique({
         where: { id: order.shippingAddressId },
+        select: { city: true },
       });
-      shippingCity = shippingAddr?.city || 'Istanbul';
-    } else if (order.shippingAddress && typeof order.shippingAddress === 'object') {
-      shippingCity = (order.shippingAddress as any).city || 'Istanbul';
-    } else {
-      shippingCity = 'Istanbul';
     }
+    const shippingCity = resolveShippingDestinationCity(
+      shippingAddrRow,
+      order.shippingAddress,
+    );
 
     const rate = await this.calculateProviderRate(
       dto.provider,

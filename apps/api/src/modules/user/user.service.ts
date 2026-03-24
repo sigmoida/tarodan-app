@@ -14,6 +14,16 @@ interface UserBlock {
   createdAt: Date;
 }
 
+/** Edge case 1.11: allow address delete only when no open order references it as shipping (terminal orders keep JSON snapshot). */
+const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.pending_payment,
+  OrderStatus.paid,
+  OrderStatus.preparing,
+  OrderStatus.shipped,
+  OrderStatus.delivered,
+  OrderStatus.refund_requested,
+];
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -661,6 +671,19 @@ export class UserService {
 
     if (!address) {
       throw new NotFoundException('Adres bulunamadı');
+    }
+
+    const openOrdersUsingAddress = await this.prisma.order.count({
+      where: {
+        buyerId: userId,
+        shippingAddressId: addressId,
+        status: { in: ADDRESS_DELETE_BLOCKED_ORDER_STATUSES },
+      },
+    });
+    if (openOrdersUsingAddress > 0) {
+      throw new BadRequestException(
+        'Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
+      );
     }
 
     await this.prisma.address.delete({
