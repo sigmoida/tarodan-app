@@ -2,7 +2,6 @@ import { IsUUID, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum PaymentProvider {
-  iyzico = 'iyzico',
   paytr = 'paytr',
 }
 
@@ -16,7 +15,7 @@ export class InitiatePaymentDto {
 
   @ApiProperty({
     enum: PaymentProvider,
-    example: 'iyzico',
+    example: 'paytr',
     description: 'Payment provider to use',
   })
   @IsEnum(PaymentProvider, { message: 'Geçerli bir ödeme sağlayıcı seçiniz' })

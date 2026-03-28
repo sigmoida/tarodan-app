@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
-import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -56,7 +55,6 @@ describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () 
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn().mockResolvedValue(undefined) } },
         { provide: ConfigService, useValue: { get: mockConfigGet } },
-        { provide: IyzicoService, useValue: {} },
         { provide: PayTRService, useValue: {} },
         { provide: EventService, useValue: { emitPaymentFailed: jest.fn().mockResolvedValue(undefined) } },
         { provide: InvoiceService, useValue: {} },

@@ -22,7 +22,7 @@ import { json, urlencoded } from 'express';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
-    // IMPORTANT: Disable default body parser so our custom parsers work for Iyzico callbacks
+    // IMPORTANT: Disable default body parser so custom parsers work for payment callbacks
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable default parser
       logger:
@@ -31,7 +31,7 @@ async function bootstrap() {
           : new QuietRouteNestLogger(),
     });
 
-    // Custom Body Parsers (Critical for Iyzico 3DS callbacks which use x-www-form-urlencoded)
+    // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks)
     app.use(json({ limit: '50mb' }));
     app.use(urlencoded({ extended: true, limit: '50mb' }));
 

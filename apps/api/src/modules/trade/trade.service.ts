@@ -24,6 +24,7 @@ import {
 } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { PaymentService } from '../payment/payment.service';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -49,6 +50,7 @@ export class TradeService {
     private readonly membershipService: MembershipService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    private readonly paymentService: PaymentService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -923,6 +925,8 @@ export class TradeService {
       );
     }
 
+    await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+
     await this.prisma.$transaction(async (tx) => {
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
 
@@ -938,18 +942,6 @@ export class TradeService {
             reservedQuantity: { decrement: qty },
             status: ProductStatus.active,
           },
-        });
-      }
-
-      // Refund cash payment if any
-      const cashPayment = await tx.tradeCashPayment.findUnique({
-        where: { tradeId },
-      });
-
-      if (cashPayment && cashPayment.status === PaymentStatus.completed) {
-        await tx.tradeCashPayment.update({
-          where: { tradeId },
-          data: { status: PaymentStatus.refunded, refundedAt: new Date() },
         });
       }
 
@@ -1322,6 +1314,10 @@ export class TradeService {
       newStatus = TradeStatus.completed;
     }
 
+    if (newStatus === TradeStatus.cancelled) {
+      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       // Update dispute
       await tx.tradeDispute.update({
@@ -1394,18 +1390,6 @@ export class TradeService {
             },
           });
         }
-
-        // Refund cash payment if any
-        const cashPayment = await tx.tradeCashPayment.findUnique({
-          where: { tradeId },
-        });
-
-        if (cashPayment && cashPayment.status === PaymentStatus.completed) {
-          await tx.tradeCashPayment.update({
-            where: { tradeId },
-            data: { status: PaymentStatus.refunded, refundedAt: new Date() },
-          });
-        }
       }
     });
 
@@ -1442,6 +1426,15 @@ export class TradeService {
 
     for (const trade of [...expiredPendingTrades, ...expiredAcceptedTrades]) {
       try {
+        try {
+          await this.paymentService.refundTradeCashPaymentIfCompleted(trade.id);
+        } catch (refundErr: any) {
+          this.logger.error(
+            `autoCancelExpiredTrades: PayTR nakit iade başarısız trade=${trade.id} — iptal atlandı: ${refundErr?.message}`,
+          );
+          continue;
+        }
+
         await this.prisma.$transaction(async (tx) => {
           const allItems = await tx.tradeItem.findMany({
             where: { tradeId: trade.id },

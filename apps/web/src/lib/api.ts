@@ -276,9 +276,9 @@ export const ordersApi = {
 
 // Payments
 export const paymentsApi = {
-  initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
-  initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiateGuest: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
   /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
   initiateTradeCash: (tradeId: string) =>
@@ -307,22 +307,6 @@ export const paymentsApi = {
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
 
-  // Direct Payment API
-  processDirect: (data: {
-    orderId: string;
-    card?: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-      cardAlias?: string;
-    };
-    cardToken?: string;
-    saveCard?: boolean;
-    provider?: string;
-  }) => api.post('/payments/process-direct', data),
-
   getPaymentMethods: () => api.get('/payments/methods'),
 
   addPaymentMethod: (data: {
@@ -336,7 +320,7 @@ export const paymentsApi = {
     };
   }) => api.post('/payments/methods', data),
 
-  deletePaymentMethod: (cardToken: string) => api.delete(`/payments/methods/${cardToken}`),
+  deletePaymentMethod: (paymentMethodId: string) => api.delete(`/payments/methods/${paymentMethodId}`),
 };
 
 // Addresses

@@ -138,7 +138,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     // PHASE 4 - Infrastructure Modules
     StorageModule,      // GAP-007: AWS S3 File Storage (HIGH)
     SearchModule,       // GAP-008: Elasticsearch Search (HIGH) - Enabled for improved search
-    PaymentProvidersModule, // GAP-015 & GAP-016: iyzico & Aras Kargo
+    PaymentProvidersModule, // PayTR & kargo
 
     // PHASE 5 - Operations Modules
     ReportsModule,      // GAP-019: Report Export (MEDIUM)

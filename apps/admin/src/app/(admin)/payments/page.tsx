@@ -207,7 +207,6 @@ export default function AdminPaymentsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Tümü</option>
-                  <option value="iyzico">Iyzico</option>
                   <option value="paytr">PayTR</option>
                 </select>
               </div>

@@ -21,26 +21,16 @@ interface PaymentGateway {
 
 const DEFAULT_GATEWAYS: PaymentGateway[] = [
     {
-        id: 'iyzico',
-        name: 'Iyzico',
+        id: 'paytr',
+        name: 'PayTR',
         enabled: true,
         mode: 'test',
         config: {
-            apiKey: '',
-            secretKey: '',
-            baseUrl: 'https://sandbox-api.iyzipay.com'
+            merchantId: '',
+            merchantKey: '',
+            merchantSalt: '',
         }
     },
-    {
-        id: 'stripe',
-        name: 'Stripe',
-        enabled: false,
-        mode: 'test',
-        config: {
-            publishableKey: '',
-            secretKey: '',
-        }
-    }
 ];
 
 export default function PaymentSettingsPage() {

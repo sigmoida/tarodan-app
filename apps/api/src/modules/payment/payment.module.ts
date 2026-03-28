@@ -29,6 +29,6 @@ export class PaymentModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(RawBodyMiddleware)
-      .forRoutes('payments/callback/iyzico', 'payments/callback/paytr');
+      .forRoutes('payments/callback/paytr');
   }
 }

@@ -185,7 +185,7 @@ export default function PaymentDetailScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Ödeme Sağlayıcı</Text>
             <Text style={styles.detailValue}>
-              {payment.provider === 'paytr' ? 'PayTR' : payment.provider === 'iyzico' ? 'iyzico' : payment.provider || '—'}
+              {payment.provider === 'paytr' ? 'PayTR' : payment.provider || '—'}
             </Text>
           </View>
 

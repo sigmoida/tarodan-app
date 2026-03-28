@@ -4,7 +4,6 @@ import { PaymentService } from './payment.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
-import { IyzicoService } from '../payment-providers/iyzico.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -41,7 +40,6 @@ describe('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },
         { provide: ConfigService, useValue: { get: mockConfigGet } },
-        { provide: IyzicoService, useValue: {} },
         { provide: PayTRService, useValue: mockPaytr },
         { provide: EventService, useValue: {} },
         { provide: InvoiceService, useValue: {} },

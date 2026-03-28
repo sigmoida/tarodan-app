@@ -14,7 +14,6 @@ import toast from 'react-hot-toast';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import CreditCardForm from '@/components/payment/CreditCardForm';
 
 export default function PaymentPage() {
   const params = useParams();
@@ -225,24 +224,6 @@ export default function PaymentPage() {
             <p className="text-sm text-gray-500 mt-4 text-center">
               Ödeme tamamlandıktan sonra otomatik olarak yönlendirileceksiniz.
             </p>
-          </motion.div>
-        ) : payment.provider === 'iyzico' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <CreditCardForm
-              orderId={payment.orderId}
-              amount={payment.amount}
-              onSuccess={(html) => {
-                if (html) {
-                  setPaymentHtml(html);
-                } else {
-                  handlePaymentComplete();
-                }
-              }}
-              onCancel={() => router.back()}
-            />
           </motion.div>
         ) : payment.paymentUrl ? (
           // Generic redirect (fallback)

@@ -378,13 +378,6 @@ export const paymentsApi = {
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
-  processDirect: (data: {
-    orderId: string;
-    card?: { cardHolderName: string; cardNumber: string; expireMonth: string; expireYear: string; cvc: string; cardAlias?: string };
-    cardToken?: string;
-    saveCard?: boolean;
-    provider?: string;
-  }) => api.post('/payments/process-direct', data),
   getMethods: () =>
     api.get('/payments/methods'),
   addMethod: (data: { cardNumber: string; cardHolder: string; expiryMonth: number; expiryYear: number; cvv: string }) =>

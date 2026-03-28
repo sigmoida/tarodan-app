@@ -1482,7 +1482,7 @@ async function main() {
       await prisma.payment.create({
         data: {
           orderId: order.id,
-          provider: Math.random() > 0.5 ? 'iyzico' : 'paytr',
+          provider: 'paytr',
           providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
           amount: order.totalAmount,
           currency: 'TRY',
