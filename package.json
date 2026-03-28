@@ -25,6 +25,7 @@
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
     "docker:prod": "docker compose -f infrastructure/docker-compose.prod.yml up -d",
+    "ngrok": "./tools/ngrok http 3001",
     "postinstall": "echo Skipping husky"
   },
   "devDependencies": {

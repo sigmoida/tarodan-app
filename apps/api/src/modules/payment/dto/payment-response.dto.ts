@@ -56,9 +56,6 @@ export class PaymentInitResponseDto {
 
   @ApiProperty({ example: 300 })
   expiresIn: number;
-
-  @ApiPropertyOptional({ example: true })
-  useBypass?: boolean;
 }
 
 export class PaymentHoldResponseDto {

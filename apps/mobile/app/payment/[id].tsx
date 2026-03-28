@@ -79,15 +79,6 @@ export default function PaymentDetailScreen() {
         return;
       }
 
-      const isMembershipOrder =
-        data?.metadata?.type === 'membership' ||
-        data?.orderType === 'membership' ||
-        data?.isMembershipPayment;
-
-      if (isMembershipOrder && data?.metadata?.useBypass) {
-        router.replace('/membership/checkout');
-        return;
-      }
     } catch (err) {
       console.error('Payment detail fetch error:', err);
       setError('Ödeme bilgileri yüklenirken bir hata oluştu.');

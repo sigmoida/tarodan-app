@@ -24,7 +24,4 @@ export class RetryPaymentResponseDto {
 
   @ApiProperty({ example: 300 })
   expiresIn: number;
-
-  @ApiPropertyOptional({ example: true })
-  useBypass?: boolean;
 }

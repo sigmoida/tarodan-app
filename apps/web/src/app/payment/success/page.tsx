@@ -58,6 +58,12 @@ export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [invoiceError, setInvoiceError] = useState(false);
+  /** Auth store: SSR uses isLoading=true, client without token uses false → hydration mismatch. Defer auth UI until mount. */
+  const [clientReady, setClientReady] = useState(false);
+
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
 
   useEffect(() => {
     // Üyelik ödemesi için bu sayfa sipariş sayfası; doğru sayfaya yönlendir
@@ -163,6 +169,14 @@ export default function PaymentSuccessPage() {
       setDownloading(false);
     }
   };
+
+  if (!clientReady) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500" />
+      </div>
+    );
+  }
 
   const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
   const guestOk = isGuestCheckout || urlGuest;

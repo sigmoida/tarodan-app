@@ -519,22 +519,6 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/:id/bypass-complete - Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true)
-   */
-  @Post(':id/bypass-complete')
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @Public()
-  @ApiOperation({ summary: 'Complete payment with test bypass (one card success, others fail)' })
-  @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Success or failure based on card number' })
-  async bypassComplete(
-    @Param('id') paymentId: string,
-    @Body() body: { cardNumber: string },
-  ): Promise<{ success: boolean }> {
-    return this.paymentService.bypassComplete(paymentId, body?.cardNumber ?? '');
-  }
-
-  /**
    * POST /payments/:id/cancel - Cancel a pending payment
    */
   @Post(':id/cancel')

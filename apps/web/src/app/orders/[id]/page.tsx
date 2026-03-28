@@ -346,52 +346,6 @@ export default function OrderDetailPage() {
       const res = await paymentsApi.initiate(order.id, 'paytr');
       const data = res.data?.data ?? res.data;
 
-      // Bypass mode: complete payment with the entered card number
-      if (data?.useBypass && data?.paymentId) {
-        const card = cardNumber.replace(/\D/g, '');
-        setCardError(null);
-        if (!card) {
-          try { await paymentsApi.confirmFailed(data.paymentId); } catch (_) {}
-          setCardError(locale === 'en' ? 'Enter card number' : 'Kart numarası girin');
-          setPaymentLoading(false);
-          setAddressLoading(false);
-          return;
-        }
-        try {
-          const bypassRes = await paymentsApi.bypassComplete(data.paymentId, card);
-          if (bypassRes.data?.success) {
-            toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
-            router.push(`/payment/success?paymentId=${data.paymentId}`);
-          } else {
-            setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
-            setPaymentLoading(false);
-            setAddressLoading(false);
-            return;
-          }
-        } catch (err: any) {
-          setCardError(locale === 'en' ? 'Card details are incorrect' : 'Kart bilgileri yanlış');
-          setPaymentLoading(false);
-          setAddressLoading(false);
-          return;
-        }
-        // Save card if requested
-        if (saveCard && useNewCard && cardNumber && cardExpiry) {
-          try {
-            const [month, year] = cardExpiry.split('/');
-            await api.post('/payments/methods', {
-              cardNumber: cardNumber.replace(/\s/g, ''),
-              cardHolder: cardName,
-              expiryMonth: parseInt(month),
-              expiryYear: parseInt('20' + year),
-              cvv: cardCvc,
-            });
-          } catch {}
-        }
-        setPaymentLoading(false);
-        setAddressLoading(false);
-        return;
-      }
-
       // PayTR mode: redirect
       if (data?.paymentUrl) {
         // Save card before redirecting

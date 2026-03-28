@@ -95,6 +95,13 @@ export type PayTRStatusInquiryResult =
   | PayTRStatusInquirySuccess
   | { ok: false; errNo?: string; errMsg?: string };
 
+/** PAYTR_TEST_MODE: true / 1 / yes → test */
+export function parsePaytrTestMode(raw: string | undefined): boolean {
+  if (raw === undefined || raw === '') return true;
+  const v = String(raw).trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 // =============================================================================
 // PAYTR SERVICE
 // =============================================================================
@@ -109,14 +116,26 @@ export class PayTRService {
   private readonly testMode: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.merchantId = this.configService.get('PAYTR_MERCHANT_ID', '');
-    this.merchantKey = this.configService.get('PAYTR_MERCHANT_KEY', '');
-    this.merchantSalt = this.configService.get('PAYTR_MERCHANT_SALT', '');
+    this.merchantId = (this.configService.get('PAYTR_MERCHANT_ID', '') || '').trim();
+    this.merchantKey = (this.configService.get('PAYTR_MERCHANT_KEY', '') || '').trim();
+    this.merchantSalt = (this.configService.get('PAYTR_MERCHANT_SALT', '') || '').trim();
     this.baseUrl = 'https://www.paytr.com/odeme';
-    this.testMode = this.configService.get('PAYTR_TEST_MODE', 'true') === 'true';
+    this.testMode = parsePaytrTestMode(this.configService.get('PAYTR_TEST_MODE'));
+
+    const customCallback = (this.configService.get('PAYTR_CALLBACK_URL', '') || '').trim();
+    const apiUrl = (this.configService.get('API_URL', 'http://localhost:3001') || '').replace(/\/$/, '');
+    const effectiveCallback = customCallback || `${apiUrl}/api/payments/callback/paytr`;
+    this.logger.log(`PayTR callback (panel Bildirim URL): ${effectiveCallback}`);
+    if (effectiveCallback.includes('localhost')) {
+      this.logger.warn(
+        'PayTR genelde localhost bildirim kabul etmez; ngrok ve PAYTR_CALLBACK_URL kullanın, panelde aynı URL tanımlı olsun.',
+      );
+    }
 
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       this.logger.warn('⚠️ PayTR API credentials not configured');
+    } else {
+      this.logger.log(`PayTR test mode: ${this.testMode ? 'ON' : 'OFF'}`);
     }
   }
 
@@ -148,36 +167,44 @@ export class PayTRService {
       : successBase;
     const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
 
-    // Encode basket
+    // Encode basket (must match POST user_basket)
     const userBasket = this.encodeBasket(basketItems);
 
-    // Build hash string
-    const hashStr = this.buildHashString({
-      merchantOid: orderId,
-      email: buyer.email,
-      paymentAmount,
-      userBasket,
-      noInstallment: options?.installmentCount === 1 ? '1' : '0',
-      maxInstallment: String(options?.maxInstallment || 0),
-      currency: 'TL',
-      testMode: this.testMode ? '1' : '0',
-    });
+    const noInstallment = options?.installmentCount === 1 ? '1' : '0';
+    const maxInstallment = String(options?.maxInstallment ?? 0);
+    const paymentAmountStr = String(paymentAmount);
+    const testModeStr = this.testMode ? '1' : '0';
 
-    // Generate PayTR token
-    const paytrToken = this.generateHash(hashStr);
+    // iFrame API: paytr_token = base64(HMAC-SHA256(merchant_key, hashStr + merchant_salt))
+    // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode
+    const hashStr =
+      this.merchantId +
+      buyer.ip +
+      orderId +
+      buyer.email +
+      paymentAmountStr +
+      userBasket +
+      noInstallment +
+      maxInstallment +
+      'TL' +
+      testModeStr;
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(hashStr + this.merchantSalt)
+      .digest('base64');
 
-    // Build request data
+    // Build request data (field values must match hash above)
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
       user_ip: buyer.ip,
       merchant_oid: orderId,
       email: buyer.email,
-      payment_amount: String(paymentAmount),
+      payment_amount: paymentAmountStr,
       paytr_token: paytrToken,
       user_basket: userBasket,
       debug_on: this.testMode ? '1' : '0',
-      no_installment: options?.installmentCount === 1 ? '1' : '0',
-      max_installment: String(options?.maxInstallment || 0),
+      no_installment: noInstallment,
+      max_installment: maxInstallment,
       user_name: `${buyer.name} ${buyer.surname}`,
       user_address: buyer.address,
       user_phone: buyer.phone,
@@ -385,15 +412,16 @@ export class PayTRService {
     merchantOid: string,
     amount: number, // in TL
   ): Promise<PayTRRefundResponse> {
+    const oid = merchantOid.includes('-') ? merchantOid.replace(/-/g, '') : merchantOid;
     const returnAmount = Math.round(amount * 100); // Convert to kuruş
 
     // Build hash for refund
-    const hashStr = `${this.merchantId}${merchantOid}${returnAmount}${this.merchantSalt}`;
+    const hashStr = `${this.merchantId}${oid}${returnAmount}${this.merchantSalt}`;
     const paytrToken = this.generateHash(hashStr);
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
-      merchant_oid: merchantOid,
+      merchant_oid: oid,
       return_amount: String(returnAmount),
       paytr_token: paytrToken,
     });
@@ -525,78 +553,15 @@ export class PayTRService {
     threeDSUrl?: string;
     errorMessage?: string;
   }> {
-    const paymentAmount = Math.round(amount * 100);
-    const userBasket = this.encodeBasket(basketItems);
-
-    // Build hash
-    const hashStr = this.buildHashString({
-      merchantOid: orderId,
-      email: buyer.email,
-      paymentAmount,
-      userBasket,
-      noInstallment: options?.installmentCount === 1 ? '1' : '0',
-      maxInstallment: String(options?.installmentCount || 0),
-      currency: 'TL',
-      testMode: this.testMode ? '1' : '0',
-    });
-    const paytrToken = this.generateHash(hashStr);
-
-    const formData = new URLSearchParams({
-      merchant_id: this.merchantId,
-      user_ip: buyer.ip,
-      merchant_oid: orderId,
-      email: buyer.email,
-      payment_type: 'card',
-      payment_amount: String(paymentAmount),
-      currency: 'TL',
-      test_mode: this.testMode ? '1' : '0',
-      non_3d: options?.is3D === false ? '1' : '0',
-      cc_owner: card.holderName,
-      card_number: card.number,
-      expiry_month: card.expireMonth,
-      expiry_year: card.expireYear,
-      cvv: card.cvv,
-      installment_count: String(options?.installmentCount || 0),
-      user_name: `${buyer.name} ${buyer.surname}`,
-      user_address: buyer.address,
-      user_phone: buyer.phone,
-      user_basket: userBasket,
-      paytr_token: paytrToken,
-      merchant_ok_url: `${this.configService.get('FRONTEND_URL')}/payment/success`,
-      merchant_fail_url: `${this.configService.get('FRONTEND_URL')}/payment/fail`,
-    });
-
-    try {
-      const response = await fetch('https://www.paytr.com/odeme/api/direct-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        return {
-          status: 'success',
-          paymentId: data.payment_id,
-        };
-      } else if (data.status === '3d') {
-        return {
-          status: 'success',
-          threeDSUrl: data.redirect_url,
-        };
-      } else {
-        return {
-          status: 'failed',
-          errorMessage: data.reason || 'Ödeme başarısız',
-        };
-      }
-    } catch (error: any) {
-      this.logger.error('PayTR direct payment error:', error);
-      throw new BadRequestException(error.message || 'PayTR ödeme hatası');
-    }
+    void orderId;
+    void amount;
+    void card;
+    void buyer;
+    void basketItems;
+    void options;
+    throw new BadRequestException(
+      'PayTR Direct API bu projede kullanılmıyor; checkout iFrame (get-token) akışını kullanın.',
+    );
   }
 
   // ==========================================================================
@@ -616,33 +581,7 @@ export class PayTRService {
   }
 
   /**
-   * Build hash string for token generation
-   */
-  private buildHashString(params: {
-    merchantOid: string;
-    email: string;
-    paymentAmount: number;
-    userBasket: string;
-    noInstallment: string;
-    maxInstallment: string;
-    currency: string;
-    testMode: string;
-  }): string {
-    return (
-      this.merchantId +
-      params.email +
-      params.paymentAmount +
-      params.userBasket +
-      params.noInstallment +
-      params.maxInstallment +
-      params.currency +
-      params.testMode +
-      this.merchantSalt
-    );
-  }
-
-  /**
-   * Generate HMAC-SHA256 hash in Base64
+   * Generate HMAC-SHA256 hash in Base64 (refund, bin-detail; not iFrame get-token)
    */
   private generateHash(data: string): string {
     return crypto

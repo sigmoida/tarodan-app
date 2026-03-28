@@ -302,9 +302,6 @@ export const paymentsApi = {
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
   confirmFailed: (paymentId: string) =>
     api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
-  /** Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true) */
-  bypassComplete: (paymentId: string, cardNumber: string) =>
-    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>

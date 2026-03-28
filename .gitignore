@@ -31,6 +31,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Local ngrok binary (copy from ngrok.com; do not commit)
+tools/ngrok
+
 # Testing
 coverage/
 

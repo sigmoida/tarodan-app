@@ -202,13 +202,11 @@ export class PaymentService {
         });
       }
       const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
-      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
       return {
         paymentId: existingPayment.id,
         paymentUrl: `${frontendUrl}/payment/${existingPayment.id}`,
         provider: existingPayment.provider,
         expiresIn: 300,
-        ...(paymentBypassExisting && { useBypass: true }),
         tradeId,
         amount: Number(cashPayment.totalAmount),
       };
@@ -234,20 +232,6 @@ export class PaymentService {
       tradeCashPaymentId: cashPayment.id,
       payerId: userId,
     });
-
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
-      return {
-        paymentId: payment.id,
-        tradeId,
-        amount: totalAmount,
-        paymentUrl: undefined,
-        paymentHtml: undefined,
-        provider,
-        expiresIn: 300,
-        useBypass: true,
-      };
-    }
 
     // Build a virtual order-like object for PayTR initialization
     const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
@@ -304,20 +288,6 @@ export class PaymentService {
         });
       }
 
-      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-      if (paymentBypassExisting) {
-        return {
-          paymentId: existingPayment.id,
-          orderId: dto.orderId,
-          amount: Number(order.totalAmount),
-          paymentUrl: undefined,
-          paymentHtml: undefined,
-          provider: existingPayment.provider,
-          expiresIn: 300,
-          useBypass: true,
-        };
-      }
-
       return {
         paymentId: existingPayment.id,
         paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
@@ -352,21 +322,6 @@ export class PaymentService {
     // İyzico kaldırıldı – sadece PayTR kullanılıyor
     if (dto.provider === PaymentProvider.iyzico) {
       dto.provider = PaymentProvider.paytr;
-    }
-
-    // Ödeme bypass (test): PayTR çağrılmaz; tek kart başarılı, diğerleri başarısız
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
-      return {
-        paymentId: payment.id,
-        orderId: dto.orderId,
-        amount: Number(order.totalAmount),
-        paymentUrl: undefined,
-        paymentHtml: undefined,
-        provider: dto.provider,
-        expiresIn: 300,
-        useBypass: true,
-      };
     }
 
     // PayTR flow
@@ -1976,22 +1931,6 @@ export class PaymentService {
       userId,
     });
 
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
-      this.logger.log(`Payment ${paymentId} retried (bypass), new payment ${newPayment.id}`);
-      return {
-        success: true,
-        paymentId: payment.id,
-        newPaymentId: newPayment.id,
-        orderId: payment.orderId,
-        paymentUrl: undefined,
-        paymentHtml: undefined,
-        provider: payment.provider,
-        expiresIn: 300,
-        useBypass: true,
-      };
-    }
-
     // Generate payment URL based on provider
     let paymentUrl: string;
     let paymentHtml: string | undefined;
@@ -2161,11 +2100,10 @@ export class PaymentService {
           );
         }
       } else if (payment.provider === 'paytr') {
-        // PayTR refund uses merchant_oid (order ID)
-        refundResult = await this.paytrService.createRefund(
-          orderId,
-          amountToRefund,
-        );
+        const paytrOid =
+          payment.providerConversationId?.trim() ||
+          orderId.replace(/-/g, '');
+        refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
 
         if (refundResult.status !== 'success') {
           throw new BadRequestException(
@@ -2372,9 +2310,15 @@ export class PaymentService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
-    const useBypass =
-      (this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1') &&
-      payment.status === PaymentStatus.pending;
+    const pendingPaytrResume =
+      payment.status === PaymentStatus.pending &&
+      payment.provider === PaymentProvider.paytr &&
+      payment.providerPaymentId
+        ? {
+            paymentUrl: `https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}`,
+            paymentHtml: `<iframe src="https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}" frameborder="0" style="width:100%;height:600px;border:none;"></iframe>`,
+          }
+        : {};
 
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {
@@ -2391,7 +2335,7 @@ export class PaymentService {
         provider: payment.provider,
         createdAt: payment.createdAt,
         updatedAt: payment.updatedAt,
-        ...(useBypass && { useBypass: true }),
+        ...pendingPaytrResume,
       };
     }
 
@@ -2444,49 +2388,9 @@ export class PaymentService {
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
-      ...(useBypass && { useBypass: true }),
+      ...pendingPaytrResume,
       ...(isMembershipOrder && { isMembershipOrder: true }),
     };
-  }
-
-  /**
-   * Test bypass: belirtilen kart numarası başarılı, diğerleri başarısız (PAYMENT_BYPASS=true iken)
-   */
-  async bypassComplete(paymentId: string, cardNumber: string): Promise<{ success: boolean }> {
-    if (this.configService.get('PAYMENT_BYPASS') !== 'true' && this.configService.get('PAYMENT_BYPASS') !== '1') {
-      throw new BadRequestException('Bypass modu kapalı');
-    }
-
-    const normalized = cardNumber.replace(/\D/g, '');
-    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '0000000000000000').replace(/\D/g, '');
-
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        order: {
-          include: {
-            buyer: true,
-            seller: true,
-            product: true,
-          },
-        },
-        tradeCashPayment: true,
-      },
-    });
-
-    if (!payment) throw new NotFoundException('Ödeme bulunamadı');
-    if (payment.status !== PaymentStatus.pending) {
-      return { success: payment.status === PaymentStatus.completed };
-    }
-
-    if (normalized === successCard) {
-      const transactionRef = payment.order?.orderNumber || payment.orderId || payment.tradeCashPaymentId || payment.id;
-      await this.processSuccessfulPayment(payment, transactionRef);
-      return { success: true };
-    }
-
-    await this.processFailedPayment(payment, 'Test kartı geçersiz (bypass: sadece belirlenen kart başarılı)');
-    return { success: false };
   }
 
   /**

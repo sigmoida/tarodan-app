@@ -1014,34 +1014,6 @@ export default function CheckoutPage() {
               const paymentResponse = await paymentsApi.initiate(orderId, paymentProvider);
               const paymentData = paymentResponse.data;
 
-              // Bypass: kart numarasını kullan, ödemeyi burada tamamla
-              if (paymentData.useBypass && paymentData.paymentId) {
-                const card = cardNumber.replace(/\D/g, '');
-                if (!card) {
-                  try { await paymentsApi.confirmFailed(paymentData.paymentId); } catch (_) {}
-                  toast.error(locale === 'en' ? 'Enter card number on the Payment step' : 'Ödeme adımında kart numarası girin');
-                  setStep(2);
-                  setIsLoading(false);
-                  return;
-                }
-                try {
-                  const res = await paymentsApi.bypassComplete(paymentData.paymentId, card);
-                  if (!directProductId) await clearCart();
-                  if (res.data?.success) {
-                    toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
-                    router.push(`/payment/success?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
-                  } else {
-                    toast.error(locale === 'en' ? 'Payment failed' : 'Ödeme başarısız');
-                    router.push(`/payment/fail?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
-                  }
-                } catch (err: any) {
-                  toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment failed' : 'Ödeme başarısız'));
-                  router.push(`/payment/fail?paymentId=${paymentData.paymentId}${isAuthenticated ? '' : '&guest=true'}`);
-                }
-                setIsLoading(false);
-                return;
-              }
-
               // Clear cart before redirecting to payment
               if (!directProductId) {
                 await clearCart();

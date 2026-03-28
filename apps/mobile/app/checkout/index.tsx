@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TextInput, Linking } from 'react-native';
 import { Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -415,30 +415,18 @@ export default function CheckoutScreen() {
         const paymentId =
           (payData as Record<string, unknown> | undefined)?.paymentId ??
           (payData as Record<string, unknown> | undefined)?.id;
+        const paymentUrl = (payData as Record<string, unknown> | undefined)?.paymentUrl as string | undefined;
 
-        if (payData && (payData as { useBypass?: boolean }).useBypass && paymentId) {
-          const rawCard = cardNumber.replace(/\s/g, '');
-          if (!rawCard) {
-            try {
-              await paymentsApi.confirmFailed(String(paymentId));
-            } catch {
-              /* ignore */
-            }
-            Alert.alert('Hata', 'Kart numarası giriniz.');
-            setStep(2);
-            return;
-          }
-          await paymentsApi.bypassComplete(String(paymentId), rawCard);
+        if (paymentUrl && paymentUrl.startsWith('http')) {
           if (!isDirectBuy) clearCart();
-          const guestParam = !isAuthenticated ? '&guest=true' : '';
-          router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
+          await Linking.openURL(paymentUrl);
           return;
         }
 
         if (!isDirectBuy) clearCart();
         if (paymentId) {
-          const guestParam = !isAuthenticated ? '&guest=true' : '';
-          router.replace(`/payment/success?paymentId=${paymentId}&orderId=${orderId}${guestParam}` as any);
+          const guestQ = !isAuthenticated ? '?guest=true' : '';
+          router.replace(`/payment/${paymentId}${guestQ}` as any);
           return;
         }
 

@@ -370,8 +370,6 @@ export const paymentsApi = {
     api.get(`/payments/${paymentId}/status-guest`),
   getMyPayments: (params?: { status?: string; provider?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
     api.get('/payments/me', { params }),
-  bypassComplete: (paymentId: string, cardNumber: string) =>
-    api.post(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
   confirmFailed: (paymentId: string) =>
     api.post(`/payments/${paymentId}/confirm-failed`),
   cancel: (paymentId: string) =>

@@ -58,30 +58,13 @@ export default function PaymentPage() {
         router.replace('/membership/success');
         return;
       }
-      // Bypass + üyelik + bekliyor: kart checkout’ta girilsin, bu sayfa gösterilmesin
-      if (paymentData.useBypass && isMembership) {
-        router.replace('/membership/checkout');
-        return;
-      }
-      if (paymentData.useBypass && paymentData.orderId) {
-        router.replace(`/checkout?orderId=${paymentData.orderId}`);
-        return;
-      }
-      if (paymentData.useBypass && paymentData.tradeId) {
-        router.replace(`/trades/${paymentData.tradeId}`);
-        return;
-      }
-      if (paymentData.useBypass) {
-        router.replace('/orders');
-        return;
-      }
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
-      } else if (paymentData.paymentUrl && !paymentData.useBypass) {
+      } else if (paymentData.paymentUrl) {
         const url = paymentData.paymentUrl;
         if (url.includes('/payment/') && url.includes(paymentId)) {
-          // Aynı sayfaya yönlendirilmiş (bypass); redirect etme
+          // Same payment page URL — stay on page
         } else {
           window.location.href = url;
         }
@@ -223,7 +206,7 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Payment Content – üyelik bypass checkout’ta yapılıyor, bu sayfada form yok */}
+        {/* PayTR iframe veya yönlendirme linki */}
         {paymentHtml ? (
           // PayTR iframe
           <motion.div

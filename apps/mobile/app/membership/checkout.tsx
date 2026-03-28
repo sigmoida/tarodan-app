@@ -237,7 +237,7 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
-      let statusData: { status?: string; useBypass?: boolean } | undefined;
+      let statusData: { status?: string } | undefined;
       try {
         const statusRes = await paymentsApi.getStatusLight(paymentId);
         statusData = (statusRes.data as { data?: typeof statusData })?.data || statusRes.data;
@@ -247,7 +247,6 @@ export default function MembershipCheckoutScreen() {
       }
 
       const status = statusData?.status;
-      const useBypass = statusData?.useBypass;
 
       if (status === 'completed' || status === 'success') {
         await refreshUserData();
@@ -255,18 +254,7 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
-      if (useBypass) {
-        try {
-          await paymentsApi.bypassComplete(paymentId, rawCard);
-          await refreshUserData();
-          router.replace(`/membership/success?tier=${tierType}` as any);
-        } catch (bypassErr: unknown) {
-          const msg = formatApiErrorMessage(bypassErr, 'Ödeme tamamlanamadı.');
-          Alert.alert('Ödeme Hatası', msg);
-        }
-      } else {
-        router.replace(`/payment/${paymentId}?type=membership` as any);
-      }
+      router.replace(`/payment/${paymentId}?type=membership` as any);
     } catch (err: unknown) {
       const msg = formatApiErrorMessage(err, 'Abonelik oluşturulamadı.');
       Alert.alert('Hata', msg);

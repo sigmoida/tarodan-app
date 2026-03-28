@@ -450,52 +450,6 @@ export default function TradeDetailScreen() {
       const raw = res.data as Record<string, unknown> | undefined;
       const data = (raw?.data ?? raw) as Record<string, unknown> | undefined;
 
-      if (data?.useBypass && data?.paymentId) {
-        const card = cardNumber.replace(/\D/g, '');
-        if (!card) {
-          try {
-            await paymentsApi.confirmFailed(String(data.paymentId));
-          } catch {
-            /* ignore */
-          }
-          setCardError('Kart numarası girin');
-          setCashPaymentLoading(false);
-          return;
-        }
-        try {
-          const bypassRes = await paymentsApi.bypassComplete(String(data.paymentId), card);
-          const bypassData = bypassRes.data as Record<string, unknown> | undefined;
-          if (bypassData?.success) {
-            setSnackbar({ visible: true, message: 'Ödeme başarılı' });
-            invalidateTradeCaches();
-          } else {
-            setCardError('Kart bilgileri yanlış');
-            setCashPaymentLoading(false);
-            return;
-          }
-        } catch {
-          setCardError('Kart bilgileri yanlış');
-          setCashPaymentLoading(false);
-          return;
-        }
-        if (saveCard && useNewCard && cardNumber && cardExpiry) {
-          try {
-            const [month, year] = cardExpiry.split('/');
-            await api.post('/payments/methods', {
-              cardNumber: cardNumber.replace(/\s/g, ''),
-              cardHolder: cardName,
-              expiryMonth: parseInt(month, 10),
-              expiryYear: parseInt(`20${year}`, 10),
-              cvv: cardCvc,
-            });
-          } catch {
-            /* ignore */
-          }
-        }
-        setCashPaymentLoading(false);
-        return;
-      }
-
       if (data?.paymentUrl) {
         if (saveCard && useNewCard && cardNumber && cardExpiry) {
           try {
