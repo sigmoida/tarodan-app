@@ -25,6 +25,7 @@ import {
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import { PaymentService } from '../payment/payment.service';
+import { ProductLockService } from '../product/product-lock.service';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -51,6 +52,7 @@ export class TradeService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
+    private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -427,14 +429,7 @@ export class TradeService {
     userId: string,
     dto: AcceptTradeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Only receiver can accept
-    if (trade.receiverId !== userId) {
-      throw new ForbiddenException('Sadece takas alıcısı kabul edebilir');
-    }
-
-    // Validate receiver membership - must still be premium (subscription might have expired)
+    // Validate receiver membership before opening the transaction
     const receiverCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!receiverCanTrade.allowed) {
       throw new BadRequestException(
@@ -442,19 +437,7 @@ export class TradeService {
       );
     }
 
-    // Check valid transition
-    if (!this.canTransition(trade.status, TradeStatus.accepted)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' kabul edilemez`,
-      );
-    }
-
-    // Check deadline
-    if (new Date() > trade.responseDeadline) {
-      throw new BadRequestException('Yanıt süresi dolmuş');
-    }
-
-    // Get deadline settings
+    // Get deadline settings (read-only, safe outside tx)
     const paymentHoursSetting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: 'trade_payment_deadline_hours' },
     });
@@ -465,46 +448,54 @@ export class TradeService {
     const paymentHours = parseInt(paymentHoursSetting?.settingValue ?? '48');
     const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7');
 
-    const now = new Date();
-    const paymentDeadline = new Date(now);
-    paymentDeadline.setHours(paymentDeadline.getHours() + paymentHours);
-
-    const shippingDeadline = new Date(now);
-    shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+    let tradeInitiatorId: string;
 
     await this.prisma.$transaction(async (tx) => {
+      // Lock trade row first
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      if (trade.receiverId !== userId) {
+        throw new ForbiddenException('Sadece takas alıcısı kabul edebilir');
+      }
+
+      if (!this.canTransition(trade.status, TradeStatus.accepted)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' kabul edilemez`,
+        );
+      }
+
+      if (new Date() > trade.responseDeadline) {
+        throw new BadRequestException('Yanıt süresi dolmuş');
+      }
+
+      tradeInitiatorId = trade.initiatorId;
+
+      const now = new Date();
+      const paymentDeadline = new Date(now);
+      paymentDeadline.setHours(paymentDeadline.getHours() + paymentHours);
+      const shippingDeadline = new Date(now);
+      shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+
       const tradeItems = await tx.tradeItem.findMany({
         where: { tradeId },
       });
 
-      // Adet bazlı: müsait adet kontrolü ve rezervasyon
-      const products = await tx.product.findMany({
-        where: { id: { in: tradeItems.map((i) => i.productId) } },
-      });
-      for (const item of tradeItems) {
-        const product = products.find((p) => p.id === item.productId);
-        if (product) {
-          const available = getAvailableQuantity(product);
-          if (available !== null && available < item.quantity) {
-            throw new BadRequestException(
-              `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
-            );
-          }
-        }
-      }
-
+      // Lock every product row involved and verify availability
       const byProduct = new Map<string, number>();
       for (const item of tradeItems) {
         byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
       }
+
       for (const [productId, qty] of byProduct) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { reservedQuantity: { increment: qty } },
-        });
+        await this.productLockService.checkAndReserve(tx, productId, qty);
       }
 
-      // Update trade
+      // Cross-flow: reject pending offers & cancel other pending trades for involved products
+      for (const productId of byProduct.keys()) {
+        await this.productLockService.invalidateRelatedOffers(tx, productId);
+        await this.productLockService.invalidateRelatedTrades(tx, productId, tradeId);
+      }
+
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -517,9 +508,8 @@ export class TradeService {
         },
       });
 
-      // Create cash payment record if applicable
       if (trade.cashAmount && trade.cashPayerId) {
-        const commission = trade.cashAmount.toNumber() * 0.05; // 5% commission
+        const commission = trade.cashAmount.toNumber() * 0.05;
         await tx.tradeCashPayment.create({
           data: {
             tradeId,
@@ -540,14 +530,11 @@ export class TradeService {
 
     await this.invalidateProductCachesForTrade(tradeId);
 
-    // Send notification to initiator that trade was accepted
     try {
       await this.notificationService.createInAppNotification(
-        trade.initiatorId,
+        tradeInitiatorId!,
         NotificationType.TRADE_ACCEPTED,
-        {
-          tradeId,
-        },
+        { tradeId },
       );
     } catch (error) {
       this.logger.warn('Failed to send trade accepted notification');
@@ -564,41 +551,46 @@ export class TradeService {
     userId: string,
     dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Only receiver can reject
-    if (trade.receiverId !== userId) {
-      throw new ForbiddenException('Sadece takas alıcısı reddedebilir');
-    }
-
-    // Check valid transition
-    if (!this.canTransition(trade.status, TradeStatus.rejected)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' reddedilemez`,
-      );
-    }
+    let tradeInitiatorId: string;
 
     await this.prisma.$transaction(async (tx) => {
-      const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
-      if (allItems.length > 0) {
-        const byProduct = new Map<string, number>();
-        for (const item of allItems) {
-          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
-        }
-        const products = await tx.product.findMany({
-          where: { id: { in: [...byProduct.keys()] } },
-          select: { id: true, reservedQuantity: true },
-        });
-        for (const product of products) {
-          const qty = byProduct.get(product.id) ?? 0;
-          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - qty);
-          await tx.product.update({
-            where: { id: product.id },
-            data: {
-              reservedQuantity: newReserved,
-              status: ProductStatus.active,
-            },
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      if (trade.receiverId !== userId) {
+        throw new ForbiddenException('Sadece takas alıcısı reddedebilir');
+      }
+
+      if (!this.canTransition(trade.status, TradeStatus.rejected)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' reddedilemez`,
+        );
+      }
+
+      tradeInitiatorId = trade.initiatorId;
+
+      // Release reservations only if trade was accepted (pending trades have none)
+      if (trade.status === TradeStatus.accepted) {
+        const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+        if (allItems.length > 0) {
+          const byProduct = new Map<string, number>();
+          for (const item of allItems) {
+            byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+          }
+          const products = await tx.product.findMany({
+            where: { id: { in: [...byProduct.keys()] } },
+            select: { id: true, reservedQuantity: true },
           });
+          for (const product of products) {
+            const qty = byProduct.get(product.id) ?? 0;
+            const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - qty);
+            await tx.product.update({
+              where: { id: product.id },
+              data: {
+                reservedQuantity: newReserved,
+                status: ProductStatus.active,
+              },
+            });
+          }
         }
       }
 
@@ -615,14 +607,11 @@ export class TradeService {
 
     await this.invalidateProductCachesForTrade(tradeId);
 
-    // Send notification to initiator that trade was rejected
     try {
       await this.notificationService.createInAppNotification(
-        trade.initiatorId,
+        tradeInitiatorId!,
         NotificationType.TRADE_REJECTED,
-        {
-          tradeId,
-        },
+        { tradeId },
       );
     } catch (error) {
       this.logger.warn('Failed to send trade rejected notification');
@@ -900,49 +889,46 @@ export class TradeService {
     userId: string,
     dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Only participants can cancel
-    if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-      throw new ForbiddenException('Bu takası iptal etme yetkiniz yok');
-    }
-
-    // Check valid transition
-    if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' iptal edilemez`,
-      );
-    }
-
-    // Cannot cancel after both shipped
-    if (
-      trade.status === TradeStatus.both_shipped ||
-      trade.status === TradeStatus.initiator_received ||
-      trade.status === TradeStatus.receiver_received
-    ) {
-      throw new BadRequestException(
-        'Her iki taraf da gönderdikten sonra iptal edilemez',
-      );
-    }
-
-    await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-
     await this.prisma.$transaction(async (tx) => {
-      const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+      const trade = await this.getTradeWithLock(tradeId, tx);
 
-      // Adet bazlı: takasta rezerve edilmiş adetleri serbest bırak (accept veya sonrası)
-      const byProduct = new Map<string, number>();
-      for (const item of allItems) {
-        byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+      if (trade.initiatorId !== userId && trade.receiverId !== userId) {
+        throw new ForbiddenException('Bu takası iptal etme yetkiniz yok');
       }
-      for (const [productId, qty] of byProduct) {
-        await tx.product.update({
-          where: { id: productId },
-          data: {
-            reservedQuantity: { decrement: qty },
-            status: ProductStatus.active,
-          },
-        });
+
+      if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' iptal edilemez`,
+        );
+      }
+
+      if (
+        trade.status === TradeStatus.both_shipped ||
+        trade.status === TradeStatus.initiator_received ||
+        trade.status === TradeStatus.receiver_received
+      ) {
+        throw new BadRequestException(
+          'Her iki taraf da gönderdikten sonra iptal edilemez',
+        );
+      }
+
+      // Release reservations only for accepted+ trades
+      const hasReservation = trade.status !== TradeStatus.pending;
+      if (hasReservation) {
+        const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
+        const byProduct = new Map<string, number>();
+        for (const item of allItems) {
+          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+        for (const [productId, qty] of byProduct) {
+          await tx.product.update({
+            where: { id: productId },
+            data: {
+              reservedQuantity: { decrement: qty },
+              status: ProductStatus.active,
+            },
+          });
+        }
       }
 
       await tx.trade.update({
@@ -955,6 +941,8 @@ export class TradeService {
         },
       });
     });
+
+    await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
 
     await this.invalidateProductCachesForTrade(tradeId);
 
@@ -969,17 +957,6 @@ export class TradeService {
     userId: string,
     dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Validate participant
-    const isInitiator = trade.initiatorId === userId;
-    const isReceiver = trade.receiverId === userId;
-
-    if (!isInitiator && !isReceiver) {
-      throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
-    }
-
-    // Validate user membership - must be premium to ship trade
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
@@ -987,70 +964,69 @@ export class TradeService {
       );
     }
 
-    // Check trade can be shipped
-    const canShipStatuses = [
-      TradeStatus.accepted,
-      TradeStatus.initiator_shipped,
-      TradeStatus.receiver_shipped,
-    ];
-
-    if (!(canShipStatuses as TradeStatus[]).includes(trade.status)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' gönderim yapılamaz`,
-      );
-    }
-
-    // Check if user already shipped
-    const existingShipment = await this.prisma.tradeShipment.findFirst({
-      where: { tradeId, shipperId: userId },
-    });
-
-    if (existingShipment) {
-      throw new BadRequestException('Zaten gönderim yaptınız');
-    }
-
-    // Validate address
     const address = await this.prisma.address.findFirst({
       where: { id: dto.fromAddressId, userId },
     });
-
     if (!address) {
       throw new NotFoundException('Adres bulunamadı');
     }
 
-    // Determine new status
-    let newStatus: TradeStatus;
-    if (trade.status === TradeStatus.accepted) {
-      newStatus = isInitiator
-        ? TradeStatus.initiator_shipped
-        : TradeStatus.receiver_shipped;
-    } else if (
-      (trade.status === TradeStatus.initiator_shipped && isReceiver) ||
-      (trade.status === TradeStatus.receiver_shipped && isInitiator)
-    ) {
-      newStatus = TradeStatus.both_shipped;
-    } else {
-      throw new BadRequestException('Geçersiz gönderim durumu');
-    }
-
-    // Generate tracking number (in real system, this would come from shipping provider)
-    const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    // Get confirmation deadline setting if both parties have shipped
-    let confirmationDeadline: Date | null = null;
-    if (newStatus === TradeStatus.both_shipped) {
-      const confirmationDaysSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'trade_confirmation_deadline_days' },
-      });
-      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
-      
-      const now = new Date();
-      confirmationDeadline = new Date(now);
-      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // Create shipment
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      const isInitiator = trade.initiatorId === userId;
+      const isReceiver = trade.receiverId === userId;
+
+      if (!isInitiator && !isReceiver) {
+        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+      }
+
+      const canShipStatuses: TradeStatus[] = [
+        TradeStatus.accepted,
+        TradeStatus.initiator_shipped,
+        TradeStatus.receiver_shipped,
+      ];
+
+      if (!canShipStatuses.includes(trade.status)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' gönderim yapılamaz`,
+        );
+      }
+
+      const existingShipment = await tx.tradeShipment.findFirst({
+        where: { tradeId, shipperId: userId },
+      });
+      if (existingShipment) {
+        throw new BadRequestException('Zaten gönderim yaptınız');
+      }
+
+      let newStatus: TradeStatus;
+      if (trade.status === TradeStatus.accepted) {
+        newStatus = isInitiator
+          ? TradeStatus.initiator_shipped
+          : TradeStatus.receiver_shipped;
+      } else if (
+        (trade.status === TradeStatus.initiator_shipped && isReceiver) ||
+        (trade.status === TradeStatus.receiver_shipped && isInitiator)
+      ) {
+        newStatus = TradeStatus.both_shipped;
+      } else {
+        throw new BadRequestException('Geçersiz gönderim durumu');
+      }
+
+      const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      let confirmationDeadline: Date | null = null;
+      if (newStatus === TradeStatus.both_shipped) {
+        const confirmationDaysSetting = await tx.platformSetting.findUnique({
+          where: { settingKey: 'trade_confirmation_deadline_days' },
+        });
+        const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+        const now = new Date();
+        confirmationDeadline = new Date(now);
+        confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+      }
+
       await tx.tradeShipment.create({
         data: {
           tradeId,
@@ -1063,7 +1039,6 @@ export class TradeService {
         },
       });
 
-      // Update trade status
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -1085,65 +1060,58 @@ export class TradeService {
     userId: string,
     dto: ConfirmTradeReceiptDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Validate participant
-    const isInitiator = trade.initiatorId === userId;
-    const isReceiver = trade.receiverId === userId;
-
-    if (!isInitiator && !isReceiver) {
-      throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
-    }
-
-    // Check trade can confirm receipt
-    const canConfirmStatuses = [
-      TradeStatus.both_shipped,
-      TradeStatus.initiator_received,
-      TradeStatus.receiver_received,
-    ];
-
-    if (!(canConfirmStatuses as TradeStatus[]).includes(trade.status)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' onay yapılamaz`,
-      );
-    }
-
-    // Find the shipment the user needs to confirm (the one sent TO them)
-    const otherPartyId = isInitiator ? trade.receiverId : trade.initiatorId;
-    const shipment = await this.prisma.tradeShipment.findFirst({
-      where: { tradeId, shipperId: otherPartyId },
-    });
-
-    if (!shipment) {
-      throw new BadRequestException('Onaylanacak gönderim bulunamadı');
-    }
-
-    if (shipment.confirmedAt) {
-      throw new BadRequestException('Bu gönderim zaten onaylandı');
-    }
-
-    // Check confirmation deadline if trade has one
-    if (trade.confirmationDeadline && new Date() > trade.confirmationDeadline) {
-      throw new BadRequestException('Onay süresi dolmuş');
-    }
-
-    // Determine new status
-    let newStatus: TradeStatus;
-    if (trade.status === TradeStatus.both_shipped) {
-      newStatus = isInitiator
-        ? TradeStatus.initiator_received
-        : TradeStatus.receiver_received;
-    } else if (
-      (trade.status === TradeStatus.initiator_received && isReceiver) ||
-      (trade.status === TradeStatus.receiver_received && isInitiator)
-    ) {
-      newStatus = TradeStatus.completed;
-    } else {
-      throw new BadRequestException('Geçersiz onay durumu');
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // Confirm shipment
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      const isInitiator = trade.initiatorId === userId;
+      const isReceiver = trade.receiverId === userId;
+
+      if (!isInitiator && !isReceiver) {
+        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+      }
+
+      const canConfirmStatuses: TradeStatus[] = [
+        TradeStatus.both_shipped,
+        TradeStatus.initiator_received,
+        TradeStatus.receiver_received,
+      ];
+
+      if (!canConfirmStatuses.includes(trade.status)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' onay yapılamaz`,
+        );
+      }
+
+      const otherPartyId = isInitiator ? trade.receiverId : trade.initiatorId;
+      const shipment = await tx.tradeShipment.findFirst({
+        where: { tradeId, shipperId: otherPartyId },
+      });
+
+      if (!shipment) {
+        throw new BadRequestException('Onaylanacak gönderim bulunamadı');
+      }
+      if (shipment.confirmedAt) {
+        throw new BadRequestException('Bu gönderim zaten onaylandı');
+      }
+
+      if (trade.confirmationDeadline && new Date() > trade.confirmationDeadline) {
+        throw new BadRequestException('Onay süresi dolmuş');
+      }
+
+      let newStatus: TradeStatus;
+      if (trade.status === TradeStatus.both_shipped) {
+        newStatus = isInitiator
+          ? TradeStatus.initiator_received
+          : TradeStatus.receiver_received;
+      } else if (
+        (trade.status === TradeStatus.initiator_received && isReceiver) ||
+        (trade.status === TradeStatus.receiver_received && isInitiator)
+      ) {
+        newStatus = TradeStatus.completed;
+      } else {
+        throw new BadRequestException('Geçersiz onay durumu');
+      }
+
       await tx.tradeShipment.update({
         where: { id: shipment.id },
         data: {
@@ -1153,7 +1121,6 @@ export class TradeService {
         },
       });
 
-      // Update trade status
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -1163,7 +1130,6 @@ export class TradeService {
         },
       });
 
-      // If trade completed, decrease stock and release reservation (adet bazlı)
       if (newStatus === TradeStatus.completed) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
         const products = await tx.product.findMany({
@@ -1201,11 +1167,9 @@ export class TradeService {
           });
         }
 
-        // Release cash payment to recipient if any
         const cashPayment = await tx.tradeCashPayment.findUnique({
           where: { tradeId },
         });
-
         if (cashPayment && cashPayment.status === PaymentStatus.completed) {
           await tx.tradeCashPayment.update({
             where: { tradeId },
@@ -1228,37 +1192,32 @@ export class TradeService {
     userId: string,
     dto: RaiseTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    // Validate participant
-    if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-      throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
-    }
-
-    // Check if dispute already exists
-    const existingDispute = await this.prisma.tradeDispute.findUnique({
-      where: { tradeId },
-    });
-
-    if (existingDispute) {
-      throw new BadRequestException('Bu takas için zaten itiraz açılmış');
-    }
-
-    // Check valid states for dispute
-    const canDisputeStatuses = [
-      TradeStatus.both_shipped,
-      TradeStatus.initiator_received,
-      TradeStatus.receiver_received,
-    ];
-
-    if (!(canDisputeStatuses as TradeStatus[]).includes(trade.status)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' itiraz açılamaz`,
-      );
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // Create dispute
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      if (trade.initiatorId !== userId && trade.receiverId !== userId) {
+        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+      }
+
+      const existingDispute = await tx.tradeDispute.findUnique({
+        where: { tradeId },
+      });
+      if (existingDispute) {
+        throw new BadRequestException('Bu takas için zaten itiraz açılmış');
+      }
+
+      const canDisputeStatuses: TradeStatus[] = [
+        TradeStatus.both_shipped,
+        TradeStatus.initiator_received,
+        TradeStatus.receiver_received,
+      ];
+
+      if (!canDisputeStatuses.includes(trade.status)) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' itiraz açılamaz`,
+        );
+      }
+
       await tx.tradeDispute.create({
         data: {
           tradeId,
@@ -1269,7 +1228,6 @@ export class TradeService {
         },
       });
 
-      // Update trade status
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -1290,36 +1248,37 @@ export class TradeService {
     adminId: string,
     dto: ResolveTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    const trade = await this.getTradeWithLock(tradeId);
-
-    if (trade.status !== TradeStatus.disputed) {
-      throw new BadRequestException('Takas itiraz durumunda değil');
-    }
-
-    const dispute = await this.prisma.tradeDispute.findUnique({
-      where: { tradeId },
-    });
-
-    if (!dispute) {
-      throw new NotFoundException('İtiraz bulunamadı');
-    }
-
     let newStatus: TradeStatus;
     if (dto.resolution === 'complete_trade') {
       newStatus = TradeStatus.completed;
     } else if (dto.resolution === 'cancel_trade') {
       newStatus = TradeStatus.cancelled;
     } else {
-      // Partial refund - still complete the trade
       newStatus = TradeStatus.completed;
     }
+
+    let resolvedTradeInitiatorId: string;
 
     if (newStatus === TradeStatus.cancelled) {
       await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Update dispute
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      if (trade.status !== TradeStatus.disputed) {
+        throw new BadRequestException('Takas itiraz durumunda değil');
+      }
+
+      const dispute = await tx.tradeDispute.findUnique({
+        where: { tradeId },
+      });
+      if (!dispute) {
+        throw new NotFoundException('İtiraz bulunamadı');
+      }
+
+      resolvedTradeInitiatorId = trade.initiatorId;
+
       await tx.tradeDispute.update({
         where: { tradeId },
         data: {
@@ -1330,15 +1289,12 @@ export class TradeService {
         },
       });
 
-      // Update trade
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
           status: newStatus,
-          completedAt:
-            newStatus === TradeStatus.completed ? new Date() : null,
-          cancelledAt:
-            newStatus === TradeStatus.cancelled ? new Date() : null,
+          completedAt: newStatus === TradeStatus.completed ? new Date() : null,
+          cancelledAt: newStatus === TradeStatus.cancelled ? new Date() : null,
           cancelReason:
             newStatus === TradeStatus.cancelled
               ? `İtiraz çözümü: ${dto.resolution}`
@@ -1347,7 +1303,6 @@ export class TradeService {
         },
       });
 
-      // Handle products based on resolution (adet bazlı: quantity + reservedQuantity)
       const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
       const qtyByProduct = new Map<string, number>();
       for (const item of allItems) {
@@ -1397,7 +1352,7 @@ export class TradeService {
 
     return this.getTradeById(
       tradeId,
-      trade.initiatorId, // Admin can use any participant ID for viewing
+      resolvedTradeInitiatorId!,
     );
   }
 
@@ -1500,8 +1455,20 @@ export class TradeService {
     await this.invalidateProductCaches(items.map((i) => i.productId));
   }
 
-  private async getTradeWithLock(tradeId: string) {
-    const trade = await this.prisma.trade.findUnique({
+  /**
+   * Acquire FOR UPDATE lock on the trade row.
+   * When called with a Prisma transaction client the lock is held until
+   * the transaction commits/rolls-back, providing real pessimistic locking.
+   * Falls back to the root PrismaService when no tx is supplied (legacy callers).
+   */
+  private async getTradeWithLock(tradeId: string, tx?: Prisma.TransactionClient) {
+    const client = tx ?? this.prisma;
+
+    await client.$queryRaw`
+      SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE
+    `;
+
+    const trade = await client.trade.findUnique({
       where: { id: tradeId },
     });
 

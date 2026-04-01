@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
+import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
@@ -1678,7 +1678,13 @@ export class PaymentService {
       }
     } else {
       if (!isGuestOrder) {
-        throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+        // Oturum yok veya JWT decode edilemedi (ör. token checkout sırasında temizlendi): yine de
+        // bekleyen/işlenen ödemede durum okunabilsin; ödeme kimliği UUID ile korunur.
+        const canPollWithoutAuth =
+          payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
+        if (!canPollWithoutAuth) {
+          throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+        }
       }
     }
 
@@ -2166,18 +2172,18 @@ export class PaymentService {
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
 
+    // Include ALL pending_payment orders (both direct-buy and offer-based)
     const expiredOrders = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
-        offerId: null, // Tekliften gelen siparişleri otomatik iptal etme; sadece sepetteki ödeme bekleyen siparişler
       },
-      select: { id: true, productId: true, orderNumber: true },
+      select: { id: true, productId: true, orderNumber: true, offerId: true },
     });
 
     let released = 0;
     for (const order of expiredOrders) {
-      if (!order.productId) continue; // productId yoksa atla (Prisma'da not: null hataya yol açıyor)
+      if (!order.productId) continue;
       try {
         const product = await this.prisma.product.findUnique({
           where: { id: order.productId },
@@ -2191,20 +2197,33 @@ export class PaymentService {
             updateData.status = ProductStatus.active;
           }
         }
-        await this.prisma.$transaction([
+
+        const txOps: any[] = [
           this.prisma.order.update({
             where: { id: order.id },
             data: { status: OrderStatus.cancelled },
           }),
-          ...(product && Object.keys(updateData).length > 0
-            ? [
-                this.prisma.product.update({
-                  where: { id: order.productId },
-                  data: updateData,
-                }),
-              ]
-            : []),
-        ]);
+        ];
+        if (product && Object.keys(updateData).length > 0) {
+          txOps.push(
+            this.prisma.product.update({
+              where: { id: order.productId },
+              data: updateData,
+            }),
+          );
+        }
+        // Cancel associated offer so buyer can re-offer later
+        if (order.offerId) {
+          txOps.push(
+            this.prisma.offer.update({
+              where: { id: order.offerId },
+              data: { status: OfferStatus.cancelled },
+            }),
+          );
+        }
+
+        await this.prisma.$transaction(txOps);
+
         const pendingPayment = await this.prisma.payment.findFirst({
           where: { orderId: order.id, status: PaymentStatus.pending },
           select: { id: true },

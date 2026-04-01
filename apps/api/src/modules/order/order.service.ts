@@ -27,6 +27,7 @@ import {
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { ProductLockService } from '../product/product-lock.service';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -66,6 +67,7 @@ export class OrderService {
     private readonly discountService: DiscountService,
     private readonly discountCalculator: DiscountCalculator,
     private readonly suratCargoService: SuratCargoService,
+    private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -356,22 +358,24 @@ export class OrderService {
   }
 
   /**
-   * Generate unique order number
+   * Generate unique order number using atomic DB sequence.
+   * Falls back to timestamp+random if the sequence doesn't exist yet.
    */
   private async generateOrderNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `ORD-${year}-`;
 
-    // Get count of orders this year for sequential numbering
-    const count = await this.prisma.order.count({
-      where: {
-        createdAt: {
-          gte: new Date(`${year}-01-01`),
-        },
-      },
-    });
-
-    return `${prefix}${String(count + 1).padStart(6, '0')}`;
+    try {
+      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
+        SELECT nextval('order_number_seq') AS next_val
+      `;
+      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
+    } catch {
+      // Sequence may not exist yet; use timestamp+random as safe fallback
+      const ts = Date.now().toString(36).toUpperCase();
+      const rand = randomInt(0, 9999).toString().padStart(4, '0');
+      return `${prefix}${ts}${rand}`;
+    }
   }
 
   /**
@@ -904,6 +908,10 @@ export class OrderService {
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
       });
+
+      // Cross-flow invalidation: reject pending offers & cancel pending trades
+      await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
+      await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
       const shippingAddressJson: Record<string, unknown> = {
@@ -1618,6 +1626,10 @@ export class OrderService {
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
       });
+
+      // Cross-flow invalidation: reject pending offers & cancel pending trades
+      await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
+      await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
 
       return {
         ...(await this.formatOrderResponse(order, guestUser.id)),

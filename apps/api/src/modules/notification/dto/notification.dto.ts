@@ -35,6 +35,11 @@ export enum NotificationType {
   TRADE_COUNTER = 'trade_counter',
   TRADE_SHIPPED = 'trade_shipped',
   TRADE_COMPLETED = 'trade_completed',
+  TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
+
+  // Cross-flow auto-rejection
+  OFFER_AUTO_REJECTED = 'offer_auto_rejected',
+  RESERVATION_EXPIRED = 'reservation_expired',
 
   // Messaging notifications
   NEW_MESSAGE = 'new_message',

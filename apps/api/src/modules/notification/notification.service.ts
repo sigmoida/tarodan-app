@@ -320,6 +320,24 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '📢',
     link: '{{announcementLink}}',
   },
+  [NotificationType.TRADE_AUTO_CANCELLED]: {
+    title: 'Takas Otomatik İptal Edildi',
+    message: 'Takasınızdaki ürünlerden biri satıldığı veya başka bir işlemle rezerve edildiği için takas otomatik olarak iptal edildi.',
+    icon: '🔄',
+    link: '/trades',
+  },
+  [NotificationType.OFFER_AUTO_REJECTED]: {
+    title: 'Teklifiniz Kapatıldı',
+    message: 'Teklif verdiğiniz ürün satıldığı için teklifiniz otomatik olarak kapatıldı.',
+    icon: '💰',
+    link: '/offers',
+  },
+  [NotificationType.RESERVATION_EXPIRED]: {
+    title: 'Sipariş Süresi Doldu',
+    message: 'Siparişinizin ödeme süresi dolduğu için otomatik olarak iptal edildi.',
+    icon: '⏰',
+    link: '/orders',
+  },
 };
 
 @Injectable()

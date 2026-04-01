@@ -7,9 +7,10 @@ import { MembershipModule } from '../membership/membership.module';
 import { NotificationModule } from '../notification/notification.module';
 import { StorageModule } from '../storage/storage.module';
 import { PaymentModule } from '../payment/payment.module';
+import { ProductModule } from '../product/product.module';
 
 @Module({
-  imports: [PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule],
+  imports: [PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule, ProductModule],
   controllers: [TradeController],
   providers: [TradeService],
   exports: [TradeService],

@@ -233,12 +233,16 @@ export const useAuthStore = create<AuthState>()(
           const user = mapApiUser(apiUser);
           const limits = TIER_LIMITS[user.membershipTier];
           set({ user, token, refreshToken, isAuthenticated: true, limits });
-        } catch (error) {
-          if (typeof window !== 'undefined') {
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response?.status;
+          const isUnauthorized = status === 401 || status === 403;
+          if (isUnauthorized && typeof window !== 'undefined') {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('refresh_token');
           }
-          set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
+          if (isUnauthorized) {
+            set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
+          }
         } finally {
           set({ isLoading: false });
         }

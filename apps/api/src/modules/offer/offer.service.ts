@@ -19,6 +19,7 @@ import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { OrderService } from '../order/order.service';
+import { ProductLockService } from '../product/product-lock.service';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 
 @Injectable()
@@ -36,6 +37,7 @@ export class OfferService {
     private readonly notificationService: NotificationService,
     @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
+    private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
   ) {
@@ -50,22 +52,23 @@ export class OfferService {
   }
 
   /**
-   * Generate unique order number
+   * Generate unique order number using atomic DB sequence.
+   * Falls back to timestamp+random if the sequence doesn't exist yet.
    */
   private async generateOrderNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `ORD-${year}-`;
 
-    // Get count of orders this year for sequential numbering
-    const count = await this.prisma.order.count({
-      where: {
-        createdAt: {
-          gte: new Date(`${year}-01-01`),
-        },
-      },
-    });
-
-    return `${prefix}${String(count + 1).padStart(6, '0')}`;
+    try {
+      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
+        SELECT nextval('order_number_seq') AS next_val
+      `;
+      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
+    } catch {
+      const ts = Date.now().toString(36).toUpperCase();
+      const rand = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
+      return `${prefix}${ts}${rand}`;
+    }
   }
 
   /**
@@ -260,10 +263,8 @@ export class OfferService {
         throw new BadRequestException('Bu teklifin süresi dolmuş');
       }
 
-      // Check product is still available
-      const productData = await tx.product.findUnique({
-        where: { id: offerData.productId },
-      });
+      // Lock product row and check availability (prevents race with direct buy / trade accept)
+      const productData = await this.productLockService.lockProductForUpdate(tx, offerData.productId);
 
       if (!productData) {
         throw new NotFoundException('Ürün bulunamadı');
@@ -273,7 +274,6 @@ export class OfferService {
         throw new BadRequestException('Ürün artık satışta değil');
       }
 
-      // Adet bazlı: müsait adet >= 1 olmalı
       const available = getAvailableQuantity(productData);
       if (available !== null && available < 1) {
         throw new BadRequestException('Ürün için yeterli müsait adet yok');
@@ -321,6 +321,9 @@ export class OfferService {
         where: { id: offerData.productId },
         data: { reservedQuantity: { increment: 1 } },
       });
+
+      // Cross-flow: cancel pending trades involving this product
+      await this.productLockService.invalidateRelatedTrades(tx, offerData.productId);
 
       // Calculate commission using the same logic as direct buy
       const commissionResult = await this.orderService.calculateCommission(

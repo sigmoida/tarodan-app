@@ -7,6 +7,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { DiscountModule } from '../discount';
 import { StorageModule } from '../storage/storage.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
+import { ProductModule } from '../product/product.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
     DiscountModule,
     StorageModule,
     SuratCargoModule,
+    ProductModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

@@ -18,7 +18,10 @@ import {
   AppliedDiscountDto,
 } from './dto';
 import { ProductStatus, DiscountScope, Prisma } from '@prisma/client';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import {
+  getAvailableQuantity,
+  canAddRequestedQuantityToCart,
+} from '../product/helpers/product-availability.helper';
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -136,11 +139,14 @@ export class CartService {
       throw new BadRequestException('Kendi ürününüzü satın alamazsınız');
     }
 
-    // Adet bazlı: müsait adet kontrolü
-    const available = getAvailableQuantity(product);
-    if (available !== null && available < (dto.quantity || 1)) {
+    // Sepet: fiziksel stok üst sınırı (reservedQuantity yok — rezervasyon checkout’ta)
+    if (
+      !canAddRequestedQuantityToCart(product, dto.quantity || 1)
+    ) {
       throw new BadRequestException(
-        available === 0 ? 'Ürün stokta yok' : `Stokta sadece ${available} adet var`,
+        product.quantity === 0
+          ? 'Ürün stokta yok'
+          : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
       );
     }
 
@@ -165,10 +171,11 @@ export class CartService {
         );
       }
 
-      const available = getAvailableQuantity(product);
-      if (available !== null && newQuantity > available) {
+      if (!canAddRequestedQuantityToCart(product, newQuantity)) {
         throw new BadRequestException(
-          available === 0 ? 'Ürün stokta yok' : `Stokta sadece ${available} adet var`,
+          product.quantity === 0
+            ? 'Ürün stokta yok'
+            : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
         );
       }
 

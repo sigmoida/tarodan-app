@@ -623,6 +623,79 @@ export class EventService {
   }
 
   /**
+   * Emit offer.auto-rejected event — sent to buyers whose pending
+   * offers were auto-rejected because the product was sold / reserved.
+   */
+  async emitOfferAutoRejected(payload: {
+    offerId: string;
+    buyerId: string;
+    productId: string;
+    productTitle: string;
+    reason: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting offer.auto-rejected for offer ${payload.offerId}`);
+
+    await this.pushQueue.add('send-notification', {
+      userId: payload.buyerId,
+      title: 'Teklifiniz Kapatıldı',
+      body: `${payload.productTitle} ürünü satıldığı için teklifiniz otomatik olarak kapatıldı.`,
+      data: {
+        type: 'offer_auto_rejected',
+        offerId: payload.offerId,
+        productId: payload.productId,
+      },
+    }, { priority: 3 });
+  }
+
+  /**
+   * Emit trade.auto-cancelled event — sent to both parties when
+   * a pending/accepted trade is auto-cancelled because a product was sold.
+   */
+  async emitTradeAutoCancelled(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+    reason: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.auto-cancelled for trade ${payload.tradeId}`);
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add('send-notification', {
+        userId,
+        title: 'Takas İptal Edildi',
+        body: `Takasınız otomatik olarak iptal edildi: ${payload.reason}`,
+        data: {
+          type: 'trade_auto_cancelled',
+          tradeId: payload.tradeId,
+        },
+      }, { priority: 3 });
+    }
+  }
+
+  /**
+   * Emit reservation.expired event — sent to buyer whose order timed out.
+   */
+  async emitReservationExpired(payload: {
+    orderId: string;
+    orderNumber: string;
+    buyerId: string;
+    productTitle: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting reservation.expired for order ${payload.orderNumber}`);
+
+    await this.pushQueue.add('send-notification', {
+      userId: payload.buyerId,
+      title: 'Sipariş Süresi Doldu',
+      body: `${payload.productTitle} siparişinizin ödeme süresi doldu ve iptal edildi.`,
+      data: {
+        type: 'reservation_expired',
+        orderId: payload.orderId,
+        orderNumber: payload.orderNumber,
+      },
+    }, { priority: 3 });
+  }
+
+  /**
    * Queue email for sending (public helper method)
    */
   async queueEmail(data: {

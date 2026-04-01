@@ -326,7 +326,11 @@ export default function ListingDetailPage() {
         });
         toast.success(t('product.addedToCart'));
       } else {
-        toast.error(t('common.operationFailed'));
+        const msg =
+          error instanceof Error && error.message
+            ? error.message
+            : t('common.operationFailed');
+        toast.error(msg);
       }
     } finally {
       setIsAddingToCart(false);

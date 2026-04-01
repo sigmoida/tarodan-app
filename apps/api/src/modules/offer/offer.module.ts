@@ -8,9 +8,10 @@ import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
 import { StorageModule } from '../storage/storage.module';
 import { OrderModule } from '../order/order.module';
+import { ProductModule } from '../product/product.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule)],
+  imports: [PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule), ProductModule],
   controllers: [OfferController],
   providers: [OfferService],
   exports: [OfferService],

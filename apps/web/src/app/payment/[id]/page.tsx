@@ -32,7 +32,11 @@ export default function PaymentPage() {
   useEffect(() => {
     if (authLoading) return;
     const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
-    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
+    const hasToken =
+      typeof window !== 'undefined' && !!localStorage.getItem('auth_token');
+    // Oturum token'ı varken yalnızca isAuthenticated=false ise (ör. ağ hatası) girişe atma;
+    // GET /payments/:id/status zaten isteğe bağlı JWT ile çalışır.
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest && !hasToken) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }

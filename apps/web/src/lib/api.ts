@@ -25,6 +25,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */
+function shouldPreserveAuthTokenOn401(): boolean {
+  if (typeof window === 'undefined') return false;
+  const p = window.location?.pathname || '';
+  return p === '/checkout' || p.startsWith('/payment') || p.startsWith('/cart');
+}
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
@@ -60,8 +67,10 @@ api.interceptors.response.use(
           } catch (refreshError) {
             // Refresh failed, logout user
             const hadToken = localStorage.getItem('auth_token');
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
+            if (!shouldPreserveAuthTokenOn401()) {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('refresh_token');
+            }
 
             // Only auto-redirect for expired sessions; never redirect on public/guest pages
             if (hadToken) {
@@ -89,8 +98,10 @@ api.interceptors.response.use(
         } else {
           // No refresh token or refresh endpoint failed, handle as before
           const hadToken = localStorage.getItem('auth_token');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('refresh_token');
+          if (!shouldPreserveAuthTokenOn401()) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+          }
 
           // Only auto-redirect for expired sessions; never redirect on public/guest pages
           if (hadToken) {
