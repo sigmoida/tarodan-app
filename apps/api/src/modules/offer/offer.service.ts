@@ -304,17 +304,12 @@ export class OfferService {
         },
       });
 
-      // Auto-reject other pending offers for this product
-      await tx.offer.updateMany({
-        where: {
-          productId: offerData.productId,
-          status: OfferStatus.pending,
-          id: { not: offerId },
-        },
-        data: {
-          status: OfferStatus.rejected,
-        },
-      });
+      // Auto-reject other pending offers for this product (bildirim için veriler capture edilir)
+      const offerInvalidation = await this.productLockService.invalidateRelatedOffers(
+        tx,
+        offerData.productId,
+        offerId, // kabul edilen teklifi dışla
+      );
 
       // Adet bazlı rezervasyon: 1 adet rezerve et (ödemeye kadar)
       await tx.product.update({
@@ -322,8 +317,8 @@ export class OfferService {
         data: { reservedQuantity: { increment: 1 } },
       });
 
-      // Cross-flow: cancel pending trades involving this product
-      await this.productLockService.invalidateRelatedTrades(tx, offerData.productId);
+      // Cross-flow: cancel pending trades involving this product (bildirim için veriler capture edilir)
+      const tradeInvalidation = await this.productLockService.invalidateRelatedTrades(tx, offerData.productId);
 
       // Calculate commission using the same logic as direct buy
       const commissionResult = await this.orderService.calculateCommission(
@@ -358,6 +353,8 @@ export class OfferService {
       return {
         offer: acceptedOffer,
         order,
+        offerInvalidation,
+        tradeInvalidation,
       };
     });
 
@@ -380,6 +377,35 @@ export class OfferService {
     } catch (error) {
       // Log but don't fail - offer was already accepted
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
+    }
+
+    // Transaction commit sonrası: otomatik reddedilen tekliflere bildirim gönder
+    for (const rejected of result.offerInvalidation.rejectedOffers) {
+      try {
+        await this.eventService.emitOfferAutoRejected({
+          offerId: rejected.offerId,
+          buyerId: rejected.buyerId,
+          productId: rejected.productId,
+          productTitle: rejected.productTitle,
+          reason: 'Ürün başka bir teklif kabul edilerek rezerve edildi',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
+      }
+    }
+
+    // Transaction commit sonrası: otomatik iptal edilen takaslara bildirim gönder
+    for (const cancelled of result.tradeInvalidation.cancelledTrades) {
+      try {
+        await this.eventService.emitTradeAutoCancelled({
+          tradeId: cancelled.tradeId,
+          initiatorId: cancelled.initiatorId,
+          receiverId: cancelled.receiverId,
+          reason: 'Ürün teklif kabul edilerek rezerve edildi',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
+      }
     }
 
     // Ürün detay cache'ini temizle; müsait adet (availableQuantity) güncel dönsün

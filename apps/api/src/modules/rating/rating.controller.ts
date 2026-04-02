@@ -83,8 +83,10 @@ export class RatingController {
     @Param('productId', ParseUUIDPipe) productId: string,
     @Query('page') page?: number,
     @Query('pageSize') pageSize?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('score') score?: number,
   ) {
-    return this.ratingService.getProductRatings(productId, page, pageSize);
+    return this.ratingService.getProductRatings(productId, page, pageSize, sortBy, score);
   }
 
   /**

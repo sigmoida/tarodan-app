@@ -1,7 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { OfferController } from './offer.controller';
 import { OfferService } from './offer.service';
+import { OfferSchedulerService } from './offer-scheduler.service';
 import { PrismaModule } from '../../prisma';
 import { CacheModule } from '../cache/cache.module';
 import { EventModule } from '../events';
@@ -11,9 +13,9 @@ import { OrderModule } from '../order/order.module';
 import { ProductModule } from '../product/product.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule), ProductModule],
+  imports: [ScheduleModule.forRoot(), PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule), ProductModule],
   controllers: [OfferController],
-  providers: [OfferService],
+  providers: [OfferService, OfferSchedulerService],
   exports: [OfferService],
 })
 export class OfferModule {}

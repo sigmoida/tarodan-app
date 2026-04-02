@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { api, paymentsApi, addressesApi, ratingsApi } from '@/lib/api';
+import { api, paymentsApi, addressesApi, ratingsApi, mediaApi } from '@/lib/api';
 import { ArrowLeftIcon, TruckIcon, MapPinIcon, CreditCardIcon, ArrowUturnLeftIcon, TagIcon, CheckIcon, PlusIcon, ShieldCheckIcon, StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -159,6 +159,8 @@ export default function OrderDetailPage() {
   const [sellerPackaging, setSellerPackaging] = useState(5);
   const [sellerReviewText, setSellerReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewImages, setReviewImages] = useState<File[]>([]);
+  const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
 
   const orderId = params?.id as string;
 
@@ -202,7 +204,29 @@ export default function OrderDetailPage() {
     setSellerShipping(5);
     setSellerPackaging(5);
     setSellerReviewText('');
+    setReviewImages([]);
+    setReviewImagePreviews([]);
     setShowReviewModal(true);
+  };
+  const handleReviewImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const maxFiles = 5;
+    const remaining = maxFiles - reviewImages.length;
+    const newFiles = files.slice(0, remaining);
+    if (newFiles.length === 0) return;
+    setReviewImages(prev => [...prev, ...newFiles]);
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setReviewImagePreviews(prev => [...prev, ev.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+  const removeReviewImage = (index: number) => {
+    setReviewImages(prev => prev.filter((_, i) => i !== index));
+    setReviewImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
   const submitReview = async () => {
     if (!order) return;
@@ -214,12 +238,20 @@ export default function OrderDetailPage() {
     }
     setSubmittingReview(true);
     try {
+      // Upload review images first
+      let imageUrls: string[] = [];
+      if (reviewImages.length > 0) {
+        const uploadPromises = reviewImages.map(file => mediaApi.uploadReviewImage(file));
+        const results = await Promise.all(uploadPromises);
+        imageUrls = results.map(r => r.data?.url || r.data?.data?.url).filter(Boolean);
+      }
       await ratingsApi.createProductRating({
         productId,
         orderId: order.id,
         score: reviewScore,
         title: reviewTitle || undefined,
         review: reviewText || undefined,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
       });
       if (sellerId) {
         const avgSellerScore = Math.round((sellerCommunication + sellerShipping + sellerPackaging) / 3);
@@ -1253,6 +1285,38 @@ export default function OrderDetailPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     maxLength={1000}
                   />
+                </div>
+
+                {/* Photo Upload */}
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {locale === 'en' ? 'Photos (optional, max 5)' : 'Fotoğraflar (opsiyonel, maks 5)'}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {reviewImagePreviews.map((src, idx) => (
+                      <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeReviewImage(idx)}
+                          className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {reviewImages.length < 5 && (
+                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-primary-400 transition-colors">
+                        <span className="text-2xl text-gray-400">+</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReviewImageAdd}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
 

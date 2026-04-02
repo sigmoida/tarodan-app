@@ -25,6 +25,7 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
+import { JwtService } from '@nestjs/jwt';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
@@ -47,7 +48,10 @@ import {
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
-  constructor(private readonly paymentService: PaymentService) { }
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly jwtService: JwtService,
+  ) { }
 
   /**
    * POST /payments/initiate - Initiate payment (works for both authenticated and guest users)
@@ -72,11 +76,9 @@ export class PaymentController {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
         userId = decoded.sub || decoded.id;
       } catch (e) {
-        // Token invalid or expired - treat as guest
         userId = null;
       }
     }
@@ -122,8 +124,7 @@ export class PaymentController {
     }
     try {
       const token = authHeader.substring(7);
-      const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
       const userId = decoded.sub || decoded.id;
       if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
       return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
@@ -256,8 +257,7 @@ export class PaymentController {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
         userId = decoded.sub || decoded.id;
       } catch (e) {
         userId = null;

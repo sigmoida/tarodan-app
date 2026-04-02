@@ -638,6 +638,15 @@ export const mediaApi = {
       },
     });
   },
+  uploadReviewImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ url: string; key?: string }>('/media/upload?folder=reviews', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   deleteFile: (key: string) => api.delete(`/media/${key}`),
 };
 

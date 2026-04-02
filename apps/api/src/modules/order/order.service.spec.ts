@@ -147,7 +147,7 @@ describe('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
 
     expect(first.orderId).toBe('order-pending-1');
     expect(second.orderId).toBe(first.orderId);
-    expect(second.existingOrder).toBe(true);
+    expect((second as any).existingOrder).toBe(true);
     expect(mockTx.order.findFirst).toHaveBeenCalledTimes(2);
     expect(mockTx.order.create).not.toHaveBeenCalled();
   });

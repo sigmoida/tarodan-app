@@ -910,8 +910,9 @@ export class OrderService {
       });
 
       // Cross-flow invalidation: reject pending offers & cancel pending trades
-      await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
-      await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
+      // Bildirim için return değerleri transaction dışında kullanılır
+      const offerInvalidation = await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
+      const tradeInvalidation = await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
       const shippingAddressJson: Record<string, unknown> = {
@@ -1032,13 +1033,44 @@ export class OrderService {
         productId: dto.productId, // Include for cache invalidation
         paymentUrl: '', // Will be set by payment service
         provider: 'paytr', // Default provider
+        offerInvalidation,
+        tradeInvalidation,
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(result.productId);
-    
-    return result;
+
+    // Transaction commit sonrası: otomatik reddedilen tekliflere bildirim gönder
+    for (const rejected of result.offerInvalidation.rejectedOffers) {
+      try {
+        await this.eventService.emitOfferAutoRejected({
+          offerId: rejected.offerId,
+          buyerId: rejected.buyerId,
+          productId: rejected.productId,
+          productTitle: rejected.productTitle,
+          reason: 'Ürün satın alındı',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
+      }
+    }
+    // Transaction commit sonrası: otomatik iptal edilen takaslara bildirim gönder
+    for (const cancelled of result.tradeInvalidation.cancelledTrades) {
+      try {
+        await this.eventService.emitTradeAutoCancelled({
+          tradeId: cancelled.tradeId,
+          initiatorId: cancelled.initiatorId,
+          receiverId: cancelled.receiverId,
+          reason: 'Ürün satın alındığı için takas iptal edildi',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
+      }
+    }
+
+    const { offerInvalidation: _oi, tradeInvalidation: _ti, ...cleanResult } = result as any;
+    return cleanResult;
   }
 
   /**
@@ -1628,21 +1660,51 @@ export class OrderService {
       });
 
       // Cross-flow invalidation: reject pending offers & cancel pending trades
-      await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
-      await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
+      const offerInvalidationGuest = await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
+      const tradeInvalidationGuest = await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
 
       return {
         ...(await this.formatOrderResponse(order, guestUser.id)),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
         productId: dto.productId, // Include for cache invalidation
+        offerInvalidation: offerInvalidationGuest,
+        tradeInvalidation: tradeInvalidationGuest,
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(dto.productId);
-    
-    return result;
+
+    // Transaction commit sonrası bildirimler
+    for (const rejected of result.offerInvalidation.rejectedOffers) {
+      try {
+        await this.eventService.emitOfferAutoRejected({
+          offerId: rejected.offerId,
+          buyerId: rejected.buyerId,
+          productId: rejected.productId,
+          productTitle: rejected.productTitle,
+          reason: 'Ürün satın alındı',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
+      }
+    }
+    for (const cancelled of result.tradeInvalidation.cancelledTrades) {
+      try {
+        await this.eventService.emitTradeAutoCancelled({
+          tradeId: cancelled.tradeId,
+          initiatorId: cancelled.initiatorId,
+          receiverId: cancelled.receiverId,
+          reason: 'Ürün satın alındığı için takas iptal edildi',
+        });
+      } catch (err) {
+        this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
+      }
+    }
+
+    const { offerInvalidation: _oi, tradeInvalidation: _ti, ...cleanResult } = result;
+    return cleanResult;
   }
 
   /**

@@ -11,6 +11,7 @@ import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -772,7 +773,7 @@ export class PaymentService {
           product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: { decrement: 1 },
+          reservedQuantity: safeDecrementReserved(product.reservedQuantity, 1),
         };
         if (product.quantity !== null) {
           updateData.quantity = { decrement: 1 };
@@ -836,11 +837,16 @@ export class PaymentService {
             }
             for (const [productId, qty] of restoreByProduct) {
               productIdsToInvalidate.push(productId);
+              const prodToRestore = await tx.product.findUnique({
+                where: { id: productId },
+                select: { reservedQuantity: true },
+              });
+              const newReserved = safeDecrementReserved(prodToRestore?.reservedQuantity, qty);
               await tx.product.update({
                 where: { id: productId },
                 data: {
-                  reservedQuantity: { decrement: qty },
-                  status: ProductStatus.active,
+                  reservedQuantity: newReserved,
+                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
                 },
               });
             }
@@ -2185,44 +2191,51 @@ export class PaymentService {
     for (const order of expiredOrders) {
       if (!order.productId) continue;
       try {
-        const product = await this.prisma.product.findUnique({
-          where: { id: order.productId },
-          select: { reservedQuantity: true, status: true },
-        });
-        const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
-        if (product) {
-          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
-          updateData.reservedQuantity = newReserved;
-          if (product.status === ProductStatus.reserved) {
-            updateData.status = ProductStatus.active;
-          }
-        }
+        await this.prisma.$transaction(async (tx) => {
+          // FOR UPDATE: sipariş satırını kilitle — aynı anda ödeme gelmesini engeller
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
 
-        const txOps: any[] = [
-          this.prisma.order.update({
+          // Kilitleme sonrası statüyü tekrar kontrol et
+          const freshOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!freshOrder || freshOrder.status !== OrderStatus.pending_payment) {
+            // Başka bir akış (ödeme webhook'u vb.) zaten işledi, atla
+            return;
+          }
+
+          // Ürün satırını da kilitle
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
+          const product = await tx.product.findUnique({
+            where: { id: order.productId },
+            select: { reservedQuantity: true, status: true },
+          });
+
+          if (product) {
+            const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+            await tx.product.update({
+              where: { id: order.productId },
+              data: {
+                reservedQuantity: newReserved,
+                status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+              },
+            });
+          }
+
+          await tx.order.update({
             where: { id: order.id },
             data: { status: OrderStatus.cancelled },
-          }),
-        ];
-        if (product && Object.keys(updateData).length > 0) {
-          txOps.push(
-            this.prisma.product.update({
-              where: { id: order.productId },
-              data: updateData,
-            }),
-          );
-        }
-        // Cancel associated offer so buyer can re-offer later
-        if (order.offerId) {
-          txOps.push(
-            this.prisma.offer.update({
+          });
+
+          // Cancel associated offer so buyer can re-offer later
+          if (order.offerId) {
+            await tx.offer.update({
               where: { id: order.offerId },
               data: { status: OfferStatus.cancelled },
-            }),
-          );
-        }
-
-        await this.prisma.$transaction(txOps);
+            });
+          }
+        });
 
         const pendingPayment = await this.prisma.payment.findFirst({
           where: { orderId: order.id, status: PaymentStatus.pending },

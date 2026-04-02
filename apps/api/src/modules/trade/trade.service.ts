@@ -15,6 +15,7 @@ import { MembershipService } from '../membership/membership.service';
 import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { EventService } from '../events';
 import {
   TradeStatus,
   ProductStatus,
@@ -23,7 +24,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import {
@@ -55,6 +56,8 @@ export class TradeService {
     private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly eventService: EventService,
   ) {}
 
   // ==========================================================================
@@ -449,6 +452,8 @@ export class TradeService {
     const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7');
 
     let tradeInitiatorId: string;
+    let acceptInvalidatedOffers: { offerId: string; buyerId: string; productId: string; productTitle: string }[] = [];
+    let acceptInvalidatedTrades: { tradeId: string; initiatorId: string; receiverId: string }[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       // Lock trade row first
@@ -491,9 +496,12 @@ export class TradeService {
       }
 
       // Cross-flow: reject pending offers & cancel other pending trades for involved products
+      // Bildirim için return değerleri closure dışına yazılır
       for (const productId of byProduct.keys()) {
-        await this.productLockService.invalidateRelatedOffers(tx, productId);
-        await this.productLockService.invalidateRelatedTrades(tx, productId, tradeId);
+        const offerResult = await this.productLockService.invalidateRelatedOffers(tx, productId);
+        const tradeResult = await this.productLockService.invalidateRelatedTrades(tx, productId, tradeId);
+        acceptInvalidatedOffers.push(...offerResult.rejectedOffers);
+        acceptInvalidatedTrades.push(...tradeResult.cancelledTrades);
       }
 
       await tx.trade.update({
@@ -538,6 +546,36 @@ export class TradeService {
       );
     } catch (error) {
       this.logger.warn('Failed to send trade accepted notification');
+    }
+
+    // Transaction commit sonrası: otomatik reddedilen tekliflere bildirim gönder
+    if (this.eventService) {
+      for (const rejected of acceptInvalidatedOffers) {
+        try {
+          await this.eventService.emitOfferAutoRejected({
+            offerId: rejected.offerId,
+            buyerId: rejected.buyerId,
+            productId: rejected.productId,
+            productTitle: rejected.productTitle,
+            reason: 'Ürün takas kabul edilerek rezerve edildi',
+          });
+        } catch (err) {
+          this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
+        }
+      }
+      // Transaction commit sonrası: otomatik iptal edilen takaslara bildirim gönder
+      for (const cancelled of acceptInvalidatedTrades) {
+        try {
+          await this.eventService.emitTradeAutoCancelled({
+            tradeId: cancelled.tradeId,
+            initiatorId: cancelled.initiatorId,
+            receiverId: cancelled.receiverId,
+            reason: 'Ürün başka bir takas kabul edilerek rezerve edildi',
+          });
+        } catch (err) {
+          this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
+        }
+      }
     }
 
     return this.getTradeById(tradeId, userId);
@@ -921,11 +959,16 @@ export class TradeService {
           byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
         }
         for (const [productId, qty] of byProduct) {
+          const prod = await tx.product.findUnique({
+            where: { id: productId },
+            select: { reservedQuantity: true, quantity: true },
+          });
+          const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
           await tx.product.update({
             where: { id: productId },
             data: {
-              reservedQuantity: { decrement: qty },
-              status: ProductStatus.active,
+              reservedQuantity: newReserved,
+              status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
             },
           });
         }
@@ -1155,7 +1198,7 @@ export class TradeService {
 
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: { decrement: tradedQty },
+            reservedQuantity: safeDecrementReserved(product.reservedQuantity, tradedQty),
           };
           if (product.quantity !== null && product.quantity > 0) {
             updateData.quantity = newQuantity;
@@ -1325,7 +1368,7 @@ export class TradeService {
           }
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: { decrement: tradedQty },
+            reservedQuantity: safeDecrementReserved(product.reservedQuantity, tradedQty),
           };
           if (product.quantity !== null && product.quantity > 0) {
             updateData.quantity = newQuantity;
@@ -1337,11 +1380,16 @@ export class TradeService {
         }
       } else if (newStatus === TradeStatus.cancelled) {
         for (const [productId, qty] of qtyByProduct) {
+          const prod = await tx.product.findUnique({
+            where: { id: productId },
+            select: { reservedQuantity: true },
+          });
+          const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
           await tx.product.update({
             where: { id: productId },
             data: {
-              reservedQuantity: { decrement: qty },
-              status: ProductStatus.active,
+              reservedQuantity: newReserved,
+              status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
             },
           });
         }
@@ -1391,6 +1439,20 @@ export class TradeService {
         }
 
         await this.prisma.$transaction(async (tx) => {
+          // FOR UPDATE: trade satırını kilitle; başka bir işlem (örn. acceptTrade)
+          // bu trade'i aynı anda değiştirmeye çalışırsa bekler.
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${trade.id} FOR UPDATE`;
+
+          // Kilitleme sonrası en güncel statüyü oku
+          const freshTrade = await tx.trade.findUnique({
+            where: { id: trade.id },
+            select: { status: true },
+          });
+          // Başka bir akış zaten işleme almışsa bu trade'i atla
+          if (!freshTrade || freshTrade.status !== trade.status) {
+            return;
+          }
+
           const allItems = await tx.tradeItem.findMany({
             where: { tradeId: trade.id },
           });
@@ -1401,11 +1463,18 @@ export class TradeService {
               byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
             }
             for (const [productId, qty] of byProduct) {
+              // Ürün satırını da kilitle
+              await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+              const prod = await tx.product.findUnique({
+                where: { id: productId },
+                select: { reservedQuantity: true },
+              });
+              const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
               await tx.product.update({
                 where: { id: productId },
                 data: {
-                  reservedQuantity: { decrement: qty },
-                  status: ProductStatus.active,
+                  reservedQuantity: newReserved,
+                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
                 },
               });
             }
@@ -1427,6 +1496,20 @@ export class TradeService {
         });
         await this.invalidateProductCachesForTrade(trade.id);
         cancelledCount++;
+
+        // Transaction commit sonrası: iptal edilen takas katılımcılarına bildirim
+        if (this.eventService) {
+          try {
+            await this.eventService.emitTradeAutoCancelled({
+              tradeId: trade.id,
+              initiatorId: trade.initiatorId,
+              receiverId: trade.receiverId,
+              reason: 'Takas süresi dolduğu için otomatik iptal edildi',
+            });
+          } catch (err) {
+            this.logger.error(`Failed to emit trade.auto-cancelled for trade ${trade.id}: ${err}`);
+          }
+        }
       } catch (error) {
         this.logger.error('Failed to auto-cancel trade');
       }

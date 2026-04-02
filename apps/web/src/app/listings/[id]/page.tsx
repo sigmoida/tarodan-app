@@ -27,6 +27,9 @@ import {
   ArrowPathIcon,
   PlayIcon,
   PauseIcon,
+  CheckBadgeIcon,
+  FunnelIcon,
+  HandThumbUpIcon as HandThumbUpOutlineIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
@@ -146,6 +149,8 @@ export default function ListingDetailPage() {
   const [addingToCollection, setAddingToCollection] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reviewSortBy, setReviewSortBy] = useState('newest');
+  const [reviewFilterScore, setReviewFilterScore] = useState<number | null>(null);
   const [authModalConfig, setAuthModalConfig] = useState({
     title: '',
     message: '',
@@ -216,10 +221,12 @@ export default function ListingDetailPage() {
 
   // Reviews: React Query
   const reviewsQuery = useQuery({
-    queryKey: ['listing-reviews', id],
+    queryKey: ['listing-reviews', id, reviewSortBy, reviewFilterScore],
     queryFn: async () => {
+      const params: Record<string, any> = { sortBy: reviewSortBy };
+      if (reviewFilterScore) params.score = reviewFilterScore;
       const [reviewsRes, statsRes] = await Promise.all([
-        api.get(`/ratings/products/${id}`),
+        api.get(`/ratings/products/${id}`, { params }),
         api.get(`/ratings/products/${id}/stats`),
       ]);
       const reviewsList = reviewsRes.data?.ratings || reviewsRes.data?.data || [];
@@ -1752,7 +1759,8 @@ export default function ListingDetailPage() {
       {/* Product Reviews Section */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-12">
         <div className="bg-white rounded shadow-sm p-4 sm:p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
+          {/* Header: Title + Average Rating */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
               {t('product.productReviews')}
             </h2>
@@ -1779,6 +1787,67 @@ export default function ListingDetailPage() {
             )}
           </div>
 
+          {/* Star Distribution + Filters */}
+          {reviewStats && reviewStats.scoreDistribution && reviewStats.totalRatings > 0 && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col sm:flex-row gap-6">
+                {/* Star Distribution Bars */}
+                <div className="flex-1 space-y-1.5">
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const count = reviewStats.scoreDistribution?.[star] || 0;
+                    const pct = reviewStats.totalRatings > 0
+                      ? Math.round((count / reviewStats.totalRatings) * 100)
+                      : 0;
+                    const isActive = reviewFilterScore === star;
+                    return (
+                      <button
+                        key={star}
+                        onClick={() => setReviewFilterScore(isActive ? null : star)}
+                        className={`flex items-center gap-2 w-full text-left px-2 py-0.5 rounded transition-colors ${isActive ? 'bg-yellow-100' : 'hover:bg-gray-100'}`}
+                      >
+                        <span className="text-sm font-medium w-3">{star}</span>
+                        <StarIcon className="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-yellow-400 rounded-full transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 w-8 text-right">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="sm:w-48">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    {locale === 'en' ? 'Sort by' : 'Sırala'}
+                  </label>
+                  <select
+                    value={reviewSortBy}
+                    onChange={(e) => setReviewSortBy(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="newest">{locale === 'en' ? 'Most Recent' : 'En Yeni'}</option>
+                    <option value="oldest">{locale === 'en' ? 'Oldest' : 'En Eski'}</option>
+                    <option value="highest">{locale === 'en' ? 'Highest Rating' : 'En Yüksek Puan'}</option>
+                    <option value="lowest">{locale === 'en' ? 'Lowest Rating' : 'En Düşük Puan'}</option>
+                    <option value="helpful">{locale === 'en' ? 'Most Helpful' : 'En Faydalı'}</option>
+                  </select>
+                  {reviewFilterScore && (
+                    <button
+                      onClick={() => setReviewFilterScore(null)}
+                      className="mt-2 text-xs text-primary-500 hover:underline"
+                    >
+                      {locale === 'en' ? 'Clear filter' : 'Filtreyi temizle'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {reviewsLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -1787,11 +1856,15 @@ export default function ListingDetailPage() {
             <div className="text-center py-12 bg-gray-50 rounded">
               <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-medium text-gray-900 mb-2">
-                {t('product.noReviews')}
+                {reviewFilterScore
+                  ? (locale === 'en' ? 'No reviews with this rating' : 'Bu puana sahip değerlendirme yok')
+                  : t('product.noReviews')}
               </p>
-              <p className="text-gray-600">
-                {t('product.beFirstToReview')}
-              </p>
+              {!reviewFilterScore && (
+                <p className="text-gray-600">
+                  {t('product.beFirstToReview')}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
@@ -1807,7 +1880,7 @@ export default function ListingDetailPage() {
                       size="sm"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center flex-wrap gap-2 mb-1">
                         <span className="font-medium text-gray-900">
                           {review.isAnonymous || (!review.userName && !review.user?.displayName)
                             ? (locale === 'en' ? 'Anonymous' : 'Anonim')
@@ -1824,6 +1897,12 @@ export default function ListingDetailPage() {
                             />
                           ))}
                         </div>
+                        {review.isVerifiedPurchase && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                            <CheckBadgeIcon className="w-3.5 h-3.5" />
+                            {locale === 'en' ? 'Verified Purchase' : 'Doğrulanmış Alıcı'}
+                          </span>
+                        )}
                         <span className="text-sm text-gray-500">
                           {new Date(review.createdAt).toLocaleDateString('tr-TR')}
                         </span>
@@ -1835,6 +1914,31 @@ export default function ListingDetailPage() {
                       )}
                       {(review.review || review.comment) && (
                         <p className="text-gray-700">{review.review || review.comment}</p>
+                      )}
+                      {/* Review Images */}
+                      {review.images && review.images.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {review.images.map((img: string, idx: number) => (
+                            <a
+                              key={idx}
+                              href={img}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:border-primary-400 transition-colors"
+                            >
+                              <img src={img} alt={`Review ${idx + 1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {/* Admin Reply */}
+                      {review.adminReply && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                          <p className="text-xs font-semibold text-blue-700 mb-1">
+                            {locale === 'en' ? 'Seller Reply' : 'Satıcı Yanıtı'}
+                          </p>
+                          <p className="text-sm text-blue-900">{review.adminReply}</p>
+                        </div>
                       )}
                     </div>
                   </div>

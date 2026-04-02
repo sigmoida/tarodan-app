@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
@@ -20,6 +21,14 @@ import { InvoiceModule } from '../invoice/invoice.module';
     EventModule,
     ScheduleModule.forRoot(),
     InvoiceModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '15m' },
+      }),
+      inject: [ConfigService],
+    }),
   ],
   controllers: [PaymentController],
   providers: [PaymentService, PaymentSchedulerService, RawBodyMiddleware],
