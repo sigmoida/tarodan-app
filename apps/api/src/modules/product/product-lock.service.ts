@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   OfferStatus,
   ProductStatus,
   TradeStatus,
   Prisma,
 } from '@prisma/client';
+import { PrismaService } from '../../prisma';
 import { getAvailableQuantity, safeDecrementReserved } from './helpers/product-availability.helper';
 
 type PrismaTx = Prisma.TransactionClient;
@@ -35,40 +36,28 @@ export interface InvalidateTradesResult {
 }
 
 /**
- * Centralised product-level locking and cross-flow invalidation.
+ * Centralised product-level locking and stock reservation.
  *
- * Every time a product is "claimed" (direct buy, offer accept, trade accept)
- * the caller should use this service inside its DB transaction to:
- *   1. Lock the product row (FOR UPDATE)
- *   2. Verify available quantity
- *   3. Reserve the requested quantity
- *   4. Invalidate conflicting offers / trades on the same product
+ * Stok modeli (stock_plan.md):
+ *   - quantity = fiziksel stok (sadece ödeme/takas tamamlandığında düşer)
+ *   - reservedQuantity = ödeme bekleyen / takas sürecindeki adet
+ *   - available = quantity - reservedQuantity
  *
- * Keeping this logic in one place avoids duplication across
- * OrderService, OfferService and TradeService.
+ * Invalidation artık INLINE YAPILMIYOR. Cron (sweepOutOfStockProducts) ile
+ * quantity=0 olan ürünlerdeki pending teklif/takaslar periyodik iptal edilir.
  *
- * Bildirimler: invalidation metotları bildirim için gereken verileri döner.
- * Caller, transaction COMMIT'ten sonra bu verileri kullanarak bildirimleri
- * göndermelidir — rollback olursa bildirim asla gönderilmez.
+ * checkAndReserve: Ödeme başlatılırken veya takas kabul edilirken çağrılır.
+ * invalidateRelatedOffers/Trades: Sadece cron tarafından çağrılır.
  */
 @Injectable()
 export class ProductLockService {
   private readonly logger = new Logger(ProductLockService.name);
 
-  // Active trade statuses — trades in these states reference a live product.
-  private readonly ACTIVE_TRADE_STATUSES: TradeStatus[] = [
-    TradeStatus.pending,
-    TradeStatus.accepted,
-    TradeStatus.initiator_shipped,
-    TradeStatus.receiver_shipped,
-    TradeStatus.both_shipped,
-    TradeStatus.initiator_received,
-    TradeStatus.receiver_received,
-  ];
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Acquire an exclusive row-level lock on the product and return the
-   * current row.  Must be called inside a Prisma interactive transaction.
+   * current row. Must be called inside a Prisma interactive transaction.
    */
   async lockProductForUpdate(tx: PrismaTx, productId: string) {
     await tx.$queryRaw`
@@ -85,28 +74,33 @@ export class ProductLockService {
   /**
    * Lock the product, assert that `requiredQty` units are available,
    * then atomically increment `reservedQuantity`.
+   *
+   * Used at:
+   *   - Direct buy checkout (order creation)
+   *   - Payment initiate for offer-based orders
+   *   - Trade accept (both products)
    */
   async checkAndReserve(
     tx: PrismaTx,
     productId: string,
-    requiredQty: number,
+    requiredQty: number = 1,
   ) {
     const product = await this.lockProductForUpdate(tx, productId);
 
     if (!product) {
-      throw new Error(`Product ${productId} not found`);
+      throw new BadRequestException(`Ürün bulunamadı: ${productId}`);
     }
 
-    if (product.status !== ProductStatus.active) {
-      throw new Error(
-        `Product ${productId} is not active (status=${product.status})`,
+    if (product.status !== ProductStatus.active && product.status !== ProductStatus.reserved) {
+      throw new BadRequestException(
+        `Ürün satışta değil (status=${product.status})`,
       );
     }
 
     const available = getAvailableQuantity(product);
     if (available !== null && available < requiredQty) {
-      throw new Error(
-        `Product ${productId}: insufficient stock (available=${available}, required=${requiredQty})`,
+      throw new BadRequestException(
+        `Bu ürün stokta bulunmamaktadır (müsait=${available}, istenen=${requiredQty})`,
       );
     }
 
@@ -115,15 +109,16 @@ export class ProductLockService {
       data: { reservedQuantity: { increment: requiredQty } },
     });
 
+    this.logger.log(
+      `Reserved ${requiredQty} unit(s) for product ${productId} (new reserved=${(product.reservedQuantity ?? 0) + requiredQty})`,
+    );
+
     return product;
   }
 
   /**
-   * Auto-reject every pending offer that targets `productId`.
-   * Optionally exclude one offer (e.g. the one being accepted).
-   *
-   * Returns the count AND the list of rejected offers so the caller can
-   * send notifications AFTER the transaction commits.
+   * Auto-reject every pending+accepted offer that targets `productId`.
+   * Used by the cron sweep when quantity reaches 0.
    */
   async invalidateRelatedOffers(
     tx: PrismaTx,
@@ -132,13 +127,12 @@ export class ProductLockService {
   ): Promise<InvalidateOffersResult> {
     const where: Prisma.OfferWhereInput = {
       productId,
-      status: OfferStatus.pending,
+      status: { in: [OfferStatus.pending, OfferStatus.accepted] },
     };
     if (excludeOfferId) {
       where.id = { not: excludeOfferId };
     }
 
-    // Bildirim için önce reddedilecek teklifleri çek
     const offersToReject = await tx.offer.findMany({
       where,
       select: {
@@ -155,12 +149,15 @@ export class ProductLockService {
 
     const result = await tx.offer.updateMany({
       where: { id: { in: offersToReject.map((o) => o.id) } },
-      data: { status: OfferStatus.rejected },
+      data: {
+        status: OfferStatus.cancelled,
+        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
+      },
     });
 
     if (result.count > 0) {
       this.logger.log(
-        `Auto-rejected ${result.count} pending offer(s) for product ${productId}`,
+        `Auto-cancelled ${result.count} pending/accepted offer(s) for product ${productId}`,
       );
     }
 
@@ -176,88 +173,48 @@ export class ProductLockService {
   }
 
   /**
-   * Auto-cancel every *pending* trade that references `productId`
-   * (on either side — initiator or receiver).
-   * For trades that were already *accepted* (reserved), also release
-   * the reserved quantities for all items in that trade.
+   * Auto-cancel every *pending* trade that references `productId`.
+   * ACCEPTED TAKASLARA DOKUNMAZ — kargo sürecinde olabilirler.
    *
-   * Optionally exclude one trade (e.g. the one being accepted).
-   *
-   * Returns the count AND the list of cancelled trades so the caller can
-   * send notifications AFTER the transaction commits.
+   * Used by the cron sweep when quantity reaches 0.
    */
   async invalidateRelatedTrades(
     tx: PrismaTx,
     productId: string,
     excludeTradeId?: string,
   ): Promise<InvalidateTradesResult> {
+    // Sadece PENDING takaslari iptal et (accepted'a dokunma!)
     const tradeItems = await tx.tradeItem.findMany({
       where: {
         productId,
         trade: {
-          status: { in: [TradeStatus.pending, TradeStatus.accepted] },
+          status: TradeStatus.pending,
           ...(excludeTradeId ? { id: { not: excludeTradeId } } : {}),
         },
       },
-      select: { tradeId: true, trade: { select: { status: true } } },
+      select: { tradeId: true },
     });
 
     const tradeIds = [...new Set(tradeItems.map((ti) => ti.tradeId))];
     if (tradeIds.length === 0) return { count: 0, cancelledTrades: [] };
 
-    // Bildirim için takas katılımcı bilgilerini çek
     const tradesToCancel = await tx.trade.findMany({
       where: { id: { in: tradeIds } },
       select: { id: true, initiatorId: true, receiverId: true, status: true },
     });
 
-    const acceptedTradeIds = [
-      ...new Set(
-        tradesToCancel
-          .filter((t) => t.status === TradeStatus.accepted)
-          .map((t) => t.id),
-      ),
-    ];
-
-    // Release reserved quantities for accepted trades
-    for (const tradeId of acceptedTradeIds) {
-      const allItems = await tx.tradeItem.findMany({
-        where: { tradeId },
-      });
-      const byProduct = new Map<string, number>();
-      for (const item of allItems) {
-        byProduct.set(
-          item.productId,
-          (byProduct.get(item.productId) ?? 0) + item.quantity,
-        );
-      }
-      for (const [pid, qty] of byProduct) {
-        const prod = await tx.product.findUnique({
-          where: { id: pid },
-          select: { reservedQuantity: true },
-        });
-        if (prod) {
-          const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
-          await tx.product.update({
-            where: { id: pid },
-            data: { reservedQuantity: newReserved },
-          });
-        }
-      }
-    }
-
-    // Cancel all identified trades
+    // Cancel all identified pending trades
     await tx.trade.updateMany({
       where: { id: { in: tradeIds } },
       data: {
         status: TradeStatus.cancelled,
-        cancelReason: 'Ürün satıldı veya başka bir işlemle rezerve edildi',
+        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
         cancelledAt: new Date(),
       },
     });
 
     this.logger.log(
-      `Auto-cancelled ${tradeIds.length} trade(s) for product ${productId}`,
+      `Auto-cancelled ${tradeIds.length} pending trade(s) for product ${productId}`,
     );
 
     return {
@@ -267,6 +224,63 @@ export class ProductLockService {
         initiatorId: t.initiatorId,
         receiverId: t.receiverId,
       })),
+    };
+  }
+
+  /**
+   * Periodic safety-net sweep: find all products with quantity = 0 and
+   * cancel any lingering pending offers/trades.
+   *
+   * IMPORTANT: Accepted trades are NOT cancelled (they may be in shipping).
+   *
+   * Called by payment-scheduler cron every 5 minutes.
+   */
+  async sweepOutOfStockProducts(): Promise<{
+    productsScanned: number;
+    offersCancelled: number;
+    tradesCancelled: number;
+    rejectedOffers: RejectedOfferPayload[];
+    cancelledTrades: CancelledTradePayload[];
+  }> {
+    const outOfStockProducts = await this.prisma.product.findMany({
+      where: { quantity: 0 },
+      select: { id: true },
+    });
+
+    let offersCancelled = 0;
+    let tradesCancelled = 0;
+    const allRejectedOffers: RejectedOfferPayload[] = [];
+    const allCancelledTrades: CancelledTradePayload[] = [];
+
+    for (const product of outOfStockProducts) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const offers = await this.invalidateRelatedOffers(tx, product.id);
+          const trades = await this.invalidateRelatedTrades(tx, product.id);
+          offersCancelled += offers.count;
+          tradesCancelled += trades.count;
+          allRejectedOffers.push(...offers.rejectedOffers);
+          allCancelledTrades.push(...trades.cancelledTrades);
+        });
+      } catch (e: any) {
+        this.logger.error(
+          `Failed to sweep out-of-stock product ${product.id}: ${e.message}`,
+        );
+      }
+    }
+
+    if (offersCancelled > 0 || tradesCancelled > 0) {
+      this.logger.log(
+        `Stock sweep: scanned ${outOfStockProducts.length} products, cancelled ${offersCancelled} offers, ${tradesCancelled} trades`,
+      );
+    }
+
+    return {
+      productsScanned: outOfStockProducts.length,
+      offersCancelled,
+      tradesCancelled,
+      rejectedOffers: allRejectedOffers,
+      cancelledTrades: allCancelledTrades,
     };
   }
 }

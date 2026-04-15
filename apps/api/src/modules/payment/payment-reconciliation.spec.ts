@@ -192,7 +192,22 @@ describe('PaymentSchedulerService handleExpiredPayments order', () => {
       }),
     };
 
-    const scheduler = new PaymentSchedulerService(paymentService as any);
+    const mockProductLockService = {
+      sweepOutOfStockProducts: jest.fn().mockResolvedValue({
+        productsScanned: 0,
+        offersCancelled: 0,
+        tradesCancelled: 0,
+        rejectedOffers: [],
+        cancelledTrades: [],
+      }),
+    };
+    const mockEventService = {};
+
+    const scheduler = new PaymentSchedulerService(
+      paymentService as any,
+      mockProductLockService as any,
+      mockEventService as any,
+    );
     await scheduler.handleExpiredPayments();
 
     expect(order).toEqual(['reconcile', 'release', 'cancel']);

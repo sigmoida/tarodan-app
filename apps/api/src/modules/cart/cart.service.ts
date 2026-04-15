@@ -139,7 +139,7 @@ export class CartService {
       throw new BadRequestException('Kendi ürününüzü satın alamazsınız');
     }
 
-    // Sepet: fiziksel stok üst sınırı (reservedQuantity yok — rezervasyon checkout’ta)
+    // Sepet: fiziksel stok üst sınırı kontrolü
     if (
       !canAddRequestedQuantityToCart(product, dto.quantity || 1)
     ) {

@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -11,6 +11,7 @@ import { PaymentProvidersModule } from '../payment-providers';
 import { EventModule } from '../events';
 import { RawBodyMiddleware } from './middleware/raw-body.middleware';
 import { InvoiceModule } from '../invoice/invoice.module';
+import { ProductModule } from '../product/product.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { InvoiceModule } from '../invoice/invoice.module';
     EventModule,
     ScheduleModule.forRoot(),
     InvoiceModule,
+    forwardRef(() => ProductModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

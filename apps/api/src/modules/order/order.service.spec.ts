@@ -68,7 +68,6 @@ describe('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
           saleStartDate: null,
           saleEndDate: null,
           quantity: null,
-          reservedQuantity: 0,
           seller: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', displayName: 'Seller' },
         }),
         update: jest.fn(),

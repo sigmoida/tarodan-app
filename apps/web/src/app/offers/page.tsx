@@ -33,6 +33,7 @@ interface Offer {
   /** Satıcı karşı teklifinden sonra kabul/red sırası alıcıda */
   buyerMustAccept?: boolean;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired';
+  cancelReason?: string | null;
   orderId?: string | null;
   orderStatus?: string | null;
   message?: string;
@@ -497,9 +498,14 @@ function OffersPageContent() {
                           </div>
 
                           {/* Status Badge */}
-                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded ${statusConfig.bg} ${statusConfig.text}`}>
-                            <StatusIcon className="w-4 h-4" />
-                            <span className="text-sm font-medium">{statusConfig.label}</span>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded ${statusConfig.bg} ${statusConfig.text}`}>
+                              <StatusIcon className="w-4 h-4" />
+                              <span className="text-sm font-medium">{statusConfig.label}</span>
+                            </div>
+                            {offer.status === 'cancelled' && offer.cancelReason && (
+                              <p className="text-xs text-gray-500">{offer.cancelReason}</p>
+                            )}
                           </div>
                         </div>
 

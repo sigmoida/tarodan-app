@@ -6,12 +6,12 @@ import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ProductLockService } from '../product/product-lock.service';
 import { OrderStatus, PaymentStatus, ProductStatus } from '@prisma/client';
 
-/** Testlerde gerçek süreyi beklemeden eşik: env yoksa prod varsayılanı 30 dk; burada sabit 1 dk. */
 const TEST_PAYMENT_TIMEOUT_MINUTES = '1';
 
-describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () => {
+describe('PaymentService expiry (callback gelmeyen pending ödeme)', () => {
   let service: PaymentService;
 
   const mockConfigGet = jest.fn((key: string) => {
@@ -34,19 +34,30 @@ describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () 
       findUnique: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
-    $transaction: jest.fn().mockImplementation(async (ops: unknown[]) => {
-      for (const op of ops) {
-        await op;
-      }
+    offer: {
+      update: jest.fn().mockResolvedValue({}),
+    },
+    $transaction: jest.fn().mockImplementation(async (cb: any) => {
+      if (typeof cb === 'function') return cb(mockPrisma);
+      for (const op of cb) await op;
+    }),
+    $queryRaw: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockProductLockService = {
+    checkAndReserve: jest.fn().mockResolvedValue({}),
+    sweepOutOfStockProducts: jest.fn().mockResolvedValue({
+      productsScanned: 0,
+      offersCancelled: 0,
+      tradesCancelled: 0,
     }),
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockPrisma.$transaction.mockImplementation(async (ops: unknown[]) => {
-      for (const op of ops) {
-        await op;
-      }
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+      if (typeof cb === 'function') return cb(mockPrisma);
+      for (const op of cb) await op;
     });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -58,13 +69,14 @@ describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () 
         { provide: PayTRService, useValue: {} },
         { provide: EventService, useValue: { emitPaymentFailed: jest.fn().mockResolvedValue(undefined) } },
         { provide: InvoiceService, useValue: {} },
+        { provide: ProductLockService, useValue: mockProductLockService },
       ],
     }).compile();
 
     service = module.get(PaymentService);
   });
 
-  it('cancelExpiredPayments: süresi geçmiş pending ödemeyi failed yapar ve siparişi serbest bırakır', async () => {
+  it('cancelExpiredPayments: süresi geçmiş pending ödemeyi failed yapar ve rezervasyonu serbest bırakır', async () => {
     const oldCreated = new Date(Date.now() - 120_000);
     mockPrisma.payment.findMany.mockResolvedValue([
       {
@@ -85,6 +97,7 @@ describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () 
     mockPrisma.order.findUnique.mockResolvedValue({
       status: OrderStatus.pending_payment,
       productId: 'prod-1',
+      offerId: null,
     });
     mockPrisma.product.findUnique.mockResolvedValue({
       reservedQuantity: 1,
@@ -103,44 +116,40 @@ describe('PaymentService expiry (1.3 — callback gelmeyen pending ödeme)', () 
         }),
       }),
     );
+    // Order iptal edilmeli
     expect(mockPrisma.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'order-1' },
         data: { status: OrderStatus.cancelled },
       }),
     );
+    // reservedQuantity azaltılmalı
     expect(mockPrisma.product.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'prod-1' },
         data: expect.objectContaining({
           reservedQuantity: 0,
-          status: ProductStatus.active,
         }),
       }),
     );
   });
 
-  it('releaseExpiredOrderReservations: teklifsiz pending_payment siparişi zaman aşımında iptal eder', async () => {
+  it('releaseExpiredOrderReservations: pending_payment siparişi zaman aşımında iptal eder', async () => {
     mockPrisma.order.findMany.mockResolvedValue([
-      { id: 'order-2', productId: 'prod-2', orderNumber: 'T-200' },
+      { id: 'order-2', productId: 'prod-2', orderNumber: 'T-200', offerId: null },
     ]);
+    mockPrisma.payment.findFirst.mockResolvedValue(null);
+    mockPrisma.order.findUnique.mockResolvedValue({
+      status: OrderStatus.pending_payment,
+    });
     mockPrisma.product.findUnique.mockResolvedValue({
       reservedQuantity: 1,
       status: ProductStatus.reserved,
     });
-    mockPrisma.payment.findFirst.mockResolvedValue(null);
 
     const result = await service.releaseExpiredOrderReservations();
 
     expect(result.count).toBe(1);
-    expect(mockPrisma.order.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          status: OrderStatus.pending_payment,
-          offerId: null,
-        }),
-      }),
-    );
     expect(mockPrisma.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'order-2' },

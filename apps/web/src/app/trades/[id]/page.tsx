@@ -993,6 +993,12 @@ export default function TradeDetailPage() {
         {/* Status Description */}
         <div className="card p-4 mb-6 bg-orange-50 border-orange-200">
           <p className="text-sm text-orange-800">{statusConfig.description}</p>
+          {(trade.status === 'cancelled' || trade.status === 'rejected') && trade.cancelReason && (
+            <p className="text-sm text-gray-600 mt-2">
+              <span className="font-medium">{locale === 'en' ? 'Reason: ' : 'Sebep: '}</span>
+              {trade.cancelReason}
+            </p>
+          )}
         </div>
 
         {/* Completed Trade Summary - only when status is completed */}

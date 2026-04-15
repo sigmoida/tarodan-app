@@ -23,8 +23,8 @@ import {
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
+import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import {
@@ -452,8 +452,6 @@ export class TradeService {
     const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7');
 
     let tradeInitiatorId: string;
-    let acceptInvalidatedOffers: { offerId: string; buyerId: string; productId: string; productTitle: string }[] = [];
-    let acceptInvalidatedTrades: { tradeId: string; initiatorId: string; receiverId: string }[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       // Lock trade row first
@@ -491,17 +489,10 @@ export class TradeService {
         byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
       }
 
+      // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock)
+      // Invalidation YAPILMIYOR — cron halledecek (stock_plan.md)
       for (const [productId, qty] of byProduct) {
         await this.productLockService.checkAndReserve(tx, productId, qty);
-      }
-
-      // Cross-flow: reject pending offers & cancel other pending trades for involved products
-      // Bildirim için return değerleri closure dışına yazılır
-      for (const productId of byProduct.keys()) {
-        const offerResult = await this.productLockService.invalidateRelatedOffers(tx, productId);
-        const tradeResult = await this.productLockService.invalidateRelatedTrades(tx, productId, tradeId);
-        acceptInvalidatedOffers.push(...offerResult.rejectedOffers);
-        acceptInvalidatedTrades.push(...tradeResult.cancelledTrades);
       }
 
       await tx.trade.update({
@@ -548,36 +539,6 @@ export class TradeService {
       this.logger.warn('Failed to send trade accepted notification');
     }
 
-    // Transaction commit sonrası: otomatik reddedilen tekliflere bildirim gönder
-    if (this.eventService) {
-      for (const rejected of acceptInvalidatedOffers) {
-        try {
-          await this.eventService.emitOfferAutoRejected({
-            offerId: rejected.offerId,
-            buyerId: rejected.buyerId,
-            productId: rejected.productId,
-            productTitle: rejected.productTitle,
-            reason: 'Ürün takas kabul edilerek rezerve edildi',
-          });
-        } catch (err) {
-          this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
-        }
-      }
-      // Transaction commit sonrası: otomatik iptal edilen takaslara bildirim gönder
-      for (const cancelled of acceptInvalidatedTrades) {
-        try {
-          await this.eventService.emitTradeAutoCancelled({
-            tradeId: cancelled.tradeId,
-            initiatorId: cancelled.initiatorId,
-            receiverId: cancelled.receiverId,
-            reason: 'Ürün başka bir takas kabul edilerek rezerve edildi',
-          });
-        } catch (err) {
-          this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
-        }
-      }
-    }
-
     return this.getTradeById(tradeId, userId);
   }
 
@@ -606,7 +567,7 @@ export class TradeService {
 
       tradeInitiatorId = trade.initiatorId;
 
-      // Release reservations only if trade was accepted (pending trades have none)
+      // Restore stock only if trade was accepted (pending trades have none decremented)
       if (trade.status === TradeStatus.accepted) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
         if (allItems.length > 0) {
@@ -614,20 +575,18 @@ export class TradeService {
           for (const item of allItems) {
             byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
           }
-          const products = await tx.product.findMany({
-            where: { id: { in: [...byProduct.keys()] } },
-            select: { id: true, reservedQuantity: true },
-          });
-          for (const product of products) {
-            const qty = byProduct.get(product.id) ?? 0;
-            const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - qty);
-            await tx.product.update({
-              where: { id: product.id },
-              data: {
-                reservedQuantity: newReserved,
-                status: ProductStatus.active,
-              },
+          for (const [productId, qty] of byProduct) {
+            const prod = await tx.product.findUnique({
+              where: { id: productId },
+              select: { reservedQuantity: true },
             });
+            if (prod) {
+              const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+              await tx.product.update({
+                where: { id: productId },
+                data: { reservedQuantity: newReserved, status: ProductStatus.active },
+              });
+            }
           }
         }
       }
@@ -813,40 +772,12 @@ export class TradeService {
     const oldProductIds = [...new Set(oldItems.map((i) => i.productId))];
 
     // Update trade in transaction
+    // Not: Counter offer sadece pending trade'de yapılır. Pending'de quantity
+    // düşürülmemiştir, dolayısıyla burada stok manipülasyonu gerekmez.
     await this.prisma.$transaction(async (tx) => {
-      // Eski ürünler (önceki karşı tekliften rezerve edilmiş olabilir) reservedQuantity düşür
-      const oldByProduct = new Map<string, number>();
-      for (const item of oldItems) {
-        oldByProduct.set(item.productId, (oldByProduct.get(item.productId) ?? 0) + item.quantity);
-      }
-      for (const [productId, qty] of oldByProduct) {
-        const prod = await tx.product.findUnique({
-          where: { id: productId },
-          select: { reservedQuantity: true },
-        });
-        if (prod) {
-          const newReserved = Math.max(0, (prod.reservedQuantity ?? 0) - qty);
-          await tx.product.update({
-            where: { id: productId },
-            data: { reservedQuantity: newReserved, status: ProductStatus.active },
-          });
-        }
-      }
-
       await tx.tradeItem.deleteMany({
         where: { tradeId },
       });
-
-      const newByProduct = new Map<string, number>();
-      for (const item of dto.initiatorItems) {
-        newByProduct.set(item.productId, (newByProduct.get(item.productId) ?? 0) + item.quantity);
-      }
-      for (const [productId, qty] of newByProduct) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { reservedQuantity: { increment: qty } },
-        });
-      }
 
       // Swap roles: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
       // Update trade with swapped roles
@@ -950,7 +881,7 @@ export class TradeService {
         );
       }
 
-      // Release reservations only for accepted+ trades
+      // Restore stock only for accepted+ trades (pending have nothing decremented)
       const hasReservation = trade.status !== TradeStatus.pending;
       if (hasReservation) {
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
@@ -961,16 +892,15 @@ export class TradeService {
         for (const [productId, qty] of byProduct) {
           const prod = await tx.product.findUnique({
             where: { id: productId },
-            select: { reservedQuantity: true, quantity: true },
+            select: { reservedQuantity: true },
           });
-          const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
-          await tx.product.update({
-            where: { id: productId },
-            data: {
-              reservedQuantity: newReserved,
-              status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-            },
-          });
+          if (prod) {
+            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+            await tx.product.update({
+              where: { id: productId },
+              data: { reservedQuantity: newReserved, status: ProductStatus.active },
+            });
+          }
         }
       }
 
@@ -1174,6 +1104,7 @@ export class TradeService {
       });
 
       if (newStatus === TradeStatus.completed) {
+        // Takas tamamlandı: quantity-- + reservedQuantity-- (her iki tarafın ürünü için)
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
         const products = await tx.product.findMany({
           where: { id: { in: allItems.map((i) => i.productId) } },
@@ -1353,6 +1284,7 @@ export class TradeService {
       }
 
       if (newStatus === TradeStatus.completed) {
+        // Takas tamamlandı: quantity-- + reservedQuantity--
         const products = await tx.product.findMany({
           where: { id: { in: allItems.map((i) => i.productId) } },
         });
@@ -1379,19 +1311,19 @@ export class TradeService {
           });
         }
       } else if (newStatus === TradeStatus.cancelled) {
+        // İptal: kabul anında yapılan rezervasyonu geri al
         for (const [productId, qty] of qtyByProduct) {
           const prod = await tx.product.findUnique({
             where: { id: productId },
             select: { reservedQuantity: true },
           });
-          const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
-          await tx.product.update({
-            where: { id: productId },
-            data: {
-              reservedQuantity: newReserved,
-              status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-            },
-          });
+          if (prod) {
+            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+            await tx.product.update({
+              where: { id: productId },
+              data: { reservedQuantity: newReserved, status: ProductStatus.active },
+            });
+          }
         }
       }
     });
@@ -1462,27 +1394,24 @@ export class TradeService {
             for (const item of allItems) {
               byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
             }
+            // Accepted trade auto-cancel: kabul anında yapılan rezervasyonu geri al
             for (const [productId, qty] of byProduct) {
-              // Ürün satırını da kilitle
               await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
               const prod = await tx.product.findUnique({
                 where: { id: productId },
                 select: { reservedQuantity: true },
               });
-              const newReserved = safeDecrementReserved(prod?.reservedQuantity, qty);
-              await tx.product.update({
-                where: { id: productId },
-                data: {
-                  reservedQuantity: newReserved,
-                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-                },
-              });
+              if (prod) {
+                const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+                await tx.product.update({
+                  where: { id: productId },
+                  data: {
+                    reservedQuantity: newReserved,
+                    status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                  },
+                });
+              }
             }
-          } else if (allItems.length > 0) {
-            await tx.product.updateMany({
-              where: { id: { in: allItems.map((i) => i.productId) } },
-              data: { status: ProductStatus.active },
-            });
           }
 
           await tx.trade.update({

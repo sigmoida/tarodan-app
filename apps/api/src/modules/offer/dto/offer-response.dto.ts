@@ -86,6 +86,12 @@ export class OfferResponseDto {
     description: 'Time remaining until expiration',
   })
   timeRemaining?: string;
+
+  @ApiPropertyOptional({
+    example: 'Stok tükendiği için otomatik iptal edildi',
+    description: 'Reason for cancellation (if cancelled)',
+  })
+  cancelReason?: string | null;
 }
 
 export class PaginatedOffersDto {

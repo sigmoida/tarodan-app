@@ -91,15 +91,13 @@ async function main() {
           id: true,
           title: true,
           quantity: true,
-          reservedQuantity: true,
           status: true,
         },
       });
       console.log('\nDB snapshot:', p);
       const q = p?.quantity;
-      const r = p?.reservedQuantity ?? 0;
-      if (q != null && r > q) {
-        console.error(`❌ Oversell: reserved_quantity (${r}) > quantity (${q})`);
+      if (q != null && q < 0) {
+        console.error(`❌ Oversell: quantity went negative (${q})`);
         process.exit(1);
       }
     } finally {

@@ -918,11 +918,12 @@ model Offer {
   expiresAt DateTime    @map("expires_at")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
-  version   Int         @default(1)
-  buyer     User        @relation("BuyerOffers", fields: [buyerId], references: [id])
-  product   Product     @relation(fields: [productId], references: [id])
-  seller    User        @relation("SellerOffers", fields: [sellerId], references: [id])
-  order     Order?
+  version      Int         @default(1)
+  cancelReason String?     @map("cancel_reason")
+  buyer        User        @relation("BuyerOffers", fields: [buyerId], references: [id])
+  product      Product     @relation(fields: [productId], references: [id])
+  seller       User        @relation("SellerOffers", fields: [sellerId], references: [id])
+  order        Order?
 
   @@index([productId])
   @@index([status])
@@ -1636,6 +1637,7 @@ enum OfferStatus {
   rejected
   expired
   cancelled
+  payment_expired
 }
 
 enum OrderStatus {

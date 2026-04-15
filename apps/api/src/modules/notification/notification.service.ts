@@ -322,13 +322,13 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.TRADE_AUTO_CANCELLED]: {
     title: 'Takas Otomatik İptal Edildi',
-    message: 'Takasınızdaki ürünlerden biri satıldığı veya başka bir işlemle rezerve edildiği için takas otomatik olarak iptal edildi.',
+    message: '{{cancelReason}}',
     icon: '🔄',
     link: '/trades',
   },
   [NotificationType.OFFER_AUTO_REJECTED]: {
     title: 'Teklifiniz Kapatıldı',
-    message: 'Teklif verdiğiniz ürün satıldığı için teklifiniz otomatik olarak kapatıldı.',
+    message: '{{cancelReason}}',
     icon: '💰',
     link: '/offers',
   },

@@ -734,7 +734,7 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
 
-      // Adet bazlı stok: müsait adet (quantity - reservedQuantity) >= 1 olmalı
+      // Adet bazlı stok kontrolü: müsait adet >= 1 olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
@@ -904,15 +904,11 @@ export class OrderService {
       });
 
       // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
+      // Invalidation yapılmıyor — cron halledecek (stock_plan.md)
       await tx.product.update({
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
       });
-
-      // Cross-flow invalidation: reject pending offers & cancel pending trades
-      // Bildirim için return değerleri transaction dışında kullanılır
-      const offerInvalidation = await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
-      const tradeInvalidation = await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
 
       // Build shippingAddress JSON; add billing snapshot when different from shipping
       const shippingAddressJson: Record<string, unknown> = {
@@ -1030,47 +1026,16 @@ export class OrderService {
         subtotal,
         discountAmount: totalDiscount,
         appliedCouponCode: appliedCouponCode ?? undefined,
-        productId: dto.productId, // Include for cache invalidation
-        paymentUrl: '', // Will be set by payment service
-        provider: 'paytr', // Default provider
-        offerInvalidation,
-        tradeInvalidation,
+        productId: dto.productId,
+        paymentUrl: '',
+        provider: 'paytr',
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(result.productId);
 
-    // Transaction commit sonrası: otomatik reddedilen tekliflere bildirim gönder
-    for (const rejected of result.offerInvalidation.rejectedOffers) {
-      try {
-        await this.eventService.emitOfferAutoRejected({
-          offerId: rejected.offerId,
-          buyerId: rejected.buyerId,
-          productId: rejected.productId,
-          productTitle: rejected.productTitle,
-          reason: 'Ürün satın alındı',
-        });
-      } catch (err) {
-        this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
-      }
-    }
-    // Transaction commit sonrası: otomatik iptal edilen takaslara bildirim gönder
-    for (const cancelled of result.tradeInvalidation.cancelledTrades) {
-      try {
-        await this.eventService.emitTradeAutoCancelled({
-          tradeId: cancelled.tradeId,
-          initiatorId: cancelled.initiatorId,
-          receiverId: cancelled.receiverId,
-          reason: 'Ürün satın alındığı için takas iptal edildi',
-        });
-      } catch (err) {
-        this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
-      }
-    }
-
-    const { offerInvalidation: _oi, tradeInvalidation: _ti, ...cleanResult } = result as any;
-    return cleanResult;
+    return result;
   }
 
   /**
@@ -1653,58 +1618,24 @@ export class OrderService {
         commissionResult,
       );
 
-      // Adet bazlı rezervasyon: 1 adet rezerve et
+      // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek)
       await tx.product.update({
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
       });
 
-      // Cross-flow invalidation: reject pending offers & cancel pending trades
-      const offerInvalidationGuest = await this.productLockService.invalidateRelatedOffers(tx, dto.productId);
-      const tradeInvalidationGuest = await this.productLockService.invalidateRelatedTrades(tx, dto.productId);
-
       return {
         ...(await this.formatOrderResponse(order, guestUser.id)),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
-        productId: dto.productId, // Include for cache invalidation
-        offerInvalidation: offerInvalidationGuest,
-        tradeInvalidation: tradeInvalidationGuest,
+        productId: dto.productId,
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(dto.productId);
 
-    // Transaction commit sonrası bildirimler
-    for (const rejected of result.offerInvalidation.rejectedOffers) {
-      try {
-        await this.eventService.emitOfferAutoRejected({
-          offerId: rejected.offerId,
-          buyerId: rejected.buyerId,
-          productId: rejected.productId,
-          productTitle: rejected.productTitle,
-          reason: 'Ürün satın alındı',
-        });
-      } catch (err) {
-        this.logger.error(`Failed to emit offer.auto-rejected for offer ${rejected.offerId}: ${err}`);
-      }
-    }
-    for (const cancelled of result.tradeInvalidation.cancelledTrades) {
-      try {
-        await this.eventService.emitTradeAutoCancelled({
-          tradeId: cancelled.tradeId,
-          initiatorId: cancelled.initiatorId,
-          receiverId: cancelled.receiverId,
-          reason: 'Ürün satın alındığı için takas iptal edildi',
-        });
-      } catch (err) {
-        this.logger.error(`Failed to emit trade.auto-cancelled for trade ${cancelled.tradeId}: ${err}`);
-      }
-    }
-
-    const { offerInvalidation: _oi, tradeInvalidation: _ti, ...cleanResult } = result;
-    return cleanResult;
+    return result;
   }
 
   /**
@@ -2067,18 +1998,11 @@ export class OrderService {
         },
       });
 
-      // Adet bazlı: rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
+      // Rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
       if (order.status === OrderStatus.pending_payment) {
         await tx.product.update({
           where: { id: order.productId },
           data: { reservedQuantity: { decrement: 1 } },
-        });
-      }
-      // Eski davranış: ürün reserved idiyse tekrar active yap (geçiş dönemi)
-      if (order.product.status === ProductStatus.reserved) {
-        await tx.product.update({
-          where: { id: order.productId },
-          data: { status: ProductStatus.active },
         });
       }
 
@@ -2130,16 +2054,14 @@ export class OrderService {
       throw new BadRequestException('Ürün için yeterli müsait adet yok');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.order.update({
+    await this.prisma.$transaction(async (tx) => {
+      // Yeniden rezerve et (FOR UPDATE ile)
+      await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      await tx.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
-      }),
-      this.prisma.product.update({
-        where: { id: order.productId },
-        data: { reservedQuantity: { increment: 1 } },
-      }),
-    ]);
+      });
+    });
 
     return this.findOne(orderId, userId);
   }

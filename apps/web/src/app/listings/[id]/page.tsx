@@ -28,8 +28,6 @@ import {
   PlayIcon,
   PauseIcon,
   CheckBadgeIcon,
-  FunnelIcon,
-  HandThumbUpIcon as HandThumbUpOutlineIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';

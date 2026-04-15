@@ -638,7 +638,7 @@ export class EventService {
     await this.pushQueue.add('send-notification', {
       userId: payload.buyerId,
       title: 'Teklifiniz Kapatıldı',
-      body: `${payload.productTitle} ürünü satıldığı için teklifiniz otomatik olarak kapatıldı.`,
+      body: `${payload.productTitle}: ${payload.reason}`,
       data: {
         type: 'offer_auto_rejected',
         offerId: payload.offerId,

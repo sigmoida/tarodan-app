@@ -15,6 +15,7 @@ import { safeDecrementReserved } from '../product/helpers/product-availability.h
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ProductLockService } from '../product/product-lock.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -29,6 +30,7 @@ export class PaymentService {
     private readonly paytrService: PayTRService,
     private readonly eventService: EventService,
     private readonly invoiceService: InvoiceService,
+    private readonly productLockService: ProductLockService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
   }
@@ -257,6 +259,15 @@ export class PaymentService {
         provider: existingPayment.provider,
         expiresIn: 300,
       };
+    }
+
+    // Offer-based order ise: ödeme başlatılırken stok rezerve et
+    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı
+    if (order.offerId) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      });
+      this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
     }
 
     // Create payment record
@@ -758,7 +769,7 @@ export class PaymentService {
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
       } else {
-        // Regular product order - update product status to SOLD and decrement stock (stock is only decremented on payment success, not at order creation)
+        // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
         productIdsToInvalidate.push(payment.order.productId);
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
@@ -768,7 +779,6 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
-        // Stok ödeme anında düşer; rezervasyon da kalkar (adet bazlı)
         const newQuantity =
           product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
@@ -784,78 +794,10 @@ export class PaymentService {
           data: updateData,
         });
 
-        // CRITICAL: Cancel all pending/accepted trades that include this product
-        // When a product is sold, any pending or accepted trades involving it should be cancelled
-        const tradesWithThisProduct = await tx.tradeItem.findMany({
-          where: { productId: payment.order.productId },
-          select: { tradeId: true },
-          distinct: ['tradeId'],
-        });
-
-        const tradeIds = tradesWithThisProduct.map((item) => item.tradeId);
-
-        if (tradeIds.length > 0) {
-          // Find trades that are still pending or accepted (can be cancelled)
-          const activeTrades = await tx.trade.findMany({
-            where: {
-              id: { in: tradeIds },
-              status: {
-                in: [TradeStatus.pending, TradeStatus.accepted],
-              },
-            },
-          });
-
-          if (activeTrades.length > 0) {
-            // Cancel these trades
-            await tx.trade.updateMany({
-              where: {
-                id: { in: activeTrades.map((t) => t.id) },
-              },
-              data: {
-                status: TradeStatus.cancelled,
-                cancelledAt: new Date(),
-                cancelReason: 'Ürün satın alındığı için takas iptal edildi',
-                version: { increment: 1 },
-              },
-            });
-
-            // Adet bazlı: iptal edilen takaslardaki ürünlerin reservedQuantity'sini düşür
-            const allTradeItems = await tx.tradeItem.findMany({
-              where: {
-                tradeId: { in: activeTrades.map((t) => t.id) },
-              },
-              select: { productId: true, quantity: true },
-            });
-
-            const restoreByProduct = new Map<string, number>();
-            for (const item of allTradeItems) {
-              if (item.productId === payment.order.productId) continue;
-              restoreByProduct.set(
-                item.productId,
-                (restoreByProduct.get(item.productId) ?? 0) + item.quantity,
-              );
-            }
-            for (const [productId, qty] of restoreByProduct) {
-              productIdsToInvalidate.push(productId);
-              const prodToRestore = await tx.product.findUnique({
-                where: { id: productId },
-                select: { reservedQuantity: true },
-              });
-              const newReserved = safeDecrementReserved(prodToRestore?.reservedQuantity, qty);
-              await tx.product.update({
-                where: { id: productId },
-                data: {
-                  reservedQuantity: newReserved,
-                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-                },
-              });
-            }
-
-            this.logger.log(
-              `Cancelled ${activeTrades.length} trade(s) due to product ${payment.order.productId} being sold`,
-            );
-          }
-        }
+        // Invalidation YAPILMIYOR — cron (sweepOutOfStockProducts) halledecek.
+        this.logger.log(
+          `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
+        );
       }
 
       // Get full order details for event emission
@@ -980,13 +922,14 @@ export class PaymentService {
   }
 
   /**
-   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır (adet bazlı), siparişi iptal et.
+   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır, siparişi iptal et.
+   * Offer-based orderlarda teklif status'u payment_expired yapılır (tekrar ödenebilir).
    */
   private async releaseProductForFailedPayment(orderId: string): Promise<void> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { status: true, productId: true },
+        select: { status: true, productId: true, offerId: true },
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
@@ -996,9 +939,9 @@ export class PaymentService {
       });
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
       if (product) {
-        const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+        const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
         updateData.reservedQuantity = newReserved;
-        if (product.status === ProductStatus.reserved) {
+        if (product.status === ProductStatus.reserved && newReserved === 0) {
           updateData.status = ProductStatus.active;
         }
       }
@@ -1016,8 +959,17 @@ export class PaymentService {
               }),
             ]
           : []),
+        // Offer-based ise: payment_expired yap (tekrar ödenebilir)
+        ...(order.offerId
+          ? [
+              this.prisma.offer.update({
+                where: { id: order.offerId },
+                data: { status: OfferStatus.payment_expired },
+              }),
+            ]
+          : []),
       ]);
-      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released (reservation decremented) after payment failure`);
+      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`);
       await this.cache.del(`products:detail:${order.productId}`);
     } catch (error: any) {
       this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
@@ -2205,7 +2157,7 @@ export class PaymentService {
             return;
           }
 
-          // Ürün satırını da kilitle
+          // Ürün satırını kilitle ve rezervasyonu kaldır
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
           const product = await tx.product.findUnique({
             where: { id: order.productId },
@@ -2228,11 +2180,11 @@ export class PaymentService {
             data: { status: OrderStatus.cancelled },
           });
 
-          // Cancel associated offer so buyer can re-offer later
+          // Offer-based ise: payment_expired yap (tekrar ödenebilir)
           if (order.offerId) {
             await tx.offer.update({
               where: { id: order.offerId },
-              data: { status: OfferStatus.cancelled },
+              data: { status: OfferStatus.payment_expired },
             });
           }
         });
