@@ -67,15 +67,21 @@ export class TradeService {
   private readonly validTransitions: Record<TradeStatus, TradeStatus[]> = {
     [TradeStatus.pending]: [
       TradeStatus.accepted,
+      TradeStatus.awaiting_payment,
+      TradeStatus.shipping_to_warehouse,
       TradeStatus.rejected,
       TradeStatus.cancelled,
     ],
+    // Legacy accepted state (peer-to-peer flow) — kept for backwards compat
     [TradeStatus.accepted]: [
       TradeStatus.initiator_shipped,
       TradeStatus.receiver_shipped,
+      TradeStatus.awaiting_payment,
+      TradeStatus.shipping_to_warehouse,
       TradeStatus.cancelled,
     ],
     [TradeStatus.rejected]: [], // Terminal state
+    // Legacy peer-to-peer shipping states
     [TradeStatus.initiator_shipped]: [
       TradeStatus.both_shipped,
       TradeStatus.cancelled,
@@ -96,6 +102,33 @@ export class TradeService {
     [TradeStatus.receiver_received]: [
       TradeStatus.completed,
       TradeStatus.disputed,
+    ],
+    // New escrow flow states
+    [TradeStatus.awaiting_payment]: [
+      TradeStatus.shipping_to_warehouse,
+      TradeStatus.cancelled,
+    ],
+    [TradeStatus.shipping_to_warehouse]: [
+      TradeStatus.at_warehouse,
+      TradeStatus.cancelled,
+      TradeStatus.returning,
+    ],
+    [TradeStatus.at_warehouse]: [
+      TradeStatus.admin_reviewing,
+      TradeStatus.shipping_to_recipients,
+      TradeStatus.returning,
+      TradeStatus.cancelled,
+    ],
+    [TradeStatus.admin_reviewing]: [
+      TradeStatus.shipping_to_recipients,
+      TradeStatus.returning,
+    ],
+    [TradeStatus.shipping_to_recipients]: [
+      TradeStatus.completed,
+      TradeStatus.disputed,
+    ],
+    [TradeStatus.returning]: [
+      TradeStatus.cancelled,
     ],
     [TradeStatus.completed]: [], // Terminal state
     [TradeStatus.cancelled]: [], // Terminal state
@@ -490,19 +523,59 @@ export class TradeService {
       }
 
       // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock)
-      // Invalidation YAPILMIYOR — cron halledecek (stock_plan.md)
       for (const [productId, qty] of byProduct) {
         await this.productLockService.checkAndReserve(tx, productId, qty);
       }
 
+      // Safe-trade stock cascade: if this trade depleted the last available
+      // unit, cancel OTHER pending offers, trades, and pending_payment orders.
+      for (const productId of byProduct.keys()) {
+        const product = await tx.product.findUnique({
+          where: { id: productId },
+          select: { quantity: true, reservedQuantity: true },
+        });
+        if (!product || product.quantity === null) continue;
+        const available =
+          (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
+        if (available <= 0) {
+          const reason = 'Stok takas icin ayrildi';
+          await this.productLockService.invalidateRelatedOffers(
+            tx,
+            productId,
+          );
+          await this.productLockService.invalidateRelatedTrades(
+            tx,
+            productId,
+            tradeId, // exclude the current trade
+          );
+          await this.productLockService.invalidatePendingOrdersForProduct(
+            tx,
+            productId,
+            reason,
+          );
+        }
+      }
+
+      // Safe-trade status routing:
+      //   - cash trade  -> awaiting_payment (cash must be paid before shipping)
+      //   - non-cash    -> shipping_to_warehouse (both ship to Tarodan warehouse)
+      const nextStatus = trade.cashPayerId && trade.cashAmount
+        ? TradeStatus.awaiting_payment
+        : TradeStatus.shipping_to_warehouse;
+
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          status: TradeStatus.accepted,
+          status: nextStatus,
           receiverMessage: dto.message,
           acceptedAt: now,
           paymentDeadline: trade.cashPayerId ? paymentDeadline : null,
-          shippingDeadline,
+          // shippingDeadline only set when shipping begins (either immediately
+          // for non-cash, or after successful payment for cash trades)
+          shippingDeadline:
+            nextStatus === TradeStatus.shipping_to_warehouse
+              ? shippingDeadline
+              : null,
           version: { increment: 1 },
         },
       });
@@ -871,6 +944,7 @@ export class TradeService {
         );
       }
 
+      // Legacy flow: after both shipped can't cancel
       if (
         trade.status === TradeStatus.both_shipped ||
         trade.status === TradeStatus.initiator_received ||
@@ -878,6 +952,18 @@ export class TradeService {
       ) {
         throw new BadRequestException(
           'Her iki taraf da gönderdikten sonra iptal edilemez',
+        );
+      }
+
+      // Safe-trade flow: once items reach warehouse, only admin can intervene
+      if (
+        trade.status === TradeStatus.at_warehouse ||
+        trade.status === TradeStatus.admin_reviewing ||
+        trade.status === TradeStatus.shipping_to_recipients ||
+        trade.status === TradeStatus.returning
+      ) {
+        throw new BadRequestException(
+          'Ürünler depoya ulaştıktan sonra sadece admin iptal edebilir',
         );
       }
 
@@ -1026,6 +1112,86 @@ export class TradeService {
   }
 
   // ==========================================================================
+  // SHIP TO WAREHOUSE (Safe-trade: each party sends items to Tarodan warehouse)
+  // ==========================================================================
+  async shipToWarehouse(
+    tradeId: string,
+    userId: string,
+    dto: ShipTradeDto,
+  ): Promise<TradeResponseDto> {
+    const userCanTrade = await this.membershipService.canCreateTrade(userId);
+    if (!userCanTrade.allowed) {
+      throw new BadRequestException(
+        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir.',
+      );
+    }
+
+    const address = await this.prisma.address.findFirst({
+      where: { id: dto.fromAddressId, userId },
+    });
+    if (!address) {
+      throw new NotFoundException('Adres bulunamadı');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      const isInitiator = trade.initiatorId === userId;
+      const isReceiver = trade.receiverId === userId;
+
+      if (!isInitiator && !isReceiver) {
+        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+      }
+
+      if (trade.status !== TradeStatus.shipping_to_warehouse) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' depoya gönderim yapılamaz. Önce takas kabul edilmeli ve varsa ödeme tamamlanmalı.`,
+        );
+      }
+
+      // User can only ship once for the to_warehouse leg
+      const existingShipment = await tx.tradeShipment.findFirst({
+        where: { tradeId, shipperId: userId, leg: 'to_warehouse' },
+      });
+      if (existingShipment) {
+        throw new BadRequestException('Depoya zaten gönderim yaptınız');
+      }
+
+      const trackingNumber = dto.trackingNumber ||
+        `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      await tx.tradeShipment.create({
+        data: {
+          tradeId,
+          shipperId: userId,
+          fromAddressId: dto.fromAddressId,
+          carrier: dto.carrier,
+          trackingNumber,
+          status: ShipmentStatus.label_created,
+          shippedAt: new Date(),
+          leg: 'to_warehouse',
+          recipientType: 'warehouse',
+          recipientUserId: null,
+        },
+      });
+
+      // Trade status stays as shipping_to_warehouse until admin marks both
+      // shipments as delivered, which transitions the trade to at_warehouse.
+      await tx.trade.update({
+        where: { id: tradeId, version: trade.version },
+        data: {
+          version: { increment: 1 },
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    await this.invalidateProductCachesForTrade(tradeId);
+
+    return this.getTradeById(tradeId, userId);
+  }
+
+  // ==========================================================================
   // CONFIRM RECEIPT
   // ==========================================================================
   async confirmReceipt(
@@ -1044,9 +1210,12 @@ export class TradeService {
       }
 
       const canConfirmStatuses: TradeStatus[] = [
+        // Legacy peer-to-peer flow
         TradeStatus.both_shipped,
         TradeStatus.initiator_received,
         TradeStatus.receiver_received,
+        // Safe-trade flow: user confirms the from_warehouse shipment to them
+        TradeStatus.shipping_to_recipients,
       ];
 
       if (!canConfirmStatuses.includes(trade.status)) {
@@ -1055,10 +1224,24 @@ export class TradeService {
         );
       }
 
-      const otherPartyId = isInitiator ? trade.receiverId : trade.initiatorId;
-      const shipment = await tx.tradeShipment.findFirst({
-        where: { tradeId, shipperId: otherPartyId },
-      });
+      // Locate the shipment to confirm
+      let shipment;
+      if (trade.status === TradeStatus.shipping_to_recipients) {
+        // Safe-trade: find the from_warehouse shipment addressed to this user
+        shipment = await tx.tradeShipment.findFirst({
+          where: {
+            tradeId,
+            leg: 'from_warehouse',
+            recipientUserId: userId,
+          },
+        });
+      } else {
+        // Legacy: find the shipment from the other party
+        const otherPartyId = isInitiator ? trade.receiverId : trade.initiatorId;
+        shipment = await tx.tradeShipment.findFirst({
+          where: { tradeId, shipperId: otherPartyId },
+        });
+      }
 
       if (!shipment) {
         throw new BadRequestException('Onaylanacak gönderim bulunamadı');
@@ -1072,7 +1255,20 @@ export class TradeService {
       }
 
       let newStatus: TradeStatus;
-      if (trade.status === TradeStatus.both_shipped) {
+      if (trade.status === TradeStatus.shipping_to_recipients) {
+        // Safe-trade: if the OTHER from_warehouse shipment is also confirmed,
+        // trade is completed. Otherwise stay in shipping_to_recipients.
+        const otherShipment = await tx.tradeShipment.findFirst({
+          where: {
+            tradeId,
+            leg: 'from_warehouse',
+            NOT: { id: shipment.id },
+          },
+        });
+        newStatus = otherShipment && otherShipment.confirmedAt
+          ? TradeStatus.completed
+          : TradeStatus.shipping_to_recipients;
+      } else if (trade.status === TradeStatus.both_shipped) {
         newStatus = isInitiator
           ? TradeStatus.initiator_received
           : TradeStatus.receiver_received;
@@ -1145,9 +1341,17 @@ export class TradeService {
           where: { tradeId },
         });
         if (cashPayment && cashPayment.status === PaymentStatus.completed) {
+          // Safe-trade escrow: don't release immediately. Set hold for 7 days.
+          const holdDaysSetting = await tx.platformSetting.findUnique({
+            where: { settingKey: 'payment_hold_days' },
+          });
+          const holdDays = parseInt(holdDaysSetting?.settingValue ?? '7');
+          const holdReleaseAt = new Date();
+          holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
+
           await tx.tradeCashPayment.update({
             where: { tradeId },
-            data: { releasedAt: new Date() },
+            data: { holdReleaseAt },
           });
         }
       }
@@ -1357,9 +1561,30 @@ export class TradeService {
       },
     });
 
+    // Safe-trade: cash payment timeout
+    const expiredPaymentTrades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.awaiting_payment,
+        paymentDeadline: { lt: now },
+      },
+    });
+
+    // Safe-trade: shipping-to-warehouse timeout
+    const expiredShippingTrades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_warehouse,
+        shippingDeadline: { lt: now },
+      },
+    });
+
     let cancelledCount = 0;
 
-    for (const trade of [...expiredPendingTrades, ...expiredAcceptedTrades]) {
+    for (const trade of [
+      ...expiredPendingTrades,
+      ...expiredAcceptedTrades,
+      ...expiredPaymentTrades,
+      ...expiredShippingTrades,
+    ]) {
       try {
         try {
           await this.paymentService.refundTradeCashPaymentIfCompleted(trade.id);
@@ -1389,12 +1614,18 @@ export class TradeService {
             where: { tradeId: trade.id },
           });
 
-          if (trade.status === TradeStatus.accepted && allItems.length > 0) {
+          // Release reservations for any non-pending trade being auto-cancelled
+          const statusesWithReservation: TradeStatus[] = [
+            TradeStatus.accepted,
+            TradeStatus.awaiting_payment,
+            TradeStatus.shipping_to_warehouse,
+          ];
+          if (statusesWithReservation.includes(trade.status) && allItems.length > 0) {
             const byProduct = new Map<string, number>();
             for (const item of allItems) {
               byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
             }
-            // Accepted trade auto-cancel: kabul anında yapılan rezervasyonu geri al
+            // Auto-cancel: kabul anında yapılan rezervasyonu geri al
             for (const [productId, qty] of byProduct) {
               await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
               const prod = await tx.product.findUnique({

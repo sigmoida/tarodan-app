@@ -17,6 +17,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { Button } from '@tarodan/ui';
 
 interface Collection {
   id: string;
@@ -203,13 +204,15 @@ export default function CollectionsPage() {
             </div>
             <div className="flex items-center gap-2">
               {mounted && isAuthenticated && limits?.canCreateCollections && (
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleCreateClick}
-                  className="px-4 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+                  className="flex items-center gap-1.5"
                 >
                   <FolderPlusIcon className="w-4 h-4" />
                   {t('collection.createCollection')}
-                </button>
+                </Button>
               )}
               {mounted && isAuthenticated && !limits?.canCreateCollections && (
                 <Link
@@ -329,14 +332,14 @@ export default function CollectionsPage() {
               {locale === 'en' ? 'Start building your collection today' : 'Koleksiyonunuzu bugün oluşturmaya başlayın'}
             </p>
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
+              <Button variant="secondary" size="md" onClick={() => setSearchQuery('')}>
                 {t('common.clear')}
-              </button>
+              </Button>
             )}
             {activeTab === 'mine' && !searchQuery && (
-              <button onClick={() => setShowCreateModal(true)} className="px-5 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors">
+              <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>
                 {t('collection.createCollection')}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -436,9 +439,9 @@ export default function CollectionsPage() {
               Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowPremiumModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors text-sm">
+              <Button variant="outline" size="md" className="flex-1" onClick={() => setShowPremiumModal(false)}>
                 Vazgeç
-              </button>
+              </Button>
               <Link href="/membership" className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded font-medium hover:bg-orange-600 transition-colors text-center text-sm">
                 Üyeliği Yükselt
               </Link>
@@ -540,16 +543,19 @@ function CreateCollectionModal({
             <label htmlFor="isPublic" className="text-sm text-gray-700">Herkese açık koleksiyon</label>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
+            <Button type="button" variant="secondary" size="md" className="flex-1" onClick={onClose}>
               İptal
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
+              className="flex-1"
               disabled={loading || !name}
-              className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              isLoading={loading}
             >
               {loading ? 'Oluşturuluyor...' : 'Oluştur'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

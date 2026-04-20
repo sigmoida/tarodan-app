@@ -26,6 +26,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { Spinner } from '@tarodan/ui';
 
 ChartJS.register(
   CategoryScale,
@@ -325,7 +326,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }

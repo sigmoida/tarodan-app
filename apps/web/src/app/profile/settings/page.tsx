@@ -21,6 +21,7 @@ import {
   FingerPrintIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Modal } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
@@ -380,35 +381,28 @@ export default function SettingsPage() {
                     : 'Hesabınızı ve tüm verilerinizi kalıcı olarak silin'}
                 </p>
               </div>
-              <button
+              <Button
+                variant="danger"
+                size="md"
+                className="flex items-center gap-2 whitespace-nowrap"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 <TrashIcon className="w-4 h-4" />
                 {locale === 'en' ? 'Delete Account' : 'Hesabı Sil'}
-              </button>
+              </Button>
             </div>
           </div>
         </motion.div>
 
         {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl"
-            >
+        <Modal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }} title={locale === 'en' ? 'Delete Account?' : 'Hesabı Sil?'} maxWidth="max-w-md">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {locale === 'en' ? 'Delete Account?' : 'Hesabı Sil?'}
-                </h3>
                 <p className="text-gray-500">
-                  {locale === 'en' 
-                    ? 'This action cannot be undone. All your data, listings, and order history will be permanently deleted.' 
+                  {locale === 'en'
+                    ? 'This action cannot be undone. All your data, listings, and order history will be permanently deleted.'
                     : 'Bu işlem geri alınamaz. Tüm verileriniz, ilanlarınız ve sipariş geçmişiniz kalıcı olarak silinecektir.'}
                 </p>
               </div>
@@ -427,28 +421,30 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setDeleteConfirmText('');
                   }}
-                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
                 >
                   {locale === 'en' ? 'Cancel' : 'İptal'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="flex-1"
                   onClick={handleDeleteAccount}
                   disabled={loading || deleteConfirmText !== 'SİL'}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading 
-                    ? (locale === 'en' ? 'Deleting...' : 'Siliniyor...') 
+                  {loading
+                    ? (locale === 'en' ? 'Deleting...' : 'Siliniyor...')
                     : (locale === 'en' ? 'Yes, Delete' : 'Evet, Sil')}
-                </button>
+                </Button>
               </div>
-            </motion.div>
-          </div>
-        )}
+        </Modal>
       </main>
     </div>
   );

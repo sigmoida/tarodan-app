@@ -8,6 +8,7 @@ import { ArrowLeftIcon, TruckIcon, MapPinIcon, MagnifyingGlassIcon, TagIcon } fr
 import toast from 'react-hot-toast';
 import { ordersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { StatusBadge, orderStatusConfig, Spinner } from '@tarodan/ui';
 
 interface GuestOrderDetail {
   id: string;
@@ -28,17 +29,17 @@ interface GuestOrderDetail {
   updatedAt: string;
 }
 
-const getStatusLabels = (locale: string): Record<string, { label: string; color: string; bg: string }> => ({
-  pending_payment: { label: locale === 'en' ? 'Awaiting Payment' : 'Ödeme Bekleniyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  paid: { label: locale === 'en' ? 'Paid' : 'Ödendi', color: 'text-green-600', bg: 'bg-green-100' },
-  preparing: { label: locale === 'en' ? 'Preparing' : 'Hazırlanıyor', color: 'text-orange-600', bg: 'bg-orange-100' },
-  shipped: { label: locale === 'en' ? 'Shipped' : 'Kargoya Verildi', color: 'text-purple-600', bg: 'bg-purple-100' },
-  delivered: { label: locale === 'en' ? 'Delivered' : 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: locale === 'en' ? 'Completed' : 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: locale === 'en' ? 'Cancelled' : 'İptal Edildi', color: 'text-red-600', bg: 'bg-red-100' },
-  refund_requested: { label: locale === 'en' ? 'Refund Requested' : 'İade Talebi', color: 'text-orange-600', bg: 'bg-orange-100' },
-  refunded: { label: locale === 'en' ? 'Refunded' : 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
-});
+const orderStatusEnLabels: Record<string, string> = {
+  pending_payment: 'Awaiting Payment',
+  paid: 'Paid',
+  preparing: 'Preparing',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  refund_requested: 'Refund Requested',
+  refunded: 'Refunded',
+};
 
 export default function TrackOrderPage() {
   const searchParams = useSearchParams();
@@ -86,7 +87,7 @@ export default function TrackOrderPage() {
     fetchByUrl();
   }, [searchParams, autoFetched, locale]);
 
-  const statusLabels = getStatusLabels(locale);
+  const getOrderStatusLabel = (s: string) => locale === 'en' ? (orderStatusEnLabels[s] || s) : (orderStatusConfig[s]?.label || s);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +121,7 @@ export default function TrackOrderPage() {
     }
   };
 
-  const status = order ? (statusLabels[order.status] || { label: order.status, color: 'text-gray-600', bg: 'bg-gray-100' }) : null;
+  const statusLabel = order ? getOrderStatusLabel(order.status) : null;
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
 
   return (
@@ -139,7 +140,7 @@ export default function TrackOrderPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             {loading && searchParams.get('orderNumber') && searchParams.get('email') ? (
               <div className="py-12 flex flex-col items-center justify-center gap-4">
-                <span className="animate-spin rounded-full h-10 w-10 border-2 border-primary-500 border-t-transparent" />
+                <Spinner size="lg" />
                 <p className="text-gray-600">{locale === 'en' ? 'Loading order details...' : 'Sipariş bilgileriniz yükleniyor...'}</p>
               </div>
             ) : (
@@ -185,7 +186,7 @@ export default function TrackOrderPage() {
                 className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {loading ? (
-                  <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                  <Spinner size="sm" color="border-white border-t-transparent" />
                 ) : (
                   <MagnifyingGlassIcon className="w-5 h-5" />
                 )}
@@ -217,9 +218,11 @@ export default function TrackOrderPage() {
                   })}
                 </p>
               </div>
-              <span className={`px-4 py-2 rounded-full font-medium ${status!.color} ${status!.bg}`}>
-                {status!.label}
-              </span>
+              <StatusBadge
+                status={order.status}
+                config={orderStatusConfig}
+                label={statusLabel!}
+              />
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-6">

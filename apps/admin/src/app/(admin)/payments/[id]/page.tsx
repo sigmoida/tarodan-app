@@ -11,6 +11,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
 interface PaymentDetail {
@@ -145,7 +146,7 @@ export default function AdminPaymentDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -326,29 +327,33 @@ export default function AdminPaymentDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Admin İşlemleri</h2>
               <div className="space-y-3">
                 {payment.status === 'completed' && (
-                  <button
+                  <Button
+                    variant="danger"
+                    size="md"
                     onClick={() => {
                       setRefundAmount(undefined);
                       setRefundReason('');
                       setShowRefundModal(true);
                     }}
-                    className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-gray-900 rounded-lg flex items-center justify-center gap-2"
+                    className="w-full flex items-center justify-center gap-2"
                   >
                     <ArrowUturnLeftIcon className="w-5 h-5" />
                     Manuel İade
-                  </button>
+                  </Button>
                 )}
                 {payment.status !== 'completed' && payment.status !== 'refunded' && (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="md"
                     onClick={() => {
                       setCancelReason('');
                       setShowCancelModal(true);
                     }}
-                    className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-gray-900 rounded-lg flex items-center justify-center gap-2"
+                    className="w-full flex items-center justify-center gap-2"
                   >
                     <XCircleIcon className="w-5 h-5" />
                     Zorla İptal
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -401,24 +406,29 @@ export default function AdminPaymentDetailPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => {
                     setShowRefundModal(false);
                     setRefundAmount(undefined);
                     setRefundReason('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                   disabled={processing}
+                  className="flex-1"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
                   onClick={handleManualRefund}
                   disabled={processing}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={processing}
+                  className="flex-1"
                 >
                   {processing ? 'İşleniyor...' : 'İade Et'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -449,23 +459,28 @@ export default function AdminPaymentDetailPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => {
                     setShowCancelModal(false);
                     setCancelReason('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                   disabled={processing}
+                  className="flex-1"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleForceCancel}
                   disabled={processing || !cancelReason.trim()}
-                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={processing}
+                  className="flex-1"
                 >
                   {processing ? 'İşleniyor...' : 'Zorla İptal Et'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

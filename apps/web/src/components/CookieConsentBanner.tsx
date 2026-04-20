@@ -9,6 +9,7 @@ import {
     CheckIcon,
     ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
+import { Button } from '@tarodan/ui';
 
 export interface CookiePreferences {
     necessary: boolean; // Always true, required
@@ -164,26 +165,31 @@ export default function CookieConsentBanner() {
                                             inceleyebilirsiniz.
                                         </p>
                                         <div className="flex flex-wrap gap-3">
-                                            <button
+                                            <Button
+                                                variant="primary"
+                                                size="md"
+                                                className="flex items-center gap-2"
                                                 onClick={acceptAll}
-                                                className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-colors flex items-center gap-2"
                                             >
                                                 <CheckIcon className="w-4 h-4" />
                                                 Tümünü Kabul Et
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                size="md"
                                                 onClick={acceptNecessaryOnly}
-                                                className="px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm transition-colors"
                                             >
                                                 Sadece Gerekli Olanlar
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="md"
+                                                className="flex items-center gap-2"
                                                 onClick={() => setShowSettings(true)}
-                                                className="px-5 py-2.5 border border-gray-300 dark:border-gray-600 hover:border-orange-500 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm transition-colors flex items-center gap-2"
                                             >
                                                 <Cog6ToothIcon className="w-4 h-4" />
                                                 Ayarlar
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -226,7 +232,7 @@ export default function CookieConsentBanner() {
                                             </p>
                                         </div>
                                         <div className="ml-4">
-                                            <div className="w-12 h-7 bg-green-500 rounded-full flex items-center justify-end px-1">
+                                            <div className="w-12 h-7 bg-green-600 rounded-full flex items-center justify-end px-1">
                                                 <div className="w-5 h-5 bg-white rounded-full shadow" />
                                             </div>
                                         </div>
@@ -282,18 +288,20 @@ export default function CookieConsentBanner() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                    <button
+                                    <Button
+                                        variant="primary"
+                                        size="md"
                                         onClick={saveCustomPreferences}
-                                        className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-colors"
                                     >
                                         Tercihlerimi Kaydet
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        size="md"
                                         onClick={acceptAll}
-                                        className="px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm transition-colors"
                                     >
                                         Tümünü Kabul Et
-                                    </button>
+                                    </Button>
                                 </div>
                             </motion.div>
                         )}

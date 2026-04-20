@@ -1,11 +1,14 @@
 import type { Config } from 'tailwindcss';
+import tarodanPreset from '@tarodan/ui/tailwind-preset';
 
 const config: Config = {
   darkMode: ["class"],
+  presets: [tarodanPreset as Config],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    '../../packages/ui/src/**/*.{ts,tsx}',
   ],
   theme: {
     container: {
@@ -25,16 +28,6 @@ const config: Config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -72,18 +65,6 @@ const config: Config = {
           800: '#ffffff',
           900: '#f8f8f8',
         },
-        heading: '#1A1A1A',
-        body: '#333333',
-        subtle: '#999999',
-        surface: {
-          DEFAULT: '#FAFAFA',
-          alt: '#F5F5F7',
-        },
-      },
-      boxShadow: {
-        soft: '0 2px 8px -2px rgba(0,0,0,0.08)',
-        medium: '0 4px 16px -4px rgba(0,0,0,0.12)',
-        elevated: '0 8px 30px -8px rgba(0,0,0,0.16)',
       },
       borderRadius: {
         lg: "var(--radius)",

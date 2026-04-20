@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FaceFrownIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
+import { Spinner } from '@tarodan/ui';
 import axios from 'axios';
 
 interface Brand {
@@ -89,7 +90,7 @@ export default function ModelDetailPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-                <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mb-4" />
+                <Spinner size="xl" color="border-primary-100 border-t-primary-500" className="mb-4" />
                 <p className="text-gray-500 font-medium">{t('common.loading')}</p>
             </div>
         );

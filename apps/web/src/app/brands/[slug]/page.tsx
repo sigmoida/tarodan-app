@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Spinner } from '@tarodan/ui';
 import { api, listingsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import OptimizedImage from '@/components/OptimizedImage';
@@ -128,7 +129,7 @@ export default function BrandDetailPage() {
     if (brandQuery.isLoading) {
         return (
             <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center">
-                <div className="w-16 h-16 border-4 border-orange-100 border-t-orange-500 rounded-full animate-spin mb-6" />
+                <Spinner size="2xl" color="border-orange-100 border-t-orange-500" className="mb-6" />
                 <p className="text-gray-400 font-medium tracking-widest uppercase text-sm">{t('common.loading')}</p>
             </div>
         );

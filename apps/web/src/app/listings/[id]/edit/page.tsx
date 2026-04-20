@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 import { SimpleDropdown } from '@/components/SimpleDropdown';
+import { Toggle, Button, Spinner } from '@tarodan/ui';
 
 interface Category {
   id: string;
@@ -775,7 +776,7 @@ export default function EditListingPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-gray-600">Yükleniyor...</p>
         </div>
       </div>
@@ -822,14 +823,15 @@ export default function EditListingPage() {
                     className="w-28 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-gray-900"
                   />
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="md"
                   onClick={handleReactivate}
                   disabled={reactivating}
-                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors"
                 >
                   {reactivating ? 'İşleniyor...' : 'Yeniden Satışa Aç'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1040,17 +1042,11 @@ export default function EditListingPage() {
                 </p>
               </div>
               {limits?.canTrade ? (
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                  />
-                </button>
+                <Toggle
+                  checked={formData.isTradeEnabled}
+                  onChange={(val) => setFormData({ ...formData, isTradeEnabled: val })}
+                  size="md"
+                />
               ) : (
                 <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                   Premium'a Geç →
@@ -1116,12 +1112,11 @@ export default function EditListingPage() {
                 </p>
                 <input
                   type="number"
-                  value={formData.quantity || ''}
+                  value={formData.quantity === '' || formData.quantity === null || formData.quantity === undefined ? '' : formData.quantity}
                   onChange={(e) => {
                     const value = e.target.value;
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - value:', value, 'type:', typeof value);
-                    // Save as string, empty string means unlimited stock
-                    const newQuantity = value === '' ? '' : value;
+                    const newQuantity = value === '' ? '' : Number(value);
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - setting quantity to:', newQuantity);
                     setFormData({ ...formData, quantity: newQuantity });
                   }}
@@ -1345,20 +1340,24 @@ export default function EditListingPage() {
 
             {/* Submit */}
             <div className="flex gap-4 pt-4">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="lg"
+                className="flex-1"
                 onClick={() => router.back()}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-medium"
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                size="lg"
+                className="flex-1"
                 disabled={isLoading}
-                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
-              </button>
+              </Button>
             </div>
 
             {/* Status Actions */}
@@ -1366,32 +1365,38 @@ export default function EditListingPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">İlan Durumu</h3>
               <div className="flex flex-col sm:flex-row gap-3">
                 {formData.status === 'active' ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1"
                     onClick={handleDeactivate}
                     disabled={isLoading}
-                    className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                   >
                     🔒 İlanı Pasife Al
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="success"
+                    size="lg"
+                    className="flex-1"
                     onClick={handleActivate}
                     disabled={isLoading}
-                    className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                   >
                     ✅ İlanı Aktif Et
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="danger"
+                  size="lg"
+                  className="flex-1"
                   onClick={() => setShowDeleteModal(true)}
                   disabled={isLoading}
-                  className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                 >
                   🗑️ İlanı Sil
-                </button>
+                </Button>
               </div>
               <p className="text-sm text-gray-500 mt-2">
                 {formData.status === 'active'
@@ -1415,19 +1420,23 @@ export default function EditListingPage() {
                 Bu ilanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve ilan kalıcı olarak silinir.
               </p>
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1"
                   onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="flex-1"
                   onClick={handleDelete}
                   disabled={isLoading}
-                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 font-medium"
                 >
                   {isLoading ? 'Siliniyor...' : 'Evet, Sil'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>

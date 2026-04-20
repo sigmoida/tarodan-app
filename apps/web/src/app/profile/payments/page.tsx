@@ -9,14 +9,12 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { paymentsApi } from '@/lib/api';
 import {
-  CheckCircleIcon,
-  XCircleIcon,
-  ArrowPathIcon,
   CreditCardIcon,
   CalendarIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { StatusBadge, paymentStatusConfig, Spinner } from '@tarodan/ui';
 
 interface Payment {
   id: string;
@@ -56,38 +54,14 @@ interface PaymentListResponse {
   };
 }
 
-const getStatusConfig = (locale: string) => ({
-  pending: {
-    label: locale === 'en' ? 'Pending' : 'Bekliyor',
-    color: 'text-yellow-600',
-    bg: 'bg-yellow-100',
-    icon: ArrowPathIcon,
-  },
-  processing: {
-    label: locale === 'en' ? 'Processing' : 'İşleniyor',
-    color: 'text-blue-600',
-    bg: 'bg-blue-100',
-    icon: ArrowPathIcon,
-  },
-  completed: {
-    label: locale === 'en' ? 'Completed' : 'Tamamlandı',
-    color: 'text-green-600',
-    bg: 'bg-green-100',
-    icon: CheckCircleIcon,
-  },
-  failed: {
-    label: locale === 'en' ? 'Failed' : 'Başarısız',
-    color: 'text-red-600',
-    bg: 'bg-red-100',
-    icon: XCircleIcon,
-  },
-  refunded: {
-    label: locale === 'en' ? 'Refunded' : 'İade Edildi',
-    color: 'text-gray-600',
-    bg: 'bg-gray-100',
-    icon: XCircleIcon,
-  },
-});
+const paymentStatusEnLabels: Record<string, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  completed: 'Completed',
+  failed: 'Failed',
+  refunded: 'Refunded',
+  cancelled: 'Cancelled',
+};
 
 export default function PaymentHistoryPage() {
   const router = useRouter();
@@ -193,7 +167,7 @@ export default function PaymentHistoryPage() {
   if (!isAuthenticated || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -324,9 +298,7 @@ export default function PaymentHistoryPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {payments.map((payment) => {
-                      const statusConfig = getStatusConfig(locale);
-                      const statusInfo = statusConfig[payment.status as keyof typeof statusConfig] || statusConfig.pending;
-                      const StatusIcon = statusInfo.icon;
+                      const paymentStatusLabel = locale === 'en' ? (paymentStatusEnLabels[payment.status] || payment.status) : (paymentStatusConfig[payment.status]?.label || payment.status);
 
                       return (
                         <tr key={payment.id} className="hover:bg-gray-50">
@@ -373,12 +345,11 @@ export default function PaymentHistoryPage() {
                             <span className="text-sm text-gray-600 uppercase">{payment.provider}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color} ${statusInfo.bg}`}
-                            >
-                              <StatusIcon className="w-4 h-4" />
-                              {statusInfo.label}
-                            </span>
+                            <StatusBadge
+                              status={payment.status}
+                              config={paymentStatusConfig}
+                              label={paymentStatusLabel}
+                            />
                             {payment.failureReason && (
                               <p className="text-xs text-red-600 mt-1">{payment.failureReason}</p>
                             )}

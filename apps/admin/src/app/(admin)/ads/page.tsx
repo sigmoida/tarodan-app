@@ -20,6 +20,7 @@ import {
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 // IAB Standard Ad Sizes
 const IAB_SIZES = [
@@ -579,7 +580,7 @@ export default function AdsPage() {
                 >
                   {uploadingImage ? (
                     <div className="text-gray-500">
-                      <div className="animate-spin h-8 w-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-2" />
+                      <Spinner size="lg" className="mx-auto mb-2" />
                       Yükleniyor...
                     </div>
                   ) : imagePreview ? (

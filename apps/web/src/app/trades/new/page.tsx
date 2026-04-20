@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
 import { ArrowsRightLeftIcon, ArrowLeftIcon, PlusIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Spinner } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { listingsApi, userApi } from '@/lib/api';
@@ -472,7 +473,7 @@ export default function NewTradePage() {
           >
             {isSubmitting ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Spinner size="sm" color="border-white border-t-transparent" />
                 {t('common.sending')}
               </>
             ) : (

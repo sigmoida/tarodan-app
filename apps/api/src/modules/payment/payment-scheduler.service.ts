@@ -96,6 +96,9 @@ export class PaymentSchedulerService {
       if (result.count > 0) {
         this.logger.log(`Released ${result.count} payment hold(s)`);
       }
+      if (result.tradeCashReleased > 0) {
+        this.logger.log(`Released ${result.tradeCashReleased} trade cash payment(s)`);
+      }
     } catch (error: any) {
       this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
     }

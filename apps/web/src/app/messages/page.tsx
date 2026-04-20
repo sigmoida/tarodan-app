@@ -7,6 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
+import { Button, Spinner } from '@tarodan/ui';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
@@ -443,7 +444,7 @@ export default function MessagesPage() {
 
           {loading ? (
             <div className="flex-1 flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+              <Spinner size="lg" />
             </div>
           ) : threads.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-gray-500 p-6 text-center text-sm">
@@ -615,7 +616,7 @@ export default function MessagesPage() {
                                 },
                               }));
                             }}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-700"
                           >
                             ×
                           </button>
@@ -651,14 +652,16 @@ export default function MessagesPage() {
                         contentWarning ? 'border-amber-400 ring-1 ring-amber-200' : ''
                       }`}
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
+                      size="md"
+                      className="flex-shrink-0 rounded-xl shadow-sm"
                       onClick={sendMessage}
                       disabled={(!newMessage.trim() && !attachedUrls.length) || sending}
-                      className="flex-shrink-0 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
                     >
                       {sending ? '...' : t('common.send')}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-xs text-gray-300 mt-1.5">{newMessage.length}/{maxMessageLength}</p>
               </div>

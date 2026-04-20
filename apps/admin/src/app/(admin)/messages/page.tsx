@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import { CheckIcon, XMarkIcon, EyeIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -116,17 +118,10 @@ export default function MessagesPage() {
     }
   };
 
-  const getStatusBadge = (status: string, flaggedReason: string) => {
-    if (status === 'pending') {
-      return <span className="badge badge-warning">⏳ Onay Bekliyor</span>;
-    }
-    if (status === 'approved') {
-      return <span className="badge badge-success">✓ Onaylandı</span>;
-    }
-    if (status === 'rejected') {
-      return <span className="badge badge-danger">✗ Reddedildi</span>;
-    }
-    return null;
+  const messageStatusConfig: Record<string, StatusConfig> = {
+    pending: { label: 'Onay Bekliyor', variant: 'warning' },
+    approved: { label: 'Onaylandı', variant: 'success' },
+    rejected: { label: 'Reddedildi', variant: 'danger' },
   };
 
   return (
@@ -179,7 +174,7 @@ export default function MessagesPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                      <Spinner size="lg" className="mx-auto" />
                     </td>
                   </tr>
                 ) : messages.length === 0 ? (
@@ -217,7 +212,7 @@ export default function MessagesPage() {
                           <span className="text-gray-500">-</span>
                         )}
                       </td>
-                      <td>{getStatusBadge(message.status, message.flaggedReason)}</td>
+                      <td><StatusBadge status={message.status} config={messageStatusConfig} /></td>
                       <td className="text-sm text-gray-500">
                         {new Date(message.createdAt).toLocaleDateString('tr-TR')}
                       </td>

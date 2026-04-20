@@ -12,6 +12,7 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import { useTranslation } from '@/i18n/LanguageContext';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import UserAvatar from '@/components/UserAvatar';
+import { StatusBadge, orderStatusConfig, Button, Modal, Spinner } from '@tarodan/ui';
 
 interface OrderDetail {
   id: string;
@@ -92,17 +93,17 @@ interface OrderDetail {
   };
 }
 
-const getStatusLabels = (locale: string): Record<string, { label: string; color: string; bg: string }> => ({
-  pending_payment: { label: locale === 'en' ? 'Awaiting Payment' : 'Ödeme Bekleniyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  paid: { label: locale === 'en' ? 'Paid' : 'Ödendi', color: 'text-green-600', bg: 'bg-green-100' },
-  preparing: { label: locale === 'en' ? 'Preparing' : 'Hazırlanıyor', color: 'text-orange-600', bg: 'bg-orange-100' },
-  shipped: { label: locale === 'en' ? 'Shipped' : 'Kargoya Verildi', color: 'text-purple-600', bg: 'bg-purple-100' },
-  delivered: { label: locale === 'en' ? 'Delivered' : 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: locale === 'en' ? 'Completed' : 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: locale === 'en' ? 'Cancelled' : 'İptal Edildi', color: 'text-red-600', bg: 'bg-red-100' },
-  refund_requested: { label: locale === 'en' ? 'Refund Requested' : 'İade Talebi', color: 'text-orange-600', bg: 'bg-orange-100' },
-  refunded: { label: locale === 'en' ? 'Refunded' : 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
-});
+const orderStatusEnLabels: Record<string, string> = {
+  pending_payment: 'Awaiting Payment',
+  paid: 'Paid',
+  preparing: 'Preparing',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  refund_requested: 'Refund Requested',
+  refunded: 'Refunded',
+};
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -110,7 +111,7 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
-  const statusLabels = getStatusLabels(locale);
+  const getOrderStatusLabel = (s: string) => locale === 'en' ? (orderStatusEnLabels[s] || s) : (orderStatusConfig[s]?.label || s);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number | undefined>(undefined);
   const [processingRefund, setProcessingRefund] = useState(false);
@@ -378,6 +379,25 @@ export default function OrderDetailPage() {
       const res = await paymentsApi.initiate(order.id, 'paytr');
       const data = res.data?.data ?? res.data;
 
+      // Bypass mode: complete payment instantly without PayTR
+      if (data?.useBypass && data?.paymentId) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(data.paymentId);
+          if (bypassRes.data?.success) {
+            toast.success(locale === 'en' ? 'Payment successful' : 'Ödeme başarılı');
+            router.push(`/payment/success?paymentId=${data.paymentId}`);
+          } else {
+            toast.error(locale === 'en' ? 'Payment failed' : 'Ödeme başarısız');
+            router.push(`/payment/fail?paymentId=${data.paymentId}`);
+          }
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || (locale === 'en' ? 'Payment failed' : 'Ödeme başarısız'));
+        }
+        setPaymentLoading(false);
+        setAddressLoading(false);
+        return;
+      }
+
       // PayTR mode: redirect
       if (data?.paymentUrl) {
         // Save card before redirecting
@@ -484,7 +504,7 @@ export default function OrderDetailPage() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -514,7 +534,7 @@ export default function OrderDetailPage() {
     );
   }
 
-  const status = statusLabels[order.status] || { label: order.status, color: 'text-gray-600', bg: 'bg-gray-100' };
+  const statusLabel = getOrderStatusLabel(order.status);
   const orderAmount = Number(order.totalAmount) || Number(order.amount) || 0;
   const productInfo = order.product || order.items?.[0]?.product;
   const productImage = productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
@@ -539,9 +559,11 @@ export default function OrderDetailPage() {
               })}
             </p>
           </div>
-          <span className={`px-4 py-2 rounded-full font-medium ${status.color} ${status.bg}`}>
-            {status.label}
-          </span>
+          <StatusBadge
+            status={order.status}
+            config={orderStatusConfig}
+            label={statusLabel}
+          />
         </div>
 
         {/* İptal edilmiş teklif siparişi: alıcı ödemeyi tamamlamak için yeniden aktive edebilir */}
@@ -552,19 +574,21 @@ export default function OrderDetailPage() {
                 ? 'This order expired before payment. You can reactivate it to complete payment.'
                 : 'Bu sipariş ödeme yapılmadan süre aşımına uğradı. Ödemeyi tamamlamak için siparişi yeniden aktive edebilirsiniz.'}
             </p>
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="md"
+              className="flex-shrink-0 flex items-center justify-center gap-2"
               onClick={handleReactivate}
               disabled={reactivateLoading}
-              className="flex-shrink-0 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {reactivateLoading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Spinner size="sm" color="border-white border-t-transparent" />
               ) : (
                 <CreditCardIcon className="w-5 h-5" />
               )}
               {locale === 'en' ? 'Complete payment' : 'Ödemeyi tamamla'}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -628,7 +652,7 @@ export default function OrderDetailPage() {
                   {order.isBuyer && (
                     <Link
                       href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || '')}`}
-                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       <TruckIcon className="w-4 h-4" />
                       {t('order.trackOrder')}
@@ -661,12 +685,14 @@ export default function OrderDetailPage() {
             {order.isSeller && order.status === 'paid' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Seller Actions' : 'Satıcı İşlemleri'}</h2>
-                <button
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
                   onClick={() => handleUpdateStatus('preparing')}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                   {locale === 'en' ? 'Mark as Preparing' : 'Hazırlanıyor Olarak İşaretle'}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -676,12 +702,14 @@ export default function OrderDetailPage() {
                 <p className="text-gray-600 mb-4">
                   {locale === 'en' ? 'Please enter tracking number when shipped.' : 'Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir.'}
                 </p>
-                <button
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
                   onClick={() => toast(locale === 'en' ? 'Shipping info feature is under development...' : 'Kargo bilgisi girme özelliği geliştiriliyor...')}
-                  className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                   {locale === 'en' ? 'Enter Shipping Info' : 'Kargo Bilgisi Gir'}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -721,7 +749,7 @@ export default function OrderDetailPage() {
 
                     {!addressesFetched ? (
                       <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-                        <div className="w-4 h-4 border-2 border-gray-300 border-t-primary-500 rounded-full animate-spin" />
+                        <Spinner size="sm" color="border-gray-300 border-t-primary-500" />
                         {locale === 'en' ? 'Loading addresses...' : 'Adresler yükleniyor...'}
                       </div>
                     ) : !showNewAddressForm ? (
@@ -1025,7 +1053,10 @@ export default function OrderDetailPage() {
 
                   {/* Ödeme Yap - adres zorunlu (kayıtlıdan seç veya yeni adres doldur) */}
                   <div>
-                    <button
+                    <Button
+                      variant="success"
+                      size="lg"
+                      className="w-full flex items-center justify-center gap-2 text-base"
                       onClick={handleSetAddressAndPay}
                       disabled={
                         addressLoading ||
@@ -1033,13 +1064,12 @@ export default function OrderDetailPage() {
                         (!showNewAddressForm && !selectedAddressId) ||
                         (showNewAddressForm && (!newAddress.fullName || !newAddress.phone || !newAddress.city || !newAddress.district || !newAddress.address))
                       }
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
                     >
                       <ShieldCheckIcon className="w-5 h-5" />
                       {(addressLoading || paymentLoading)
                         ? (locale === 'en' ? 'Processing...' : 'İşleniyor...')
                         : `${locale === 'en' ? 'Pay' : 'Ödeme Yap'} – ${orderAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1049,12 +1079,14 @@ export default function OrderDetailPage() {
             {order.isBuyer && order.status === 'delivered' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">{locale === 'en' ? 'Delivery Confirmation' : 'Teslimat Onayı'}</h2>
-                <button
+                <Button
+                  variant="success"
+                  size="lg"
+                  className="w-full"
                   onClick={() => handleUpdateStatus('completed')}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                   {locale === 'en' ? 'Received - Complete Order' : 'Teslim Aldım - Siparişi Tamamla'}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -1065,13 +1097,15 @@ export default function OrderDetailPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   {locale === 'en' ? 'Share your experience about the product and seller.' : 'Ürün ve satıcı hakkında deneyiminizi paylaşın.'}
                 </p>
-                <button
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full flex items-center justify-center gap-2"
                   onClick={openReviewModal}
-                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <StarIcon className="w-5 h-5" />
                   {t('review.writeReview')}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -1082,13 +1116,16 @@ export default function OrderDetailPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   {locale === 'en' ? 'Payment completed. You can start a refund if needed.' : 'Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.'}
                 </p>
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="w-full flex items-center justify-center gap-2"
+                  disabled
                   onClick={handleRefund}
-                  className="w-full bg-gray-400 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-not-allowed"
                 >
                   <ArrowUturnLeftIcon className="w-5 h-5" />
                   {locale === 'en' ? 'Request Refund' : 'İade Talebi Oluştur'}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1180,13 +1217,14 @@ export default function OrderDetailPage() {
                         : 'Faturanız ödeme tamamlandıktan sonra e-posta adresinize gönderildi.'}
                     </p>
                     {order.isBuyer && (
-                      <button
+                      <Button
+                        variant="success"
+                        size="sm"
                         onClick={handleDownloadInvoice}
                         disabled={downloadingInvoice}
-                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                       >
                         {downloadingInvoice ? (locale === 'en' ? 'Downloading...' : 'İndiriliyor...') : t('order.downloadInvoice')}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -1215,10 +1253,7 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Review Modal */}
-        {showReviewModal && order && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">{t('review.reviewOrder')}</h2>
+        <Modal isOpen={showReviewModal && !!order} onClose={() => setShowReviewModal(false)} title={t('review.reviewOrder')} maxWidth="max-w-lg">
 
               {/* Product Section */}
               <div className="mb-6">
@@ -1409,23 +1444,25 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => setShowReviewModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
                   onClick={submitReview}
                   disabled={submittingReview}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
                   {submittingReview ? t('common.sending') : t('review.submit')}
-                </button>
+                </Button>
               </div>
-            </div>
-          </div>
-        )}
+        </Modal>
       </main>
     </div>
   );

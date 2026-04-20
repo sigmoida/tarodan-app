@@ -24,6 +24,7 @@ import {
   FireIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
+import { Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { messagesApi, api, wishlistApi, searchApi } from '@/lib/api';
@@ -614,7 +615,7 @@ export default function Navbar() {
                       <div className="max-h-[480px] overflow-y-auto">
                         {richAutoQuery.isLoading ? (
                           <div className="flex items-center justify-center py-8">
-                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-orange-500 border-t-transparent" />
+                            <Spinner size="md" color="border-orange-500 border-t-transparent" />
                           </div>
                         ) : (
                           <>

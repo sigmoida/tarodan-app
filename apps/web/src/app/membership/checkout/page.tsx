@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
@@ -266,7 +267,7 @@ export default function MembershipCheckoutPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -381,7 +382,7 @@ export default function MembershipCheckoutPage() {
               >
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                    <Spinner size="sm" color="border-white border-t-transparent" />
                     İşleniyor...
                   </>
                 ) : (

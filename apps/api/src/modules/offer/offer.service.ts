@@ -337,8 +337,27 @@ export class OfferService {
 
       this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`);
 
+      // Re-fetch offer with order relation so response includes orderId
+      const offerWithOrder = await tx.offer.findUnique({
+        where: { id: offerId },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            },
+          },
+          buyer: {
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+          },
+          seller: {
+            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+          },
+          order: { select: { id: true, status: true } },
+        },
+      });
+
       return {
-        offer: acceptedOffer,
+        offer: offerWithOrder!,
         order,
       };
     });
@@ -917,9 +936,9 @@ export class OfferService {
             {
               cardKey: firstImage.cardKey,
               detailKey: firstImage.detailKey,
-              cardUrl: this.storageService.getPublicAssetUrl(firstImage.cardKey),
+              cardUrl: this.storageService?.getPublicAssetUrl(firstImage.cardKey) ?? null,
               detailUrl: firstImage.detailKey
-                ? this.storageService.getPublicAssetUrl(firstImage.detailKey)
+                ? this.storageService?.getPublicAssetUrl(firstImage.detailKey) ?? null
                 : undefined,
               sortOrder: firstImage.sortOrder,
             },

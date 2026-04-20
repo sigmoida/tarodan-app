@@ -673,6 +673,97 @@ export class EventService {
   }
 
   /**
+   * Emit trade.ready-for-shipping event — sent to both parties when
+   * a safe-trade (escrow) cash payment is completed and the trade is
+   * ready to be shipped to the Tarodan warehouse.
+   */
+  async emitTradeReadyForShipping(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+    shippingDeadline: Date;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.ready-for-shipping for trade ${payload.tradeId}`);
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add('send-notification', {
+        userId,
+        title: 'Takas Kargoya Hazır',
+        body: 'Ödeme tamamlandı. Ürününüzü Tarodan deposuna göndermeniz gerekiyor.',
+        data: {
+          type: 'trade_ready_for_shipping',
+          tradeId: payload.tradeId,
+          shippingDeadline: payload.shippingDeadline.toISOString(),
+        },
+      }, { priority: 3 });
+    }
+  }
+
+  /**
+   * Emit trade.warehouse-approved event — admin approved the safe-trade at the
+   * warehouse and items are now being shipped to their new owners.
+   */
+  async emitTradeWarehouseApproved(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+    notes?: string;
+  }): Promise<void> {
+    this.logger.log(
+      `Emitting trade.warehouse-approved for trade ${payload.tradeId}`,
+    );
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId,
+          title: 'Takas Onaylandı',
+          body: 'Takas onaylandı, ürünler yolda.',
+          data: {
+            type: 'trade_warehouse_approved',
+            tradeId: payload.tradeId,
+            notes: payload.notes ?? null,
+          },
+        },
+        { priority: 3 },
+      );
+    }
+  }
+
+  /**
+   * Emit trade.warehouse-rejected event — admin rejected the safe-trade; each
+   * party's own items are being returned to them.
+   */
+  async emitTradeWarehouseRejected(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+    reason: string;
+  }): Promise<void> {
+    this.logger.log(
+      `Emitting trade.warehouse-rejected for trade ${payload.tradeId}`,
+    );
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId,
+          title: 'Takas Reddedildi',
+          body: `Takas reddedildi: ${payload.reason}`,
+          data: {
+            type: 'trade_warehouse_rejected',
+            tradeId: payload.tradeId,
+            reason: payload.reason,
+          },
+        },
+        { priority: 3 },
+      );
+    }
+  }
+
+  /**
    * Emit reservation.expired event — sent to buyer whose order timed out.
    */
   async emitReservationExpired(payload: {

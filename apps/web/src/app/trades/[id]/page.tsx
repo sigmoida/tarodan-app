@@ -12,7 +12,6 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   TruckIcon,
-  ExclamationTriangleIcon,
   ChatBubbleLeftRightIcon,
   PlusIcon,
   TrashIcon,
@@ -25,6 +24,7 @@ import { tradesApi, listingsApi, userApi, addressesApi, api, paymentsApi } from 
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { StatusBadge, tradeStatusConfig, Button, Modal, Spinner } from '@tarodan/ui';
 
 interface TradeItem {
   id: string;
@@ -35,6 +35,18 @@ interface TradeItem {
   side: string;
   quantity: number;
   valueAtTrade: number;
+}
+
+interface TradeShipment {
+  id: string;
+  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
+  senderUserId?: string | null;
+  recipientUserId?: string | null;
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  status?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
 }
 
 interface Trade {
@@ -64,6 +76,7 @@ interface Trade {
     trackingNumber: string;
     status: string;
   };
+  shipments?: TradeShipment[];
   cashPayment?: {
     id: string;
     payerId: string;
@@ -73,7 +86,9 @@ interface Trade {
     totalAmount: number;
     status: string;
     paidAt?: string;
+    refundedAt?: string;
   };
+  cashRefundedAt?: string;
   createdAt: string;
   acceptedAt?: string;
   completedAt?: string;
@@ -82,73 +97,64 @@ interface Trade {
   version?: number;
 }
 
-const getStatusConfig = (locale: string): Record<string, { label: string; color: string; icon: any; description: string }> => ({
-  pending: { 
-    label: locale === 'en' ? 'Pending' : 'Bekliyor', 
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-300', 
-    icon: ClockIcon,
-    description: locale === 'en' ? 'Offer is being evaluated by the recipient' : 'Teklif alıcı tarafından değerlendiriliyor'
-  },
-  accepted: { 
-    label: locale === 'en' ? 'Accepted' : 'Kabul Edildi', 
-    color: 'bg-orange-100 text-orange-700 border-orange-300', 
-    icon: CheckCircleIcon,
-    description: locale === 'en' ? 'Trade accepted, awaiting shipment' : 'Takas kabul edildi, gönderim bekleniyor'
-  },
-  rejected: { 
-    label: locale === 'en' ? 'Rejected' : 'Reddedildi', 
-    color: 'bg-red-100 text-red-700 border-red-300', 
-    icon: XCircleIcon,
-    description: locale === 'en' ? 'Offer rejected' : 'Teklif reddedildi'
-  },
-  initiator_shipped: { 
-    label: locale === 'en' ? 'Shipped' : 'Gönderildi', 
-    color: 'bg-purple-100 text-purple-700 border-purple-300', 
-    icon: TruckIcon,
-    description: locale === 'en' ? 'Initiator shipped their items' : 'Başlatıcı ürünlerini gönderdi'
-  },
-  receiver_shipped: { 
-    label: locale === 'en' ? 'Shipped' : 'Gönderildi', 
-    color: 'bg-purple-100 text-purple-700 border-purple-300', 
-    icon: TruckIcon,
-    description: locale === 'en' ? 'Receiver shipped their items' : 'Alıcı ürünlerini gönderdi'
-  },
-  both_shipped: { 
-    label: locale === 'en' ? 'Both Parties Shipped' : 'Her İki Taraf Gönderdi', 
-    color: 'bg-indigo-100 text-indigo-700 border-indigo-300', 
-    icon: TruckIcon,
-    description: locale === 'en' ? 'Both parties shipped their items' : 'Her iki taraf da ürünlerini gönderdi'
-  },
-  initiator_received: { 
-    label: locale === 'en' ? 'Received' : 'Teslim Alındı', 
-    color: 'bg-green-100 text-green-700 border-green-300', 
-    icon: CheckCircleIcon,
-    description: locale === 'en' ? 'Initiator received the items' : 'Başlatıcı ürünleri teslim aldı'
-  },
-  receiver_received: { 
-    label: locale === 'en' ? 'Received' : 'Teslim Alındı', 
-    color: 'bg-green-100 text-green-700 border-green-300', 
-    icon: CheckCircleIcon,
-    description: locale === 'en' ? 'Receiver received the items' : 'Alıcı ürünleri teslim aldı'
-  },
-  completed: { 
-    label: locale === 'en' ? 'Completed' : 'Tamamlandı', 
-    color: 'bg-green-100 text-green-700 border-green-300', 
-    icon: CheckCircleIcon,
-    description: locale === 'en' ? 'Trade successfully completed' : 'Takas başarıyla tamamlandı'
-  },
-  cancelled: { 
-    label: locale === 'en' ? 'Cancelled' : 'İptal Edildi', 
-    color: 'bg-gray-100 text-gray-700 border-gray-300', 
-    icon: XCircleIcon,
-    description: locale === 'en' ? 'Trade cancelled' : 'Takas iptal edildi'
-  },
-  disputed: { 
-    label: locale === 'en' ? 'Disputed' : 'İtiraz Açıldı', 
-    color: 'bg-orange-100 text-orange-700 border-orange-300', 
-    icon: ExclamationTriangleIcon,
-    description: locale === 'en' ? 'Dispute opened for trade' : 'Takas için itiraz açıldı'
-  },
+const tradeStatusEnLabels: Record<string, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+  awaiting_payment: 'Awaiting Payment',
+  shipping_to_warehouse: 'Shipping to Warehouse',
+  at_warehouse: 'At Tarodan Warehouse',
+  admin_reviewing: 'Under Review',
+  shipping_to_recipients: 'Shipping to Recipients',
+  returning: 'Returning',
+  initiator_shipped: 'Shipped',
+  receiver_shipped: 'Shipped',
+  both_shipped: 'Both Parties Shipped',
+  initiator_received: 'Received',
+  receiver_received: 'Received',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  disputed: 'Disputed',
+};
+
+const tradeStatusTrLabels: Record<string, string> = {
+  pending: 'Bekliyor',
+  accepted: 'Kabul Edildi',
+  rejected: 'Reddedildi',
+  awaiting_payment: 'Ödeme Bekleniyor',
+  shipping_to_warehouse: 'Depoya Gönderim',
+  at_warehouse: 'Tarodan Deposunda',
+  admin_reviewing: 'İnceleniyor',
+  shipping_to_recipients: 'Alıcılara Gönderim',
+  returning: 'İade Yolda',
+  initiator_shipped: 'Gönderildi',
+  receiver_shipped: 'Karşı Taraf Gönderdi',
+  both_shipped: 'İki Taraf Gönderdi',
+  initiator_received: 'Teslim Alındı',
+  receiver_received: 'Karşı Taraf Teslim Aldı',
+  completed: 'Tamamlandı',
+  cancelled: 'İptal Edildi',
+  disputed: 'İtiraz Açıldı',
+};
+
+const getTradeStatusMeta = (locale: string): Record<string, { description: string }> => ({
+  pending: { description: locale === 'en' ? 'Offer is being evaluated by the recipient' : 'Teklif alıcı tarafından değerlendiriliyor' },
+  accepted: { description: locale === 'en' ? 'Trade accepted, awaiting shipment' : 'Takas kabul edildi, gönderim bekleniyor' },
+  rejected: { description: locale === 'en' ? 'Offer rejected' : 'Teklif reddedildi' },
+  awaiting_payment: { description: locale === 'en' ? 'Cash payment required to proceed' : 'Devam etmek için nakit ödeme gerekli' },
+  shipping_to_warehouse: { description: locale === 'en' ? 'Both parties must ship their items to the Tarodan warehouse' : 'Her iki taraf ürünlerini Tarodan deposuna göndermelidir' },
+  at_warehouse: { description: locale === 'en' ? 'Your items are at the Tarodan warehouse and being reviewed' : 'Ürünleriniz Tarodan deposunda, inceleme başlatıldı' },
+  admin_reviewing: { description: locale === 'en' ? 'An admin is physically reviewing the items' : 'Admin ürünleri fiziksel olarak inceliyor' },
+  shipping_to_recipients: { description: locale === 'en' ? 'Admin approved — items are being shipped to the recipients' : 'Admin onayladı — ürünler alıcılara gönderiliyor' },
+  returning: { description: locale === 'en' ? 'Trade was rejected — items are being returned to their owners' : 'Takas reddedildi — ürünler sahiplerine iade ediliyor' },
+  initiator_shipped: { description: locale === 'en' ? 'Initiator shipped their items' : 'Başlatıcı ürünlerini gönderdi' },
+  receiver_shipped: { description: locale === 'en' ? 'Receiver shipped their items' : 'Alıcı ürünlerini gönderdi' },
+  both_shipped: { description: locale === 'en' ? 'Both parties shipped their items' : 'Her iki taraf da ürünlerini gönderdi' },
+  initiator_received: { description: locale === 'en' ? 'Initiator received the items' : 'Başlatıcı ürünleri teslim aldı' },
+  receiver_received: { description: locale === 'en' ? 'Receiver received the items' : 'Alıcı ürünleri teslim aldı' },
+  completed: { description: locale === 'en' ? 'Trade successfully completed' : 'Takas başarıyla tamamlandı' },
+  cancelled: { description: locale === 'en' ? 'Trade cancelled' : 'Takas iptal edildi' },
+  disputed: { description: locale === 'en' ? 'Dispute opened for trade' : 'Takas için itiraz açıldı' },
 });
 
 export default function TradeDetailPage() {
@@ -158,7 +164,10 @@ export default function TradeDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const tradeId = params.id as string;
-  const STATUS_CONFIG = getStatusConfig(locale);
+  const TRADE_STATUS_META = getTradeStatusMeta(locale);
+  const getTradeStatusLabel = (s: string) => locale === 'en'
+    ? (tradeStatusEnLabels[s] || s)
+    : (tradeStatusConfig[s]?.label || tradeStatusTrLabels[s] || s);
 
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
@@ -176,6 +185,7 @@ export default function TradeDetailPage() {
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
   const [shipAddressId, setShipAddressId] = useState('');
   const [shipCarrier, setShipCarrier] = useState('aras');
+  const [shipTrackingNumber, setShipTrackingNumber] = useState('');
 
   // Card states for inline cash payment checkout
   const [cardError, setCardError] = useState<string | null>(null);
@@ -258,6 +268,31 @@ export default function TradeDetailPage() {
     ((user.id === trade.initiatorId && !trade.initiatorShipment && (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
      (user.id === trade.receiverId && !trade.receiverShipment && (trade.status === 'accepted' || trade.status === 'initiator_shipped')));
 
+  // Shipments for the safe-trade (escrow) flow
+  const shipments: TradeShipment[] = trade?.shipments ?? [];
+  const myToWarehouseShipment = user
+    ? shipments.find(s => s.direction === 'to_warehouse' && s.senderUserId === user.id)
+    : undefined;
+  const otherToWarehouseShipment = user && trade
+    ? shipments.find(s => s.direction === 'to_warehouse' && s.senderUserId && s.senderUserId !== user.id)
+    : undefined;
+  const myFromWarehouseShipment = user
+    ? shipments.find(s => s.direction === 'from_warehouse' && s.recipientUserId === user.id)
+    : undefined;
+  const otherFromWarehouseShipment = user && trade
+    ? shipments.find(s => s.direction === 'from_warehouse' && s.recipientUserId && s.recipientUserId !== user.id)
+    : undefined;
+  const myReturnShipment = user
+    ? shipments.find(s => s.direction === 'return' && s.recipientUserId === user.id)
+    : undefined;
+
+  const needToShipToWarehouse =
+    !!trade &&
+    !!user &&
+    trade.status === 'shipping_to_warehouse' &&
+    (user.id === trade.initiatorId || user.id === trade.receiverId) &&
+    (!myToWarehouseShipment || !myToWarehouseShipment.shippedAt);
+
   const addressesQuery = useQuery({
     queryKey: ['addresses'],
     queryFn: async () => {
@@ -265,7 +300,7 @@ export default function TradeDetailPage() {
       const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
       return Array.isArray(list) ? list : [];
     },
-    enabled: !!needToShip,
+    enabled: !!needToShip || !!needToShipToWarehouse,
     meta: { page: 'trade-ship-addresses' },
   });
   const addresses = addressesQuery.data ?? [];
@@ -334,6 +369,46 @@ export default function TradeDetailPage() {
     }
   };
 
+  const handleShipToWarehouseSubmit = async () => {
+    if (!trade || !shipAddressId || !shipCarrier) {
+      toast.error(locale === 'en' ? 'Please select address and carrier' : 'Lütfen adres ve kargo firması seçin');
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      await tradesApi.shipToWarehouse(trade.id, {
+        fromAddressId: shipAddressId,
+        carrier: shipCarrier,
+        ...(shipTrackingNumber.trim() ? { trackingNumber: shipTrackingNumber.trim() } : {}),
+      });
+      toast.success(locale === 'en' ? 'Shipping info submitted' : 'Kargo bilgisi gönderildi');
+      setShipAddressId('');
+      setShipCarrier('aras');
+      setShipTrackingNumber('');
+      await invalidateTrade();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to submit shipping-to-warehouse:', error);
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to submit shipping' : 'Kargo bilgisi gönderilemedi'));
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleConfirmReceipt = async () => {
+    if (!trade) return;
+    setIsActionLoading(true);
+    try {
+      await tradesApi.confirmReceipt(trade.id);
+      toast.success(locale === 'en' ? 'Receipt confirmed' : 'Teslim alındı olarak işaretlendi');
+      await invalidateTrade();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to confirm receipt:', error);
+      toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to confirm receipt' : 'Teslim alındı işaretlenemedi'));
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Countdown timer effect
   useEffect(() => {
     if (!trade) return;
@@ -345,10 +420,13 @@ export default function TradeDetailPage() {
     if (trade.status === 'pending' && trade.responseDeadline) {
       deadline = trade.responseDeadline;
       deadlineLabel = locale === 'en' ? 'Response Time' : 'Yanıt Süresi';
-    } else if (trade.status === 'accepted' && trade.paymentDeadline) {
+    } else if ((trade.status === 'accepted' || trade.status === 'awaiting_payment') && trade.paymentDeadline) {
       deadline = trade.paymentDeadline;
       deadlineLabel = locale === 'en' ? 'Payment Time' : 'Ödeme Süresi';
-    } else if (['initiator_shipped', 'receiver_shipped', 'accepted'].includes(trade.status) && trade.shippingDeadline) {
+    } else if (
+      ['initiator_shipped', 'receiver_shipped', 'accepted', 'shipping_to_warehouse'].includes(trade.status) &&
+      trade.shippingDeadline
+    ) {
       deadline = trade.shippingDeadline;
       deadlineLabel = locale === 'en' ? 'Shipping Time' : 'Kargo Süresi';
     }
@@ -678,14 +756,16 @@ export default function TradeDetailPage() {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[trade.status] || STATUS_CONFIG.pending;
-  const StatusIcon = statusConfig.icon;
+  const statusMeta = TRADE_STATUS_META[trade.status] || TRADE_STATUS_META.pending;
   const isInitiator = user?.id === trade.initiatorId;
   const isReceiver = user?.id === trade.receiverId;
   const canAccept = isReceiver && trade.status === 'pending';
   const canReject = isReceiver && trade.status === 'pending';
-  const canCounter = isReceiver && trade.status === 'pending' && 
+  const canCounter = isReceiver && trade.status === 'pending' &&
     (!trade.responseDeadline || new Date(trade.responseDeadline) > new Date());
+  // Cancel is allowed only in early statuses; locked once items enter the warehouse flow
+  const cancellableStatuses = new Set(['pending', 'accepted', 'awaiting_payment', 'shipping_to_warehouse']);
+  const canCancel = !!user && (isInitiator || isReceiver) && cancellableStatuses.has(trade.status);
 
   const getItemImage = (item: TradeItem) => {
     const url = item.productImages?.[0]?.cardUrl ?? item.productImages?.[0]?.detailUrl ?? item.productImage;
@@ -731,7 +811,7 @@ export default function TradeDetailPage() {
 
           {isLoadingCounterData ? (
             <div className="text-center py-12">
-              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto mb-4" />
               <p className="text-gray-600">{locale === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}</p>
             </div>
           ) : (
@@ -932,20 +1012,24 @@ export default function TradeDetailPage() {
 
               {/* Actions */}
               <div className="flex gap-4">
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1"
                   onClick={handleExitCounterMode}
-                  className="flex-1 px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="flex-1 flex items-center justify-center gap-2"
                   onClick={handleCounterSubmit}
                   disabled={isActionLoading || selectedCounterProducts.length === 0 || selectedCounterTargetProducts.length === 0}
-                  className="flex-1 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isActionLoading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <Spinner size="sm" color="border-white border-t-transparent" />
                       {locale === 'en' ? 'Sending...' : 'Gönderiliyor...'}
                     </>
                   ) : (
@@ -954,7 +1038,7 @@ export default function TradeDetailPage() {
                       {locale === 'en' ? 'Send Counter Offer' : 'Karşı Teklif Gönder'}
                     </>
                   )}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -983,16 +1067,17 @@ export default function TradeDetailPage() {
                 )}
               </div>
             </div>
-            <div className={`px-4 py-2 rounded-lg border-2 flex items-center gap-2 ${statusConfig.color}`}>
-              <StatusIcon className="w-5 h-5" />
-              <span className="font-semibold">{statusConfig.label}</span>
-            </div>
+            <StatusBadge
+              status={trade.status}
+              config={tradeStatusConfig}
+              label={getTradeStatusLabel(trade.status)}
+            />
           </div>
         </div>
 
         {/* Status Description */}
         <div className="card p-4 mb-6 bg-orange-50 border-orange-200">
-          <p className="text-sm text-orange-800">{statusConfig.description}</p>
+          <p className="text-sm text-orange-800">{statusMeta.description}</p>
           {(trade.status === 'cancelled' || trade.status === 'rejected') && trade.cancelReason && (
             <p className="text-sm text-gray-600 mt-2">
               <span className="font-medium">{locale === 'en' ? 'Reason: ' : 'Sebep: '}</span>
@@ -1072,13 +1157,66 @@ export default function TradeDetailPage() {
         )}
 
         {/* Güvenli takas bilgisi - pending veya accepted durumunda */}
-        {(trade.status === 'pending' || trade.status === 'accepted') && (
+        {(trade.status === 'pending' || trade.status === 'accepted' || trade.status === 'awaiting_payment') && (
           <div className="card p-4 mb-6 bg-blue-50 border-blue-200">
             <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
               <CheckCircleIcon className="w-5 h-5 text-blue-600" />
               {t('trade.safeTradeTitle')}
             </h3>
             <p className="text-sm text-blue-800">{t('trade.safeTradeDesc')}</p>
+          </div>
+        )}
+
+        {/* Safe-trade (escrow) warehouse info banner */}
+        {(trade.status === 'at_warehouse' || trade.status === 'admin_reviewing') && (
+          <div className="card p-6 mb-6 bg-blue-50 border-2 border-blue-200">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
+                <ShieldCheckIcon className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-blue-900 mb-1">
+                  {locale === 'en' ? 'Your items are at the Tarodan warehouse' : 'Ürünleriniz Tarodan Deposunda'}
+                </h2>
+                <p className="text-sm text-blue-800">
+                  {locale === 'en'
+                    ? 'Our team is reviewing the items. You will be notified once the review is complete.'
+                    : 'Ekibimiz ürünleri inceliyor. İnceleme tamamlandığında bilgilendirileceksiniz.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Returning banner */}
+        {trade.status === 'returning' && (
+          <div className="card p-6 mb-6 bg-amber-50 border-2 border-amber-200">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center">
+                <XCircleIcon className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-amber-900 mb-1">
+                  {locale === 'en' ? 'Trade rejected by admin' : 'Takas reddedildi'}
+                </h2>
+                {trade.cancelReason && (
+                  <p className="text-sm text-amber-800 mb-2">
+                    <span className="font-medium">{locale === 'en' ? 'Reason: ' : 'Sebep: '}</span>
+                    {trade.cancelReason}
+                  </p>
+                )}
+                <p className="text-sm text-amber-800">
+                  {locale === 'en'
+                    ? 'Your items are being returned to you.'
+                    : 'Ürünleriniz size iade ediliyor.'}
+                </p>
+                {(trade.cashRefundedAt || trade.cashPayment?.refundedAt) && (
+                  <p className="text-sm text-green-700 mt-2 font-medium">
+                    {locale === 'en' ? 'Cash has been refunded' : 'Nakit iade edildi'}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1199,8 +1337,22 @@ export default function TradeDetailPage() {
               </div>
             </div>
 
+            {/* Inline info for the non-payer when awaiting payment */}
+            {trade.status === 'awaiting_payment' && user && trade.cashPayerId !== user.id && trade.cashPayment?.status !== 'completed' && (
+              <div className="pt-4 border-t border-green-200">
+                <div className="flex items-center gap-3 px-4 py-3 bg-white/70 rounded-lg">
+                  <ClockIcon className="w-5 h-5 text-green-700" />
+                  <p className="text-sm text-gray-700">
+                    {locale === 'en'
+                      ? 'Waiting for the other party to complete payment.'
+                      : 'Karşı tarafın ödemeyi tamamlaması bekleniyor.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Inline checkout for cash payer */}
-            {trade.status === 'accepted' && user && trade.cashPayerId === user.id && trade.cashPayment?.status !== 'completed' && (
+            {(trade.status === 'accepted' || trade.status === 'awaiting_payment') && user && trade.cashPayerId === user.id && trade.cashPayment?.status !== 'completed' && (
               <div className="pt-4 border-t border-green-200 space-y-5">
                 <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-3 rounded-lg -mx-1">
                   <h3 className="text-base font-semibold text-white flex items-center gap-2">
@@ -1380,16 +1532,18 @@ export default function TradeDetailPage() {
                 </div>
 
                 {/* Pay Button */}
-                <button
+                <Button
+                  variant="success"
+                  size="lg"
+                  className="w-full flex items-center justify-center gap-2 text-base"
                   onClick={handleCashPayment}
                   disabled={cashPaymentLoading}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
                 >
                   <ShieldCheckIcon className="w-5 h-5" />
                   {cashPaymentLoading
                     ? (locale === 'en' ? 'Processing...' : 'İşleniyor...')
                     : `${locale === 'en' ? 'Pay' : 'Ödeme Yap'} – ${(trade.cashPayment?.totalAmount ?? trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1446,14 +1600,16 @@ export default function TradeDetailPage() {
                   <option value="mng">MNG Kargo</option>
                 </select>
               </div>
-              <button
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full flex items-center justify-center gap-2"
                 onClick={handleShipSubmit}
                 disabled={isActionLoading || !shipAddressId || addresses.length === 0}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isActionLoading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <Spinner size="sm" color="border-white border-t-transparent" />
                     {locale === 'en' ? 'Submitting...' : 'Gönderiliyor...'}
                   </>
                 ) : (
@@ -1462,8 +1618,207 @@ export default function TradeDetailPage() {
                     {locale === 'en' ? 'Submit Shipping Info' : 'Kargo Bilgisini Gönder'}
                   </>
                 )}
-              </button>
+              </Button>
             </div>
+          </div>
+        )}
+
+        {/* Ship to warehouse form (safe-trade escrow flow) */}
+        {trade.status === 'shipping_to_warehouse' && user && (user.id === trade.initiatorId || user.id === trade.receiverId) && (
+          <div className="card p-6 mb-6 bg-purple-50 border-purple-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <TruckIcon className="w-5 h-5 text-purple-600" />
+              {locale === 'en' ? 'Ship to Tarodan Warehouse' : 'Tarodan Deposuna Gönder'}
+            </h2>
+
+            {/* Both parties shipment status */}
+            <div className="mb-4 p-3 bg-white/70 rounded-lg text-sm text-gray-700">
+              <p>
+                <span className="font-medium">{locale === 'en' ? 'You: ' : 'Siz: '}</span>
+                {myToWarehouseShipment?.shippedAt
+                  ? (locale === 'en' ? 'Shipped' : 'Gönderildi')
+                  : (locale === 'en' ? 'Pending' : 'Bekleniyor')}
+                {' · '}
+                <span className="font-medium">{locale === 'en' ? 'Other party: ' : 'Karşı taraf: '}</span>
+                {otherToWarehouseShipment?.shippedAt
+                  ? (locale === 'en' ? 'Shipped' : 'Gönderildi')
+                  : (locale === 'en' ? 'Pending' : 'Bekleniyor')}
+              </p>
+            </div>
+
+            {myToWarehouseShipment?.shippedAt ? (
+              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-purple-200">
+                <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                <div className="text-sm text-gray-700">
+                  <p className="font-medium">
+                    {locale === 'en'
+                      ? 'Shipping info submitted, awaiting arrival at the warehouse'
+                      : 'Kargo bilgileri gönderildi, depoya varışı bekleniyor'}
+                  </p>
+                  {(myToWarehouseShipment.carrier || myToWarehouseShipment.trackingNumber) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {myToWarehouseShipment.carrier}
+                      {myToWarehouseShipment.trackingNumber ? ` · ${myToWarehouseShipment.trackingNumber}` : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-600 text-sm mb-4">
+                  {locale === 'en'
+                    ? 'Select the address you will ship from and the carrier. Items will be reviewed at our warehouse.'
+                    : 'Gönderim yapacağınız adresi ve kargo firmasını seçin. Ürünler depomuzda incelenecek.'}
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'en' ? 'Shipping address' : 'Gönderim adresi'}
+                    </label>
+                    <select
+                      value={shipAddressId}
+                      onChange={(e) => setShipAddressId(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="">
+                        {addressesQuery.isLoading ? (locale === 'en' ? 'Loading...' : 'Yükleniyor...') : (locale === 'en' ? 'Select address' : 'Adres seçin')}
+                      </option>
+                      {addresses.map((addr: any) => (
+                        <option key={addr.id} value={addr.id}>
+                          {addr.fullName || addr.title} – {addr.city} / {addr.district} {addr.address ? `– ${addr.address}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {addresses.length === 0 && !addressesQuery.isLoading && (
+                      <p className="text-sm text-amber-600 mt-2">
+                        {locale === 'en' ? 'No saved addresses. Add one in ' : 'Kayıtlı adres yok. '}
+                        <Link href="/profile/addresses" className="underline font-medium">{locale === 'en' ? 'Profile → Addresses' : 'Profil → Adresler'}</Link>
+                        {locale === 'en' ? '' : ' bölümünden ekleyebilirsiniz.'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'en' ? 'Carrier' : 'Kargo firması'}
+                    </label>
+                    <select
+                      value={shipCarrier}
+                      onChange={(e) => setShipCarrier(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="aras">Aras Kargo</option>
+                      <option value="yurtici">Yurtiçi Kargo</option>
+                      <option value="mng">MNG Kargo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'en' ? 'Tracking number (optional)' : 'Takip numarası (opsiyonel)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={shipTrackingNumber}
+                      onChange={(e) => setShipTrackingNumber(e.target.value)}
+                      placeholder={locale === 'en' ? 'e.g. 1234567890' : 'örn. 1234567890'}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={handleShipToWarehouseSubmit}
+                    disabled={isActionLoading || !shipAddressId || addresses.length === 0}
+                  >
+                    {isActionLoading ? (
+                      <>
+                        <Spinner size="sm" color="border-white border-t-transparent" />
+                        {locale === 'en' ? 'Submitting...' : 'Gönderiliyor...'}
+                      </>
+                    ) : (
+                      <>
+                        <TruckIcon className="w-5 h-5" />
+                        {locale === 'en' ? 'Ship to Warehouse' : 'Depoya Gönder'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Shipping to recipients (admin approved; confirm-receipt) */}
+        {trade.status === 'shipping_to_recipients' && user && (user.id === trade.initiatorId || user.id === trade.receiverId) && (
+          <div className="card p-6 mb-6 bg-indigo-50 border-indigo-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <TruckIcon className="w-5 h-5 text-indigo-600" />
+              {locale === 'en' ? 'Your Shipment is on the Way' : 'Kargonuz Yolda'}
+            </h2>
+
+            {myFromWarehouseShipment ? (
+              <div className="p-4 bg-white rounded-lg border border-indigo-200 mb-4">
+                <p className="text-sm text-gray-600 mb-1">
+                  {locale === 'en' ? 'Shipped to you' : 'Size gönderilen kargo'}
+                </p>
+                <p className="font-medium text-gray-900">
+                  {myFromWarehouseShipment.carrier || '—'}
+                  {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 bg-white rounded-lg border border-indigo-200 mb-4">
+                <p className="text-sm text-gray-600">
+                  {locale === 'en' ? 'Tracking info will be available shortly.' : 'Takip bilgileri kısa süre içinde görünecek.'}
+                </p>
+              </div>
+            )}
+
+            {otherFromWarehouseShipment && (
+              <div className="p-3 bg-white/70 rounded-lg border border-indigo-100 mb-4 text-sm text-gray-600">
+                <p className="font-medium text-gray-700 mb-0.5">
+                  {locale === 'en' ? 'Other party\'s shipment' : 'Karşı tarafın kargosu'}
+                </p>
+                <p>
+                  {otherFromWarehouseShipment.carrier || '—'}
+                  {otherFromWarehouseShipment.trackingNumber ? ` · ${otherFromWarehouseShipment.trackingNumber}` : ''}
+                </p>
+              </div>
+            )}
+
+            <Button
+              variant="success"
+              size="lg"
+              className="w-full flex items-center justify-center gap-2"
+              onClick={handleConfirmReceipt}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? (
+                <>
+                  <Spinner size="sm" color="border-white border-t-transparent" />
+                  {locale === 'en' ? 'Processing...' : 'İşleniyor...'}
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-5 h-5" />
+                  {locale === 'en' ? 'I Received It' : 'Teslim Aldım'}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Return shipment info */}
+        {trade.status === 'returning' && myReturnShipment && (
+          <div className="card p-6 mb-6 bg-amber-50 border-amber-200">
+            <h3 className="font-semibold text-amber-900 mb-2 flex items-center gap-2">
+              <TruckIcon className="w-5 h-5" />
+              {locale === 'en' ? 'Return Shipment' : 'İade Kargosu'}
+            </h3>
+            <p className="text-sm text-gray-700">
+              {myReturnShipment.carrier || '—'}
+              {myReturnShipment.trackingNumber ? ` · ${myReturnShipment.trackingNumber}` : ''}
+            </p>
           </div>
         )}
 
@@ -1528,45 +1883,59 @@ export default function TradeDetailPage() {
         )}
 
         {/* Action Buttons */}
-        {(canAccept || canReject || canCounter) && (
+        {(canAccept || canReject || canCounter || canCancel) && (
           <div className="card p-6">
             <div className="flex flex-wrap gap-3">
               {canAccept && (
-                <button
+                <Button
+                  variant="success"
+                  size="lg"
+                  className="flex-1 min-w-[120px]"
                   onClick={handleAccept}
                   disabled={isActionLoading}
-                  className="btn-primary flex-1 min-w-[120px]"
                 >
                   {isActionLoading ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : (locale === 'en' ? 'Accept' : 'Kabul Et')}
-                </button>
+                </Button>
               )}
               {canCounter && (
-                <button
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="flex-1 min-w-[120px]"
                   onClick={handleOpenCounterModal}
                   disabled={isActionLoading}
-                  className="btn-primary flex-1 min-w-[120px] bg-orange-500 hover:bg-orange-600"
                 >
                   {locale === 'en' ? 'Counter Offer' : 'Karşı Teklif'}
-                </button>
+                </Button>
               )}
               {canReject && (
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1 min-w-[120px]"
                   onClick={() => setShowRejectModal(true)}
                   disabled={isActionLoading}
-                  className="btn-secondary flex-1 min-w-[120px]"
                 >
                   {locale === 'en' ? 'Reject' : 'Reddet'}
-                </button>
+                </Button>
+              )}
+              {canCancel && !canAccept && !canReject && (
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="flex-1 min-w-[120px]"
+                  onClick={handleCancel}
+                  disabled={isActionLoading}
+                >
+                  {locale === 'en' ? 'Cancel Trade' : 'İptal Et'}
+                </Button>
               )}
             </div>
           </div>
         )}
 
         {/* Reject Modal */}
-        {showRejectModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4">{locale === 'en' ? 'Reject Trade' : 'Takası Reddet'}</h2>
+        <Modal isOpen={showRejectModal} onClose={() => { setShowRejectModal(false); setRejectReason(''); }} title={locale === 'en' ? 'Reject Trade' : 'Takası Reddet'} maxWidth="max-w-md">
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
@@ -1575,26 +1944,28 @@ export default function TradeDetailPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
               />
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => {
                     setShowRejectModal(false);
                     setRejectReason('');
                   }}
-                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
+                  className="flex-1"
                   onClick={handleReject}
                   disabled={isActionLoading}
-                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   {isActionLoading ? (locale === 'en' ? 'Rejecting...' : 'Reddediliyor...') : (locale === 'en' ? 'Reject' : 'Reddet')}
-                </button>
+                </Button>
               </div>
-            </div>
-          </div>
-        )}
+        </Modal>
 
       </div>
     </div>

@@ -28,6 +28,7 @@ import {
   CurrencyDollarIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
+import { Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
@@ -283,7 +284,7 @@ export default function ProfilePage() {
         <div className="bg-orange-500 pt-8 pb-24">
           <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+              <Spinner size="xl" color="border-white border-t-transparent" />
             </div>
           </div>
         </div>
@@ -366,7 +367,7 @@ export default function ProfilePage() {
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+              <Spinner size="xl" color="border-white border-t-transparent" />
             </div>
           ) : profile && (
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">

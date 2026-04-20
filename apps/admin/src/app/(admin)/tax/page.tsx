@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button } from '@tarodan/ui';
 import {
   PlusIcon,
   PencilIcon,
@@ -940,13 +941,9 @@ export default function TaxSettingsPage() {
               <p className="text-gray-900 font-medium">Bu kaydı silmek istediğinize emin misiniz?</p>
               <div className="flex justify-end gap-2 mt-4">
                 <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary">Vazgeç</button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(deleteConfirm.type, deleteConfirm.id)}
-                  className="bg-red-600 hover:bg-red-500 text-gray-900 px-4 py-2 rounded-lg"
-                >
+                <Button variant="danger" size="md" type="button" onClick={() => handleDelete(deleteConfirm.type, deleteConfirm.id)}>
                   Sil
-                </button>
+                </Button>
               </div>
             </div>
           </div>

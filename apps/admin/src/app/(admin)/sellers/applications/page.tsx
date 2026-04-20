@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@tarodan/ui';
 import {
     CheckCircleIcon,
     XCircleIcon,
@@ -130,20 +131,14 @@ export default function SellerApplicationsPage() {
                                         <p className="text-gray-500">{selectedApplication.email}</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={() => openRejectModal(selectedApplication)}
-                                            className="px-4 py-2 border border-red-500/50 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors flex items-center"
-                                        >
+                                        <Button variant="outline" size="md" onClick={() => openRejectModal(selectedApplication)}>
                                             <XCircleIcon className="w-5 h-5 mr-2" />
                                             Reddet
-                                        </button>
-                                        <button
-                                            onClick={() => handleApprove(selectedApplication.id)}
-                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-gray-900 rounded-lg transition-colors flex items-center"
-                                        >
+                                        </Button>
+                                        <Button variant="success" size="md" onClick={() => handleApprove(selectedApplication.id)}>
                                             <CheckCircleIcon className="w-5 h-5 mr-2" />
                                             Onayla
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
 
@@ -244,9 +239,9 @@ export default function SellerApplicationsPage() {
                                         >
                                             İptal
                                         </button>
-                                        <button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-gray-900 rounded-lg transition-colors">
+                                        <Button variant="danger" size="md" type="submit">
                                             Reddet
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             </div>

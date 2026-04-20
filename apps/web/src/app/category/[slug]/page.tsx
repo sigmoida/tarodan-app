@@ -15,6 +15,7 @@ import {
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { Button, Spinner } from '@tarodan/ui';
 
 interface Product {
   id: string;
@@ -289,7 +290,7 @@ export default function CategoryPage() {
           <div className="flex-1">
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+                <Spinner size="xl" />
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-16">
@@ -400,23 +401,25 @@ export default function CategoryPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center gap-2 mt-8">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page === 1}
-                  className="px-4 py-2 bg-dark-800 text-white rounded-lg disabled:opacity-50"
                 >
                   Önceki
-                </button>
+                </Button>
                 <span className="px-4 py-2 text-gray-400">
                   Sayfa {page} / {totalPages}
                 </span>
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
-                  className="px-4 py-2 bg-dark-800 text-white rounded-lg disabled:opacity-50"
                 >
                   Sonraki
-                </button>
+                </Button>
               </div>
             )}
           </div>

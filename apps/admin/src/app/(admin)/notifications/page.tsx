@@ -9,6 +9,7 @@ import {
     XCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface NotificationLog {
     id: string;
@@ -390,7 +391,7 @@ export default function NotificationsPage() {
                                     {loadingScheduled ? (
                                         <tr>
                                             <td colSpan={6} className="text-center py-8">
-                                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                                                <Spinner size="lg" className="mx-auto" />
                                             </td>
                                         </tr>
                                     ) : scheduled.length === 0 ? (
@@ -467,7 +468,7 @@ export default function NotificationsPage() {
                                         {loadingHistory ? (
                                             <tr>
                                                 <td colSpan={5} className="text-center py-8">
-                                                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                                                    <Spinner size="lg" className="mx-auto" />
                                                 </td>
                                             </tr>
                                         ) : history.length === 0 ? (

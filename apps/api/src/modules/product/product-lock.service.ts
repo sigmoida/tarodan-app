@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   OfferStatus,
+  OrderStatus,
   ProductStatus,
   TradeStatus,
   Prisma,
@@ -25,6 +26,14 @@ export interface CancelledTradePayload {
   receiverId: string;
 }
 
+/** Bildirim için iptal edilen sipariş verisi */
+export interface CancelledOrderPayload {
+  orderId: string;
+  buyerId: string;
+  productId: string;
+  productTitle: string;
+}
+
 export interface InvalidateOffersResult {
   count: number;
   rejectedOffers: RejectedOfferPayload[];
@@ -33,6 +42,11 @@ export interface InvalidateOffersResult {
 export interface InvalidateTradesResult {
   count: number;
   cancelledTrades: CancelledTradePayload[];
+}
+
+export interface InvalidateOrdersResult {
+  count: number;
+  cancelledOrders: CancelledOrderPayload[];
 }
 
 /**
@@ -223,6 +237,91 @@ export class ProductLockService {
         tradeId: t.id,
         initiatorId: t.initiatorId,
         receiverId: t.receiverId,
+      })),
+    };
+  }
+
+  /**
+   * Cancel pending_payment orders for a product and release their reservations.
+   * Called when a trade acceptance depletes stock for other buyers.
+   *
+   * Safe-trade model: trade acceptance can claim the last unit; existing
+   * pending_payment orders for the same product must be cancelled because
+   * there's no stock left.
+   */
+  async invalidatePendingOrdersForProduct(
+    tx: PrismaTx,
+    productId: string,
+    cancelReason: string = 'Stok takas icin ayrildi',
+  ): Promise<InvalidateOrdersResult> {
+    const orders = await tx.order.findMany({
+      where: {
+        productId,
+        status: OrderStatus.pending_payment,
+      },
+      select: {
+        id: true,
+        buyerId: true,
+        productId: true,
+        product: { select: { title: true } },
+      },
+    });
+
+    if (orders.length === 0) {
+      return { count: 0, cancelledOrders: [] };
+    }
+
+    // Cancel the orders
+    await tx.order.updateMany({
+      where: { id: { in: orders.map((o) => o.id) } },
+      data: {
+        status: OrderStatus.cancelled,
+        cancelReason,
+      },
+    });
+
+    // Release reservations: decrement reservedQuantity by 1 per order
+    // (direct-buy orders reserve 1 unit each at createDirectOrder)
+    await tx.product.update({
+      where: { id: productId },
+      data: {
+        reservedQuantity: {
+          decrement: orders.length,
+        },
+      },
+    });
+
+    // Mark the offer (if any) as payment_expired / cancelled so the buyer knows
+    // Note: offers still remain valid for re-payment in some cases; here we
+    // cancel outright because stock is gone.
+    const offerIds = await tx.offer.findMany({
+      where: {
+        productId,
+        order: { id: { in: orders.map((o) => o.id) } },
+      },
+      select: { id: true },
+    });
+    if (offerIds.length > 0) {
+      await tx.offer.updateMany({
+        where: { id: { in: offerIds.map((o) => o.id) } },
+        data: {
+          status: OfferStatus.cancelled,
+          cancelReason,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Auto-cancelled ${orders.length} pending_payment order(s) for product ${productId}: ${cancelReason}`,
+    );
+
+    return {
+      count: orders.length,
+      cancelledOrders: orders.map((o) => ({
+        orderId: o.id,
+        buyerId: o.buyerId,
+        productId: o.productId,
+        productTitle: o.product.title,
       })),
     };
   }

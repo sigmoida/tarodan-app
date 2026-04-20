@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { discountsApi, userApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { StatusBadge, type StatusConfig, Button, Spinner } from '@tarodan/ui';
 
 interface Discount {
   id: string;
@@ -298,23 +299,26 @@ export default function ProfileDiscountsPage() {
     });
   };
 
-  const getStatusBadge = (discount: Discount) => {
-    if (!discount.isActive) {
-      return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Pasif</span>;
-    }
-    if (discount.isCurrentlyValid) {
-      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Aktif</span>;
-    }
+  const discountStatusConfig: Record<string, StatusConfig> = {
+    inactive: { label: 'Pasif', variant: 'secondary' },
+    active: { label: 'Aktif', variant: 'success' },
+    pending: { label: 'Bekliyor', variant: 'warning' },
+    expired: { label: 'Süresi Doldu', variant: 'danger' },
+    unknown: { label: 'Belirsiz', variant: 'secondary' },
+  };
+
+  const getDiscountStatus = (discount: Discount): string => {
+    if (!discount.isActive) return 'inactive';
+    if (discount.isCurrentlyValid) return 'active';
     const now = new Date();
-    const start = new Date(discount.startDate);
-    const end = new Date(discount.endDate);
-    if (now < start) {
-      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Bekliyor</span>;
-    }
-    if (now > end) {
-      return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">Süresi Doldu</span>;
-    }
-    return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Belirsiz</span>;
+    if (now < new Date(discount.startDate)) return 'pending';
+    if (now > new Date(discount.endDate)) return 'expired';
+    return 'unknown';
+  };
+
+  const getStatusBadge = (discount: Discount) => {
+    const status = getDiscountStatus(discount);
+    return <StatusBadge status={status} config={discountStatusConfig} size="sm" />;
   };
 
   const toggleProductSelection = (productId: string) => {
@@ -329,7 +333,7 @@ export default function ProfileDiscountsPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+        <Spinner size="xl" color="border-orange-500 border-t-transparent" />
       </div>
     );
   }
@@ -351,13 +355,15 @@ export default function ProfileDiscountsPage() {
                 </h1>
               </div>
             </div>
-            <button
+            <Button
+              variant="primary"
+              size="md"
+              className="flex items-center gap-2"
               onClick={openCreateModal}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
             >
               <PlusIcon className="w-5 h-5" />
               <span className="hidden sm:inline">Yeni İndirim</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -408,7 +414,7 @@ export default function ProfileDiscountsPage() {
         {/* Discount List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+            <Spinner size="xl" color="border-orange-500 border-t-transparent" />
           </div>
         ) : discounts.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
@@ -419,12 +425,13 @@ export default function ProfileDiscountsPage() {
             <p className="text-gray-500 mb-6">
               Müşterilerinize özel indirimler ve kampanyalar oluşturun
             </p>
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               onClick={openCreateModal}
-              className="px-6 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors"
             >
               İlk İndirimi Oluştur
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -773,19 +780,21 @@ export default function ProfileDiscountsPage() {
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="md"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  variant="primary"
+                  size="md"
                 >
                   {editingDiscount ? 'Güncelle' : 'Oluştur'}
-                </button>
+                </Button>
               </div>
             </form>
           </motion.div>
@@ -805,18 +814,20 @@ export default function ProfileDiscountsPage() {
               Bu indirimi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
                 onClick={() => handleDelete(deleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Sil
-              </button>
+              </Button>
             </div>
           </motion.div>
         </div>

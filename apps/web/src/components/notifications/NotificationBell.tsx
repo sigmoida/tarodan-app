@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
+import { Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
@@ -164,7 +165,7 @@ export default function NotificationBell() {
             <div className="max-h-80 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+                  <Spinner size="md" color="border-orange-500 border-t-transparent" />
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-8 px-4">

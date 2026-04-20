@@ -253,11 +253,13 @@ export class PaymentService {
         });
       }
 
+      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
       return {
         paymentId: existingPayment.id,
-        paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
+        paymentUrl: bypassEnabled ? undefined : `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
         provider: existingPayment.provider,
         expiresIn: 300,
+        ...(bypassEnabled ? { useBypass: true } : {}),
       };
     }
 
@@ -288,9 +290,21 @@ export class PaymentService {
       buyerId: order.buyerId,
     });
 
+    // PAYMENT_BYPASS: dev/test modunda PayTR'ye gitmeden ödemeyi tamamla
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (bypassEnabled) {
+      this.logger.warn(`PAYMENT_BYPASS active: payment ${payment.id} ready for bypass completion`);
+      return {
+        paymentId: payment.id,
+        orderId: order.id,
+        amount: Number(order.totalAmount),
+        provider: PaymentProvider.paytr,
+        expiresIn: 300,
+        useBypass: true,
+      };
+    }
+
     // Generate payment URL based on provider
-    let paymentUrl: string;
-    let paymentHtml: string | undefined;
     const clientIp = this.getClientIp(req);
 
     const result = await this.initializePayTRPayment(payment, order, clientIp);
@@ -301,6 +315,44 @@ export class PaymentService {
       provider: PaymentProvider.paytr,
       expiresIn: 300, // 5 minutes
     };
+  }
+
+  /**
+   * Bypass payment completion (dev/test only)
+   * Directly marks payment as successful without going through PayTR.
+   */
+  async bypassCompletePayment(paymentId: string): Promise<{ success: boolean }> {
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (!bypassEnabled) {
+      throw new BadRequestException('Payment bypass is not enabled');
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
+          },
+        },
+        tradeCashPayment: true,
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== PaymentStatus.pending) {
+      throw new BadRequestException(`Payment already ${payment.status}`);
+    }
+
+    const did = await this.processSuccessfulPayment(payment, `bypass:${paymentId}`);
+    this.logger.warn(`PAYMENT_BYPASS: payment ${paymentId} completed (did=${did})`);
+
+    return { success: did };
   }
 
   /**
@@ -1043,9 +1095,18 @@ export class PaymentService {
   /**
    * Handle successful trade cash payment separately from order payments.
    * Updates TradeCashPayment status to completed; does NOT touch orders/products.
+   *
+   * Safe-trade (escrow) flow: if the associated Trade is in `awaiting_payment`,
+   * transition it to `shipping_to_warehouse` and set the shipping deadline.
    */
   private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string): Promise<boolean> {
-    const didComplete = await this.prisma.$transaction(async (tx) => {
+    // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
+    const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'trade_shipping_deadline_days' },
+    });
+    const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7', 10) || 7;
+
+    const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.pending },
         data: {
@@ -1055,10 +1116,10 @@ export class PaymentService {
         },
       });
       if (claimed.count === 0) {
-        return false;
+        return { didComplete: false } as const;
       }
 
-      await tx.tradeCashPayment.update({
+      const tcp = await tx.tradeCashPayment.update({
         where: { id: payment.tradeCashPaymentId },
         data: {
           status: PaymentStatus.completed,
@@ -1066,13 +1127,61 @@ export class PaymentService {
           paidAt: new Date(),
         },
       });
-      return true;
+
+      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse
+      const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
+      let tradeTransitioned = false;
+      let shippingDeadline: Date | null = null;
+
+      if (trade && trade.status === TradeStatus.awaiting_payment) {
+        const now = new Date();
+        shippingDeadline = new Date(now);
+        shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+
+        await tx.trade.update({
+          where: { id: trade.id, version: trade.version },
+          data: {
+            status: TradeStatus.shipping_to_warehouse,
+            shippingDeadline,
+            version: { increment: 1 },
+          },
+        });
+        tradeTransitioned = true;
+      }
+
+      return {
+        didComplete: true,
+        tradeTransitioned,
+        trade,
+        shippingDeadline,
+      } as const;
     });
 
-    if (didComplete) {
-      this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+    if (!result.didComplete) {
+      return false;
     }
-    return didComplete;
+
+    this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+
+    // İşlem tamamlandıktan sonra bildirim emit et (her iki tarafa)
+    if (result.tradeTransitioned && result.trade && result.shippingDeadline) {
+      try {
+        await this.eventService.emitTradeReadyForShipping({
+          tradeId: result.trade.id,
+          initiatorId: result.trade.initiatorId,
+          receiverId: result.trade.receiverId,
+          shippingDeadline: result.shippingDeadline,
+        });
+        this.logger.log(
+          `trade.ready-for-shipping event emitted for trade ${result.trade.id}`,
+        );
+      } catch (error) {
+        // Log but don't fail - payment was already completed
+        this.logger.error(`Failed to emit trade.ready-for-shipping event: ${error}`);
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -1434,7 +1543,12 @@ export class PaymentService {
   }> {
     const payment = await this.prisma.payment.findFirst({
       where: {
-        tradeCashPayment: { tradeId },
+        tradeCashPayment: {
+          tradeId,
+          // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
+          releasedAt: null,
+          refundedAt: null,
+        },
         status: PaymentStatus.completed,
         provider: PaymentProvider.paytr,
       },
@@ -1443,6 +1557,19 @@ export class PaymentService {
 
     if (!payment) {
       return { refunded: false, skippedReason: 'no_completed_paytr_payment' };
+    }
+
+    // Defensive guard: eğer ilişkili tradeCashPayment bırakılmış veya iade edilmişse atla
+    if (
+      payment.tradeCashPayment?.releasedAt ||
+      payment.tradeCashPayment?.refundedAt
+    ) {
+      return {
+        refunded: false,
+        skippedReason: payment.tradeCashPayment.releasedAt
+          ? 'already_released'
+          : 'already_refunded',
+      };
     }
 
     const oid =
@@ -1522,10 +1649,14 @@ export class PaymentService {
 
   /**
    * Release all payment holds whose releaseAt date has passed (for cron).
-   * Returns the number of holds released.
+   * Also releases TradeCashPayment (safe-trade escrow) records whose
+   * holdReleaseAt has passed.
+   * Returns the number of order holds and trade cash payments released.
    */
-  async releaseHoldsDue(): Promise<{ count: number }> {
+  async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
+
+    // 1) Sipariş ödeme bekletmeleri (PaymentHold)
     const result = await this.prisma.paymentHold.updateMany({
       where: {
         status: PaymentHoldStatus.held,
@@ -1539,7 +1670,32 @@ export class PaymentService {
     if (result.count > 0) {
       this.logger.log(`Released ${result.count} payment hold(s) (releaseAt <= ${now.toISOString()})`);
     }
-    return { count: result.count };
+
+    // 2) Safe-trade nakit ödemeleri: holdReleaseAt süresi geçmiş olanları bırak
+    let tradeCashReleased = 0;
+    const dueTradeCash = await this.prisma.tradeCashPayment.findMany({
+      where: {
+        status: PaymentStatus.completed,
+        holdReleaseAt: { lte: now },
+        releasedAt: null,
+      },
+    });
+
+    for (const tcp of dueTradeCash) {
+      await this.prisma.tradeCashPayment.update({
+        where: { id: tcp.id },
+        data: { releasedAt: now },
+      });
+      tradeCashReleased++;
+    }
+
+    if (tradeCashReleased > 0) {
+      this.logger.log(
+        `Released ${tradeCashReleased} trade cash payment(s) (holdReleaseAt <= ${now.toISOString()})`,
+      );
+    }
+
+    return { count: result.count, tradeCashReleased };
   }
 
   /**

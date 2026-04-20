@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { adminApi } from '@/lib/api';
 import { MagnifyingGlassIcon, ArrowPathIcon, BanknotesIcon, EyeIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface Refund {
     id: string;
@@ -66,7 +67,7 @@ export default function RefundsPage() {
                             <thead><tr><th>ID</th><th>Tutar</th><th>Alıcı</th><th>Satıcı</th><th>Ürün</th><th>İade Tarihi</th><th>İşlemler</th></tr></thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={7} className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary-500 mx-auto"></div></td></tr>
+                                    <tr><td colSpan={7} className="text-center py-8"><Spinner size="lg" className="mx-auto" /></td></tr>
                                 ) : refunds.length === 0 ? (
                                     <tr><td colSpan={7} className="text-center py-8 text-gray-500">İade bulunamadı</td></tr>
                                 ) : refunds.map((r) => (

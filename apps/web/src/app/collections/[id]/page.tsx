@@ -17,6 +17,7 @@ import {
   HeartIcon as HeartIconSolid,
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { Button, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi, listingsApi, api } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
@@ -469,13 +470,15 @@ export default function CollectionDetailPage() {
                   >
                     {t('collection.edit')}
                   </Link>
-                  <button
+                  <Button
+                    variant="primary"
+                    size="md"
                     onClick={handleOpenAddModal}
-                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+                    className="flex items-center gap-1.5"
                   >
                     <PlusIcon className="w-4 h-4" />
                     {t('collection.addProduct')}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -487,9 +490,9 @@ export default function CollectionDetailPage() {
           <div className="text-center py-20 bg-white rounded border border-gray-200">
             <p className="text-gray-600 mb-4 text-base">{t('collection.noProductsYet')}</p>
             {isOwner && (
-              <button onClick={handleOpenAddModal} className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors">
+              <Button variant="primary" size="md" onClick={handleOpenAddModal}>
                 {t('collection.addProduct')}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -610,7 +613,7 @@ export default function CollectionDetailPage() {
               <>
                 {loadingProducts ? (
                   <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+                    <Spinner size="lg" color="border-orange-500 border-t-transparent" />
                   </div>
                 ) : myProducts.length === 0 ? (
                   <div className="text-center py-8">
@@ -674,23 +677,27 @@ export default function CollectionDetailPage() {
                     </div>
 
                     <div className="flex gap-3 pt-3 border-t border-gray-200">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
                         onClick={() => { setShowAddItemModal(false); setSelectedProductIds([]); }}
-                        className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                       >
                         {t('common.cancel')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
                         onClick={handleAddItemToCollection}
                         disabled={selectedProductIds.length === 0 || addingItem}
-                        className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {addingItem
                           ? `${t('common.adding')} (${selectedProductIds.length})`
                           : selectedProductIds.length > 0
                             ? `${selectedProductIds.length} ${t('collection.addProduct')}`
                             : t('common.add')}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
@@ -788,33 +795,39 @@ export default function CollectionDetailPage() {
                 </div>
 
                 <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
                     onClick={() => {
                       setShowAddItemModal(false);
                       setCustomTitle(''); setCustomDescription(''); setCustomBrand(''); setCustomModel(''); setCustomYear(''); setCustomScale(''); setCustomManufacturer(''); setCustomMaterial(''); setCustomImageFile(null); setCustomImagePreview(null);
                     }}
-                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                   >
                     {t('common.cancel')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="flex-1"
                     onClick={handleAddCustomItem}
                     disabled={!customTitle.trim() || addingItem}
-                    className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {addingItem ? t('common.adding') : t('common.add')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
 
             {activeTab === 'products' && (myProducts.length === 0 || loadingProducts) && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full mt-4"
                 onClick={() => { setShowAddItemModal(false); setSelectedProductIds([]); }}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors mt-4"
               >
                 {t('common.close')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

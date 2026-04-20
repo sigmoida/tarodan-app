@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, orderStatusConfig, Spinner } from '@tarodan/ui';
 import { MagnifyingGlassIcon, EyeIcon, PencilIcon, CheckIcon, XMarkIcon, UserIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -200,27 +201,6 @@ export default function OrdersPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending_payment: 'badge-warning',
-      paid: 'badge-info',
-      preparing: 'badge-info',
-      shipped: 'badge-info',
-      delivered: 'badge-success',
-      completed: 'badge-success',
-      cancelled: 'badge-danger',
-    };
-    const labels: Record<string, string> = {
-      pending_payment: 'Ödeme Bekliyor',
-      paid: 'Ödendi',
-      preparing: 'Hazırlanıyor',
-      shipped: 'Kargoda',
-      delivered: 'Teslim Edildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-    };
-    return <span className={`badge ${colors[status] || 'badge-info'}`}>{labels[status] || status}</span>;
-  };
 
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
@@ -335,7 +315,7 @@ export default function OrdersPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="text-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                      <Spinner size="lg" className="mx-auto" />
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
@@ -390,7 +370,7 @@ export default function OrdersPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            {getStatusBadge(order.status)}
+                            <StatusBadge status={order.status} config={orderStatusConfig} />
                           </div>
                         )}
                       </td>

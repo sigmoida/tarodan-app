@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
+import { Spinner } from '@tarodan/ui';
 
 // Turkish cities (major ones)
 const TURKISH_CITIES = [
@@ -89,7 +90,7 @@ export default function BusinessRegisterPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }

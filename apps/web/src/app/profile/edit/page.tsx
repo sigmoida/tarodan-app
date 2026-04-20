@@ -20,6 +20,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -223,7 +224,7 @@ export default function EditProfilePage() {
                 className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-orange-500 hover:bg-orange-50 rounded-xl shadow-lg flex items-center justify-center transition-all disabled:opacity-50"
               >
                 {uploadingPhoto ? (
-                  <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" color="border-orange-500 border-t-transparent" />
                 ) : (
                   <CameraIcon className="w-5 h-5" />
                 )}
@@ -461,7 +462,7 @@ export default function EditProfilePage() {
             >
               {loading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" color="border-white border-t-transparent" />
                   {locale === 'en' ? 'Saving...' : 'Kaydediliyor...'}
                 </>
               ) : saved ? (

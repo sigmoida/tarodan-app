@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
+import { Spinner } from '@tarodan/ui';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function RegisterPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="lg" />
       </div>
     );
   }

@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -242,7 +243,7 @@ export default function NotificationsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+            <Spinner size="xl" color="border-orange-500 border-t-transparent" className="mb-4" />
             <p className="text-gray-500">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
           </div>
         ) : filteredNotifications.length === 0 ? (

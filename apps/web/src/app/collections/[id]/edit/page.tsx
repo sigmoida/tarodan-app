@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Spinner } from '@tarodan/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -233,7 +234,7 @@ export default function EditCollectionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto mb-4" />
           <p className="text-gray-600">{t('collection.loading')}</p>
         </div>
       </div>
@@ -245,12 +246,13 @@ export default function EditCollectionPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error || t('collection.collectionNotFound')}</p>
-          <button
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => router.push('/collections')}
-            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm font-medium transition-colors"
           >
             {t('collection.backToCollections')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -386,31 +388,37 @@ export default function EditCollectionPage() {
             {/* Actions */}
             <div className="flex flex-col gap-4 pt-4 border-t border-gray-200">
               <div className="flex gap-4">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => router.back()}
-                  className="flex-1 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
                   disabled={isSaving || !name.trim()}
-                  className="flex-1 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? t('collection.saving') : t('collection.saveChanges')}
-                </button>
+                </Button>
               </div>
               
               {/* Delete Button */}
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="md"
+                className="flex items-center justify-center gap-2"
                 onClick={() => setShowDeleteModal(true)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors"
               >
                 <TrashIcon className="w-5 h-5" />
                 {t('collection.deleteCollection')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -427,22 +435,26 @@ export default function EditCollectionPage() {
               {t('collection.deleteCollectionConfirm')}
             </p>
             <div className="flex gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
+                className="flex-1"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('common.cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger"
+                size="md"
+                className="flex-1"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting ? t('collection.deleting') : t('collection.yesDelete')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

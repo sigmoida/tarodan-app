@@ -25,6 +25,7 @@ function getCacheHeaders() {
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  transpilePackages: ['@tarodan/ui'],
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
     if (!isServer) {

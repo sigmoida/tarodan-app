@@ -74,6 +74,9 @@ import {
   RatingQueryDto,
   UpdateRatingStatusDto,
   ReplyToRatingDto,
+  ApproveWarehouseTradeDto,
+  RejectWarehouseTradeDto,
+  MarkShipmentDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -935,6 +938,92 @@ export class AdminController {
     @Body() body: { resolution: string; note?: string },
   ) {
     return this.adminService.resolveTrade(adminId, id, body);
+  }
+
+  // -------- Safe-trade (warehouse escrow) admin actions --------
+
+  @Post('trades/:id/mark-warehouse-received')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Mark an incoming (to_warehouse) shipment as received at the Tarodan warehouse',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Shipment marked delivered; if both legs delivered, trade transitions to at_warehouse',
+  })
+  async markWarehouseReceived(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: MarkShipmentDto,
+  ) {
+    return this.adminService.markWarehouseReceived(adminId, id, body.shipmentId);
+  }
+
+  @Post('trades/:id/approve')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Approve a safe-trade after both items arrived; ship items to their new owners',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Trade approved; outbound shipments created and status set to shipping_to_recipients',
+  })
+  async approveWarehouseTrade(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: ApproveWarehouseTradeDto,
+  ) {
+    return this.adminService.approveWarehouseTrade(adminId, id, body);
+  }
+
+  @Post('trades/:id/reject')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Reject a safe-trade after admin review; return each item to its original owner',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Trade rejected; return shipments created and status set to returning',
+  })
+  async rejectWarehouseTrade(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: RejectWarehouseTradeDto,
+  ) {
+    return this.adminService.rejectWarehouseTrade(adminId, id, body);
+  }
+
+  @Post('trades/:id/mark-return-delivered')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Mark a return shipment as delivered to its original owner; cancel trade when both returns are complete',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Return shipment marked delivered; reservations released and trade cancelled when both complete',
+  })
+  async markReturnDelivered(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: MarkShipmentDto,
+  ) {
+    return this.adminService.markReturnDelivered(adminId, id, body.shipmentId);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================

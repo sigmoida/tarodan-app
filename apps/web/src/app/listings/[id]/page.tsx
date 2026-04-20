@@ -31,6 +31,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 import { listingsApi, wishlistApi, collectionsApi, offersApi, api } from '@/lib/api';
 import { formatCondition } from '@/lib/format';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
@@ -1848,7 +1849,7 @@ export default function ListingDetailPage() {
 
           {reviewsLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+              <Spinner size="lg" color="border-orange-500 border-t-transparent" />
             </div>
           ) : reviews.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded">
@@ -1955,7 +1956,7 @@ export default function ListingDetailPage() {
 
             {loadingCollections ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                <Spinner size="lg" color="border-orange-500 border-t-transparent" />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">

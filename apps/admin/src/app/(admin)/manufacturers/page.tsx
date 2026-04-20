@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import {
   PlusIcon,
   PencilIcon,
@@ -172,19 +173,16 @@ export default function ManufacturersPage() {
               Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz
             </p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600 transition-colors"
-          >
+          <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
             Yeni Üretici Ekle
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+              <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto" />
               <p className="mt-2 text-gray-500">Yükleniyor...</p>
             </div>
           ) : manufacturers.length === 0 ? (
@@ -361,12 +359,12 @@ export default function ManufacturersPage() {
                     </select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
-                    <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)}>
                       İptal
-                    </button>
-                    <button type="submit" className="px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600">
+                    </Button>
+                    <Button variant="primary" size="md" type="submit">
                       {editingManufacturer ? 'Güncelle' : 'Ekle'}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </div>
@@ -382,12 +380,12 @@ export default function ManufacturersPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Üreticiyi Sil</h3>
                 <p className="text-gray-600 mb-4">Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                  <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)}>
                     İptal
-                  </button>
-                  <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600">
+                  </Button>
+                  <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)}>
                     Sil
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

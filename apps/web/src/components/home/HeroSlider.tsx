@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useAuthStore } from '@/stores/authStore';
-import Button from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 
 const HERO_SLIDES = {
   tr: [
@@ -189,12 +189,12 @@ export default function HeroSlider() {
                   {slide.subtitle}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="primary" size="md" href={slide.cta1.href}>
+                  <ButtonLink variant="primary" size="md" href={slide.cta1.href}>
                     {slide.cta1.label}
-                  </Button>
-                  <Button variant="secondary" size="md" href={slide.cta2.href}>
+                  </ButtonLink>
+                  <ButtonLink variant="secondary" size="md" href={slide.cta2.href}>
                     {slide.cta2.label}
-                  </Button>
+                  </ButtonLink>
                 </div>
               </motion.div>
             ) : (
@@ -263,12 +263,12 @@ export default function HeroSlider() {
                   {slide.subtitle}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="primary" size="md" href={slide.cta1.href}>
+                  <ButtonLink variant="primary" size="md" href={slide.cta1.href}>
                     {slide.cta1.label}
-                  </Button>
-                  <Button variant="secondary" size="md" href={slide.cta2.href}>
+                  </ButtonLink>
+                  <ButtonLink variant="secondary" size="md" href={slide.cta2.href}>
                     {slide.cta2.label}
-                  </Button>
+                  </ButtonLink>
                 </div>
               </motion.div>
             )}

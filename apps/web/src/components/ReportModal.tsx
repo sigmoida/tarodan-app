@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, FlagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { Button } from '@tarodan/ui';
 
 export type ReportEntityType = 'product' | 'user' | 'collection' | 'message';
 
@@ -199,20 +200,24 @@ export default function ReportModal({
 
               {/* Actions - Compact */}
               <div className="flex gap-2 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1"
                   onClick={onClose}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
                   {locale === 'en' ? 'Cancel' : 'İptal'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="danger"
+                  size="sm"
+                  className="flex-1"
                   disabled={isSubmitting || !selectedReason}
-                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmitting ? '...' : (locale === 'en' ? 'Report' : 'Raporu Gönder')}
-                </button>
+                </Button>
               </div>
 
               {/* Info - Compact */}

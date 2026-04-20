@@ -5,6 +5,7 @@ const path = require('path');
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  transpilePackages: ['@tarodan/ui'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },

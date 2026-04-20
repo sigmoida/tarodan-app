@@ -1,5 +1,5 @@
 import { ShoppingBagIcon } from '@heroicons/react/24/outline';
-import Button from './Button';
+import { ButtonLink } from './ButtonLink';
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -27,9 +27,9 @@ export default function EmptyState({
       )}
       {actionLabel && actionHref && (
         <div className="mt-4">
-          <Button variant="secondary" size="sm" href={actionHref}>
+          <ButtonLink variant="secondary" size="sm" href={actionHref}>
             {actionLabel}
-          </Button>
+          </ButtonLink>
         </div>
       )}
     </div>

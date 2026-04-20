@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
     TruckIcon,
     BuildingOfficeIcon,
@@ -286,19 +288,11 @@ export default function ShippingPage() {
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        switch (status?.toLowerCase()) {
-            case 'pending':
-                return <span className="badge badge-warning">Bekliyor</span>;
-            case 'label_generated':
-                return <span className="badge badge-info">Etiket Hazır</span>;
-            case 'shipped':
-                return <span className="badge badge-success">Kargolandı</span>;
-            case 'delivered':
-                return <span className="badge badge-success">Teslim Edildi</span>;
-            default:
-                return <span className="badge badge-gray">{status}</span>;
-        }
+    const shippingStatusConfig: Record<string, StatusConfig> = {
+        pending: { label: 'Bekliyor', variant: 'warning' },
+        label_generated: { label: 'Etiket Hazır', variant: 'info' },
+        shipped: { label: 'Kargolandı', variant: 'success' },
+        delivered: { label: 'Teslim Edildi', variant: 'success' },
     };
 
     // Render form fields based on active tab
@@ -582,7 +576,7 @@ export default function ShippingPage() {
         if (loading) {
             return (
                 <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                    <Spinner size="lg" className="mx-auto" />
                 </div>
             );
         }
@@ -831,7 +825,7 @@ export default function ShippingPage() {
                                             <td className="text-gray-900">{item.order?.buyer?.displayName || '-'}</td>
                                             <td className="text-gray-500">{item.carrier?.name || '-'}</td>
                                             <td><code className="text-xs text-gray-500">{item.trackingNumber || '-'}</code></td>
-                                            <td>{getStatusBadge(item.status)}</td>
+                                            <td><StatusBadge status={(item.status || '').toLowerCase()} config={shippingStatusConfig} /></td>
                                             <td>
                                                 {item.labelUrl ? (
                                                     <a href={item.labelUrl} target="_blank" rel="noreferrer" className="p-2 text-blue-700 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg inline-flex">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -150,20 +151,17 @@ export default function CategoriesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Kategoriler</h1>
             <p className="text-gray-500 mt-1">Kategori listesi ve yönetimi</p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-          >
+          <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
             Yeni Kategori
-          </button>
+          </Button>
         </div>
 
         {/* Categories List */}
         <div className="admin-card overflow-hidden">
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+              <Spinner size="lg" className="mx-auto" />
               <p className="text-gray-500 mt-4">Yükleniyor...</p>
             </div>
           ) : categories.length === 0 ? (
@@ -226,19 +224,12 @@ export default function CategoriesPage() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                >
+                <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">
                   İptal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                >
+                </Button>
+                <Button variant="primary" size="md" type="submit" className="flex-1">
                   {editingCategory ? 'Güncelle' : 'Oluştur'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -254,18 +245,12 @@ export default function CategoriesPage() {
               Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-              >
+              <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">
                 İptal
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors"
-              >
+              </Button>
+              <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">
                 Sil
-              </button>
+              </Button>
             </div>
           </div>
         </div>

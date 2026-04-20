@@ -13,6 +13,7 @@ import {
   CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { paymentsApi, api } from '@/lib/api';
+import { Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -173,7 +174,7 @@ export default function PaymentSuccessPage() {
   if (!clientReady) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500" />
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -187,7 +188,7 @@ export default function PaymentSuccessPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }

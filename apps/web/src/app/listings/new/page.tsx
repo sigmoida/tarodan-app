@@ -10,6 +10,7 @@ import { listingsApi, api, mediaApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { SimpleDropdown } from '@/components/SimpleDropdown';
+import { Toggle, Button, Spinner } from '@tarodan/ui';
 
 interface Category {
   id: string;
@@ -110,9 +111,9 @@ export default function NewListingPage() {
             ...prev,
             ...parsed,
             images: Array.isArray(images) ? images : [],
-            // Ensure quantity is properly handled (empty string for unlimited, number as string)
+            // Ensure quantity is properly handled (empty string for unlimited, number for stock)
             quantity: parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
-              ? parsed.quantity.toString()
+              ? Number(parsed.quantity)
               : '',
           }));
           
@@ -491,7 +492,9 @@ export default function NewListingPage() {
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: false,
         isSet: formData.isSet,
-        quantity: formData.quantity ? Number(formData.quantity) : undefined, // undefined = unlimited stock
+        quantity: formData.quantity !== '' && formData.quantity !== null && formData.quantity !== undefined
+          ? Number(formData.quantity)
+          : undefined, // undefined = unlimited stock
         images: formData.images.length > 0 ? formData.images : undefined,
       };
 
@@ -522,7 +525,7 @@ export default function NewListingPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -793,17 +796,11 @@ export default function NewListingPage() {
                 </p>
               </div>
               {limits?.canTrade ? (
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                  />
-                </button>
+                <Toggle
+                  checked={formData.isTradeEnabled}
+                  onChange={(val) => setFormData({ ...formData, isTradeEnabled: val })}
+                  size="md"
+                />
               ) : (
                 <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                   Premium'a Geç →
@@ -855,10 +852,10 @@ export default function NewListingPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.quantity || ''}
+                    value={formData.quantity === '' || formData.quantity === null || formData.quantity === undefined ? '' : formData.quantity}
                     onChange={(e) => {
                       const value = e.target.value;
-                      setFormData({ ...formData, quantity: value === '' ? '' : value });
+                      setFormData({ ...formData, quantity: value === '' ? '' : Number(value) });
                     }}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-400 bg-white"
                     placeholder={locale === 'en' ? 'Unlimited' : 'Sınırsız'}
@@ -945,20 +942,24 @@ export default function NewListingPage() {
 
             {/* Submit */}
             <div className="flex gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
+                className="flex-1"
                 onClick={() => router.back()}
-                className="flex-1 px-6 py-2.5 border border-gray-200 rounded hover:bg-gray-50 text-gray-700 font-medium text-sm"
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                size="md"
+                className="flex-1"
                 disabled={isLoading}
-                className="flex-1 px-6 py-2.5 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
               >
                 {isLoading ? (locale === 'en' ? 'Creating...' : 'Oluşturuluyor...') : (locale === 'en' ? 'Create Listing' : 'İlanı Oluştur')}
-              </button>
+              </Button>
             </div>
           </form>
         </motion.div>

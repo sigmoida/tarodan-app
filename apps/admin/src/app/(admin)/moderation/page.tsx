@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { toast } from 'react-hot-toast';
+import { StatusBadge, Button, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -175,17 +177,11 @@ const ModerationPage = () => {
     }
   };
 
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'product':
-        return 'bg-blue-500/20 text-blue-700';
-      case 'message':
-        return 'bg-purple-500/20 text-purple-700';
-      case 'review':
-        return 'bg-yellow-500/20 text-yellow-700';
-      default:
-        return 'bg-gray-500/20 text-gray-500';
-    }
+  const moderationTypeConfig: Record<string, StatusConfig> = {
+    product: { label: 'Ürün', variant: 'info' },
+    message: { label: 'Mesaj', variant: 'primary' },
+    review: { label: 'Değerlendirme', variant: 'warning' },
+    other: { label: 'Diğer', variant: 'secondary' },
   };
 
   const formatDate = (dateString: string) => {
@@ -295,7 +291,7 @@ const ModerationPage = () => {
           {/* Content */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+              <Spinner size="xl" />
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -332,13 +328,7 @@ const ModerationPage = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getTypeBadgeColor(item.type)}`}>
-                        {getTypeIcon(item.type)}
-                        <span className="ml-1">
-                          {item.type === 'product' ? 'Ürün' : 
-                           item.type === 'message' ? 'Mesaj' : 'Değerlendirme'}
-                        </span>
-                      </span>
+                      <StatusBadge status={item.type} config={moderationTypeConfig} />
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-700' :
                         item.status === 'reported' ? 'bg-red-500/20 text-red-600' : 
@@ -380,20 +370,14 @@ const ModerationPage = () => {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleApprove(item)}
-                      className="flex items-center px-3 py-2 bg-green-500 text-gray-900 rounded-lg hover:bg-green-600 transition-colors text-sm"
-                    >
+                    <Button variant="success" size="sm" onClick={() => handleApprove(item)}>
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Onayla
-                    </button>
-                    <button
-                      onClick={() => handleRejectClick(item)}
-                      className="flex items-center px-3 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600 transition-colors text-sm"
-                    >
+                    </Button>
+                    <Button variant="danger" size="sm" onClick={() => handleRejectClick(item)}>
                       <XCircleIcon className="h-4 w-4 mr-1" />
                       Reddet
-                    </button>
+                    </Button>
                     <button
                       onClick={() => handleFlagClick(item)}
                       className="flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-sm"
@@ -471,19 +455,12 @@ const ModerationPage = () => {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setRejectModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-              >
+              <Button variant="secondary" size="md" onClick={() => setRejectModalOpen(false)}>
                 İptal
-              </button>
-              <button
-                onClick={handleRejectConfirm}
-                disabled={!rejectReason}
-                className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
+              </Button>
+              <Button variant="danger" size="md" onClick={handleRejectConfirm} disabled={!rejectReason}>
                 Reddet
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -523,19 +500,12 @@ const ModerationPage = () => {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setFlagModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-              >
+              <Button variant="secondary" size="md" onClick={() => setFlagModalOpen(false)}>
                 İptal
-              </button>
-              <button
-                onClick={handleFlagConfirm}
-                disabled={!flagReason}
-                className="px-4 py-2 bg-primary-500 text-gray-900 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
+              </Button>
+              <Button variant="primary" size="md" onClick={handleFlagConfirm} disabled={!flagReason}>
                 İşaretle
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import {
     PlusIcon,
     PencilIcon,
@@ -153,13 +154,10 @@ export default function CollectionsPage() {
                         <h1 className="text-2xl font-bold text-gray-900">Koleksiyonlar</h1>
                         <p className="text-gray-500 mt-1">Koleksiyon yönetimi</p>
                     </div>
-                    <button
-                        onClick={openCreateModal}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                    >
+                    <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
                         Yeni Koleksiyon
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Search */}
@@ -177,7 +175,7 @@ export default function CollectionsPage() {
                 <div className="admin-card overflow-hidden">
                     {loading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                            <Spinner size="lg" className="mx-auto" />
                             <p className="text-gray-500 mt-4">Yükleniyor...</p>
                         </div>
                     ) : collections.length === 0 ? (
@@ -358,19 +356,12 @@ export default function CollectionsPage() {
                                 </label>
                             </div>
                             <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
-                                >
+                                <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">
                                     İptal
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"
-                                >
+                                </Button>
+                                <Button variant="primary" size="md" type="submit" className="flex-1">
                                     {editingCollection ? 'Güncelle' : 'Oluştur'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </div>
@@ -386,18 +377,12 @@ export default function CollectionsPage() {
                             Bu koleksiyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
-                            >
+                            <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">
                                 İptal
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteConfirm)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700"
-                            >
+                            </Button>
+                            <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">
                                 Sil
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

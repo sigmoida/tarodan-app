@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { formatTradeStatus } from '@/lib/format';
+import { StatusBadge, tradeStatusConfig } from '@tarodan/ui';
 
 interface TradeItem {
   id: string;
@@ -45,18 +46,18 @@ export default function TradesPage() {
   const { t, locale } = useTranslation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
-  const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-    pending: { label: t('trade.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
-    accepted: { label: t('trade.statusAccepted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-    rejected: { label: t('trade.statusRejected'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
-    initiator_shipped: { label: locale === 'en' ? 'Initiator Shipped' : 'Gönderen Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    receiver_shipped: { label: locale === 'en' ? 'Receiver Shipped' : 'Alıcı Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    both_shipped: { label: locale === 'en' ? 'Both Shipped' : 'Her İkisi Kargoda', color: 'bg-indigo-100 text-indigo-800', icon: TruckIcon },
-    initiator_received: { label: locale === 'en' ? 'Initiator Received' : 'Gönderen Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
-    receiver_received: { label: locale === 'en' ? 'Receiver Received' : 'Alıcı Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
-    completed: { label: t('trade.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-    cancelled: { label: t('trade.statusCancelled'), color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
-    disputed: { label: locale === 'en' ? 'Disputed' : 'Anlaşmazlık', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+  const tradeStatusLabels: Record<string, string> = {
+    pending: t('trade.statusPending'),
+    accepted: t('trade.statusAccepted'),
+    rejected: t('trade.statusRejected'),
+    initiator_shipped: locale === 'en' ? 'Initiator Shipped' : 'Gönderen Kargoda',
+    receiver_shipped: locale === 'en' ? 'Receiver Shipped' : 'Alıcı Kargoda',
+    both_shipped: locale === 'en' ? 'Both Shipped' : 'Her İkisi Kargoda',
+    initiator_received: locale === 'en' ? 'Initiator Received' : 'Gönderen Teslim Aldı',
+    receiver_received: locale === 'en' ? 'Receiver Received' : 'Alıcı Teslim Aldı',
+    completed: t('trade.statusCompleted'),
+    cancelled: t('trade.statusCancelled'),
+    disputed: locale === 'en' ? 'Disputed' : 'Anlaşmazlık',
   };
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
@@ -91,17 +92,12 @@ export default function TradesPage() {
   const isLoading = tradesQuery.isLoading;
 
   const getStatusBadge = (status: string) => {
-    const config = statusConfig[status] || {
-      label: formatTradeStatus(status, locale),
-      color: 'bg-gray-100 text-gray-800',
-      icon: ClockIcon
-    };
-    const Icon = config.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-sm text-sm font-medium ${config.color}`}>
-        <Icon className="w-4 h-4" />
-        {config.label}
-      </span>
+      <StatusBadge
+        status={status}
+        config={tradeStatusConfig}
+        label={tradeStatusLabels[status] || formatTradeStatus(status, locale)}
+      />
     );
   };
 

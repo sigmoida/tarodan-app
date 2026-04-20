@@ -25,7 +25,7 @@ import HeroSlider from '@/components/home/HeroSlider';
 import TrustBadges from '@/components/home/TrustBadges';
 import UserAvatar from '@/components/UserAvatar';
 
-import { SectionHeader, SkeletonCard, EmptyState, ProductCard, Badge } from '@/components/ui';
+import { SectionHeader, SkeletonCard, EmptyState, ProductCard, ProductBadge } from '@/components/ui';
 
 const AuthRequiredModal = dynamic(
   withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
@@ -400,7 +400,7 @@ export default function Home() {
               viewAllHref="/listings?discountOnly=true"
               viewAllLabel={viewAllLabel}
               icon={<TagIcon className="w-5 h-5 text-primary-500" />}
-              badge={<Badge variant="sale">{locale === 'en' ? 'Deals' : 'Fırsat'}</Badge>}
+              badge={<ProductBadge variant="sale">{locale === 'en' ? 'Deals' : 'Fırsat'}</ProductBadge>}
             />
             <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
               {isLoadingDiscounted ? (
@@ -680,7 +680,7 @@ export default function Home() {
                     <h2 className="text-xl font-extrabold text-heading tracking-tight flex items-center gap-2">
                       <div className="w-1 h-7 bg-primary-500 rounded-sm flex-shrink-0" />
                       {locale === 'en' ? 'Company of the Week' : 'Haftanın Şirketi'}
-                      <Badge variant="default">Business</Badge>
+                      <ProductBadge variant="default">Business</ProductBadge>
                     </h2>
                   </div>
                   <div className="flex items-start gap-4 mb-4">

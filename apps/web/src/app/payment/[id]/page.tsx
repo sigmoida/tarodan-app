@@ -61,6 +61,22 @@ export default function PaymentPage() {
         router.replace('/membership/success');
         return;
       }
+
+      // Bypass mode: pending payment without PayTR token — complete instantly
+      if (paymentData.status === 'pending' && !paymentData.paymentHtml && !paymentData.paymentUrl) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(paymentId);
+          if (bypassRes.data?.success) {
+            toast.success('Ödeme başarılı');
+            const hasSession = isAuthenticated || (typeof window !== 'undefined' && !!localStorage.getItem('auth_token'));
+            router.push(`/payment/success?paymentId=${paymentId}${!hasSession ? '&guest=true' : ''}`);
+            return;
+          }
+        } catch {
+          // Not bypass mode or bypass failed — fall through to normal flow
+        }
+      }
+
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);

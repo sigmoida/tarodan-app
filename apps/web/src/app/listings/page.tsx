@@ -23,6 +23,7 @@ import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
 import SidebarFilters from '@/components/SidebarFilters';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
+import { Button } from '@tarodan/ui';
 
 interface Listing {
   id: string | number;
@@ -540,7 +541,7 @@ export default function ListingsPage() {
                 <p className="text-gray-600 text-lg font-medium mb-1">{t('product.noListings')}</p>
                 <p className="text-gray-400 text-sm mb-4">{locale === 'en' ? 'Try adjusting your filters' : 'Filtrelerinizi değiştirmeyi deneyin'}</p>
                 {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="px-5 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium">{t('product.clearFilters')}</button>
+                  <Button variant="primary" size="md" onClick={clearFilters}>{t('product.clearFilters')}</Button>
                 )}
               </div>
             ) : productLayout === 'list' ? (

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
   PlusIcon,
   PencilIcon,
@@ -305,23 +307,23 @@ export default function DiscountsPage() {
     });
   };
 
-  const getStatusBadge = (discount: Discount) => {
-    if (!discount.isActive) {
-      return <span className="badge badge-gray">Pasif</span>;
-    }
-    if (discount.isCurrentlyValid) {
-      return <span className="badge badge-success">Aktif</span>;
-    }
+  const discountStatusConfig: Record<string, StatusConfig> = {
+    inactive: { label: 'Pasif', variant: 'secondary' },
+    active: { label: 'Aktif', variant: 'success' },
+    pending: { label: 'Bekliyor', variant: 'warning' },
+    expired: { label: 'Süresi Doldu', variant: 'danger' },
+    unknown: { label: 'Belirsiz', variant: 'secondary' },
+  };
+
+  const getDiscountStatus = (discount: Discount): string => {
+    if (!discount.isActive) return 'inactive';
+    if (discount.isCurrentlyValid) return 'active';
     const now = new Date();
     const start = new Date(discount.startDate);
     const end = new Date(discount.endDate);
-    if (now < start) {
-      return <span className="badge badge-warning">Bekliyor</span>;
-    }
-    if (now > end) {
-      return <span className="badge badge-danger">Süresi Doldu</span>;
-    }
-    return <span className="badge badge-gray">Belirsiz</span>;
+    if (now < start) return 'pending';
+    if (now > end) return 'expired';
+    return 'unknown';
   };
 
   return (
@@ -415,7 +417,7 @@ export default function DiscountsPage() {
         <div className="admin-card p-0 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+              <Spinner size="lg" color="border-primary border-t-transparent" className="mx-auto" />
               <p className="mt-2 text-muted-foreground">Yükleniyor...</p>
             </div>
           ) : discounts.length === 0 ? (
@@ -495,7 +497,7 @@ export default function DiscountsPage() {
                         </p>
                       </td>
                       <td>
-                        {getStatusBadge(discount)}
+                        <StatusBadge status={getDiscountStatus(discount)} config={discountStatusConfig} />
                       </td>
                       <td>
                         <div className="flex items-center justify-end gap-2">

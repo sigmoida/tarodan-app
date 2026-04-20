@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -294,7 +295,7 @@ export default function ProductDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
           <p className="mt-4 text-gray-600">Yükleniyor...</p>
         </div>
       </div>
@@ -473,39 +474,27 @@ export default function ProductDetailPage() {
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
                   <div className="space-y-2">
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="w-full px-4 py-2 bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                    >
+                    <Button variant="primary" size="md" onClick={() => setShowEditModal(true)} className="w-full flex items-center justify-center gap-2">
                       <PencilIcon className="w-5 h-5" />
                       Düzenle
-                    </button>
+                    </Button>
                     {canApprove && (
-                      <button
-                        onClick={() => setShowApproveModal(true)}
-                        className="w-full px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                      >
+                      <Button variant="success" size="md" onClick={() => setShowApproveModal(true)} className="w-full flex items-center justify-center gap-2">
                         <CheckCircleIcon className="w-5 h-5" />
                         Onayla
-                      </button>
+                      </Button>
                     )}
                     {canReject && (
-                      <button
-                        onClick={() => setShowRejectModal(true)}
-                        className="w-full px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                      >
+                      <Button variant="danger" size="md" onClick={() => setShowRejectModal(true)} className="w-full flex items-center justify-center gap-2">
                         <XCircleIcon className="w-5 h-5" />
                         Reddet
-                      </button>
+                      </Button>
                     )}
                     {canDelete && (
-                      <button
-                        onClick={() => setShowDeleteModal(true)}
-                        className="w-full px-4 py-2 bg-gray-600 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
-                      >
+                      <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(true)} className="w-full flex items-center justify-center gap-2">
                         <TrashIcon className="w-5 h-5" />
                         Sil
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -542,7 +531,7 @@ export default function ProductDetailPage() {
 
               {reviewsLoading ? (
                 <div className="p-12 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                  <Spinner size="lg" className="mx-auto" />
                   <p className="mt-4 text-gray-500">Yorumlar yükleniyor...</p>
                 </div>
               ) : reviews.length === 0 ? (
@@ -656,19 +645,12 @@ export default function ProductDetailPage() {
                   required
                 />
                 <div className="flex gap-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setReplyModalOpen(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
+                  <Button variant="secondary" size="md" type="button" onClick={() => setReplyModalOpen(false)} className="flex-1">
                     İptal
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"
-                  >
+                  </Button>
+                  <Button variant="primary" size="md" type="submit" className="flex-1">
                     Yanıtla
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -693,23 +675,12 @@ export default function ProductDetailPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowApproveModal(false);
-                    setApproveNote('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => { setShowApproveModal(false); setApproveNote(''); }} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleApprove}
-                  className="flex-1 px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="success" size="md" onClick={handleApprove} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Onayla'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -733,23 +704,12 @@ export default function ProductDetailPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowRejectModal(false);
-                    setRejectReason('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => { setShowRejectModal(false); setRejectReason(''); }} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleReject}
-                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="danger" size="md" onClick={handleReject} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Reddet'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -855,20 +815,12 @@ export default function ProductDetailPage() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
+                  <Button variant="secondary" size="md" type="button" onClick={() => setShowEditModal(false)} className="flex-1">
                     İptal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={processing}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                  >
+                  </Button>
+                  <Button variant="primary" size="md" type="submit" disabled={processing} isLoading={processing} className="flex-1">
                     {processing ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -884,20 +836,12 @@ export default function ProductDetailPage() {
                 Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
               </p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(false)} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="danger" size="md" onClick={handleDelete} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Sil'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

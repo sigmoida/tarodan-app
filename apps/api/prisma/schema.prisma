@@ -510,23 +510,29 @@ model TradeItem {
 }
 
 model TradeShipment {
-  id             String               @id @default(uuid())
-  tradeId        String               @map("trade_id")
-  shipperId      String               @map("shipper_id")
-  fromAddressId  String               @map("from_address_id")
-  carrier        String
-  trackingNumber String?              @map("tracking_number")
-  status         ShipmentStatus       @default(pending)
-  shippedAt      DateTime?            @map("shipped_at")
-  deliveredAt    DateTime?            @map("delivered_at")
-  confirmedAt    DateTime?            @map("confirmed_at")
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
-  events         TradeShipmentEvent[]
-  fromAddress    Address              @relation(fields: [fromAddressId], references: [id])
-  trade          Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  id              String               @id @default(uuid())
+  tradeId         String               @map("trade_id")
+  shipperId       String               @map("shipper_id")
+  fromAddressId   String               @map("from_address_id")
+  carrier         String
+  trackingNumber  String?              @map("tracking_number")
+  status          ShipmentStatus       @default(pending)
+  shippedAt       DateTime?            @map("shipped_at")
+  deliveredAt     DateTime?            @map("delivered_at")
+  confirmedAt     DateTime?            @map("confirmed_at")
+  // Escrow: which leg of the journey this shipment represents
+  leg             String               @default("to_warehouse")
+  // Recipient of this shipment: null = warehouse, else initiator or receiver user id
+  recipientUserId String?              @map("recipient_user_id")
+  recipientType   String               @default("warehouse") @map("recipient_type")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  events          TradeShipmentEvent[]
+  fromAddress     Address              @relation(fields: [fromAddressId], references: [id])
+  trade           Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
   @@index([tradeId])
+  @@index([leg])
   @@map("trade_shipments")
 }
 
@@ -555,6 +561,8 @@ model TradeCashPayment {
   providerPaymentId String?       @map("provider_payment_id")
   status            PaymentStatus @default(pending)
   paidAt            DateTime?     @map("paid_at")
+  // Escrow hold: set when trade completes; released when holdReleaseAt passes
+  holdReleaseAt     DateTime?     @map("hold_release_at")
   releasedAt        DateTime?     @map("released_at")
   refundedAt        DateTime?     @map("refunded_at")
   createdAt         DateTime      @default(now()) @map("created_at")
@@ -952,6 +960,7 @@ model Order {
   discountBreakdown Json?       @map("discount_breakdown")
   discountCode      String?     @map("discount_code")
   subtotal          Decimal?    @db.Decimal(10, 2)
+  cancelReason      String?     @map("cancel_reason")
   invoices          Invoice[]
   buyer             User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer             Offer?      @relation(fields: [offerId], references: [id])
@@ -1713,11 +1722,20 @@ enum TradeStatus {
   pending
   accepted
   rejected
+  // Legacy peer-to-peer statuses (backwards compat)
   initiator_shipped
   receiver_shipped
   both_shipped
   initiator_received
   receiver_received
+  // New escrow/safe-trade statuses
+  awaiting_payment
+  shipping_to_warehouse
+  at_warehouse
+  admin_reviewing
+  shipping_to_recipients
+  returning
+  // Final statuses
   completed
   cancelled
   disputed

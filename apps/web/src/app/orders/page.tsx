@@ -12,6 +12,7 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { formatOrderStatus } from '@/lib/format';
+import { StatusBadge, orderStatusConfig, Button, Spinner } from '@tarodan/ui';
 
 interface Order {
   id: string;
@@ -94,16 +95,16 @@ export default function OrdersPage() {
   const [reviewImages, setReviewImages] = useState<File[]>([]);
   const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
 
-  const statusLabels: Record<string, { label: string; color: string }> = {
-    pending_payment: { label: t('order.statusPending'), color: 'text-yellow-400 bg-yellow-400/10' },
-    paid: { label: t('order.statusPaid'), color: 'text-green-400 bg-green-400/10' },
-    preparing: { label: t('order.statusProcessing'), color: 'text-orange-400 bg-orange-400/10' },
-    shipped: { label: t('order.statusShipped'), color: 'text-purple-400 bg-purple-400/10' },
-    delivered: { label: t('order.statusDelivered'), color: 'text-green-400 bg-green-400/10' },
-    completed: { label: t('order.statusCompleted'), color: 'text-green-400 bg-green-400/10' },
-    cancelled: { label: t('order.statusCancelled'), color: 'text-red-400 bg-red-400/10' },
-    refund_requested: { label: t('order.refundStarted'), color: 'text-orange-400 bg-orange-400/10' },
-    refunded: { label: t('order.statusRefunded'), color: 'text-gray-400 bg-gray-400/10' },
+  const localizedOrderStatusLabels: Record<string, string> = {
+    pending_payment: t('order.statusPending'),
+    paid: t('order.statusPaid'),
+    preparing: t('order.statusProcessing'),
+    shipped: t('order.statusShipped'),
+    delivered: t('order.statusDelivered'),
+    completed: t('order.statusCompleted'),
+    cancelled: t('order.statusCancelled'),
+    refund_requested: t('order.refundStarted'),
+    refunded: t('order.statusRefunded'),
   };
 
   const [sellerCommunication, setSellerCommunication] = useState(5);
@@ -363,7 +364,7 @@ export default function OrdersPage() {
 
         {(!mounted || authLoading || !isAuthenticated || loading) ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            <Spinner size="xl" />
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl">
@@ -378,11 +379,6 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const status = statusLabels[order.status] || {
-                label: formatOrderStatus(order.status, locale),
-                color: 'text-gray-600 bg-gray-100',
-              };
-
               return (
                 <div key={order.id} className="bg-white rounded-xl shadow-sm p-6">
                   <div className="flex justify-between items-start mb-4">
@@ -394,9 +390,11 @@ export default function OrdersPage() {
                         {new Date(order.createdAt).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
-                      {status.label}
-                    </span>
+                    <StatusBadge
+                      status={order.status}
+                      config={orderStatusConfig}
+                      label={localizedOrderStatusLabels[order.status] || formatOrderStatus(order.status, locale)}
+                    />
                   </div>
 
                   <div className="space-y-3">
@@ -482,56 +480,64 @@ export default function OrdersPage() {
                     {order.isBuyer !== false && (order.shipment || ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(order.status)) && (
                       <Link
                         href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || '')}`}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                       >
                         {t('order.trackOrder')}
                       </Link>
                     )}
                     {order.isBuyer !== false && ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(order.status) && (
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleDownloadInvoice(order.id)}
                         disabled={downloadingInvoiceOrderId === order.id}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm disabled:opacity-50"
                       >
                         {downloadingInvoiceOrderId === order.id ? (locale === 'en' ? 'Downloading...' : 'İndiriliyor...') : t('order.downloadInvoice')}
-                      </button>
+                      </Button>
                     )}
                     {order.isBuyer !== false && (order.product?.id || order.items?.[0]?.product?.id) && (
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => handleReorder(order)}
-                        className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm"
                       >
                         {t('order.reorder')}
-                      </button>
+                      </Button>
                     )}
                     {/* Seller shipping actions */}
                     {order.isSeller && ['paid', 'preparing'].includes(order.status) && !order.shipment && (
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-1"
                         onClick={() => openShippingModal(order.id)}
-                        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm flex items-center gap-1"
                       >
                         <TruckIcon className="w-4 h-4" />
                         {locale === 'en' ? 'Add Shipping Info' : 'Kargo Bilgisi Ekle'}
-                      </button>
+                      </Button>
                     )}
                     {order.isSeller && ['paid', 'preparing', 'shipped'].includes(order.status) && (
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-1"
                         onClick={() => handleDownloadInvoice(order.id)}
                         disabled={downloadingInvoiceOrderId === order.id}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm flex items-center gap-1 disabled:opacity-50"
                       >
                         <DocumentTextIcon className="w-4 h-4" />
                         {locale === 'en' ? 'Invoice' : 'Fatura'}
-                      </button>
+                      </Button>
                     )}
                     {canReview(order) && (
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-1"
                         onClick={() => openReviewModal(order)}
-                        className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors text-sm flex items-center gap-1"
                       >
                         <StarIcon className="w-4 h-4" />
                         {t('review.writeReview')}
-                      </button>
+                      </Button>
                     )}
                     {order.status === 'delivered' && (
                       <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
@@ -755,19 +761,23 @@ export default function OrdersPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => setShowReviewModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
                   onClick={submitReview}
                   disabled={submittingReview}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
                   {submittingReview ? t('common.sending') : t('review.submit')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -821,22 +831,26 @@ export default function OrdersPage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => setShowShippingModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {locale === 'en' ? 'Cancel' : 'İptal'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="flex-1 flex items-center justify-center gap-2"
                   onClick={submitShipping}
                   disabled={submittingShipping || !trackingNumber.trim()}
-                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <TruckIcon className="w-4 h-4" />
-                  {submittingShipping 
-                    ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...') 
+                  {submittingShipping
+                    ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...')
                     : (locale === 'en' ? 'Save & Ship' : 'Kaydet ve Gönder')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

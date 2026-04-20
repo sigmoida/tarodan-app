@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, Button, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
     CheckCircleIcon,
     XCircleIcon,
@@ -171,19 +173,11 @@ export default function ReviewsPage() {
         );
     };
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'approved':
-                return <span className="badge badge-success">Onaylı</span>;
-            case 'pending':
-                return <span className="badge badge-warning">Bekliyor</span>;
-            case 'rejected':
-                return <span className="badge badge-danger">Reddedildi</span>;
-            case 'spam':
-                return <span className="badge badge-gray">Spam</span>;
-            default:
-                return <span className="badge badge-gray">{status}</span>;
-        }
+    const reviewStatusConfig: Record<string, StatusConfig> = {
+        approved: { label: 'Onaylı', variant: 'success' },
+        pending: { label: 'Bekliyor', variant: 'warning' },
+        rejected: { label: 'Reddedildi', variant: 'danger' },
+        spam: { label: 'Spam', variant: 'secondary' },
     };
 
     return (
@@ -259,7 +253,7 @@ export default function ReviewsPage() {
                 <div className="admin-card overflow-hidden">
                     {sellerLoading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                            <Spinner size="lg" className="mx-auto" />
                             <p className="text-gray-500 mt-4">Yükleniyor...</p>
                         </div>
                     ) : sellerRatings.length === 0 ? (
@@ -294,7 +288,7 @@ export default function ReviewsPage() {
                                             <td className="max-w-xs">
                                                 <p className="text-sm text-gray-600 line-clamp-3">{r.comment || '-'}</p>
                                             </td>
-                                            <td>{getStatusBadge(r.status || 'approved')}</td>
+                                            <td><StatusBadge status={r.status || 'approved'} config={reviewStatusConfig} /></td>
                                             <td>
                                                 <span className="text-xs text-gray-500">
                                                     {r.orderId ? 'Sipariş' : r.tradeId ? 'Takas' : '-'}
@@ -352,7 +346,7 @@ export default function ReviewsPage() {
                 <div className="admin-card overflow-hidden">
                     {loading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                            <Spinner size="lg" className="mx-auto" />
                             <p className="text-gray-500 mt-4">Yükleniyor...</p>
                         </div>
                     ) : reviews.length === 0 ? (
@@ -425,7 +419,7 @@ export default function ReviewsPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td>{getStatusBadge(review.status)}</td>
+                                            <td><StatusBadge status={review.status} config={reviewStatusConfig} /></td>
                                             <td>
                                                 <span className="text-sm text-gray-500">
                                                     {format(new Date(review.createdAt), 'dd MMM yyyy', { locale: tr })}
@@ -509,8 +503,8 @@ export default function ReviewsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Satıcı Yorumunu Sil</h3>
                         <p className="text-gray-500 mb-6">Bu satıcı yorumunu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                         <div className="flex gap-3">
-                            <button onClick={() => setDeleteSellerConfirm(null)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100">İptal</button>
-                            <button onClick={() => handleDeleteSellerRating(deleteSellerConfirm)} className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700">Sil</button>
+                            <Button variant="secondary" size="md" onClick={() => setDeleteSellerConfirm(null)} className="flex-1">İptal</Button>
+                            <Button variant="danger" size="md" onClick={() => handleDeleteSellerRating(deleteSellerConfirm)} className="flex-1">Sil</Button>
                         </div>
                     </div>
                 </div>
@@ -525,18 +519,12 @@ export default function ReviewsPage() {
                             Bu yorumu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
-                            >
+                            <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">
                                 İptal
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteConfirm)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700"
-                            >
+                            </Button>
+                            <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">
                                 Sil
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

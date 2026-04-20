@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, tradeStatusConfig, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import { MagnifyingGlassIcon, EyeIcon, ExclamationTriangleIcon, UserIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -30,6 +32,12 @@ const statusOptions = [
   { value: 'all', label: 'Tümü' },
   { value: 'pending', label: 'Bekliyor' },
   { value: 'accepted', label: 'Kabul Edildi' },
+  { value: 'awaiting_payment', label: 'Ödeme Bekleniyor' },
+  { value: 'shipping_to_warehouse', label: 'Depoya Gönderim' },
+  { value: 'at_warehouse', label: 'Tarodan Deposunda (İnceleme)' },
+  { value: 'admin_reviewing', label: 'İnceleniyor' },
+  { value: 'shipping_to_recipients', label: 'Alıcılara Gönderim' },
+  { value: 'returning', label: 'İade Yolda' },
   { value: 'both_shipped', label: 'Gönderildi' },
   { value: 'completed', label: 'Tamamlandı' },
   { value: 'disputed', label: 'İtirazlı' },
@@ -46,6 +54,7 @@ export default function TradesPage() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [reviewQueueCount, setReviewQueueCount] = useState(0);
 
   // User filtering
   const [users, setUsers] = useState<User[]>([]);
@@ -102,6 +111,21 @@ export default function TradesPage() {
     loadTrades();
   }, [page, status, selectedUserId]);
 
+  // Load the admin-review queue count (at_warehouse) regardless of current filter
+  useEffect(() => {
+    const loadReviewQueueCount = async () => {
+      try {
+        const response = await adminApi.getTrades({ page: 1, limit: 1, status: 'at_warehouse' });
+        const meta = response.data.meta || {};
+        const data = response.data.data || response.data.trades || [];
+        setReviewQueueCount(meta.total ?? data.length ?? 0);
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error('Review queue count error:', error);
+      }
+    };
+    loadReviewQueueCount();
+  }, [status]);
+
   const loadTrades = async () => {
     setLoading(true);
     try {
@@ -134,31 +158,9 @@ export default function TradesPage() {
     }
   };
 
-  const getStatusBadge = (status: string, hasDispute: boolean) => {
-    if (hasDispute) {
-      return <span className="badge badge-danger">⚠️ İtirazlı</span>;
-    }
-    const colors: Record<string, string> = {
-      pending: 'badge-warning',
-      accepted: 'badge-info',
-      initiator_shipped: 'badge-info',
-      receiver_shipped: 'badge-info',
-      both_shipped: 'badge-info',
-      completed: 'badge-success',
-      cancelled: 'badge-danger',
-      rejected: 'badge-gray',
-    };
-    const labels: Record<string, string> = {
-      pending: 'Bekliyor',
-      accepted: 'Kabul',
-      initiator_shipped: 'Kısmen Gönderildi',
-      receiver_shipped: 'Kısmen Gönderildi',
-      both_shipped: 'Gönderildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-      rejected: 'Reddedildi',
-    };
-    return <span className={`badge ${colors[status]}`}>{labels[status]}</span>;
+  // Local dispute config entry
+  const disputeConfig: Record<string, StatusConfig> = {
+    disputed_override: { label: 'İtirazlı', variant: 'destructive' },
   };
 
   const disputedCount = trades.filter((t) => t.hasDispute).length;
@@ -179,12 +181,28 @@ export default function TradesPage() {
               )}
             </p>
           </div>
-          {disputedCount > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-red-900/20 border border-red-700 rounded-lg">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
-              <span className="text-red-600">{disputedCount} itirazlı takas</span>
-            </div>
-          )}
+          <div className="flex flex-col gap-2 items-end">
+            {reviewQueueCount > 0 && (
+              <button
+                onClick={() => { setStatus('at_warehouse'); setPage(1); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition-colors ${
+                  status === 'at_warehouse'
+                    ? 'bg-amber-500 text-white border-amber-600'
+                    : 'bg-amber-100 text-amber-900 border-amber-400 hover:bg-amber-200'
+                }`}
+                title="İnceleme kuyruğunu filtrele"
+              >
+                <ExclamationTriangleIcon className="h-5 w-5" />
+                <span>{reviewQueueCount} takas inceleme bekliyor</span>
+              </button>
+            )}
+            {disputedCount > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-red-900/20 border border-red-700 rounded-lg">
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                <span className="text-red-600">{disputedCount} itirazlı takas</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -265,7 +283,7 @@ export default function TradesPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={8} className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                      <Spinner size="lg" className="mx-auto" />
                     </td>
                   </tr>
                 ) : trades.length === 0 ? (
@@ -278,7 +296,11 @@ export default function TradesPage() {
                   trades.map((trade) => (
                     <tr key={trade.id} className={trade.hasDispute ? 'bg-red-900/10' : ''}>
                       <td className="font-mono text-sm">{trade.tradeNumber}</td>
-                      <td>{getStatusBadge(trade.status, trade.hasDispute)}</td>
+                      <td>{trade.hasDispute ? (
+                        <StatusBadge status="disputed_override" config={disputeConfig} label="⚠️ İtirazlı" />
+                      ) : (
+                        <StatusBadge status={trade.status} config={tradeStatusConfig} />
+                      )}</td>
                       <td>
                         <Link
                           href={`/users/${trade.initiator.id}`}

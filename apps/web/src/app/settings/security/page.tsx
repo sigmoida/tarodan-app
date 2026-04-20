@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import api from '@/lib/api';
+import { Button, Modal, Spinner } from '@tarodan/ui';
 
 interface TwoFactorStatus {
   isEnabled: boolean;
@@ -137,7 +138,7 @@ export default function SecuritySettingsPage() {
   if (isLoading && !setupData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+        <Spinner size="xl" color="border-red-500 border-t-transparent" />
       </div>
     );
   }
@@ -242,13 +243,15 @@ export default function SecuritySettingsPage() {
               </ul>
             </div>
 
-            <button
+            <Button
+              variant="danger"
+              size="lg"
+              className="w-full"
               onClick={handleInitiate2FA}
               disabled={isLoading}
-              className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
             >
               {isLoading ? 'Yükleniyor...' : '2FA Kurulumunu Başlat'}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -329,34 +332,35 @@ export default function SecuritySettingsPage() {
             </div>
 
             <div className="flex space-x-4">
-              <button
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
                 onClick={() => setSetupData(null)}
-                className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                size="lg"
+                className="flex-1"
                 onClick={handleVerifyAndEnable}
                 disabled={isVerifying || verificationCode.length !== 6}
-                className="flex-1 bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 {isVerifying ? 'Doğrulanıyor...' : 'Doğrula ve Etkinleştir'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {/* Backup Codes Modal */}
-        {showBackupCodes && backupCodes.length > 0 && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <Modal isOpen={showBackupCodes && backupCodes.length > 0} onClose={() => { setShowBackupCodes(false); setBackupCodes([]); }} title="2FA Etkinleştirildi!" maxWidth="max-w-md">
               <div className="text-center mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">2FA Etkinleştirildi!</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Aşağıdaki yedek kodları güvenli bir yere kaydedin.
                 </p>
@@ -379,25 +383,27 @@ export default function SecuritySettingsPage() {
                 ))}
               </div>
 
-              <button
+              <Button
+                variant="secondary"
+                size="md"
+                className="w-full mb-4"
                 onClick={() => copyToClipboard(backupCodes.join('\n'))}
-                className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors mb-4"
               >
                 Tüm Kodları Kopyala
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
                 onClick={() => {
                   setShowBackupCodes(false);
                   setBackupCodes([]);
                 }}
-                className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors"
               >
                 Tamam, Kaydettim
-              </button>
-            </div>
-          </div>
-        )}
+              </Button>
+        </Modal>
 
         {/* Enabled State Options */}
         {status.isEnabled && (
@@ -408,13 +414,15 @@ export default function SecuritySettingsPage() {
               <p className="text-sm text-gray-600 mb-4">
                 Telefonunuza erişiminizi kaybederseniz yedek kodları kullanarak giriş yapabilirsiniz.
               </p>
-              <button
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full"
                 onClick={handleRegenerateBackupCodes}
                 disabled={isLoading}
-                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 {isLoading ? 'Yükleniyor...' : 'Yeni Yedek Kodlar Oluştur'}
-              </button>
+              </Button>
             </div>
 
             {/* Disable 2FA */}
@@ -425,12 +433,14 @@ export default function SecuritySettingsPage() {
               </p>
               
               {!showDisableConfirm ? (
-                <button
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="w-full"
                   onClick={() => setShowDisableConfirm(true)}
-                  className="w-full bg-red-100 text-red-700 py-3 px-4 rounded-lg font-medium hover:bg-red-200 transition-colors"
                 >
                   2FA'yı Devre Dışı Bırak
-                </button>
+                </Button>
               ) : (
                 <div>
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
@@ -446,22 +456,26 @@ export default function SecuritySettingsPage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   />
                   <div className="flex space-x-4">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="flex-1"
                       onClick={() => {
                         setShowDisableConfirm(false);
                         setDisablePassword('');
                       }}
-                      className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                     >
                       İptal
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="lg"
+                      className="flex-1"
                       onClick={handleDisable2FA}
                       disabled={isLoading}
-                      className="flex-1 bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
                     >
                       {isLoading ? 'İşleniyor...' : 'Devre Dışı Bırak'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import {
   PlusIcon,
   PencilIcon,
@@ -276,7 +277,7 @@ export default function CommissionPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -692,12 +693,9 @@ export default function CommissionPage() {
                 <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">
                   İptal
                 </button>
-                <button
-                  onClick={() => handleDelete(deleteConfirm)}
-                  className="bg-red-600 hover:bg-red-700 text-gray-900 px-4 py-2 rounded-lg transition-colors"
-                >
+                <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)}>
                   Sil
-                </button>
+                </Button>
               </div>
             </div>
           </div>

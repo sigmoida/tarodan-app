@@ -20,7 +20,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { StatusBadge, Button } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface Product {
   id: string;
@@ -195,53 +198,29 @@ export default function UserDetailPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      pending_payment: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-blue-100 text-blue-800',
-      preparing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-indigo-100 text-indigo-800',
-      delivered: 'bg-green-100 text-green-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      rejected: 'bg-red-100 text-red-800',
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      sold: 'bg-purple-100 text-purple-800',
-      accepted: 'bg-blue-100 text-blue-800',
-      both_shipped: 'bg-indigo-100 text-indigo-800',
-      disputed: 'bg-red-100 text-red-800',
-    };
-    const labels: Record<string, string> = {
-      pending: 'Bekliyor',
-      pending_payment: 'Ödeme Bekliyor',
-      paid: 'Ödendi',
-      preparing: 'Hazırlanıyor',
-      shipped: 'Kargoda',
-      delivered: 'Teslim Edildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-      rejected: 'Reddedildi',
-      active: 'Aktif',
-      inactive: 'Pasif',
-      sold: 'Satıldı',
-      accepted: 'Kabul Edildi',
-      both_shipped: 'Gönderildi',
-      disputed: 'İtirazlı',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {labels[status] || status}
-      </span>
-    );
+  const userStatusConfig: Record<string, StatusConfig> = {
+    pending: { label: 'Bekliyor', variant: 'warning' },
+    pending_payment: { label: 'Ödeme Bekliyor', variant: 'warning' },
+    paid: { label: 'Ödendi', variant: 'info' },
+    preparing: { label: 'Hazırlanıyor', variant: 'info' },
+    shipped: { label: 'Kargoda', variant: 'primary' },
+    delivered: { label: 'Teslim Edildi', variant: 'success' },
+    completed: { label: 'Tamamlandı', variant: 'success' },
+    cancelled: { label: 'İptal', variant: 'danger' },
+    rejected: { label: 'Reddedildi', variant: 'danger' },
+    active: { label: 'Aktif', variant: 'success' },
+    inactive: { label: 'Pasif', variant: 'secondary' },
+    sold: { label: 'Satıldı', variant: 'primary' },
+    accepted: { label: 'Kabul Edildi', variant: 'info' },
+    both_shipped: { label: 'Gönderildi', variant: 'primary' },
+    disputed: { label: 'İtirazlı', variant: 'danger' },
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
           <p className="mt-4 text-gray-500">Yükleniyor...</p>
         </div>
       </div>
@@ -300,24 +279,18 @@ export default function UserDetailPage() {
                 <span className="px-4 py-2 rounded-full font-medium text-red-600 bg-red-500/20">
                   Banlı
                 </span>
-                <button
-                  onClick={() => setShowUnbanModal(true)}
-                  className="px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors"
-                >
+                <Button variant="success" size="md" onClick={() => setShowUnbanModal(true)}>
                   Banı Kaldır
-                </button>
+                </Button>
               </>
             ) : (
               <>
                 <span className="px-4 py-2 rounded-full font-medium text-green-700 bg-green-500/20">
                   Aktif
                 </span>
-                <button
-                  onClick={() => setShowBanModal(true)}
-                  className="px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors"
-                >
+                <Button variant="danger" size="md" onClick={() => setShowBanModal(true)}>
                   Banla
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -533,7 +506,7 @@ export default function UserDetailPage() {
                                 <Link href={`/orders/${order.id}`} className="text-gray-900 font-medium hover:text-primary-600">
                                   {order.orderNumber || `#${order.id.slice(0, 8)}`}
                                 </Link>
-                                {getStatusBadge(order.status)}
+                                <StatusBadge status={order.status} config={userStatusConfig} />
                               </div>
                               <p className="text-sm text-gray-500 mt-1">
                                 {order.role === 'buyer' ? 'Satıcı' : 'Alıcı'}: {order.otherParty?.displayName || 'Bilinmiyor'}
@@ -584,7 +557,7 @@ export default function UserDetailPage() {
                                 {product.title}
                               </Link>
                               <div className="flex items-center gap-2 mt-1">
-                                {getStatusBadge(product.status)}
+                                <StatusBadge status={product.status} config={userStatusConfig} />
                                 <span className="text-sm text-gray-500">{new Date(product.createdAt).toLocaleDateString('tr-TR')}</span>
                               </div>
                             </div>
@@ -623,7 +596,7 @@ export default function UserDetailPage() {
                                 <Link href={`/trades/${trade.id}`} className="text-gray-900 font-medium hover:text-primary-600">
                                   {trade.tradeNumber || `#${trade.id.slice(0, 8)}`}
                                 </Link>
-                                {getStatusBadge(trade.status)}
+                                <StatusBadge status={trade.status} config={userStatusConfig} />
                               </div>
                               <span className="text-sm text-gray-500">{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</span>
                             </div>
@@ -831,23 +804,12 @@ export default function UserDetailPage() {
                 />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowBanModal(false);
-                    setBanReason('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => { setShowBanModal(false); setBanReason(''); }} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleBan}
-                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="danger" size="md" onClick={handleBan} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Banla'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -862,20 +824,12 @@ export default function UserDetailPage() {
                 Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?
               </p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUnbanModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => setShowUnbanModal(false)} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleUnban}
-                  className="flex-1 px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="success" size="md" onClick={handleUnban} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Banı Kaldır'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

@@ -378,6 +378,20 @@ export class PaymentController {
   }
 
   /**
+   * POST /payments/:id/bypass-complete - Dev/test only: complete payment without PayTR
+   */
+  @Post(':id/bypass-complete')
+  @Public()
+  @ApiOperation({ summary: 'Bypass payment (dev/test only)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment bypassed' })
+  async bypassComplete(
+    @Param('id') paymentId: string,
+  ): Promise<{ success: boolean }> {
+    return this.paymentService.bypassCompletePayment(paymentId);
+  }
+
+  /**
    * POST /payments/:id/cancel - Cancel a pending payment
    */
   @Post(':id/cancel')

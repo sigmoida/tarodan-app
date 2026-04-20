@@ -186,6 +186,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>
     api.post(`/trades/${id}/ship`, data),
+  shipToWarehouse: (tradeId: string, data: { carrier: string; fromAddressId: string; trackingNumber?: string }) =>
+    api.post(`/trades/${tradeId}/ship-to-warehouse`, data),
   confirmReceipt: (id: string | number) =>
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
@@ -317,6 +319,9 @@ export const paymentsApi = {
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
+  /** Dev/test: PayTR olmadan ödemeyi tamamla */
+  bypassComplete: (paymentId: string, _card?: string) =>
+    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
 
   getPaymentMethods: () => api.get('/payments/methods'),
 

@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface User {
   id: string;
@@ -166,7 +167,7 @@ export default function UsersPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={8} className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                      <Spinner size="lg" className="mx-auto" />
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (

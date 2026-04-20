@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Spinner } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -154,10 +155,10 @@ export default function CarModelsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Model Yönetimi</h1>
             <p className="mt-1 text-sm text-gray-500">Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz</p>
           </div>
-          <button onClick={openCreateModal} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600 transition-colors">
+          <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
             Yeni Model Ekle
-          </button>
+          </Button>
         </div>
 
         <div className="flex gap-4 items-center">
@@ -177,7 +178,7 @@ export default function CarModelsPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+              <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto" />
               <p className="mt-2 text-gray-500">Yükleniyor...</p>
             </div>
           ) : models.length === 0 ? (
@@ -307,12 +308,12 @@ export default function CarModelsPage() {
                     </select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
-                    <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)}>
                       İptal
-                    </button>
-                    <button type="submit" className="px-4 py-2 bg-orange-500 text-gray-900 rounded-lg hover:bg-orange-600">
+                    </Button>
+                    <Button variant="primary" size="md" type="submit">
                       {editingModel ? 'Güncelle' : 'Ekle'}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </div>
@@ -328,12 +329,12 @@ export default function CarModelsPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Modeli Sil</h3>
                 <p className="text-gray-600 mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                  <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)}>
                     İptal
-                  </button>
-                  <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 bg-red-500 text-gray-900 rounded-lg hover:bg-red-600">
+                  </Button>
+                  <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)}>
                     Sil
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

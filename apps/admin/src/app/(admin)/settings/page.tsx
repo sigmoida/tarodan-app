@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface Settings {
   freeListingLimit: number;
@@ -218,7 +219,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }

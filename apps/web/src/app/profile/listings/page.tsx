@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { Button, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { userApi, api, ordersApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
@@ -151,7 +152,7 @@ export default function ProfileListingsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+          <Spinner size="xl" />
         </div>
       </div>
     );
@@ -375,14 +376,16 @@ export default function ProfileListingsPage() {
                         </Link>
                       ) : null}
                       {listing.status === 'rejected' && (
-                        <button
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="flex-1 flex items-center justify-center gap-1"
                           onClick={() => handleDelete(listing.id)}
                           disabled={deletingId === listing.id}
-                          className="flex-1 py-2 text-center bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <TrashIcon className="w-4 h-4" />
                           {deletingId === listing.id ? 'Siliniyor...' : 'Sil'}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>

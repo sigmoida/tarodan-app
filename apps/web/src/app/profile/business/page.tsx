@@ -7,6 +7,7 @@ import Image from 'next/image';
 import UserAvatar from '@/components/UserAvatar';
 import { ArrowLeftIcon, EyeIcon, HeartIcon, ShoppingBagIcon, CubeIcon, RectangleStackIcon, ArchiveBoxIcon, BookOpenIcon } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
+import { Spinner } from '@tarodan/ui';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -103,7 +104,7 @@ export default function BusinessDashboardPage() {
       <div className="min-h-screen bg-gray-900 text-white">
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+            <Spinner size="xl" color="border-orange-500 border-t-transparent" />
           </div>
         </main>
       </div>

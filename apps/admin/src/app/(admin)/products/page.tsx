@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import Image from 'next/image';
+import { StatusBadge, productStatusConfig, Button, Spinner } from '@tarodan/ui';
 import {
   MagnifyingGlassIcon,
   CheckIcon,
@@ -276,23 +277,6 @@ export default function ProductsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, string> = {
-      pending: 'badge-warning',
-      active: 'badge-success',
-      rejected: 'badge-danger',
-      sold: 'badge-info',
-      inactive: 'badge-gray',
-    };
-    const labels: Record<string, string> = {
-      pending: 'Onay Bekliyor',
-      active: 'Aktif',
-      rejected: 'Reddedildi',
-      sold: 'Satıldı',
-      inactive: 'Silindi',
-    };
-    return <span className={`badge ${badges[status] || 'badge-gray'}`}>{labels[status] || status}</span>;
-  };
 
   const getConditionLabel = (condition: string) => {
     const labels: Record<string, string> = {
@@ -344,22 +328,14 @@ export default function ProductsPage() {
               <span className="text-sm text-gray-500">
                 {selectedIds.size} ürün seçili
               </span>
-              <button
-                onClick={handleBulkApprove}
-                disabled={bulkProcessing}
-                className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-gray-900 rounded-lg disabled:opacity-50 transition-colors"
-              >
+              <Button variant="success" size="sm" onClick={handleBulkApprove} disabled={bulkProcessing} isLoading={bulkProcessing}>
                 <CheckCircleIcon className="h-4 w-4" />
                 Seçilenleri Onayla
-              </button>
-              <button
-                onClick={handleBulkReject}
-                disabled={bulkProcessing}
-                className="flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-gray-900 rounded-lg disabled:opacity-50 transition-colors"
-              >
+              </Button>
+              <Button variant="danger" size="sm" onClick={handleBulkReject} disabled={bulkProcessing} isLoading={bulkProcessing}>
                 <XCircleIcon className="h-4 w-4" />
                 Seçilenleri Reddet
-              </button>
+              </Button>
             </div>
           )}
           <button
@@ -487,7 +463,7 @@ export default function ProductsPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+                      <Spinner size="lg" className="mx-auto" />
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
@@ -537,7 +513,7 @@ export default function ProductsPage() {
                         )}
                         ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
                       </td>
-                      <td>{getStatusBadge(product.status)}</td>
+                      <td><StatusBadge status={product.status} config={productStatusConfig} /></td>
                       <td>
                         <span className="text-gray-600">
                           {getConditionLabel(product.condition)}

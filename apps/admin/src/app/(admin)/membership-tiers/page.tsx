@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface MembershipTier {
   id: string;
@@ -130,7 +131,7 @@ export default function MembershipTiersPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
             <div className="col-span-full text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
+              <Spinner size="lg" className="mx-auto" />
               <p className="text-gray-500 mt-4">Yükleniyor...</p>
             </div>
           ) : tiers.length === 0 ? (

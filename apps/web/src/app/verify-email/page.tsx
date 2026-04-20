@@ -14,6 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Spinner } from '@tarodan/ui';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -303,7 +304,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     }>
       <VerifyEmailContent />

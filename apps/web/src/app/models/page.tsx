@@ -5,6 +5,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { Spinner } from '@tarodan/ui';
 import axios from 'axios';
 
 interface Brand {
@@ -137,7 +138,7 @@ export default function ModelsPage() {
                 {/* Loading State */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-20">
-                        <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mb-4" />
+                        <Spinner size="xl" color="border-primary-100 border-t-primary-500" className="mb-4" />
                         <p className="text-gray-500 font-medium">{t('common.loading')}</p>
                     </div>
                 )}

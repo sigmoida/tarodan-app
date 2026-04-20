@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, orderStatusConfig, tradeStatusConfig, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
   UsersIcon,
   ShoppingBagIcon,
@@ -266,60 +268,16 @@ export default function DashboardPage() {
     return date.toLocaleDateString('tr-TR');
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      pending_payment: 'bg-yellow-500/20 text-yellow-700',
-      paid: 'bg-blue-500/20 text-blue-700',
-      preparing: 'bg-purple-500/20 text-purple-700',
-      shipped: 'bg-indigo-500/20 text-indigo-700',
-      delivered: 'bg-green-500/20 text-green-700',
-      completed: 'bg-green-500/20 text-green-700',
-      cancelled: 'bg-red-500/20 text-red-600',
-      refund_requested: 'bg-orange-500/20 text-orange-700',
-      refunded: 'bg-gray-500/20 text-gray-500',
-    };
-    const statusLabels: Record<string, string> = {
-      pending_payment: 'Ödeme Bekliyor',
-      paid: 'Ödendi',
-      preparing: 'Hazırlanıyor',
-      shipped: 'Kargoda',
-      delivered: 'Teslim Edildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-      refund_requested: 'İade Talebi',
-      refunded: 'İade Edildi',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-500'}`}>
-        {statusLabels[status] || status}
-      </span>
-    );
+  // Extended order config with refund_requested (not in the shared config)
+  const dashboardOrderStatusConfig: Record<string, StatusConfig> = {
+    ...orderStatusConfig,
+    refund_requested: { label: 'İade Talebi', variant: 'warning' },
   };
 
-  const getTradeStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      pending: 'bg-yellow-500/20 text-yellow-700',
-      accepted: 'bg-blue-500/20 text-blue-700',
-      in_progress: 'bg-purple-500/20 text-purple-700',
-      completed: 'bg-green-500/20 text-green-700',
-      cancelled: 'bg-red-500/20 text-red-600',
-      rejected: 'bg-red-500/20 text-red-600',
-      disputed: 'bg-orange-500/20 text-orange-700',
-    };
-    const statusLabels: Record<string, string> = {
-      pending: 'Bekliyor',
-      accepted: 'Kabul Edildi',
-      in_progress: 'Devam Ediyor',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-      rejected: 'Reddedildi',
-      disputed: 'İtirazlı',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusColors[status] || 'bg-gray-500/20 text-gray-500'}`}>
-        {statusLabels[status] || status}
-      </span>
-    );
+  // Extended trade config with in_progress (not in the shared config)
+  const dashboardTradeStatusConfig: Record<string, StatusConfig> = {
+    ...tradeStatusConfig,
+    in_progress: { label: 'Devam Ediyor', variant: 'info' },
   };
 
   // Generate 30 day labels
@@ -392,7 +350,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -652,7 +610,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                         ₺{order.amount.toLocaleString('tr-TR')}
                       </span>
-                      {getStatusBadge(order.status)}
+                      <StatusBadge status={order.status} config={dashboardOrderStatusConfig} />
                       <span className="text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(order.createdAt)}
                       </span>
@@ -701,7 +659,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-3">
-                      {getTradeStatusBadge(trade.status)}
+                      <StatusBadge status={trade.status} config={dashboardTradeStatusConfig} />
                       <span className="text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(trade.createdAt)}
                       </span>

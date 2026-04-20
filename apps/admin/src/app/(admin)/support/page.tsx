@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { StatusBadge, Spinner } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import {
   ChatBubbleLeftRightIcon,
   UserCircleIcon,
@@ -202,46 +204,19 @@ export default function SupportPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      open: 'bg-blue-50 text-blue-700 border-blue-700',
-      in_progress: 'bg-yellow-50 text-yellow-700 border-yellow-700',
-      waiting_customer: 'bg-purple-900/50 text-purple-700 border-purple-700',
-      resolved: 'bg-green-50 text-green-700 border-green-700',
-      closed: 'bg-gray-50/50 text-gray-500 border-gray-200',
-    };
-    const labels: Record<string, string> = {
-      open: 'Açık',
-      in_progress: 'İşlemde',
-      waiting_customer: 'Müşteri Bekleniyor',
-      resolved: 'Çözüldü',
-      closed: 'Kapatıldı',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.open}`}>
-        {labels[status] || status}
-      </span>
-    );
+  const supportStatusConfig: Record<string, StatusConfig> = {
+    open: { label: 'Açık', variant: 'info' },
+    in_progress: { label: 'İşlemde', variant: 'warning' },
+    waiting_customer: { label: 'Müşteri Bekleniyor', variant: 'secondary' },
+    resolved: { label: 'Çözüldü', variant: 'success' },
+    closed: { label: 'Kapatıldı', variant: 'default' },
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const styles: Record<string, string> = {
-      low: 'bg-gray-50/50 text-gray-500',
-      medium: 'bg-blue-50 text-blue-700',
-      high: 'bg-orange-900/50 text-orange-700',
-      urgent: 'bg-red-50 text-red-700',
-    };
-    const labels: Record<string, string> = {
-      low: 'Düşük',
-      medium: 'Orta',
-      high: 'Yüksek',
-      urgent: 'Acil',
-    };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${styles[priority] || styles.medium}`}>
-        {labels[priority] || priority}
-      </span>
-    );
+  const priorityConfig: Record<string, StatusConfig> = {
+    low: { label: 'Düşük', variant: 'secondary' },
+    medium: { label: 'Orta', variant: 'info' },
+    high: { label: 'Yüksek', variant: 'warning' },
+    urgent: { label: 'Acil', variant: 'danger' },
   };
 
   const getCategoryLabel = (category: string) => {
@@ -333,7 +308,7 @@ export default function SupportPage() {
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+                <Spinner size="lg" />
               </div>
             ) : tickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-gray-500">
@@ -351,7 +326,7 @@ export default function SupportPage() {
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="text-xs text-gray-500">{ticket.ticketNumber}</span>
-                    {getStatusBadge(ticket.status)}
+                    <StatusBadge status={ticket.status} config={supportStatusConfig} />
                   </div>
                   <h3 className="text-gray-900 font-medium mb-1 line-clamp-1">{ticket.subject}</h3>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -361,7 +336,7 @@ export default function SupportPage() {
                     <span>{getCategoryLabel(ticket.category)}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    {getPriorityBadge(ticket.priority)}
+                    <StatusBadge status={ticket.priority} config={priorityConfig} />
                     <span className="text-xs text-gray-500">{formatTime(ticket.createdAt)}</span>
                   </div>
                 </button>
@@ -378,8 +353,8 @@ export default function SupportPage() {
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <span className="text-gray-500">{selectedTicket.ticketNumber}</span>
-                  {getStatusBadge(selectedTicket.status)}
-                  {getPriorityBadge(selectedTicket.priority)}
+                  <StatusBadge status={selectedTicket.status} config={supportStatusConfig} />
+                  <StatusBadge status={selectedTicket.priority} config={priorityConfig} />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900">{selectedTicket.subject}</h2>
               </div>

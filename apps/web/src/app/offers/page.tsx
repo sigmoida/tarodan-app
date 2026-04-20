@@ -13,7 +13,6 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
-  ArrowPathIcon,
   ExclamationCircleIcon,
   ChatBubbleLeftIcon,
   ArrowLeftIcon,
@@ -26,6 +25,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { api, ordersApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { StatusBadge, offerStatusConfig, Button, Spinner } from '@tarodan/ui';
 
 interface Offer {
   id: string;
@@ -213,47 +213,16 @@ function OffersPageContent() {
     }
   };
 
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { bg: string; text: string; icon: any; label: string }> = {
-      pending: {
-        bg: 'bg-amber-100',
-        text: 'text-amber-700',
-        icon: ClockIcon,
-        label: locale === 'en' ? 'Pending' : 'Bekliyor',
-      },
-      accepted: {
-        bg: 'bg-green-100',
-        text: 'text-green-700',
-        icon: CheckCircleIcon,
-        label: locale === 'en' ? 'Accepted' : 'Kabul Edildi',
-      },
-      rejected: {
-        bg: 'bg-red-100',
-        text: 'text-red-700',
-        icon: XCircleIcon,
-        label: locale === 'en' ? 'Rejected' : 'Reddedildi',
-      },
-      countered: {
-        bg: 'bg-blue-100',
-        text: 'text-blue-700',
-        icon: ArrowPathIcon,
-        label: locale === 'en' ? 'Counter Offer' : 'Karşı Teklif',
-      },
-      cancelled: {
-        bg: 'bg-gray-100',
-        text: 'text-gray-700',
-        icon: XCircleIcon,
-        label: locale === 'en' ? 'Cancelled' : 'İptal Edildi',
-      },
-      expired: {
-        bg: 'bg-orange-100',
-        text: 'text-orange-700',
-        icon: ExclamationCircleIcon,
-        label: locale === 'en' ? 'Expired' : 'Süresi Doldu',
-      },
-    };
-    return configs[status] || configs.pending;
+  const offerStatusEnLabels: Record<string, string> = {
+    pending: 'Pending',
+    accepted: 'Accepted',
+    rejected: 'Rejected',
+    countered: 'Counter Offer',
+    cancelled: 'Cancelled',
+    expired: 'Expired',
+    payment_expired: 'Payment Expired',
   };
+  const getOfferStatusLabel = (s: string) => locale === 'en' ? (offerStatusEnLabels[s] || s) : (offerStatusConfig[s]?.label || s);
 
   const calculateDiscount = (offerAmount: number, listingPrice: number) => {
     return Math.round(((listingPrice - offerAmount) / listingPrice) * 100);
@@ -376,7 +345,7 @@ function OffersPageContent() {
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mb-4"></div>
+            <Spinner size="xl" color="border-orange-500 border-t-transparent" className="mb-4" />
             <p className="text-gray-500">{locale === 'en' ? 'Loading offers...' : 'Teklifler yükleniyor...'}</p>
           </div>
         ) : error ? (
@@ -387,12 +356,13 @@ function OffersPageContent() {
           >
             <ExclamationCircleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <p className="text-red-500 mb-4">{error}</p>
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['offers'] })}
-              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
             >
               {locale === 'en' ? 'Try Again' : 'Tekrar Dene'}
-            </button>
+            </Button>
           </motion.div>
         ) : offers.length === 0 ? (
           <motion.div
@@ -429,8 +399,7 @@ function OffersPageContent() {
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
               {offers.map((offer, index) => {
-                const statusConfig = getStatusConfig(offer.status);
-                const StatusIcon = statusConfig.icon;
+                const offerStatusLabel = getOfferStatusLabel(offer.status);
                 const listingEffectivePrice = getProductEffectivePrice(offer.product);
                 const discount = calculateDiscount(offer.amount, listingEffectivePrice);
                 const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;
@@ -499,10 +468,11 @@ function OffersPageContent() {
 
                           {/* Status Badge */}
                           <div className="flex flex-col items-end gap-1">
-                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded ${statusConfig.bg} ${statusConfig.text}`}>
-                              <StatusIcon className="w-4 h-4" />
-                              <span className="text-sm font-medium">{statusConfig.label}</span>
-                            </div>
+                            <StatusBadge
+                              status={offer.status}
+                              config={offerStatusConfig}
+                              label={offerStatusLabel}
+                            />
                             {offer.status === 'cancelled' && offer.cancelReason && (
                               <p className="text-xs text-gray-500">{offer.cancelReason}</p>
                             )}
@@ -579,72 +549,84 @@ function OffersPageContent() {
                                 </span>
                               ) : activeTab === 'received' ? (
                                 <>
-                                  <button
+                                  <Button
+                                    variant="success"
+                                    size="sm"
+                                    className="flex items-center gap-2"
                                     onClick={() => handleAccept(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     {actionLoading === offer.id ? (
-                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                      <Spinner size="sm" color="border-white border-t-transparent" />
                                     ) : (
                                       <CheckIcon className="w-4 h-4" />
                                     )}
                                     {locale === 'en' ? 'Accept' : 'Kabul Et'}
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    className="flex items-center gap-2"
                                     onClick={() => handleReject(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     <XMarkIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Reject' : 'Reddet'}
-                                  </button>
+                                  </Button>
                                 </>
                               ) : offer.buyerMustAccept ? (
                                 <>
-                                  <button
+                                  <Button
+                                    variant="success"
+                                    size="sm"
+                                    className="flex items-center gap-2"
                                     onClick={() => handleAccept(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     {actionLoading === offer.id ? (
-                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                      <Spinner size="sm" color="border-white border-t-transparent" />
                                     ) : (
                                       <CheckIcon className="w-4 h-4" />
                                     )}
                                     {locale === 'en' ? 'Accept counter offer' : 'Karşı teklifi kabul et'}
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    className="flex items-center gap-2"
                                     onClick={() => handleReject(offer.id)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     <XMarkIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Decline' : 'Reddet'}
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    className="flex items-center gap-2"
                                     onClick={() => openBuyerCounterModal(offer)}
                                     disabled={actionLoading === offer.id}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded text-sm font-medium transition-colors"
                                   >
                                     <ArrowTrendingDownIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Lower offer' : 'Daha düşük teklif'}
-                                  </button>
+                                  </Button>
                                 </>
                               ) : (
-                                <button
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex items-center gap-2"
                                   onClick={() => handleCancel(offer.id)}
                                   disabled={actionLoading === offer.id}
-                                  className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded text-sm font-medium transition-colors"
                                 >
                                   {actionLoading === offer.id ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <Spinner size="sm" color="border-white border-t-transparent" />
                                   ) : (
                                     <XMarkIcon className="w-4 h-4" />
                                   )}
                                   {locale === 'en' ? 'Cancel' : 'İptal Et'}
-                                </button>
+                                </Button>
                               )}
                             </div>
                           )}
@@ -701,24 +683,26 @@ function OffersPageContent() {
               onChange={(e) => setBuyerCounterAmt(e.target.value)}
             />
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
                 type="button"
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                variant="secondary"
+                size="md"
                 onClick={() => {
                   setBuyerCounterOpen(false);
                   setBuyerCounterOffer(null);
                 }}
               >
                 {locale === 'en' ? 'Cancel' : 'Vazgeç'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                variant="primary"
+                size="md"
                 disabled={actionLoading === buyerCounterOffer.id}
                 onClick={() => submitBuyerCounter()}
               >
                 {locale === 'en' ? 'Send' : 'Gönder'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -729,7 +713,7 @@ function OffersPageContent() {
 
 export default function OffersPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size="lg" color="border-orange-500 border-t-transparent" /></div>}>
       <OffersPageContent />
     </Suspense>
   );
