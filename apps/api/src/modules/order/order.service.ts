@@ -35,6 +35,7 @@ import { DiscountService, DiscountCalculator } from '../discount';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
 import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
+import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
 
 /**
  * Commission calculation result interface
@@ -314,15 +315,23 @@ export class OrderService {
       idempotencyKey: ctx.idempotencyKey,
       correlationId: ctx.correlationId,
       payload: {
-        externalReference: ctx.idempotencyKey,
-        recipientFullName: ctx.recipientFullName,
-        recipientPhone: ctx.recipientPhone,
-        recipientCity: ctx.recipientCity,
-        recipientDistrict: ctx.recipientDistrict,
-        recipientAddressLine: ctx.recipientAddressLine,
-        productId: ctx.productId,
-        productTitle: ctx.productTitle,
-        orderNumberPreview: ctx.orderNumberPreview,
+        KisiKurum: ctx.recipientFullName,
+        AliciAdresi: ctx.recipientAddressLine,
+        Il: ctx.recipientCity,
+        Ilce: ctx.recipientDistrict,
+        TelefonCep: ctx.recipientPhone,
+        SahisBirim: ctx.productTitle,
+        KargoTuru: SuratKargoTuru.Koli,
+        Odemetipi: SuratOdemeTipi.Pesin,
+        OzelKargoTakipNo: ctx.orderNumberPreview,
+        Adet: 1,
+        BirimDesi: 1,
+        BirimKg: 1,
+        TasimaSekli: SuratTasimaSekli.KaraYolu,
+        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+        GonderiSekli: SuratGonderiSekli.Standart,
+        Pazaryerimi: 0,
+        Iademi: 0,
       },
     });
 

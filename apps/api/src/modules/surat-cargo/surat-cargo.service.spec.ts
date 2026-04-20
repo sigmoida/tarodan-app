@@ -7,16 +7,31 @@ import type {
   SuratGonderiPayload,
   SuratTechnicalFailure,
 } from './surat-cargo.types';
+import {
+  SuratKargoTuru,
+  SuratOdemeTipi,
+  SuratTasimaSekli,
+  SuratTeslimSekli,
+  SuratGonderiSekli,
+} from './surat-cargo.types';
 
 const basePayload: SuratGonderiPayload = {
-  externalReference: 'ref-1',
-  recipientFullName: 'Ali Veli',
-  recipientPhone: '555',
-  recipientCity: 'İstanbul',
-  recipientDistrict: 'Kadıköy',
-  recipientAddressLine: 'Addr',
-  productId: 'p1',
-  orderNumberPreview: 'ORD-1',
+  KisiKurum: 'Ali Veli',
+  AliciAdresi: 'Atatürk Cad. No:5',
+  Il: 'İstanbul',
+  Ilce: 'Kadıköy',
+  TelefonCep: '05551234567',
+  KargoTuru: SuratKargoTuru.Koli,
+  Odemetipi: SuratOdemeTipi.Pesin,
+  OzelKargoTakipNo: 'ORD-1',
+  Adet: 1,
+  BirimDesi: 1,
+  BirimKg: 1,
+  TasimaSekli: SuratTasimaSekli.KaraYolu,
+  TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+  GonderiSekli: SuratGonderiSekli.Standart,
+  Pazaryerimi: 0,
+  Iademi: 0,
 };
 
 describe('SuratCargoService', () => {
