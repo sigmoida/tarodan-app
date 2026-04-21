@@ -89,11 +89,15 @@ interface Trade {
     carrier: string;
     trackingNumber: string;
     status: string;
+    shippedAt?: string;
+    deliveredAt?: string;
   };
   receiverShipment?: {
     carrier: string;
     trackingNumber: string;
     status: string;
+    shippedAt?: string;
+    deliveredAt?: string;
   };
   shipments?: TradeShipment[];
   cashPayment?: {
@@ -434,6 +438,43 @@ export default function TradeDetailPage() {
     trade.status === "shipping_to_warehouse" &&
     (user.id === trade.initiatorId || user.id === trade.receiverId) &&
     (!myToWarehouseShipment || !myToWarehouseShipment.shippedAt);
+
+  // Fallback for older API payloads where `shipments` is missing.
+  const fallbackMyWarehouseShipment =
+    trade && user
+      ? user.id === trade.initiatorId
+        ? trade.initiatorShipment
+        : trade.receiverShipment
+      : undefined;
+  const fallbackOtherWarehouseShipment =
+    trade && user
+      ? user.id === trade.initiatorId
+        ? trade.receiverShipment
+        : trade.initiatorShipment
+      : undefined;
+
+  const myWarehouseShipped =
+    !!(myToWarehouseShipment?.shippedAt || fallbackMyWarehouseShipment?.shippedAt);
+  const otherWarehouseShipped =
+    !!(
+      otherToWarehouseShipment?.shippedAt || fallbackOtherWarehouseShipment?.shippedAt
+    );
+
+  const warehouseProgressText = myWarehouseShipped
+    ? otherWarehouseShipped
+      ? locale === "en"
+        ? "Both shipments are on the way to the warehouse. Waiting for warehouse delivery confirmation."
+        : "Her iki gönderi depoya yolda. Depo teslim teyidi bekleniyor."
+      : locale === "en"
+        ? "Your shipment is submitted. Waiting for the other party to ship to the warehouse."
+        : "Gönderiniz alındı. Karşı tarafın depoya gönderimi bekleniyor."
+    : otherWarehouseShipped
+      ? locale === "en"
+        ? "The other party has shipped. Please submit your shipment to the warehouse."
+        : "Karşı taraf gönderdi. Lütfen siz de depoya gönderimi tamamlayın."
+      : locale === "en"
+        ? "Both parties must submit shipment details to send items to the warehouse."
+        : "Ürünlerin depoya ulaşması için her iki tarafın da gönderim yapması gerekiyor.";
 
   const addressesQuery = useQuery({
     queryKey: ["addresses"],
@@ -2222,7 +2263,7 @@ export default function TradeDetailPage() {
                   <span className="font-medium">
                     {locale === "en" ? "You: " : "Siz: "}
                   </span>
-                  {myToWarehouseShipment?.shippedAt
+                  {myWarehouseShipped
                     ? locale === "en"
                       ? "Shipped"
                       : "Gönderildi"
@@ -2233,7 +2274,7 @@ export default function TradeDetailPage() {
                   <span className="font-medium">
                     {locale === "en" ? "Other party: " : "Karşı taraf: "}
                   </span>
-                  {otherToWarehouseShipment?.shippedAt
+                  {otherWarehouseShipped
                     ? locale === "en"
                       ? "Shipped"
                       : "Gönderildi"
@@ -2243,21 +2284,32 @@ export default function TradeDetailPage() {
                 </p>
               </div>
 
-              {myToWarehouseShipment?.shippedAt ? (
+              <div className="mb-4 p-3 bg-info-50 border border-info-200 rounded-lg">
+                <p className="text-sm text-info-900">{warehouseProgressText}</p>
+              </div>
+
+              {myWarehouseShipped ? (
                 <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-primary-200">
                   <CheckCircleIcon className="w-5 h-5 text-success-600" />
                   <div className="text-sm text-gray-700">
                     <p className="font-medium">
                       {locale === "en"
-                        ? "Shipping info submitted, awaiting arrival at the warehouse"
-                        : "Kargo bilgileri gönderildi, depoya varışı bekleniyor"}
+                        ? "Your shipping info is saved"
+                        : "Kargo bilginiz kaydedildi"}
                     </p>
-                    {(myToWarehouseShipment.carrier ||
-                      myToWarehouseShipment.trackingNumber) && (
+                    {((myToWarehouseShipment?.carrier ||
+                      fallbackMyWarehouseShipment?.carrier) ||
+                      (myToWarehouseShipment?.trackingNumber ||
+                        fallbackMyWarehouseShipment?.trackingNumber)) && (
                       <p className="text-xs text-gray-500 mt-1">
-                        {myToWarehouseShipment.carrier}
-                        {myToWarehouseShipment.trackingNumber
-                          ? ` · ${myToWarehouseShipment.trackingNumber}`
+                        {myToWarehouseShipment?.carrier ||
+                          fallbackMyWarehouseShipment?.carrier}
+                        {(myToWarehouseShipment?.trackingNumber ||
+                          fallbackMyWarehouseShipment?.trackingNumber)
+                          ? ` · ${
+                              myToWarehouseShipment?.trackingNumber ||
+                              fallbackMyWarehouseShipment?.trackingNumber
+                            }`
                           : ""}
                       </p>
                     )}

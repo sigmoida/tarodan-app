@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
 import clsx from 'clsx';
-import { Button } from '@tarodan/ui';
+import { Button, Input } from '@tarodan/ui';
 import {
   HomeIcon,
   UsersIcon,
@@ -19,7 +19,6 @@ import {
   XMarkIcon,
   CurrencyDollarIcon,
   UserCircleIcon,
-  MegaphoneIcon,
   ChatBubbleLeftRightIcon,
   TagIcon,
   SwatchIcon,
@@ -28,20 +27,35 @@ import {
   BanknotesIcon,
   DocumentTextIcon,
   TruckIcon,
-  MapIcon,
   BellAlertIcon,
   CubeIcon,
   BuildingOffice2Icon,
   ClipboardDocumentCheckIcon,
   StarIcon,
   CreditCardIcon,
+  ArrowsRightLeftIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon },
-  { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon },
-  { name: 'Kullanıcılar', href: '/users', icon: UsersIcon },
+type NavItem = {
+  name: string;
+  href: string;
+  icon: ComponentType<{ className?: string }>;
+  /** Ek arama kelimeleri (ör. İngilizce route, eş anlamlı) */
+  keywords?: string[];
+};
+
+const navigation: NavItem[] = [
+  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'] },
+  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'] },
+  { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'] },
+  {
+    name: 'Takaslar',
+    href: '/trades',
+    icon: ArrowsRightLeftIcon,
+    keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
+  },
+  { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'] },
   { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
   { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
   { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
@@ -80,6 +94,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navQuery, setNavQuery] = useState('');
+
+  const filteredNavigation = useMemo(() => {
+    const q = navQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return navigation;
+    return navigation.filter((item) => {
+      const name = item.name.toLocaleLowerCase('tr-TR');
+      const href = item.href.toLowerCase();
+      if (name.includes(q) || href.includes(q)) return true;
+      return (item.keywords ?? []).some((k) => k.toLocaleLowerCase('tr-TR').includes(q));
+    });
+  }, [navQuery]);
 
   const handleLogout = () => {
     logout();
@@ -123,28 +149,46 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </Button>
         </div>
 
+        <div className="px-3 pt-3 pb-2 border-b border-gray-100 shrink-0">
+          <Input
+            type="search"
+            placeholder="Menüde ara…"
+            value={navQuery}
+            onChange={(e) => setNavQuery(e.target.value)}
+            leftAdornment={<MagnifyingGlassIcon className="h-4 w-4 text-gray-400" aria-hidden />}
+            inputSize="sm"
+            className="text-sm"
+            aria-label="Sol menüde başlık ara"
+            autoComplete="off"
+          />
+        </div>
+
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                scroll={false}
-                className={clsx(
-                  'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary-50 text-primary-600'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                )}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon className="h-5 w-5 mr-3" />
-                {item.name}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 p-3 pt-2 space-y-1 overflow-y-auto min-h-0">
+          {filteredNavigation.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-gray-500 text-center">Eşleşen menü öğesi yok</p>
+          ) : (
+            filteredNavigation.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  scroll={false}
+                  className={clsx(
+                    'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary-50 text-primary-600'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  )}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon className="h-5 w-5 mr-3 flex-shrink-0" />
+                  {item.name}
+                </Link>
+              );
+            })
+          )}
         </nav>
 
         {/* User section */}

@@ -1818,6 +1818,17 @@ export class TradeService {
             confirmedAt: receiverShipment.confirmedAt,
           }
         : undefined,
+      shipments: (trade.shipments || []).map((shipment: any) => ({
+        id: shipment.id,
+        direction: shipment.leg || 'to_warehouse',
+        senderUserId: shipment.shipperId || undefined,
+        recipientUserId: shipment.recipientUserId || undefined,
+        carrier: shipment.carrier || undefined,
+        trackingNumber: shipment.trackingNumber || undefined,
+        status: shipment.status || undefined,
+        shippedAt: shipment.shippedAt || undefined,
+        deliveredAt: shipment.deliveredAt || undefined,
+      })),
       cashPayment: trade.cashPayment
         ? {
             id: trade.cashPayment.id,

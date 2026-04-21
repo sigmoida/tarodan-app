@@ -86,6 +86,17 @@ interface TradeDetail {
   cancelledAt?: string;
 }
 
+type RawTradeItem = {
+  id: string;
+  side?: string;
+  product?: {
+    id: string;
+    title: string;
+    price: number;
+    images?: Array<{ url: string }>;
+  };
+};
+
 // ---------- Helpers ----------
 const legLabels: Record<string, string> = {
   to_warehouse: 'Depoya Giden',
@@ -145,7 +156,21 @@ export default function TradeDetailPage() {
     setLoading(true);
     try {
       const response = await adminApi.getTrade(tradeId);
-      setTrade(response.data);
+      const payload = response.data?.data ?? response.data;
+      const rawItems: RawTradeItem[] = Array.isArray(payload?.items) ? payload.items : [];
+      const initiatorItems = Array.isArray(payload?.initiatorItems)
+        ? payload.initiatorItems
+        : rawItems.filter((item) => item.side === 'initiator' && item.product);
+      const receiverItems = Array.isArray(payload?.receiverItems)
+        ? payload.receiverItems
+        : rawItems.filter((item) => item.side === 'receiver' && item.product);
+
+      setTrade({
+        ...payload,
+        initiatorItems,
+        receiverItems,
+        shipments: Array.isArray(payload?.shipments) ? payload.shipments : [],
+      });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Trade load error:', error);
       toast.error(error.response?.data?.message || 'Takas yüklenemedi');
@@ -253,6 +278,8 @@ export default function TradeDetailPage() {
     );
   }
 
+  const initiatorItems = Array.isArray(trade.initiatorItems) ? trade.initiatorItems : [];
+  const receiverItems = Array.isArray(trade.receiverItems) ? trade.receiverItems : [];
   const shipmentsByLeg = groupShipmentsByLeg(trade.shipments || []);
   const toWarehouseShipments = shipmentsByLeg['to_warehouse'] || [];
   const fromWarehouseShipments = shipmentsByLeg['from_warehouse'] || [];
@@ -355,7 +382,7 @@ export default function TradeDetailPage() {
             </div>
             <div className="space-y-3">
               <h3 className="font-medium text-gray-900">Teklif Edilen Ürünler:</h3>
-              {trade.initiatorItems.map((item) => (
+              {initiatorItems.map((item) => (
                 <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                   {item.product.images && item.product.images.length > 0 && (
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
@@ -400,7 +427,7 @@ export default function TradeDetailPage() {
             </div>
             <div className="space-y-3">
               <h3 className="font-medium text-gray-900">Karşılık Verilen Ürünler:</h3>
-              {trade.receiverItems.map((item) => (
+              {receiverItems.map((item) => (
                 <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                   {item.product.images && item.product.images.length > 0 && (
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
