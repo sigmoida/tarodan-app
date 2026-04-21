@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Spinner } from '@tarodan/ui';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -73,7 +73,7 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
@@ -95,7 +95,7 @@ function VerifyEmailContent() {
           {status === 'loading' && (
             <div className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center">
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-full flex items-center justify-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-full flex items-center justify-center">
                   <ArrowPathIcon className="w-10 h-10 text-primary-600 animate-spin" />
                 </div>
               </div>
@@ -113,16 +113,16 @@ function VerifyEmailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-white rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
                 <motion.div 
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                  className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center"
+                  className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center"
                 >
-                  <CheckCircleIcon className="w-12 h-12 text-green-600" />
+                  <CheckCircleIcon className="w-12 h-12 text-success-600" />
                 </motion.div>
               </div>
 
@@ -150,11 +150,11 @@ function VerifyEmailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-xl shadow-red-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-white rounded-3xl shadow-xl shadow-danger-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-rose-100 rounded-full flex items-center justify-center">
-                  <XCircleIcon className="w-12 h-12 text-red-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-danger-100 to-danger-100 rounded-full flex items-center justify-center">
+                  <XCircleIcon className="w-12 h-12 text-danger-600" />
                 </div>
               </div>
 
@@ -166,8 +166,8 @@ function VerifyEmailContent() {
                 {errorMessage}
               </p>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <p className="text-sm text-amber-800">
+              <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-6">
+                <p className="text-sm text-warning-800">
                   {locale === 'tr' 
                     ? 'Bağlantının süresi dolmuş olabilir. Yeni bir doğrulama e-postası isteyebilirsiniz.' 
                     : 'The link may have expired. You can request a new verification email.'}
@@ -175,27 +175,23 @@ function VerifyEmailContent() {
               </div>
 
               <form onSubmit={handleResendVerification} className="mb-6 space-y-3">
-                <input
-                  type="email"
+                <Input type="email"
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
-                  required
-                />
-                <button
-                  type="submit"
+                  className="px-4 py-3 border-gray-200 rounded-xl transition-all duration-200 ease-premium text-gray-900"
+                  required />
+                <Button variant="secondary" type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2"
-                >
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
                   ) : (
                     locale === 'tr' ? 'Yeniden doğrulama e-postası gönder' : 'Resend verification email'
                   )}
-                </button>
+                </Button>
                 {resendSuccess && (
-                  <p className="text-sm text-green-600 text-center">
+                  <p className="text-sm text-success-600 text-center">
                     {locale === 'tr' ? 'E-posta gönderildi. Gelen kutunuzu kontrol edin.' : 'Email sent. Check your inbox.'}
                   </p>
                 )}
@@ -227,7 +223,7 @@ function VerifyEmailContent() {
               className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-2xl flex items-center justify-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-2xl flex items-center justify-center">
                   <EnvelopeIcon className="w-10 h-10 text-primary-600" />
                 </div>
               </div>
@@ -242,8 +238,8 @@ function VerifyEmailContent() {
                   : 'Click the verification link in your email to activate your account.'}
               </p>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                <p className="text-sm text-blue-800">
+              <div className="bg-info-50 border border-info-200 rounded-xl p-4 mb-6">
+                <p className="text-sm text-info-800">
                   {locale === 'tr' 
                     ? 'E-postanızı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin veya yeni doğrulama e-postası isteyin.' 
                     : "Can't find the email? Check your spam/junk folder or request a new verification email."}
@@ -251,27 +247,23 @@ function VerifyEmailContent() {
               </div>
 
               <form onSubmit={handleResendVerification} className="mb-6 space-y-3">
-                <input
-                  type="email"
+                <Input type="email"
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
-                  required
-                />
-                <button
-                  type="submit"
+                  className="px-4 py-3 border-gray-200 rounded-xl transition-all duration-200 ease-premium text-gray-900"
+                  required />
+                <Button variant="secondary" type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2"
-                >
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
                   ) : (
                     locale === 'tr' ? 'Yeniden doğrulama e-postası gönder' : 'Resend verification email'
                   )}
-                </button>
+                </Button>
                 {resendSuccess && (
-                  <p className="text-sm text-green-600 text-center">
+                  <p className="text-sm text-success-600 text-center">
                     {locale === 'tr' ? 'E-posta gönderildi. Gelen kutunuzu kontrol edin.' : 'Email sent. Check your inbox.'}
                   </p>
                 )}
@@ -303,7 +295,7 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     }>

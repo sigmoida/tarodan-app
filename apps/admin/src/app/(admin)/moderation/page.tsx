@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { toast } from 'react-hot-toast';
-import { StatusBadge, Button, Spinner } from '@tarodan/ui';
+import { Button, Select, Spinner, StatusBadge, Textarea } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import {
   CheckCircleIcon,
@@ -210,13 +210,11 @@ const ModerationPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">Moderasyon Kuyruğu</h1>
             <p className="text-gray-500 mt-1">İçerik moderasyonu ve onay işlemleri</p>
           </div>
-          <button
-            onClick={() => { loadQueue(); loadStats(); }}
-            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-          >
+          <Button variant="secondary" onClick={() => { loadQueue(); loadStats(); }}
+            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
             <ArrowPathIcon className="h-5 w-5 mr-2" />
             Yenile
-          </button>
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -227,8 +225,8 @@ const ModerationPage = () => {
                 <p className="text-sm text-gray-500">Bekleyen Ürünler</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.pendingProducts || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-blue-500/20">
-                <CubeIcon className="h-6 w-6 text-blue-700" />
+              <div className="p-3 rounded-lg bg-info-500/20">
+                <CubeIcon className="h-6 w-6 text-info-700" />
               </div>
             </div>
           </div>
@@ -238,8 +236,8 @@ const ModerationPage = () => {
                 <p className="text-sm text-gray-500">Raporlanan Mesajlar</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.reportedMessages || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-purple-500/20">
-                <ChatBubbleLeftIcon className="h-6 w-6 text-purple-700" />
+              <div className="p-3 rounded-lg bg-primary-500/20">
+                <ChatBubbleLeftIcon className="h-6 w-6 text-primary-700" />
               </div>
             </div>
           </div>
@@ -249,8 +247,8 @@ const ModerationPage = () => {
                 <p className="text-sm text-gray-500">Son 7 Gün Değerlendirme</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.recentReviews || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-yellow-500/20">
-                <StarIcon className="h-6 w-6 text-yellow-700" />
+              <div className="p-3 rounded-lg bg-warning-500/20">
+                <StarIcon className="h-6 w-6 text-warning-700" />
               </div>
             </div>
           </div>
@@ -258,10 +256,10 @@ const ModerationPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Toplam Bekleyen</p>
-                <p className="text-2xl font-bold text-orange-700 mt-1">{stats?.totalPending || 0}</p>
+                <p className="text-2xl font-bold text-primary-700 mt-1">{stats?.totalPending || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-orange-500/20">
-                <ExclamationTriangleIcon className="h-6 w-6 text-orange-700" />
+              <div className="p-3 rounded-lg bg-primary-500/20">
+                <ExclamationTriangleIcon className="h-6 w-6 text-primary-700" />
               </div>
             </div>
           </div>
@@ -274,17 +272,15 @@ const ModerationPage = () => {
           {/* Tabs */}
           <div className="flex space-x-2 mb-6">
             {tabs.map((tab) => (
-              <button
-                key={tab.id}
+              <Button variant="secondary" key={tab.id}
                 onClick={() => { setSelectedTab(tab.id); setPage(1); }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedTab === tab.id
                     ? 'bg-primary-500 text-gray-900'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-100'
-                }`}
-              >
+                }`}>
                 {tab.name}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -295,7 +291,7 @@ const ModerationPage = () => {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <CheckCircleIcon className="h-12 w-12 text-green-500 mb-4" />
+              <CheckCircleIcon className="h-12 w-12 text-success-500 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900">Kuyruk Boş</h3>
               <p className="text-gray-500">Şu anda bekleyen moderasyon öğesi bulunmuyor.</p>
             </div>
@@ -330,8 +326,8 @@ const ModerationPage = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <StatusBadge status={item.type} config={moderationTypeConfig} />
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-700' :
-                        item.status === 'reported' ? 'bg-red-500/20 text-red-600' : 
+                        item.status === 'pending' ? 'bg-warning-500/20 text-warning-700' :
+                        item.status === 'reported' ? 'bg-danger-500/20 text-danger-600' : 
                         'bg-gray-500/20 text-gray-500'
                       }`}>
                         {item.status === 'pending' ? 'Bekliyor' :
@@ -378,13 +374,11 @@ const ModerationPage = () => {
                       <XCircleIcon className="h-4 w-4 mr-1" />
                       Reddet
                     </Button>
-                    <button
-                      onClick={() => handleFlagClick(item)}
-                      className="flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-sm"
-                    >
+                    <Button variant="secondary" onClick={() => handleFlagClick(item)}
+                      className="flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-sm">
                       <FlagIcon className="h-4 w-4 mr-1" />
                       İşaretle
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -396,20 +390,16 @@ const ModerationPage = () => {
                     Toplam {total} öğe, Sayfa {page}/{totalPages}
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      disabled={page === 1}
+                    <Button variant="secondary" disabled={page === 1}
                       onClick={() => setPage(page - 1)}
-                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
+                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                       Önceki
-                    </button>
-                    <button
-                      disabled={page >= totalPages}
+                    </Button>
+                    <Button variant="secondary" disabled={page >= totalPages}
                       onClick={() => setPage(page + 1)}
-                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
+                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                       Sonraki
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -429,10 +419,10 @@ const ModerationPage = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Red Sebebi *</label>
-                <select
+                <Select
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-primary-500"
+                  className="bg-gray-100"
                 >
                   <option value="">Sebep seçin</option>
                   <option value="inappropriate">Uygunsuz İçerik</option>
@@ -441,17 +431,15 @@ const ModerationPage = () => {
                   <option value="duplicate">Tekrarlayan İçerik</option>
                   <option value="copyright">Telif Hakkı İhlali</option>
                   <option value="other">Diğer</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Ek Notlar</label>
-                <textarea
-                  value={rejectNotes}
+                <Textarea value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   placeholder="İsteğe bağlı ek notlar..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-primary-500"
-                />
+                  className="bg-gray-100 text-gray-900" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
@@ -477,26 +465,24 @@ const ModerationPage = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">İşaretleme Sebebi *</label>
-                <textarea
-                  value={flagReason}
+                <Textarea value={flagReason}
                   onChange={(e) => setFlagReason(e.target.value)}
                   placeholder="İşaretleme sebebini açıklayın..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-primary-500"
-                />
+                  className="bg-gray-100 text-gray-900" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Öncelik</label>
-                <select
+                <Select
                   value={flagPriority}
                   onChange={(e) => setFlagPriority(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-primary-500"
+                  className="bg-gray-100"
                 >
                   <option value="low">Düşük</option>
                   <option value="normal">Normal</option>
                   <option value="high">Yüksek</option>
                   <option value="urgent">Acil</option>
-                </select>
+                </Select>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { Fragment } from 'react';
 import {
     PlusIcon,
@@ -277,18 +277,16 @@ export default function BrandsPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {loading ? (
                         <div className="p-8 text-center">
-                            <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto" />
+                            <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
                             <p className="mt-2 text-gray-500">Yükleniyor...</p>
                         </div>
                     ) : brands.length === 0 ? (
                         <div className="p-8 text-center">
                             <p className="text-gray-500">Henüz marka eklenmemiş</p>
-                            <button
-                                onClick={openCreateModal}
-                                className="mt-4 text-orange-500 hover:text-orange-600 font-medium"
-                            >
+                            <Button variant="secondary" onClick={openCreateModal}
+                                className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
                                 İlk markayı ekle
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <table className="min-w-full divide-y divide-gray-200">
@@ -340,7 +338,7 @@ export default function BrandsPage() {
                                                     href={brand.website}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                    className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1"
                                                 >
                                                     <GlobeAltIcon className="w-4 h-4" />
                                                     Ziyaret Et
@@ -350,13 +348,11 @@ export default function BrandsPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <button
-                                                onClick={() => toggleStatus(brand)}
+                                            <Button variant="secondary" onClick={() => toggleStatus(brand)}
                                                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${brand.isActive
-                                                        ? 'bg-green-100 text-green-800'
+                                                        ? 'bg-success-100 text-success-800'
                                                         : 'bg-gray-100 text-gray-800'
-                                                    }`}
-                                            >
+                                                    }`}>
                                                 {brand.isActive ? (
                                                     <>
                                                         <CheckCircleIcon className="w-4 h-4" />
@@ -368,13 +364,11 @@ export default function BrandsPage() {
                                                         Pasif
                                                     </>
                                                 )}
-                                            </button>
+                                            </Button>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <button
-                                                onClick={() => toggleExpand(brand.id)}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                            >
+                                            <Button variant="secondary" onClick={() => toggleExpand(brand.id)}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                                                 {expandedBrandId === brand.id ? (
                                                     <ChevronDownIcon className="w-4 h-4" />
                                                 ) : (
@@ -382,24 +376,20 @@ export default function BrandsPage() {
                                                 )}
                                                 <TruckIcon className="w-4 h-4" />
                                                 Modeller
-                                            </button>
+                                            </Button>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => openEditModal(brand)}
+                                                <Button variant="secondary" onClick={() => openEditModal(brand)}
                                                     className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                                                    title="Düzenle"
-                                                >
+                                                    title="Düzenle">
                                                     <PencilIcon className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeleteConfirm(brand.id)}
-                                                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                                    title="Sil"
-                                                >
+                                                </Button>
+                                                <Button variant="secondary" onClick={() => setDeleteConfirm(brand.id)}
+                                                    className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg"
+                                                    title="Sil">
                                                     <TrashIcon className="w-4 h-4" />
-                                                </button>
+                                                </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -408,31 +398,27 @@ export default function BrandsPage() {
                                             <td colSpan={5} className="px-6 py-4 bg-gray-50">
                                                 {modelsLoading ? (
                                                     <div className="flex items-center gap-2 text-gray-500">
-                                                        <Spinner size="sm" color="border-orange-500 border-t-transparent" />
+                                                        <Spinner size="sm" color="border-primary-500 border-t-transparent" />
                                                         Modeller yükleniyor...
                                                     </div>
                                                 ) : modelsForBrand.length === 0 ? (
                                                     <div className="flex items-center gap-4">
                                                         <p className="text-gray-500">Bu marka için henüz model eklenmemiş</p>
-                                                        <button
-                                                            onClick={() => openModelCreateModal(brand.id)}
-                                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg"
-                                                        >
+                                                        <Button variant="secondary" onClick={() => openModelCreateModal(brand.id)}
+                                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
                                                             <PlusIcon className="w-4 h-4" />
                                                             Model Ekle
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-2">
                                                         <div className="flex items-center justify-between mb-2">
                                                             <span className="text-sm font-medium text-gray-700">Modeller ({modelsForBrand.length})</span>
-                                                            <button
-                                                                onClick={() => openModelCreateModal(brand.id)}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg"
-                                                            >
+                                                            <Button variant="secondary" onClick={() => openModelCreateModal(brand.id)}
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
                                                                 <PlusIcon className="w-4 h-4" />
                                                                 Model Ekle
-                                                            </button>
+                                                            </Button>
                                                         </div>
                                                         <div className="max-h-48 overflow-y-auto">
                                                             <table className="min-w-full divide-y divide-gray-200">
@@ -449,21 +435,19 @@ export default function BrandsPage() {
                                                                                 {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
                                                                             </td>
                                                                             <td className="py-2">
-                                                                                <button
-                                                                                    onClick={() => toggleModelStatus(m)}
-                                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
-                                                                                >
+                                                                                <Button variant="secondary" onClick={() => toggleModelStatus(m)}
+                                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
                                                                                     {m.isActive ? 'Aktif' : 'Pasif'}
-                                                                                </button>
+                                                                                </Button>
                                                                             </td>
                                                                             <td className="py-2 text-right">
                                                                                 <div className="flex items-center justify-end gap-1">
-                                                                                    <button onClick={() => openModelEditModal(m)} className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-200 rounded" title="Düzenle">
+                                                                                    <Button variant="secondary" onClick={() => openModelEditModal(m)} className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-200 rounded" title="Düzenle">
                                                                                         <PencilIcon className="w-4 h-4" />
-                                                                                    </button>
-                                                                                    <button onClick={() => setDeleteConfirmModel(m.id)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Sil">
+                                                                                    </Button>
+                                                                                    <Button variant="secondary" onClick={() => setDeleteConfirmModel(m.id)} className="p-1.5 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded" title="Sil">
                                                                                         <TrashIcon className="w-4 h-4" />
-                                                                                    </button>
+                                                                                    </Button>
                                                                                 </div>
                                                                             </td>
                                                                         </tr>
@@ -497,11 +481,10 @@ export default function BrandsPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Marka Adı *
                                         </label>
-                                        <input
+                                        <Input
                                             type="text"
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             required
                                             placeholder="Örn: Ferrari"
                                         />
@@ -511,11 +494,10 @@ export default function BrandsPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Logo URL
                                         </label>
-                                        <input
+                                        <Input
                                             type="url"
                                             value={formData.logo}
                                             onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             placeholder="https://example.com/logo.png"
                                         />
                                     </div>
@@ -524,11 +506,10 @@ export default function BrandsPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Website
                                         </label>
-                                        <input
+                                        <Input
                                             type="url"
                                             value={formData.website}
                                             onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             placeholder="https://www.ferrari.com"
                                         />
                                     </div>
@@ -537,27 +518,23 @@ export default function BrandsPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Açıklama
                                         </label>
-                                        <textarea
-                                            value={formData.description}
+                                        <Textarea value={formData.description}
                                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             rows={2}
-                                            placeholder="Marka hakkında kısa açıklama"
-                                        />
+                                            placeholder="Marka hakkında kısa açıklama" />
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Durum
                                         </label>
-                                        <select
+                                        <Select
                                             value={formData.isActive ? 'true' : 'false'}
                                             onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         >
                                             <option value="true">Aktif</option>
                                             <option value="false">Pasif</option>
-                                        </select>
+                                        </Select>
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-4">
@@ -611,10 +588,9 @@ export default function BrandsPage() {
                                 <form onSubmit={handleModelSubmit} className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Marka *</label>
-                                        <select
+                                        <Select
                                             value={modelFormData.brandId}
                                             onChange={(e) => setModelFormData({ ...modelFormData, brandId: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             required
                                             disabled={!!editingModel}
                                         >
@@ -622,15 +598,14 @@ export default function BrandsPage() {
                                             {brands.map((b) => (
                                                 <option key={b.id} value={b.id}>{b.name}</option>
                                             ))}
-                                        </select>
+                                        </Select>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Model Adı *</label>
-                                        <input
+                                        <Input
                                             type="text"
                                             value={modelFormData.name}
                                             onChange={(e) => setModelFormData({ ...modelFormData, name: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             required
                                             placeholder="Örn: M4, 911 GT3"
                                         />
@@ -638,11 +613,10 @@ export default function BrandsPage() {
                                     <div className="flex gap-4">
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Yılı</label>
-                                            <input
+                                            <Input
                                                 type="number"
                                                 value={modelFormData.yearStart}
                                                 onChange={(e) => setModelFormData({ ...modelFormData, yearStart: e.target.value ? parseInt(e.target.value) : '' })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                                 min="1900"
                                                 max="2100"
                                                 placeholder="2014"
@@ -650,11 +624,10 @@ export default function BrandsPage() {
                                         </div>
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Yılı</label>
-                                            <input
+                                            <Input
                                                 type="number"
                                                 value={modelFormData.yearEnd}
                                                 onChange={(e) => setModelFormData({ ...modelFormData, yearEnd: e.target.value ? parseInt(e.target.value) : '' })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                                 min="1900"
                                                 max="2100"
                                                 placeholder="Boş = devam ediyor"
@@ -663,14 +636,13 @@ export default function BrandsPage() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                                        <select
+                                        <Select
                                             value={modelFormData.isActive ? 'true' : 'false'}
                                             onChange={(e) => setModelFormData({ ...modelFormData, isActive: e.target.value === 'true' })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         >
                                             <option value="true">Aktif</option>
                                             <option value="false">Pasif</option>
-                                        </select>
+                                        </Select>
                                     </div>
                                     <div className="flex justify-end gap-3 pt-4">
                                         <Button variant="secondary" size="md" type="button" onClick={() => setShowModelModal(false)}>

@@ -281,7 +281,7 @@ export default function ProfilePage() {
   if (!mounted || authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-orange-500 pt-8 pb-24">
+        <div className="bg-primary-500 pt-8 pb-24">
           <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
             <div className="flex justify-center py-12">
               <Spinner size="xl" color="border-white border-t-transparent" />
@@ -303,19 +303,19 @@ export default function ProfilePage() {
 
   const tierColors = {
     free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
-    basic: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
-    premium: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
-    business: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
+    basic: { bg: 'bg-info-50', text: 'text-info-700', border: 'border-info-300' },
+    premium: { bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-300' },
+    business: { bg: 'bg-warning-50', text: 'text-warning-700', border: 'border-warning-300' },
   };
 
   const currentTierColor = tierColors[profile?.membership?.tier.type as keyof typeof tierColors] || tierColors.free;
 
   // Quick action menu items
   const quickActions = [
-    { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', color: 'text-orange-500' },
-    { icon: TagIcon, label: t('order.myOrders'), href: '/orders', color: 'text-blue-500' },
-    { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', color: 'text-red-500' },
-    { icon: ChatBubbleLeftRightIcon, label: t('nav.messages'), href: '/messages', color: 'text-green-500' },
+    { icon: ShoppingBagIcon, label: t('nav.myListings'), href: '/profile/listings', color: 'text-primary-500' },
+    { icon: TagIcon, label: t('order.myOrders'), href: '/orders', color: 'text-info-500' },
+    { icon: HeartIcon, label: t('nav.favorites'), href: '/favorites', color: 'text-danger-500' },
+    { icon: ChatBubbleLeftRightIcon, label: t('nav.messages'), href: '/messages', color: 'text-success-500' },
   ];
 
   // Menu sections
@@ -363,7 +363,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-orange-500 pt-8 pb-24">
+      <div className="bg-primary-500 pt-8 pb-24">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           {loading ? (
             <div className="flex justify-center py-12">
@@ -373,7 +373,7 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar: initials only (Trendyol-style) */}
               <div className="relative flex-shrink-0">
-                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-white text-orange-500 shadow-lg" />
+                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-white text-primary-500 shadow-lg" />
               </div>
               
               {/* User Info */}
@@ -381,7 +381,7 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
                   <h1 className="text-2xl md:text-3xl font-bold truncate">{profile.displayName}</h1>
                   {profile.isVerified && (
-                    <span className="px-2 py-1 bg-green-500/30 text-green-100 text-xs rounded-sm font-medium whitespace-nowrap">
+                    <span className="px-2 py-1 bg-success-500/30 text-success-100 text-xs rounded-sm font-medium whitespace-nowrap">
                       ✓ {t('common.approved')}
                     </span>
                   )}
@@ -392,9 +392,9 @@ export default function ProfilePage() {
                   <div className="mb-3">
                     <span className={`inline-flex items-center px-4 py-1.5 text-sm rounded-sm font-semibold ${
                       profile.membership.tier.type === 'business' 
-                        ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-md' 
+                        ? 'bg-gradient-to-r from-warning-400 to-primary-400 text-white shadow-md' 
                         : profile.membership.tier.type === 'premium'
-                          ? 'bg-gradient-to-r from-purple-400 to-pink-400 text-white shadow-md'
+                          ? 'bg-gradient-to-r from-primary-400 to-danger-400 text-white shadow-md'
                           : 'bg-white/25 backdrop-blur-sm text-white'
                     }`}>
                       {profile.membership.tier.type === 'business' && <span className="mr-1">👑</span>}
@@ -405,15 +405,15 @@ export default function ProfilePage() {
                   </div>
                 )}
                 
-                <p className="text-orange-100">{profile.email}</p>
-                <p className="text-orange-200 text-sm mt-1">
+                <p className="text-primary-100">{profile.email}</p>
+                <p className="text-primary-200 text-sm mt-1">
                   {t('profile.memberSince')}: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
                 </p>
                 
                 {/* Rating - Header'da göster */}
                 {profile.stats && profile.stats.rating > 0 && (
                   <div className="flex items-center gap-2 mt-2">
-                    <div className="flex text-yellow-300">
+                    <div className="flex text-warning-300">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <svg
                           key={star}
@@ -425,7 +425,7 @@ export default function ProfilePage() {
                       ))}
                     </div>
                     <span className="text-white font-medium">{profile.stats.rating.toFixed(1)}</span>
-                    <span className="text-orange-200 text-sm">({profile.stats.reviewsCount} değerlendirme)</span>
+                    <span className="text-primary-200 text-sm">({profile.stats.reviewsCount} değerlendirme)</span>
                   </div>
                 )}
               </div>
@@ -458,7 +458,7 @@ export default function ProfilePage() {
               className="bg-white rounded p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 group"
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded bg-gray-50 group-hover:bg-orange-50 transition-colors`}>
+                <div className={`p-2 rounded bg-gray-50 group-hover:bg-primary-50 transition-colors`}>
                   <action.icon className={`w-6 h-6 ${action.color}`} />
                 </div>
                 <div>
@@ -483,9 +483,9 @@ export default function ProfilePage() {
             transition={{ delay: 0.1 }}
             className={`rounded p-6 shadow-sm border mb-6 ${
               profile.membership.tier.type === 'business' 
-                ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200' 
+                ? 'bg-gradient-to-br from-warning-50 to-primary-50 border-warning-200' 
                 : profile.membership.tier.type === 'premium'
-                  ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200'
+                  ? 'bg-gradient-to-br from-primary-50 to-danger-50 border-primary-200'
                   : 'bg-white border-gray-100'
             }`}
           >
@@ -493,9 +493,9 @@ export default function ProfilePage() {
               <div className="flex items-center gap-3">
                 <div className={`p-3 rounded ${
                   profile.membership.tier.type === 'business'
-                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
+                    ? 'bg-gradient-to-br from-warning-400 to-primary-500 text-white'
                     : profile.membership.tier.type === 'premium'
-                      ? 'bg-gradient-to-br from-purple-400 to-pink-500 text-white'
+                      ? 'bg-gradient-to-br from-primary-400 to-danger-500 text-white'
                       : 'bg-gray-100 text-gray-600'
                 }`}>
                   <SparklesIcon className="w-6 h-6" />
@@ -513,7 +513,7 @@ export default function ProfilePage() {
               {profile.membership.tier.type === 'free' && (
                 <Link
                   href="/pricing"
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded transition-colors"
+                  className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded transition-colors"
                 >
                   🚀 Premium'a Yükselt
                 </Link>
@@ -526,8 +526,8 @@ export default function ProfilePage() {
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
-                  profile.membership.tier.type === 'business' ? 'text-amber-600' :
-                  profile.membership.tier.type === 'premium' ? 'text-purple-600' : 'text-orange-500'
+                  profile.membership.tier.type === 'business' ? 'text-warning-600' :
+                  profile.membership.tier.type === 'premium' ? 'text-primary-600' : 'text-primary-500'
                 }`}>
                   {(() => {
                     const limit = profile.membership.tier.type === 'free'
@@ -542,8 +542,8 @@ export default function ProfilePage() {
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
-                  profile.membership.tier.type === 'business' ? 'text-amber-600' :
-                  profile.membership.tier.type === 'premium' ? 'text-purple-600' : 'text-orange-500'
+                  profile.membership.tier.type === 'business' ? 'text-warning-600' :
+                  profile.membership.tier.type === 'premium' ? 'text-primary-600' : 'text-primary-500'
                 }`}>{profile.membership.tier.maxImagesPerListing}</p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">Fotoğraf / İlan</p>
               </div>
@@ -551,15 +551,15 @@ export default function ProfilePage() {
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
                 <p className={`text-2xl font-bold ${
-                  profile.membership.tier.type === 'business' ? 'text-amber-600' :
-                  profile.membership.tier.type === 'premium' ? 'text-purple-600' : 'text-orange-500'
+                  profile.membership.tier.type === 'business' ? 'text-warning-600' :
+                  profile.membership.tier.type === 'premium' ? 'text-primary-600' : 'text-primary-500'
                 }`}>{profile.membership.tier.featuredListingSlots}</p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.featuredListings')}</p>
               </div>
               <div className={`text-center p-4 rounded ${
                 profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
               }`}>
-                <p className="text-2xl font-bold text-green-500">
+                <p className="text-2xl font-bold text-success-500">
                   %{(profile.membership.tier.commissionDiscount * 100).toFixed(0)}
                 </p>
                 <p className="text-xs text-gray-600 mt-1 font-medium">Komisyon İndirimi</p>
@@ -570,21 +570,21 @@ export default function ProfilePage() {
             <div className="flex flex-wrap gap-2">
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canTrade 
-                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  ? 'bg-success-100 text-success-700 border border-success-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
               }`}>
                 {profile.membership.tier.canTrade ? '✓' : '✗'} Takas
               </span>
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canCreateCollections 
-                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  ? 'bg-success-100 text-success-700 border border-success-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
               }`}>
                 {profile.membership.tier.canCreateCollections ? '✓' : '✗'} Koleksiyon
               </span>
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.isAdFree 
-                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  ? 'bg-success-100 text-success-700 border border-success-200' 
                   : 'bg-gray-100 text-gray-500 border border-gray-200'
               }`}>
                 {profile.membership.tier.isAdFree ? '✓ Reklamsız' : '✗ Reklamsız'}
@@ -615,10 +615,10 @@ export default function ProfilePage() {
                     href={item.href}
                     className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
                   >
-                    <div className="relative p-2 rounded bg-gray-100 group-hover:bg-orange-100 transition-colors">
-                      <item.icon className="w-5 h-5 text-gray-600 group-hover:text-orange-600 transition-colors" />
+                    <div className="relative p-2 rounded bg-gray-100 group-hover:bg-primary-100 transition-colors">
+                      <item.icon className="w-5 h-5 text-gray-600 group-hover:text-primary-600 transition-colors" />
                       {item.badge > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-sm flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-danger-500 text-white text-xs font-bold rounded-sm flex items-center justify-center">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}
@@ -627,14 +627,14 @@ export default function ProfilePage() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900">{item.label}</p>
                         {item.badge > 0 && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-sm">
+                          <span className="px-2 py-0.5 bg-danger-100 text-danger-600 text-xs font-medium rounded-sm">
                             {item.badge} bekliyor
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-500">{item.desc}</p>
                     </div>
-                    <ChevronRightIcon className="w-5 h-5 text-gray-300 group-hover:text-orange-400 transition-colors" />
+                    <ChevronRightIcon className="w-5 h-5 text-gray-300 group-hover:text-primary-400 transition-colors" />
                   </Link>
                 ))}
               </div>
@@ -647,7 +647,7 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             onClick={handleLogout}
-            className="w-full py-4 bg-white border border-red-200 text-red-600 font-medium rounded hover:bg-red-50 transition-colors shadow-sm"
+            className="w-full py-4 bg-white border border-danger-200 text-danger-600 font-medium rounded hover:bg-danger-50 transition-colors shadow-sm"
           >
             {t('common.logout')}
           </motion.button>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -234,7 +234,7 @@ export default function EditCollectionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto mb-4" />
+          <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto mb-4" />
           <p className="text-gray-600">{t('collection.loading')}</p>
         </div>
       </div>
@@ -245,7 +245,7 @@ export default function EditCollectionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || t('collection.collectionNotFound')}</p>
+          <p className="text-danger-600 mb-4">{error || t('collection.collectionNotFound')}</p>
           <Button
             variant="primary"
             size="md"
@@ -262,11 +262,11 @@ export default function EditCollectionPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 py-4">
-          <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors mb-3">
+          <Button variant="secondary" onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors mb-3">
             <ArrowLeftIcon className="w-4 h-4" />{t('common.back')}
-          </button>
+          </Button>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+            <div className="w-1 h-6 bg-primary-500 rounded-sm" />
             {t('collection.editCollectionTitle')}
           </h1>
         </div>
@@ -281,16 +281,14 @@ export default function EditCollectionPage() {
               <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('collection.collectionNameLabel')}
               </label>
-              <input
-                type="text"
+              <Input type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.namePlaceholder')}
                 required
                 minLength={3}
-                maxLength={100}
-              />
+                maxLength={100} />
               <p className="mt-1 text-sm text-gray-500">
                 {name.length}/100 {t('collection.characters')}
               </p>
@@ -301,14 +299,12 @@ export default function EditCollectionPage() {
               <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('collection.descriptionLabel')}
               </label>
-              <textarea
-                value={description}
+              <Textarea value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.descriptionPlaceholder')}
                 rows={5}
-                maxLength={500}
-              />
+                maxLength={500} />
               <p className="mt-1 text-sm text-gray-500">
                 {description.length}/500 {t('collection.characters')}
               </p>
@@ -319,10 +315,9 @@ export default function EditCollectionPage() {
               <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
                 {t('common.category')}
               </label>
-              <select
+              <Select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400"
               >
                 <option value="">{t('common.none')}</option>
                 {flatCategories.map((cat) => (
@@ -330,7 +325,7 @@ export default function EditCollectionPage() {
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Cover Image Upload */}
@@ -350,13 +345,11 @@ export default function EditCollectionPage() {
                     />
                   </div>
                 )}
-                <input
-                  type="file"
+                <Input type="file"
                   accept="image/*"
                   onChange={handleCoverImageChange}
                   disabled={isUploadingCover}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed" />
                 {isUploadingCover && (
                   <p className="text-sm text-gray-500">Yükleniyor...</p>
                 )}
@@ -368,16 +361,12 @@ export default function EditCollectionPage() {
 
             {/* Public/Private */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="isPublic"
                 checked={isPublic}
                 onChange={(e) => setIsPublic(e.target.checked)}
-                className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                label={t('collection.publicCollection')}
               />
-              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 cursor-pointer">
-                {t('collection.publicCollection')}
-              </label>
             </div>
             <p className="text-sm text-gray-500 -mt-4">
               {isPublic

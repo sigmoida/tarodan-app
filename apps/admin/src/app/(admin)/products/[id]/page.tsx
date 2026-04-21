@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -73,12 +73,12 @@ interface Review {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Beklemede', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  active: { label: 'Aktif', color: 'text-green-600', bg: 'bg-green-100' },
+  pending: { label: 'Beklemede', color: 'text-warning-600', bg: 'bg-warning-100' },
+  active: { label: 'Aktif', color: 'text-success-600', bg: 'bg-success-100' },
   inactive: { label: 'Pasif', color: 'text-gray-600', bg: 'bg-gray-100' },
-  rejected: { label: 'Reddedildi', color: 'text-red-600', bg: 'bg-red-100' },
-  reserved: { label: 'Rezerve', color: 'text-blue-600', bg: 'bg-blue-100' },
-  sold: { label: 'Satıldı', color: 'text-purple-600', bg: 'bg-purple-100' },
+  rejected: { label: 'Reddedildi', color: 'text-danger-600', bg: 'bg-danger-100' },
+  reserved: { label: 'Rezerve', color: 'text-info-600', bg: 'bg-info-100' },
+  sold: { label: 'Satıldı', color: 'text-primary-600', bg: 'bg-primary-100' },
 };
 
 export default function ProductDetailPage() {
@@ -205,7 +205,7 @@ export default function ProductDetailPage() {
   };
 
   const renderStars = (score: number) => (
-    <div className="flex text-yellow-500">
+    <div className="flex text-warning-500">
       {[...Array(5)].map((_, i) => (
         i < score ? <StarIconSolid key={i} className="w-4 h-4" /> : <StarIcon key={i} className="w-4 h-4" />
       ))}
@@ -214,9 +214,9 @@ export default function ProductDetailPage() {
 
   const getReviewStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved': return <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">Onaylı</span>;
-      case 'pending': return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Bekliyor</span>;
-      case 'rejected': return <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">Reddedildi</span>;
+      case 'approved': return <span className="px-2 py-1 text-xs bg-success-100 text-success-700 rounded-full">Onaylı</span>;
+      case 'pending': return <span className="px-2 py-1 text-xs bg-warning-100 text-warning-700 rounded-full">Bekliyor</span>;
+      case 'rejected': return <span className="px-2 py-1 text-xs bg-danger-100 text-danger-700 rounded-full">Reddedildi</span>;
       case 'spam': return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">Spam</span>;
       default: return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">{status}</span>;
     }
@@ -340,26 +340,22 @@ export default function ProductDetailPage() {
           {/* Tabs */}
           <div className="mb-6 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('info')}
+              <Button variant="secondary" onClick={() => setActiveTab('info')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'info'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-              >
+                  }`}>
                 <CubeIcon className="w-5 h-5 inline mr-2" />
                 Ürün Bilgileri
-              </button>
-              <button
-                onClick={() => setActiveTab('reviews')}
+              </Button>
+              <Button variant="secondary" onClick={() => setActiveTab('reviews')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'reviews'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-              >
+                  }`}>
                 <StarIcon className="w-5 h-5 inline mr-2" />
                 Yorumlar ({reviews.length})
-              </button>
+              </Button>
             </nav>
           </div>
 
@@ -438,8 +434,8 @@ export default function ProductDetailPage() {
                     </div>
                     {product.rejectionReason && (
                       <div className="pt-3 border-t">
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <p className="text-sm text-red-800">
+                        <div className="p-3 bg-danger-50 border border-danger-200 rounded-lg">
+                          <p className="text-sm text-danger-800">
                             <strong>Red Nedeni:</strong> {product.rejectionReason}
                           </p>
                         </div>
@@ -551,7 +547,7 @@ export default function ProductDetailPage() {
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-gray-900">{review.user.displayName}</span>
                               {review.isVerifiedPurchase && (
-                                <span className="text-xs text-green-600 flex items-center gap-1">
+                                <span className="text-xs text-success-600 flex items-center gap-1">
                                   <CheckCircleIcon className="w-3 h-3" /> Onaylı Alıcı
                                 </span>
                               )}
@@ -578,43 +574,33 @@ export default function ProductDetailPage() {
                         <div className="flex items-center gap-2">
                           {review.status === 'pending' && (
                             <>
-                              <button
-                                onClick={() => handleReviewStatusUpdate(review.id, 'approved')}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-                                title="Onayla"
-                              >
+                              <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'approved')}
+                                className="p-2 text-success-600 hover:bg-success-50 rounded-lg"
+                                title="Onayla">
                                 <CheckCircleIcon className="w-5 h-5" />
-                              </button>
-                              <button
-                                onClick={() => handleReviewStatusUpdate(review.id, 'rejected')}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                                title="Reddet"
-                              >
+                              </Button>
+                              <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'rejected')}
+                                className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg"
+                                title="Reddet">
                                 <XCircleIcon className="w-5 h-5" />
-                              </button>
+                              </Button>
                             </>
                           )}
-                          <button
-                            onClick={() => openReplyModal(review)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                            title="Yanıtla"
-                          >
+                          <Button variant="secondary" onClick={() => openReplyModal(review)}
+                            className="p-2 text-info-600 hover:bg-info-50 rounded-lg"
+                            title="Yanıtla">
                             <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleReviewStatusUpdate(review.id, 'spam')}
-                            className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg"
-                            title="Spam"
-                          >
+                          </Button>
+                          <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'spam')}
+                            className="p-2 text-warning-600 hover:bg-warning-50 rounded-lg"
+                            title="Spam">
                             <ExclamationTriangleIcon className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleReviewDelete(review.id)}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                            title="Sil"
-                          >
+                          </Button>
+                          <Button variant="secondary" onClick={() => handleReviewDelete(review.id)}
+                            className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg"
+                            title="Sil">
                             <TrashIcon className="w-5 h-5" />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -636,14 +622,12 @@ export default function ProductDetailPage() {
                 </div>
               )}
               <form onSubmit={handleReviewReply}>
-                <textarea
-                  value={replyText}
+                <Textarea value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  className="text-gray-900"
                   rows={4}
                   placeholder="Yanıtınızı yazın..."
-                  required
-                />
+                  required />
                 <div className="flex gap-3 mt-4">
                   <Button variant="secondary" size="md" type="button" onClick={() => setReplyModalOpen(false)} className="flex-1">
                     İptal
@@ -666,13 +650,10 @@ export default function ProductDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Not (Opsiyonel)
                 </label>
-                <textarea
-                  value={approveNote}
+                <Textarea value={approveNote}
                   onChange={(e) => setApproveNote(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   rows={3}
-                  placeholder="Onay notu ekleyin..."
-                />
+                  placeholder="Onay notu ekleyin..." />
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" size="md" onClick={() => { setShowApproveModal(false); setApproveNote(''); }} disabled={processing} className="flex-1">
@@ -695,13 +676,10 @@ export default function ProductDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Red Nedeni *
                 </label>
-                <textarea
-                  value={rejectReason}
+                <Textarea value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   rows={4}
-                  placeholder="Red nedenini açıklayın..."
-                />
+                  placeholder="Red nedenini açıklayın..." />
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" size="md" onClick={() => { setShowRejectModal(false); setRejectReason(''); }} disabled={processing} className="flex-1">
@@ -721,96 +699,82 @@ export default function ProductDetailPage() {
             <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 my-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Ürünü Düzenle</h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
+                <Button variant="secondary" onClick={() => setShowEditModal(false)}
+                  className="text-gray-500 hover:text-gray-700">
                   <XCircleIcon className="w-6 h-6" />
-                </button>
+                </Button>
               </div>
 
               <form onSubmit={handleUpdate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={editForm.title}
                     onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                    required
-                  />
+                    className="text-gray-900"
+                    required />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
-                  <textarea
-                    value={editForm.description}
+                  <Textarea value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                    rows={5}
-                  />
+                    className="text-gray-900"
+                    rows={5} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fiyat (₺)</label>
-                    <input
-                      type="number"
+                    <Input type="number"
                       step="0.01"
                       value={editForm.price}
                       onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                      required
-                    />
+                      className="text-gray-900"
+                      required />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">İndirimsiz Fiyat (Opsiyonel)</label>
-                    <input
-                      type="number"
+                    <Input type="number"
                       step="0.01"
                       value={editForm.originalPrice}
                       onChange={(e) => setEditForm({ ...editForm, originalPrice: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                      placeholder="Boş bırakılabilir"
-                    />
+                      className="text-gray-900"
+                      placeholder="Boş bırakılabilir" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Stok</label>
-                    <input
-                      type="number"
+                    <Input type="number"
                       value={editForm.quantity}
                       onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                    />
+                      className="text-gray-900" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Durum (Kondisyon)</label>
-                    <select
+                    <Select
                       value={editForm.condition}
                       onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                     >
                       <option value="new">Yeni</option>
                       <option value="like_new">Yeni Gibi</option>
                       <option value="good">İyi</option>
                       <option value="fair">Orta</option>
                       <option value="poor">Kötü</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Statü</label>
-                    <select
+                    <Select
                       value={editForm.status}
                       onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                     >
                       {Object.entries(statusConfig).map(([key, config]) => (
                         <option key={key} value={key}>{config.label}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 

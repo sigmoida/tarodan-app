@@ -55,8 +55,8 @@ export default function SellOnWebsitePage() {
                 className="bg-white rounded-xl shadow-sm p-6 border border-gray-100"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Icon className="w-6 h-6 text-orange-600" />
+                  <div className="p-2 bg-primary-100 rounded-lg">
+                    <Icon className="w-6 h-6 text-primary-600" />
                   </div>
                   <h3 className="font-semibold text-gray-900">
                     {t(`sellOnWebsite.${titleKey}`)}
@@ -78,7 +78,7 @@ export default function SellOnWebsitePage() {
           <div className="flex flex-col sm:flex-row gap-6 sm:gap-4">
             {steps.map(({ icon: Icon, textKey }, i) => (
               <div key={textKey} className="flex-1 flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold">
                   {i + 1}
                 </div>
                 <div className="flex items-center gap-2 min-w-0">
@@ -97,15 +97,15 @@ export default function SellOnWebsitePage() {
           </h2>
           <ul className="space-y-2 text-gray-700">
             <li className="flex items-center gap-2">
-              <span className="text-orange-500">•</span>
+              <span className="text-primary-500">•</span>
               {t('sellOnWebsite.req1')}
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-orange-500">•</span>
+              <span className="text-primary-500">•</span>
               {t('sellOnWebsite.req2')}
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-orange-500">•</span>
+              <span className="text-primary-500">•</span>
               {t('sellOnWebsite.req3')}
             </li>
           </ul>
@@ -116,17 +116,17 @@ export default function SellOnWebsitePage() {
           <p className="text-gray-600 mb-6">{t('sellOnWebsite.successStory')}</p>
           <Link
             href={isAuthenticated ? '/listings/new' : '/register?redirect=/listings/new'}
-            className="inline-block px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
+            className="inline-block px-8 py-4 bg-primary-500 hover:bg-primary-600 text-white font-semibold rounded-xl transition-colors"
           >
             {isAuthenticated ? t('sellOnWebsite.ctaLoggedIn') : t('sellOnWebsite.cta')}
           </Link>
           {!isAuthenticated && (
             <p className="text-sm text-gray-500 mt-3 space-x-4">
-              <Link href="/login" className="text-orange-500 hover:underline">
+              <Link href="/login" className="text-primary-500 hover:underline">
                 {t('sellOnWebsite.loginPrompt')}
               </Link>
               <span>·</span>
-              <Link href="/register/business" className="text-orange-500 hover:underline">
+              <Link href="/register/business" className="text-primary-500 hover:underline">
                 {t('sellOnWebsite.businessRegister')}
               </Link>
             </p>

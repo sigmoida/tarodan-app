@@ -25,7 +25,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { api, ordersApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { StatusBadge, offerStatusConfig, Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Spinner, StatusBadge, offerStatusConfig } from '@tarodan/ui';
 
 interface Offer {
   id: string;
@@ -271,7 +271,7 @@ function OffersPageContent() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
-                <span className="w-1 h-6 bg-orange-500 rounded-sm" />
+                <span className="w-1 h-6 bg-primary-500 rounded-sm" />
                 {locale === 'en' ? 'My Offers' : 'Tekliflerim'}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
@@ -290,21 +290,21 @@ function OffersPageContent() {
           {/* Stats Row */}
           <div className="mt-4 flex flex-wrap gap-4 bg-white rounded border border-gray-200 p-4">
             <div className="flex items-center gap-3">
-              <ClockIcon className="w-5 h-5 text-amber-500" />
+              <ClockIcon className="w-5 h-5 text-warning-500" />
               <div>
                 <p className="text-lg font-semibold text-gray-900">{pendingCount}</p>
                 <p className="text-xs text-gray-500">{locale === 'en' ? 'Pending' : 'Bekleyen'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <CheckCircleIcon className="w-5 h-5 text-green-500" />
+              <CheckCircleIcon className="w-5 h-5 text-success-500" />
               <div>
                 <p className="text-lg font-semibold text-gray-900">{acceptedCount}</p>
                 <p className="text-xs text-gray-500">{locale === 'en' ? 'Accepted' : 'Kabul Edilen'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <TagIcon className="w-5 h-5 text-orange-500" />
+              <TagIcon className="w-5 h-5 text-primary-500" />
               <div>
                 <p className="text-lg font-semibold text-gray-900">₺{totalValue.toLocaleString('tr-TR')}</p>
                 <p className="text-xs text-gray-500">{locale === 'en' ? 'Total Value' : 'Toplam Değer'}</p>
@@ -318,34 +318,30 @@ function OffersPageContent() {
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
         {/* Tabs */}
         <div className="bg-gray-100 rounded p-0.5 mb-6 inline-flex">
-          <button
-            onClick={() => switchTab('received')}
+          <Button variant="secondary" onClick={() => switchTab('received')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'received'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+            }`}>
             <InboxArrowDownIcon className="w-5 h-5" />
             {locale === 'en' ? 'Received' : 'Gelen Teklifler'}
-          </button>
-          <button
-            onClick={() => switchTab('sent')}
+          </Button>
+          <Button variant="secondary" onClick={() => switchTab('sent')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'sent'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+            }`}>
             <PaperAirplaneIcon className="w-5 h-5" />
             {locale === 'en' ? 'Sent' : 'Gönderilen Teklifler'}
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <Spinner size="xl" color="border-orange-500 border-t-transparent" className="mb-4" />
+            <Spinner size="xl" color="border-primary-500 border-t-transparent" className="mb-4" />
             <p className="text-gray-500">{locale === 'en' ? 'Loading offers...' : 'Teklifler yükleniyor...'}</p>
           </div>
         ) : error ? (
@@ -354,8 +350,8 @@ function OffersPageContent() {
             animate={{ opacity: 1, scale: 1 }}
             className="text-center py-16 bg-white rounded shadow-sm"
           >
-            <ExclamationCircleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <p className="text-red-500 mb-4">{error}</p>
+            <ExclamationCircleIcon className="w-16 h-16 text-danger-400 mx-auto mb-4" />
+            <p className="text-danger-500 mb-4">{error}</p>
             <Button
               variant="primary"
               size="md"
@@ -370,11 +366,11 @@ function OffersPageContent() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-16 bg-white rounded shadow-sm"
           >
-            <div className="w-20 h-20 bg-orange-100 rounded flex items-center justify-center mx-auto mb-4">
+            <div className="w-20 h-20 bg-primary-100 rounded flex items-center justify-center mx-auto mb-4">
               {activeTab === 'received' ? (
-                <InboxArrowDownIcon className="w-10 h-10 text-orange-500" />
+                <InboxArrowDownIcon className="w-10 h-10 text-primary-500" />
               ) : (
-                <PaperAirplaneIcon className="w-10 h-10 text-orange-500" />
+                <PaperAirplaneIcon className="w-10 h-10 text-primary-500" />
               )}
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -389,7 +385,7 @@ function OffersPageContent() {
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors"
             >
               <TagIcon className="w-5 h-5" />
               {locale === 'en' ? 'Browse Listings' : 'İlanlara Göz At'}
@@ -437,14 +433,14 @@ function OffersPageContent() {
                               logContext={{ productId: offer.product.id, page: 'offers' }}
                             />
                           ) : (
-                          <div className="w-full h-full bg-orange-100 flex items-center justify-center">
-                            <TagIcon className="w-10 h-10 text-orange-400" />
+                          <div className="w-full h-full bg-primary-100 flex items-center justify-center">
+                            <TagIcon className="w-10 h-10 text-primary-400" />
                           </div>
                           );
                         })()}
                         {/* Discount Badge */}
                         {discount > 0 && (
-                          <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
+                          <div className="absolute top-3 left-3 bg-danger-500 text-white px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
                             <ArrowTrendingDownIcon className="w-4 h-4" />
                             %{discount}
                           </div>
@@ -457,7 +453,7 @@ function OffersPageContent() {
                           <div className="flex-1">
                             <Link
                               href={`/listings/${offer.product.id}`}
-                              className="text-lg font-semibold text-gray-900 hover:text-orange-500 transition-colors line-clamp-1"
+                              className="text-lg font-semibold text-gray-900 hover:text-primary-500 transition-colors line-clamp-1"
                             >
                               {offer.product.title}
                             </Link>
@@ -481,13 +477,13 @@ function OffersPageContent() {
 
                         {/* Offer Amount & User */}
                         <div className="flex flex-wrap items-center gap-3 sm:gap-6 mb-4">
-                          <div className="bg-orange-50 border border-orange-200 rounded px-3 py-2 sm:px-4 sm:py-3">
+                          <div className="bg-primary-50 border border-primary-200 rounded px-3 py-2 sm:px-4 sm:py-3">
                             <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5 sm:mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
-                            <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                            <p className="text-lg sm:text-2xl font-bold text-primary-600">
                               ₺{offer.amount.toLocaleString('tr-TR')}
                             </p>
                             {activeTab === 'received' && offer.status === 'pending' && estimatedNetByOfferId[offer.id] != null && (
-                              <p className="text-xs text-green-600 mt-1">
+                              <p className="text-xs text-success-600 mt-1">
                                 {locale === 'en' ? 'Est. net to you' : 'Tahmini net kazanç'}: ₺{Number(estimatedNetByOfferId[offer.id]).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             )}
@@ -510,7 +506,7 @@ function OffersPageContent() {
                           )}
 
                           {timeRemaining && (
-                            <div className="flex items-center gap-1.5 sm:gap-2 text-amber-600 bg-amber-50 px-2 py-1.5 sm:px-3 sm:py-2 rounded">
+                            <div className="flex items-center gap-1.5 sm:gap-2 text-warning-600 bg-warning-50 px-2 py-1.5 sm:px-3 sm:py-2 rounded">
                               <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{timeRemaining} kaldı</span>
                             </div>
@@ -542,7 +538,7 @@ function OffersPageContent() {
                           {offer.status === 'pending' && (
                             <div className="flex flex-wrap items-center gap-2 justify-end">
                               {activeTab === 'received' && offer.buyerMustAccept ? (
-                                <span className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded">
+                                <span className="text-sm text-warning-700 bg-warning-50 px-3 py-2 rounded">
                                   {locale === 'en'
                                     ? 'Waiting for the buyer to accept or decline your counter offer.'
                                     : 'Alıcının karşı teklifinizi kabul veya reddetmesi bekleniyor.'}
@@ -640,8 +636,8 @@ function OffersPageContent() {
                                 href={offer.orderId ? `/orders/${offer.orderId}` : '/orders'}
                                 className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
                                   showPayButton
-                                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                                    : 'bg-orange-500 hover:bg-orange-600 text-white'
+                                    ? 'bg-success-600 hover:bg-success-700 text-white'
+                                    : 'bg-primary-500 hover:bg-primary-600 text-white'
                                 }`}
                               >
                                 {showPayButton
@@ -674,14 +670,12 @@ function OffersPageContent() {
                 ? 'Enter an amount below that and at least 50% of the listing price (server validates).'
                 : 'Bu tutarın altında, ilan fiyatının en az %50 kadarına uygun bir teklif girin.'}
             </p>
-            <input
-              type="text"
+            <Input type="text"
               inputMode="decimal"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
+              className="mb-4"
               placeholder={locale === 'en' ? 'Amount (TRY)' : 'Tutar (₺)'}
               value={buyerCounterAmt}
-              onChange={(e) => setBuyerCounterAmt(e.target.value)}
-            />
+              onChange={(e) => setBuyerCounterAmt(e.target.value)} />
             <div className="flex gap-2 justify-end">
               <Button
                 type="button"
@@ -713,7 +707,7 @@ function OffersPageContent() {
 
 export default function OffersPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size="lg" color="border-orange-500 border-t-transparent" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size="lg" color="border-primary-500 border-t-transparent" /></div>}>
       <OffersPageContent />
     </Suspense>
   );

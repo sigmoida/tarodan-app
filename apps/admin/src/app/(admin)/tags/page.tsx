@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -61,7 +61,7 @@ export default function TagsPage() {
                     <div><h1 className="text-2xl font-bold text-gray-900">Etiketler</h1><p className="text-gray-500">Ürün etiketlerini yönetin</p></div>
                     <Button variant="primary" size="md" onClick={openCreate}><PlusIcon className="w-5 h-5" />Yeni Etiket</Button>
                 </div>
-                <div className="admin-card p-4"><input type="text" placeholder="Etiket ara..." value={search} onChange={(e) => setSearch(e.target.value)} className="admin-input w-full max-w-md" /></div>
+                <div className="admin-card p-4"><Input type="text" placeholder="Etiket ara..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" /></div>
                 <div className="admin-card p-6">
                     {loading ? (<div className="text-center py-12"><Spinner size="lg" className="mx-auto" /></div>)
                         : tags.length === 0 ? (<div className="text-center py-12 text-gray-500">Etiket yok</div>)
@@ -69,7 +69,7 @@ export default function TagsPage() {
                                 {tags.map((t) => (<div key={t.id} className="p-4 rounded-lg border border-gray-200 hover:border-gray-400">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color || '#6366f1' }}></div><span className="font-medium text-gray-900">{t.name}</span></div>
-                                        <div className="flex gap-1"><button onClick={() => openEdit(t)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></button><button onClick={() => setDeleteConfirm(t.id)} className="p-1 text-red-600 hover:text-red-300" disabled={t.usageCount > 0}><TrashIcon className="h-4 w-4" /></button></div>
+                                        <div className="flex gap-1"><Button variant="secondary" onClick={() => openEdit(t)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(t.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={t.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
                                     </div>
                                     <div className="mt-2 flex items-center gap-2"><TagIcon className="h-4 w-4 text-gray-500" /><span className="text-sm text-gray-500">{t.usageCount} ürün</span>{!t.isActive && <span className="px-2 text-xs bg-gray-700 text-gray-500 rounded">Pasif</span>}</div>
                                 </div>))}
@@ -79,10 +79,10 @@ export default function TagsPage() {
             {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="admin-input w-full" required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="admin-input w-full" rows={2} /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Renk</label><input type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="w-10 h-10 rounded" /></div>
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-600">Aktif</span></label>
+                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><Input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} /></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Renk</label><Input type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                    <Checkbox checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingTag ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}

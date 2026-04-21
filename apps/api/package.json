@@ -33,6 +33,7 @@
     "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
     "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",
     "release-reserved": "ts-node -r tsconfig-paths/register scripts/release-reserved-products.ts",
+    "diagnose-discounts": "ts-node -r tsconfig-paths/register scripts/diagnose-discounts.ts",
     "migrate-reserved-to-quantity-based": "ts-node -r tsconfig-paths/register scripts/migrate-reserved-to-quantity-based.ts",
     "temp:concurrent-buy": "ts-node -r tsconfig-paths/register scripts/temp-concurrent-buy-now.ts"
   },

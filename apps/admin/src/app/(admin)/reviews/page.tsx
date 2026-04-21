@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { StatusBadge, Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, StatusBadge } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import {
     CheckCircleIcon,
@@ -161,7 +161,7 @@ export default function ReviewsPage() {
 
     const renderStars = (score: number) => {
         return (
-            <div className="flex text-yellow-500">
+            <div className="flex text-warning-500">
                 {[...Array(5)].map((_, i) => (
                     i < score ? (
                         <StarIconSolid key={i} className="w-4 h-4" />
@@ -192,41 +192,41 @@ export default function ReviewsPage() {
 
                     <div className="flex items-center gap-2">
                         {activeTab === 'product' && (
-                            <select
+                            <Select
                                 value={statusFilter}
                                 onChange={(e) => {
                                     setStatusFilter(e.target.value);
                                     setPage(1);
                                 }}
-                                className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                                className="w-auto"
+                                selectSize="sm"
                             >
                                 <option value="">Tüm Durumlar</option>
                                 <option value="pending">Bekleyenler</option>
                                 <option value="approved">Onaylananlar</option>
                                 <option value="rejected">Reddedilenler</option>
                                 <option value="spam">Spam</option>
-                            </select>
+                            </Select>
                         )}
                         {activeTab === 'seller' && (
                             <>
-                                <select
+                                <Select
                                     value={sellerStatusFilter}
                                     onChange={(e) => { setSellerStatusFilter(e.target.value); setSellerPage(1); }}
-                                    className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                                    className="w-auto"
+                                    selectSize="sm"
                                 >
                                     <option value="">Tüm Durumlar</option>
                                     <option value="pending">Bekleyenler</option>
                                     <option value="approved">Onaylananlar</option>
                                     <option value="rejected">Reddedilenler</option>
                                     <option value="spam">Spam</option>
-                                </select>
-                                <input
-                                    type="text"
+                                </Select>
+                                <Input type="text"
                                     value={sellerSearch}
                                     onChange={(e) => { setSellerSearch(e.target.value); setSellerPage(1); }}
                                     placeholder="Kullanıcı ara..."
-                                    className="bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
-                                />
+                                    className="border-gray-200 text-gray-900" />
                             </>
                         )}
                     </div>
@@ -234,18 +234,14 @@ export default function ReviewsPage() {
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b border-gray-200">
-                    <button
-                        onClick={() => setActiveTab('product')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'product' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
+                    <Button variant="secondary" onClick={() => setActiveTab('product')}
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'product' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                         Ürün Yorumları
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('seller')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'seller' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => setActiveTab('seller')}
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'seller' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                         Satıcı Yorumları
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Product Reviews List */}
@@ -303,29 +299,23 @@ export default function ReviewsPage() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     {(r.status === 'pending' || !r.status) && (
                                                         <>
-                                                            <button
-                                                                onClick={() => handleSellerStatusUpdate(r.id, 'approved')}
-                                                                className="p-1.5 text-green-700 hover:bg-green-400/10 rounded-lg"
-                                                                title="Onayla"
-                                                            >
+                                                            <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'approved')}
+                                                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                                                title="Onayla">
                                                                 <CheckCircleIcon className="w-5 h-5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleSellerStatusUpdate(r.id, 'rejected')}
-                                                                className="p-1.5 text-red-600 hover:bg-red-400/10 rounded-lg"
-                                                                title="Reddet"
-                                                            >
+                                                            </Button>
+                                                            <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'rejected')}
+                                                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                                title="Reddet">
                                                                 <XCircleIcon className="w-5 h-5" />
-                                                            </button>
+                                                            </Button>
                                                         </>
                                                     )}
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setDeleteSellerConfirm(r.id); }}
-                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-400/10 rounded-lg"
-                                                        title="Sil"
-                                                    >
+                                                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteSellerConfirm(r.id); }}
+                                                        className="p-1.5 text-gray-500 hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                        title="Sil">
                                                         <TrashIcon className="w-5 h-5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -336,9 +326,9 @@ export default function ReviewsPage() {
                     )}
                     {sellerTotalPages > 1 && (
                         <div className="flex justify-center mt-6 gap-2">
-                            <button onClick={() => setSellerPage(p => Math.max(1, p - 1))} disabled={sellerPage === 1} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Önceki</button>
+                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.max(1, p - 1))} disabled={sellerPage === 1} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Önceki</Button>
                             <span className="px-3 py-1 text-gray-500">Sayfa {sellerPage} / {sellerTotalPages}</span>
-                            <button onClick={() => setSellerPage(p => Math.min(sellerTotalPages, p + 1))} disabled={sellerPage === sellerTotalPages} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Sonraki</button>
+                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.min(sellerTotalPages, p + 1))} disabled={sellerPage === sellerTotalPages} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Sonraki</Button>
                         </div>
                     )}
                 </div>
@@ -398,7 +388,7 @@ export default function ReviewsPage() {
                                                     <div>
                                                         <p className="text-sm text-gray-900">{review.user.displayName}</p>
                                                         {review.isVerifiedPurchase && (
-                                                            <span className="text-[10px] text-green-700 flex items-center gap-1">
+                                                            <span className="text-[10px] text-success-700 flex items-center gap-1">
                                                                 <CheckCircleIcon className="w-3 h-3" />
                                                                 Onaylı Alıcı
                                                             </span>
@@ -429,38 +419,30 @@ export default function ReviewsPage() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     {review.status === 'pending' && (
                                                         <>
-                                                            <button
-                                                                onClick={() => handleStatusUpdate(review.id, 'approved')}
-                                                                className="p-1.5 text-green-700 hover:bg-green-400/10 rounded-lg"
-                                                                title="Onayla"
-                                                            >
+                                                            <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'approved')}
+                                                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                                                title="Onayla">
                                                                 <CheckCircleIcon className="w-5 h-5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleStatusUpdate(review.id, 'rejected')}
-                                                                className="p-1.5 text-red-600 hover:bg-red-400/10 rounded-lg"
-                                                                title="Reddet"
-                                                            >
+                                                            </Button>
+                                                            <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'rejected')}
+                                                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                                title="Reddet">
                                                                 <XCircleIcon className="w-5 h-5" />
-                                                            </button>
+                                                            </Button>
                                                         </>
                                                     )}
                                                     {(review.status === 'approved' || review.status === 'pending') && (
-                                                        <button
-                                                            onClick={() => handleStatusUpdate(review.id, 'spam')}
-                                                            className="p-1.5 text-yellow-700 hover:bg-yellow-400/10 rounded-lg"
-                                                            title="Spam Olarak İşaretle"
-                                                        >
+                                                        <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'spam')}
+                                                            className="p-1.5 text-warning-700 hover:bg-warning-400/10 rounded-lg"
+                                                            title="Spam Olarak İşaretle">
                                                             <ExclamationTriangleIcon className="w-5 h-5" />
-                                                        </button>
+                                                        </Button>
                                                     )}
-                                                    <button
-                                                        onClick={() => setDeleteConfirm(review.id)}
-                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-400/10 rounded-lg"
-                                                        title="Sil"
-                                                    >
+                                                    <Button variant="secondary" onClick={() => setDeleteConfirm(review.id)}
+                                                        className="p-1.5 text-gray-500 hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                        title="Sil">
                                                         <TrashIcon className="w-5 h-5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -473,23 +455,19 @@ export default function ReviewsPage() {
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex justify-center mt-6 gap-2">
-                            <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                            <Button variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">
                                 Önceki
-                            </button>
+                            </Button>
                             <span className="px-3 py-1 text-gray-500">
                                 Sayfa {page} / {totalPages}
                             </span>
-                            <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            <Button variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">
                                 Sonraki
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

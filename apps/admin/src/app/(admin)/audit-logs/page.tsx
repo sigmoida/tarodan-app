@@ -10,7 +10,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner } from '@tarodan/ui';
 
 interface AuditLog {
   id: string;
@@ -125,55 +125,45 @@ export default function AuditLogsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
-              <input
-                type="text"
+              <Input type="text"
                 placeholder="Ara..."
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="admin-input pl-10"
-              />
+                className="pl-10" />
             </div>
-            <select
+            <Select
               value={filters.action}
               onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-              className="admin-input"
             >
               <option value="">Tüm İşlemler</option>
               <option value="user_ban">Kullanıcı Ban</option>
               <option value="product_approve">Ürün Onay</option>
               <option value="order_update">Sipariş Güncelle</option>
               <option value="payment_refund">Ödeme İade</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={filters.entityType}
               onChange={(e) => setFilters({ ...filters, entityType: e.target.value })}
-              className="admin-input"
             >
               <option value="">Tüm Tipler</option>
               <option value="User">Kullanıcı</option>
               <option value="Product">Ürün</option>
               <option value="Order">Sipariş</option>
               <option value="Payment">Ödeme</option>
-            </select>
+            </Select>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
               <label className="block text-sm text-gray-500 mb-1">Başlangıç Tarihi</label>
-              <input
-                type="date"
+              <Input type="date"
                 value={filters.fromDate}
-                onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-                className="admin-input w-full"
-              />
+                onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm text-gray-500 mb-1">Bitiş Tarihi</label>
-              <input
-                type="date"
+              <Input type="date"
                 value={filters.toDate}
-                onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-                className="admin-input w-full"
-              />
+                onChange={(e) => setFilters({ ...filters, toDate: e.target.value })} />
             </div>
           </div>
         </div>
@@ -234,13 +224,11 @@ export default function AuditLogsPage() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => setSelectedLog(log)}
+                        <Button variant="secondary" onClick={() => setSelectedLog(log)}
                           className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                          title="Detay"
-                        >
+                          title="Detay">
                           <EyeIcon className="h-5 w-5" />
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -256,23 +244,19 @@ export default function AuditLogsPage() {
                 Toplam {total} log
               </span>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50"
-                >
+                  className="py-1 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50">
                   Önceki
-                </button>
+                </Button>
                 <span className="px-3 py-1 text-gray-600">
                   Sayfa {page} / {Math.ceil(total / 20)}
                 </span>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
+                <Button variant="secondary" onClick={() => setPage((p) => p + 1)}
                   disabled={page >= Math.ceil(total / 20)}
-                  className="px-3 py-1 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50"
-                >
+                  className="py-1 text-gray-600 rounded hover:bg-gray-100 disabled:opacity-50">
                   Sonraki
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -285,12 +269,10 @@ export default function AuditLogsPage() {
           <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Audit Log Detayı</h2>
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="text-gray-500 hover:text-gray-900"
-              >
+              <Button variant="secondary" onClick={() => setSelectedLog(null)}
+                className="text-gray-500 hover:text-gray-900">
                 <DocumentTextIcon className="w-6 h-6" />
-              </button>
+              </Button>
             </div>
             <div className="space-y-4">
               <div>
@@ -341,12 +323,10 @@ export default function AuditLogsPage() {
               )}
             </div>
             <div className="mt-6">
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setSelectedLog(null)}
+                className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
                 Kapat
-              </button>
+              </Button>
             </div>
           </div>
         </div>

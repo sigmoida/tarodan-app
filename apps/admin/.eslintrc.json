@@ -1,0 +1,40 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='file']))",
+        "message": "Use <Input />, <Checkbox />, <Radio /> or <Toggle /> from '@tarodan/ui' instead of raw <input>. For file uploads, <input type='file' /> is still allowed."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='button']",
+        "message": "Use <Button /> or <IconButton /> from '@tarodan/ui' instead of raw <button>."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='select']",
+        "message": "Use <Select /> from '@tarodan/ui' instead of raw <select>."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='textarea']",
+        "message": "Use <Textarea /> from '@tarodan/ui' instead of raw <textarea>."
+      },
+      {
+        "selector": "Literal[value=/\\b(bg|text|border|ring|from|to|via|divide|placeholder|outline|accent|caret|decoration|fill|stroke|shadow)-(red|blue|green|yellow|orange|emerald|sky|indigo|violet|purple|pink|rose|amber|lime|teal|cyan)-\\d{2,3}\\b/]",
+        "message": "Use semantic color tokens (primary, danger, success, info, warning, surface, heading, body, muted, subtle) instead of raw Tailwind palette colors."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name=/^(Input|Textarea|Select)$/] JSXAttribute[name.name='className'] Literal[value=/\\bborder-gray-300\\b/]",
+        "message": "Remove redundant default classes on <Input>/<Textarea>/<Select>. Classes like w-full, border, border-gray-300, rounded-lg, px-3, py-2, focus:outline-none, focus:ring-2, focus:ring-primary-500 are already applied by the component. Only pass project-specific overrides."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name=/^(Input|Textarea|Select)$/] JSXAttribute[name.name='className'] Literal[value=/\\bfocus:ring-primary-(200|500)\\b/]",
+        "message": "Redundant: <Input>/<Textarea>/<Select> already apply focus:ring-primary-200 by default. Drop this class."
+      },
+      {
+        "selector": "JSXAttribute[name.name='className'] Literal[value=/\\bbtn-(primary|secondary|danger)\\b/]",
+        "message": "Use <Button variant=\"primary|secondary|danger\"> from '@tarodan/ui' instead of the .btn-* helper classes. The btn-* CSS helpers have been removed; they re-applied the component defaults and created variant/style mismatches."
+      }
+    ]
+  }
+}

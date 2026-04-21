@@ -11,7 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { formatTradeStatus } from '@/lib/format';
-import { StatusBadge, tradeStatusConfig } from '@tarodan/ui';
+import { Button, StatusBadge, tradeStatusConfig } from '@tarodan/ui';
 
 interface TradeItem {
   id: string;
@@ -122,7 +122,7 @@ export default function TradesPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-8">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
-            <ArrowsRightLeftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
+            <ArrowsRightLeftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-500" />
             {t('trade.myTrades')}
           </h1>
         </div>
@@ -139,17 +139,15 @@ export default function TradesPage() {
           ].map((f) => {
             const Icon = f.icon;
             return (
-              <button
-                key={f.value || 'all'}
+              <Button variant="secondary" key={f.value || 'all'}
                 onClick={() => setStatusFilter(f.value)}
                 className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition-colors ${statusFilter === f.value
-                    ? 'bg-orange-500 text-white'
+                    ? 'bg-primary-500 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                  }`}
-              >
+                  }`}>
                 {Icon && <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 {f.label}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -166,7 +164,7 @@ export default function TradesPage() {
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded font-medium transition-colors"
             >
               {t('cart.browseListings')}
             </Link>
@@ -197,7 +195,7 @@ export default function TradesPage() {
                 <Link
                   key={trade.id}
                   href={`/trades/${trade.id}`}
-                  className="block bg-white rounded p-6 border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all"
+                  className="block bg-white rounded p-6 border border-gray-200 hover:border-primary-300 hover:shadow-lg transition-all"
                 >
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex-1">
@@ -251,8 +249,8 @@ export default function TradesPage() {
 
                     {/* Arrow */}
                     <div className="hidden md:flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-sm bg-orange-100 flex items-center justify-center">
-                        <ArrowsRightLeftIcon className="w-6 h-6 text-orange-600" />
+                      <div className="w-12 h-12 rounded-sm bg-primary-100 flex items-center justify-center">
+                        <ArrowsRightLeftIcon className="w-6 h-6 text-primary-600" />
                       </div>
                     </div>
 
@@ -296,13 +294,13 @@ export default function TradesPage() {
 
                   {/* Mobile Arrow */}
                   <div className="md:hidden flex items-center justify-center my-4">
-                    <ArrowsRightLeftIcon className="w-6 h-6 text-orange-500" />
+                    <ArrowsRightLeftIcon className="w-6 h-6 text-primary-500" />
                   </div>
 
                   {(trade.cashAmount && trade.cashAmount > 0) && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded p-3">
+                    <div className="mt-4 pt-4 border-t border-gray-200 bg-primary-50 rounded p-3">
                       <p className="text-sm text-gray-700">
-                        {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                        {t('trade.cashDifference')}: <span className="font-bold text-primary-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                       </p>
                     </div>
                   )}

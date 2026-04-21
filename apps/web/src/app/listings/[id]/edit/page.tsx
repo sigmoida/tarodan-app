@@ -12,7 +12,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 import { SimpleDropdown } from '@/components/SimpleDropdown';
-import { Toggle, Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, Textarea, Toggle } from '@tarodan/ui';
 
 interface Category {
   id: string;
@@ -805,22 +805,22 @@ export default function EditListingPage() {
           </p>
 
           {(formData.status === 'sold' || formData.status === 'inactive') && (
-            <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-xl">
-              <h2 className="text-lg font-semibold text-amber-800 mb-2">
+            <div className="mb-6 p-5 bg-warning-50 border border-warning-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-warning-800 mb-2">
                 {formData.status === 'sold' ? 'Bu ürün satılmış' : 'Bu ürün stokta yok'}
               </h2>
-              <p className="text-sm text-amber-700 mb-4">
+              <p className="text-sm text-warning-700 mb-4">
                 Yeniden satışa açmak için stok miktarı belirleyip aşağıdaki butonu kullanın.
               </p>
               <div className="flex items-end gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-amber-800 mb-1">Stok Miktarı</label>
-                  <input
+                  <label className="block text-sm font-medium text-warning-800 mb-1">Stok Miktarı</label>
+                  <Input
                     type="number"
                     min="1"
                     value={reactivateQuantity}
                     onChange={(e) => setReactivateQuantity(e.target.value)}
-                    className="w-28 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-gray-900"
+                    className="w-28 border-warning-300 focus:ring-warning-500"
                   />
                 </div>
                 <Button
@@ -837,9 +837,9 @@ export default function EditListingPage() {
           )}
 
           {formData.status === 'reserved' && (
-            <div className="mb-6 p-5 bg-blue-50 border border-blue-200 rounded-xl">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Bu ürün rezerve edilmiş</h2>
-              <p className="text-sm text-blue-700">
+            <div className="mb-6 p-5 bg-info-50 border border-info-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-info-800 mb-2">Bu ürün rezerve edilmiş</h2>
+              <p className="text-sm text-info-700">
                 Rezerve edilmiş ürünler düzenlenemez. Rezervasyon tamamlandıktan veya iptal edildikten sonra düzenleme yapabilirsiniz.
               </p>
             </div>
@@ -849,13 +849,13 @@ export default function EditListingPage() {
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Başlık <span className="text-red-500">*</span>
+                Başlık <span className="text-danger-500">*</span>
               </label>
-              <input
+              <Input
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                className="h-12 px-4 rounded-xl"
                 placeholder="Örn: Hot Wheels '69 Camaro Z28"
                 required
                 minLength={5}
@@ -868,26 +868,24 @@ export default function EditListingPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Açıklama
               </label>
-              <textarea
-                value={formData.description}
+              <Textarea value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                className="px-4 py-3 rounded-xl text-gray-900 placeholder-gray-500"
                 placeholder="Ürün hakkında detaylı bilgi..."
                 rows={5}
-                maxLength={5000}
-              />
+                maxLength={5000} />
             </div>
 
             {/* Category & Condition */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Kategori <span className="text-red-500">*</span>
+                  Kategori <span className="text-danger-500">*</span>
                 </label>
-                <select
+                <Select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                   required
                 >
                   <option value="">Kategori Seçin</option>
@@ -896,17 +894,17 @@ export default function EditListingPage() {
                       {cat.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Durum <span className="text-red-500">*</span>
+                  Durum <span className="text-danger-500">*</span>
                 </label>
-                <select
+                <Select
                   value={formData.condition}
                   onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                   required
                 >
                   {CONDITIONS.map((cond) => (
@@ -914,7 +912,7 @@ export default function EditListingPage() {
                       {cond.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -954,27 +952,27 @@ export default function EditListingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ölçek
                 </label>
-                <select
+                <Select
                   value={formData.scale}
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Malzeme
                 </label>
-                <select
+                <Select
                   value={formData.material}
                   onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Malzeme seçin</option>
                   {(materialList.length > 0 ? materialList : [
@@ -987,17 +985,17 @@ export default function EditListingPage() {
                       {m.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Üretici
                 </label>
-                <select
+                <Select
                   value={formData.manufacturerId}
                   onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Üretici seçin</option>
                   {manufacturerList.map((m) => (
@@ -1005,7 +1003,7 @@ export default function EditListingPage() {
                       {m.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -1013,10 +1011,10 @@ export default function EditListingPage() {
                   Çıkış yılı
                 </label>
                 <p className="text-xs text-gray-500 mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
-                <select
+                <Select
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Yıl seçin</option>
                   {yearOptions.map((y) => (
@@ -1024,13 +1022,13 @@ export default function EditListingPage() {
                       {y}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
             {/* Trade Toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
-                ? 'bg-green-50 border-green-200'
+                ? 'bg-success-50 border-success-200'
                 : 'bg-gray-50 border-gray-200'
               }`}>
               <div>
@@ -1060,13 +1058,11 @@ export default function EditListingPage() {
                 <label className="font-medium text-gray-900">Ön Sipariş</label>
                 <p className="text-sm text-gray-600">Ürün henüz stokta değil; çıkınca gönderilecek</p>
               </div>
-              <button
-                type="button"
+              <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-violet-500' : 'bg-gray-300'}`}
-              >
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-primary-500' : 'bg-gray-300'}`}>
                 <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+              </Button>
             </div>
 
             {/* Set / Paket */}
@@ -1075,26 +1071,24 @@ export default function EditListingPage() {
                 <label className="font-medium text-gray-900">Set / Paket</label>
                 <p className="text-sm text-gray-600">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
               </div>
-              <button
-                type="button"
+              <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isSet: !formData.isSet })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-sky-500' : 'bg-gray-300'}`}
-              >
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-info-500' : 'bg-gray-300'}`}>
                 <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+              </Button>
             </div>
 
             {/* Price & Quantity */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fiyat (₺) <span className="text-red-500">*</span>
+                  Fiyat (₺) <span className="text-danger-500">*</span>
                 </label>
-                <input
+                <Input
                   type="number"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                  className="h-12 px-4 rounded-xl"
                   placeholder="0.00"
                   required
                   min={1}
@@ -1110,7 +1104,7 @@ export default function EditListingPage() {
                 <p className="text-xs text-gray-500 mb-2">
                   Boş bırakırsanız sınırsız stok olur
                 </p>
-                <input
+                <Input
                   type="number"
                   value={formData.quantity === '' || formData.quantity === null || formData.quantity === undefined ? '' : formData.quantity}
                   onChange={(e) => {
@@ -1123,7 +1117,7 @@ export default function EditListingPage() {
                   onBlur={() => {
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onBlur - current formData.quantity:', formData.quantity);
                   }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                  className="h-12 px-4 rounded-xl"
                   placeholder="Sınırsız"
                   min={1}
                 />
@@ -1137,7 +1131,7 @@ export default function EditListingPage() {
                 ) : commissionPreview ? (
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-success-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 ) : null}
               </div>
@@ -1145,16 +1139,14 @@ export default function EditListingPage() {
 
             {/* Discount Section */}
             <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <button
-                type="button"
+              <Button variant="secondary" type="button"
                 onClick={() => setShowDiscountSection(!showDiscountSection)}
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 transition-colors"
-              >
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-primary-50 to-warning-50 hover:from-primary-100 hover:to-warning-100 transition-colors">
                 <div className="flex items-center gap-3">
-                  <ReceiptPercentIcon className="w-5 h-5 text-orange-600" />
+                  <ReceiptPercentIcon className="w-5 h-5 text-primary-600" />
                   <span className="font-medium text-gray-900">İndirim & Kampanya</span>
                   {productDiscounts.length > 0 && (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
                       {productDiscounts.length} aktif
                     </span>
                   )}
@@ -1164,14 +1156,14 @@ export default function EditListingPage() {
                 ) : (
                   <ChevronDownIcon className="w-5 h-5 text-gray-500" />
                 )}
-              </button>
+              </Button>
 
               {showDiscountSection && (
                 <div className="p-4 space-y-4 bg-white">
                   {/* Quick Sale Price */}
-                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                  <div className="p-4 bg-primary-50 rounded-lg border border-primary-100">
                     <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                      <TagIcon className="w-4 h-4 text-orange-600" />
+                      <TagIcon className="w-4 h-4 text-primary-600" />
                       Hızlı İndirim
                     </h4>
                     <p className="text-sm text-gray-600 mb-4">
@@ -1183,11 +1175,10 @@ export default function EditListingPage() {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Orijinal Fiyat (₺)
                         </label>
-                        <input
+                        <Input
                           type="number"
                           value={saleData.originalPrice || formData.price}
                           onChange={(e) => setSaleData({ ...saleData, originalPrice: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                           placeholder={formData.price || 'Orijinal fiyat'}
                         />
                       </div>
@@ -1195,11 +1186,10 @@ export default function EditListingPage() {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           İndirimli Fiyat (₺)
                         </label>
-                        <input
+                        <Input
                           type="number"
                           value={saleData.salePrice}
                           onChange={(e) => setSaleData({ ...saleData, salePrice: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                           placeholder="İndirimli fiyat"
                         />
                       </div>
@@ -1210,28 +1200,26 @@ export default function EditListingPage() {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Başlangıç
                         </label>
-                        <input
+                        <Input
                           type="date"
                           value={saleData.saleStartDate}
                           onChange={(e) => setSaleData({ ...saleData, saleStartDate: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Bitiş
                         </label>
-                        <input
+                        <Input
                           type="date"
                           value={saleData.saleEndDate}
                           onChange={(e) => setSaleData({ ...saleData, saleEndDate: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                         />
                       </div>
                     </div>
 
                     {saleData.salePrice && saleData.originalPrice && (
-                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded-lg mb-4">
+                      <div className="flex items-center gap-2 text-sm text-success-700 bg-success-50 p-2 rounded-lg mb-4">
                         <span>
                           %{Math.round((1 - Number(saleData.salePrice) / Number(saleData.originalPrice)) * 100)} indirim
                         </span>
@@ -1261,7 +1249,7 @@ export default function EditListingPage() {
                               </p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${discount.isCurrentlyValid
-                                ? 'bg-green-100 text-green-700'
+                                ? 'bg-success-100 text-success-700'
                                 : 'bg-gray-100 text-gray-600'
                               }`}>
                               {discount.isCurrentlyValid ? 'Aktif' : 'Pasif'}
@@ -1276,7 +1264,7 @@ export default function EditListingPage() {
                   <div className="pt-2 border-t border-gray-100">
                     <Link
                       href="/profile/discounts"
-                      className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 text-sm font-medium"
+                      className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
                     >
                       <ReceiptPercentIcon className="w-4 h-4" />
                       Tüm İndirimlerimi Yönet →
@@ -1293,14 +1281,12 @@ export default function EditListingPage() {
               </label>
               <div className="space-y-3">
                 <div>
-                  <input
-                    type="file"
+                  <Input type="file"
                     accept="image/*"
                     multiple
                     onChange={(e) => handleFileUpload(e.target.files)}
                     disabled={uploadingImages || formData.images.length >= (limits?.maxImagesPerListing || 3)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
+                    className="px-4 py-3 rounded-xl text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed" />
                   {uploadingImages && (
                     <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
                   )}
@@ -1320,13 +1306,11 @@ export default function EditListingPage() {
                               (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
                             }}
                           />
-                          <button
-                            type="button"
+                          <Button variant="secondary" type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                            className="absolute top-2 right-2 bg-danger-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             ×
-                          </button>
+                          </Button>
                         </div>
                       );
                     })}

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { getCityNames, getDistrictsForCity } from '@/lib/turkeyLocations';
-import { useTranslation } from '@/i18n';
+import { useTranslation } from '@/i18n';import { Button, Input } from '@tarodan/ui';
+
 
 interface CityDistrictSelectorProps {
   city: string;
@@ -120,20 +121,18 @@ export default function CityDistrictSelector({
     <div className={`grid grid-cols-2 gap-3 ${className}`}>
       {/* City Dropdown */}
       <div ref={cityDropdownRef} className="relative">
-        <button
-          type="button"
+        <Button variant="secondary" type="button"
           onClick={(e) => {
             e.stopPropagation();
             setCityOpen(!cityOpen);
             setDistrictOpen(false);
           }}
           className={`w-full px-4 py-3 text-left bg-white border rounded-xl flex items-center justify-between transition-all ${
-            cityOpen ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-200 hover:border-gray-300'
-          } ${!city ? 'text-gray-400' : 'text-gray-900'}`}
-        >
+            cityOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200 hover:border-gray-300'
+          } ${!city ? 'text-gray-400' : 'text-gray-900'}`}>
           <span className="truncate">{city || cityPlaceholder || t('common.selectCity')}</span>
           <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${cityOpen ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
 
         {cityOpen && (
           <div 
@@ -142,16 +141,14 @@ export default function CityDistrictSelector({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
-              <input
-                type="text"
+              <Input type="text"
                 value={citySearch}
                 onChange={(e) => setCitySearch(e.target.value)}
                 placeholder={t('common.searchCity')}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
+                onMouseDown={(e) => e.stopPropagation()} />
             </div>
             <ul className="overflow-y-auto" style={{ maxHeight: '220px' }}>
               {filteredCities.length === 0 ? (
@@ -174,8 +171,8 @@ export default function CityDistrictSelector({
                       }
                       e.stopPropagation();
                     }}
-                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-orange-50 select-none ${
-                      c === city ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-700'
+                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary-50 select-none ${
+                      c === city ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-700'
                     }`}
                   >
                     {c}
@@ -189,8 +186,7 @@ export default function CityDistrictSelector({
 
       {/* District Dropdown */}
       <div ref={districtDropdownRef} className="relative">
-        <button
-          type="button"
+        <Button variant="secondary" type="button"
           onClick={(e) => {
             e.stopPropagation();
             if (!city) {
@@ -202,12 +198,11 @@ export default function CityDistrictSelector({
           }}
           disabled={!city}
           className={`w-full px-4 py-3 text-left bg-white border rounded-xl flex items-center justify-between transition-all ${
-            districtOpen ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-200 hover:border-gray-300'
-          } ${!district ? 'text-gray-400' : 'text-gray-900'} ${!city ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
+            districtOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200 hover:border-gray-300'
+          } ${!district ? 'text-gray-400' : 'text-gray-900'} ${!city ? 'opacity-50 cursor-not-allowed' : ''}`}>
           <span className="truncate">{district || districtPlaceholder || t('common.selectDistrict')}</span>
           <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${districtOpen ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
 
         {districtOpen && city && (
           <div 
@@ -216,16 +211,14 @@ export default function CityDistrictSelector({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
-              <input
-                type="text"
+              <Input type="text"
                 value={districtSearch}
                 onChange={(e) => setDistrictSearch(e.target.value)}
                 placeholder={t('common.searchDistrict')}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
+                onMouseDown={(e) => e.stopPropagation()} />
             </div>
             <ul className="overflow-y-auto" style={{ maxHeight: '220px' }}>
               {filteredDistricts.length === 0 ? (
@@ -242,8 +235,8 @@ export default function CityDistrictSelector({
                     onMouseDown={(e) => {
                       e.stopPropagation();
                     }}
-                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-orange-50 select-none ${
-                      d === district ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-700'
+                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary-50 select-none ${
+                      d === district ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-700'
                     }`}
                   >
                     {d}

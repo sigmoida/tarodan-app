@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
-import { Spinner } from '@tarodan/ui';
+import { Button, Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
@@ -117,9 +117,13 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button
+        variant="nav"
+        size="icon"
         onClick={handleBellClick}
-        className="relative p-2 text-white hover:text-orange-100 transition-colors"
+        aria-expanded={showDropdown}
+        aria-label={locale === 'en' ? 'Notifications' : 'Bildirimler'}
+        className="relative h-9 w-9 rounded-md"
       >
         {unreadCount > 0 ? (
           <BellSolidIcon className="w-6 h-6" />
@@ -130,12 +134,12 @@ export default function NotificationBell() {
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-white text-orange-500 text-xs font-bold rounded-full flex items-center justify-center"
+            className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-white text-primary-500 text-xs font-bold rounded-full flex items-center justify-center"
           >
             {unreadCount > 99 ? '99+' : unreadCount}
           </motion.span>
         )}
-      </button>
+      </Button>
 
       {/* Dropdown */}
       <AnimatePresence>
@@ -148,13 +152,13 @@ export default function NotificationBell() {
             className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50"
           >
             {/* Header */}
-            <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-100">
+            <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-primary-100 border-b border-primary-100">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">
                   {locale === 'en' ? 'Notifications' : 'Bildirimler'}
                 </h3>
                 {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-orange-500 text-white rounded-full">
+                  <span className="px-2 py-0.5 text-xs font-medium bg-primary-500 text-white rounded-full">
                     {unreadCount} {locale === 'en' ? 'new' : 'yeni'}
                   </span>
                 )}
@@ -165,7 +169,7 @@ export default function NotificationBell() {
             <div className="max-h-80 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Spinner size="md" color="border-orange-500 border-t-transparent" />
+                  <Spinner size="md" color="border-primary-500 border-t-transparent" />
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-8 px-4">
@@ -180,7 +184,7 @@ export default function NotificationBell() {
                     <div
                       key={notification.id}
                       className={`relative group px-4 py-3 hover:bg-gray-50 transition-colors ${
-                        !notification.isRead ? 'bg-orange-50/50' : ''
+                        !notification.isRead ? 'bg-primary-50/50' : ''
                       }`}
                     >
                       <Link
@@ -217,20 +221,22 @@ export default function NotificationBell() {
                             </p>
                           </div>
                           {!notification.isRead && (
-                            <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0 mt-1.5"></span>
+                            <span className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1.5"></span>
                           )}
                         </div>
                       </Link>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => {
                           e.stopPropagation();
                           dismissNotification(notification.id);
                         }}
-                        className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 h-6 w-6 rounded-md text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                         aria-label={locale === 'en' ? 'Dismiss' : 'Kapat'}
                       >
                         <XMarkIcon className="w-3.5 h-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -242,7 +248,7 @@ export default function NotificationBell() {
               <Link
                 href="/notifications"
                 onClick={() => setShowDropdown(false)}
-                className="block text-center text-sm font-medium text-orange-500 hover:text-orange-600"
+                className="block text-center text-sm font-medium text-primary-500 hover:text-primary-600"
               >
                 {locale === 'en' ? 'View all notifications' : 'Tüm bildirimleri gör'}
               </Link>

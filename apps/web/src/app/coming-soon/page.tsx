@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input } from '@tarodan/ui';
+
 
 const SOCIAL_LINKS = [
   { name: 'Twitter', href: '#', icon: 'X' },
@@ -66,23 +67,19 @@ export default function ComingSoonPage() {
 
         {!submitted ? (
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto mb-10">
-            <input
-              type="email"
+            <Input type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t('utility.comingSoon.emailPlaceholder')}
               required
-              className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors"
-            >
+              className="flex-1 px-4 py-3 rounded-xl bg-white/10 border-white/20 text-white placeholder-gray-400" />
+            <Button variant="secondary" type="submit"
+              className="px-6 py-3 rounded-xl bg-primary-500 text-white font-semibold hover:bg-primary-600 transition-colors">
               {t('utility.comingSoon.notifyMe')}
-            </button>
+            </Button>
           </form>
         ) : (
-          <p className="text-green-400 mb-10">Teşekkürler! Açılışta sizi haberdar edeceğiz.</p>
+          <p className="text-success-400 mb-10">Teşekkürler! Açılışta sizi haberdar edeceğiz.</p>
         )}
 
         <p className="text-sm font-medium text-gray-300 mb-2">{t('utility.comingSoon.socialTitle')}</p>
@@ -91,7 +88,7 @@ export default function ComingSoonPage() {
             <a
               key={s.name}
               href={s.href}
-              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-medium hover:bg-orange-500 transition-colors"
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-medium hover:bg-primary-500 transition-colors"
               aria-label={s.name}
             >
               {s.icon}

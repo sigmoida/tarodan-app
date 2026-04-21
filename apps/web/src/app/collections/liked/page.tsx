@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { motion } from 'framer-motion';
+import { Button } from '@tarodan/ui';
 
 interface Collection {
   id: string;
@@ -113,7 +114,7 @@ export default function LikedCollectionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+                <div className="w-1 h-6 bg-primary-500 rounded-sm" />
                 {t('collection.likedCollections')}
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">{t('collection.likedCollectionsDesc')}</p>
@@ -141,10 +142,10 @@ export default function LikedCollectionsPage() {
           </div>
         ) : error ? (
           <div className="text-center py-20 bg-white rounded border border-gray-200">
-            <p className="text-red-500 text-sm mb-3">{error}</p>
-            <button onClick={() => likedQuery.refetch()} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
+            <p className="text-danger-500 text-sm mb-3">{error}</p>
+            <Button variant="secondary" onClick={() => likedQuery.refetch()} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
               {t('collection.tryAgain')}
-            </button>
+            </Button>
           </div>
         ) : collections.length === 0 ? (
           <div className="text-center py-20 bg-white rounded border border-gray-200">
@@ -153,7 +154,7 @@ export default function LikedCollectionsPage() {
             </div>
             <p className="text-gray-600 text-lg font-medium mb-1">{t('collection.noLikedCollections')}</p>
             <p className="text-gray-400 text-sm mb-4">{t('collection.exploreTip')}</p>
-            <Link href="/collections" className="inline-block px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors">
+            <Link href="/collections" className="inline-block px-5 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors">
               {t('collection.exploreCollections')}
             </Link>
           </div>
@@ -166,7 +167,7 @@ export default function LikedCollectionsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.02 }}
               >
-                <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
+                <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full flex flex-col">
                   <Link href={`/collections/${collection.id}`}>
                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                       {collection.coverImageUrl ? (
@@ -200,7 +201,7 @@ export default function LikedCollectionsPage() {
                             ))}
                         </div>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 text-3xl">🚗</div>
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-3xl">🚗</div>
                       )}
                       <div className="absolute bottom-1.5 right-1.5 bg-black/60 px-1.5 py-0.5 rounded text-[10px] text-white">
                         {collection.itemCount || 0} {locale === 'en' ? 'items' : 'ürün'}
@@ -210,7 +211,7 @@ export default function LikedCollectionsPage() {
 
                   <div className="p-2.5 flex-1 flex flex-col">
                     <Link href={`/collections/${collection.id}`}>
-                      <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
+                      <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">{collection.name}</h3>
                     </Link>
                     {collection.description && (
                       <p className="text-gray-400 text-[10px] mt-0.5 line-clamp-1">{collection.description}</p>
@@ -226,12 +227,10 @@ export default function LikedCollectionsPage() {
                         <span className="flex items-center gap-0.5"><HeartIcon className="w-3 h-3" />{collection.likeCount || 0}</span>
                         <span className="flex items-center gap-0.5"><EyeIcon className="w-3 h-3" />{collection.viewCount || 0}</span>
                       </div>
-                      <button
-                        onClick={() => handleUnlike(collection.id)}
-                        className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-500 rounded text-[10px] font-medium transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => handleUnlike(collection.id)}
+                        className="px-2 py-1 bg-danger-50 hover:bg-danger-100 text-danger-500 rounded text-[10px] font-medium transition-colors">
                         {t('collection.unlike')}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>

@@ -18,9 +18,9 @@ export default function MembershipSuccessPage() {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-          className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"
+          className="w-24 h-24 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6"
         >
-          <CheckCircleIcon className="w-16 h-16 text-green-500" />
+          <CheckCircleIcon className="w-16 h-16 text-success-500" />
         </motion.div>
 
         <motion.div
@@ -29,9 +29,9 @@ export default function MembershipSuccessPage() {
           transition={{ delay: 0.4 }}
         >
           <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-2">
-            <SparklesIcon className="w-8 h-8 text-yellow-500" />
+            <SparklesIcon className="w-8 h-8 text-warning-500" />
             Tebrikler!
-            <SparklesIcon className="w-8 h-8 text-yellow-500" />
+            <SparklesIcon className="w-8 h-8 text-warning-500" />
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Üyeliğiniz başarıyla yükseltildi!
@@ -47,19 +47,19 @@ export default function MembershipSuccessPage() {
           <h2 className="font-semibold text-gray-900 mb-4">Artık şunları yapabilirsiniz:</h2>
           <ul className="text-left space-y-3 text-gray-600">
             <li className="flex items-center gap-3">
-              <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+              <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
               Takas teklifleri gönderin ve alın
             </li>
             <li className="flex items-center gap-3">
-              <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+              <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
               Koleksiyonlar oluşturun ve paylaşın
             </li>
             <li className="flex items-center gap-3">
-              <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+              <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
               Daha fazla ilan yayınlayın
             </li>
             <li className="flex items-center gap-3">
-              <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+              <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
               Öncelikli destek alın
             </li>
           </ul>

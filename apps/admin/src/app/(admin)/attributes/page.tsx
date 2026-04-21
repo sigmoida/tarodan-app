@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -124,8 +124,8 @@ export default function AttributesPage() {
                                     <div key={g.id} onClick={() => selectGroup(g)} className={`p-3 rounded-lg cursor-pointer flex items-center justify-between ${selectedGroup?.id === g.id ? 'bg-primary-50 border border-primary-600' : 'bg-gray-100 hover:bg-gray-100'}`}>
                                         <div className="flex items-center gap-2"><Squares2X2Icon className="h-5 w-5 text-gray-500" /><span className="text-gray-900">{g.name}</span>{!g.isActive && <span className="px-1.5 text-xs bg-gray-600 text-gray-600 rounded">Pasif</span>}</div>
                                         <div className="flex items-center gap-1">
-                                            <button onClick={(e) => { e.stopPropagation(); openGroupEdit(g); }} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'group', id: g.id }); }} className="p-1 text-red-600 hover:text-red-300"><TrashIcon className="h-4 w-4" /></button>
+                                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openGroupEdit(g); }} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button>
+                                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'group', id: g.id }); }} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button>
                                             <ChevronRightIcon className="h-4 w-4 text-gray-500" />
                                         </div>
                                     </div>
@@ -144,7 +144,7 @@ export default function AttributesPage() {
                                         : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{attributes.map((a) => (
                                             <div key={a.id} className="p-3 rounded-lg bg-gray-100 flex items-center justify-between">
                                                 <div className="flex items-center gap-2">{a.color && <div className="w-4 h-4 rounded-full" style={{ backgroundColor: a.color }}></div>}<span className="text-gray-900">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-gray-600 text-gray-600 rounded">Pasif</span>}</div>
-                                                <div className="flex gap-1"><button onClick={() => openAttrEdit(a)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></button><button onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-red-600 hover:text-red-300"><TrashIcon className="h-4 w-4" /></button></div>
+                                                <div className="flex gap-1"><Button variant="secondary" onClick={() => openAttrEdit(a)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button></div>
                                             </div>
                                         ))}</div>}
                             </>)}
@@ -155,11 +155,11 @@ export default function AttributesPage() {
             {showGroupModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingGroup ? 'Grubu Düzenle' : 'Yeni Grup'}</h2>
                 <form onSubmit={handleGroupSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><input type="text" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} className="admin-input w-full" required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><textarea value={groupForm.description} onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })} className="admin-input w-full" rows={2} /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><input type="number" value={groupForm.sortOrder} onChange={(e) => setGroupForm({ ...groupForm, sortOrder: parseInt(e.target.value) || 0 })} className="admin-input w-24" /></div>
-                    <div className="flex gap-4"><label className="flex items-center gap-2"><input type="checkbox" checked={groupForm.isRequired} onChange={(e) => setGroupForm({ ...groupForm, isRequired: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-600">Zorunlu</span></label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={groupForm.isActive} onChange={(e) => setGroupForm({ ...groupForm, isActive: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-600">Aktif</span></label></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><Input type="text" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><Textarea value={groupForm.description} onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })} rows={2} /></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><Input type="number" value={groupForm.sortOrder} onChange={(e) => setGroupForm({ ...groupForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-24" /></div>
+                    <div className="flex gap-4"><Checkbox checked={groupForm.isRequired} onChange={(e) => setGroupForm({ ...groupForm, isRequired: e.target.checked })} label="Zorunlu" />
+                        <Checkbox checked={groupForm.isActive} onChange={(e) => setGroupForm({ ...groupForm, isActive: e.target.checked })} label="Aktif" /></div>
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowGroupModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingGroup ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}
@@ -167,11 +167,11 @@ export default function AttributesPage() {
             {showAttrModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingAttr ? 'Değeri Düzenle' : 'Yeni Değer'}</h2>
                 <form onSubmit={handleAttrSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Değer *</label><input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} className="admin-input w-full" required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Görüntülenen Değer</label><input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} className="admin-input w-full" /></div>
-                    <div className="flex gap-4"><div><label className="block text-sm text-gray-600 mb-2">Renk</label><input type="color" value={attrForm.color || '#6366f1'} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
-                        <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="admin-input w-20" /></div></div>
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={attrForm.isActive} onChange={(e) => setAttrForm({ ...attrForm, isActive: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-600">Aktif</span></label>
+                    <div><label className="block text-sm text-gray-600 mb-2">Değer *</label><Input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-gray-600 mb-2">Görüntülenen Değer</label><Input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} /></div>
+                    <div className="flex gap-4"><div><label className="block text-sm text-gray-600 mb-2">Renk</label><Input type="color" value={attrForm.color || '#6366f1'} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><Input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-20" /></div></div>
+                    <Checkbox checked={attrForm.isActive} onChange={(e) => setAttrForm({ ...attrForm, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowAttrModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingAttr ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}

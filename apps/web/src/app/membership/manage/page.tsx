@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import api from '@/lib/api';
+import { Button, Checkbox, Input, Select } from '@tarodan/ui';
 
 interface MembershipInfo {
   tier: string;
@@ -40,9 +41,9 @@ interface PaymentMethod {
 
 const tierColors: Record<string, string> = {
   free: 'bg-gray-100 text-gray-800',
-  basic: 'bg-blue-100 text-blue-800',
-  premium: 'bg-purple-100 text-purple-800',
-  business: 'bg-amber-100 text-amber-800',
+  basic: 'bg-info-100 text-info-800',
+  premium: 'bg-primary-100 text-primary-800',
+  business: 'bg-warning-100 text-warning-800',
 };
 
 const tierNames: Record<string, string> = {
@@ -327,7 +328,7 @@ export default function MembershipManagePage() {
               </span>
             </div>
             {isPaid && (
-              <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+              <span className="flex items-center gap-1 text-success-600 text-sm font-medium">
                 <CheckCircleIcon className="w-5 h-5" />
                 Aktif
               </span>
@@ -339,7 +340,7 @@ export default function MembershipManagePage() {
             <ul className="space-y-2">
               {(membership?.features || []).map((feature, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-gray-600">
-                  <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
                   {feature}
                 </li>
               ))}
@@ -379,19 +380,17 @@ export default function MembershipManagePage() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleToggleAutoRenew}
+                  <Button variant="secondary" onClick={handleToggleAutoRenew}
                     disabled={processingAutoRenew}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${
                       membership?.autoRenew ? 'bg-primary-500' : 'bg-gray-300'
-                    }`}
-                  >
+                    }`}>
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         membership?.autoRenew ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Show selected payment method */}
@@ -401,12 +400,10 @@ export default function MembershipManagePage() {
                     <span className="text-sm text-gray-700">
                       {getSelectedCard()?.cardBrand} •••• {getSelectedCard()?.lastFour}
                     </span>
-                    <button
-                      onClick={() => setShowPaymentModal(true)}
-                      className="ml-auto text-xs text-primary-600 hover:text-primary-700"
-                    >
+                    <Button variant="secondary" onClick={() => setShowPaymentModal(true)}
+                      className="ml-auto text-xs text-primary-600 hover:text-primary-700">
                       Değiştir
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -431,20 +428,18 @@ export default function MembershipManagePage() {
               >
                 Plan Değiştir
               </Link>
-              <button
-                onClick={handleCancelSubscription}
+              <Button variant="secondary" onClick={handleCancelSubscription}
                 disabled={cancelling}
-                className="w-full py-4 border border-red-300 text-red-600 hover:bg-red-50 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              >
+                className="w-full py-4 border border-danger-300 text-danger-600 hover:bg-danger-50 rounded-xl font-semibold transition-colors disabled:opacity-50">
                 {cancelling ? 'İptal Ediliyor...' : 'Üyeliği İptal Et'}
-              </button>
+              </Button>
             </>
           )}
         </div>
 
         {/* Help */}
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-blue-800 text-sm">
+        <div className="mt-8 p-4 bg-info-50 border border-info-200 rounded-xl">
+          <p className="text-info-800 text-sm">
             Üyelik ile ilgili sorularınız için{' '}
             <Link href="/support" className="font-medium underline">
               destek ekibimizle
@@ -460,25 +455,21 @@ export default function MembershipManagePage() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Ödeme Yöntemi Seç</h2>
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
+              <Button variant="secondary" onClick={() => setShowPaymentModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg">
                 <XMarkIcon className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-3 mb-6">
               {paymentMethods.map((method) => (
-                <button
-                  key={method.id}
+                <Button variant="secondary" key={method.id}
                   onClick={() => setSelectedPaymentMethod(method.id)}
                   className={`w-full p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${
                     selectedPaymentMethod === method.id
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
+                  }`}>
                   <CreditCardIcon className="w-6 h-6 text-gray-500" />
                   <div className="text-left">
                     <p className="font-medium text-gray-900">
@@ -491,35 +482,29 @@ export default function MembershipManagePage() {
                   {selectedPaymentMethod === method.id && (
                     <CheckCircleIcon className="w-5 h-5 text-primary-500 ml-auto" />
                   )}
-                </button>
+                </Button>
               ))}
 
-              <button
-                onClick={() => {
+              <Button variant="secondary" onClick={() => {
                   setShowPaymentModal(false);
                   setShowAddCardModal(true);
                 }}
-                className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center gap-2 text-gray-600 hover:border-gray-400 hover:text-gray-700 transition-colors"
-              >
+                className="p-4 rounded-xl border-2 border-dashed items-center justify-center gap-2 text-gray-600 hover:border-gray-400 hover:text-gray-700">
                 <PlusIcon className="w-5 h-5" />
                 Yeni Kart Ekle
-              </button>
+              </Button>
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setShowPaymentModal(false)}
+                className="flex-1 py-3 text-gray-700 rounded-xl font-medium hover:bg-gray-50">
                 İptal
-              </button>
-              <button
-                onClick={() => selectedPaymentMethod && enableAutoRenew(selectedPaymentMethod)}
+              </Button>
+              <Button variant="secondary" onClick={() => selectedPaymentMethod && enableAutoRenew(selectedPaymentMethod)}
                 disabled={!selectedPaymentMethod || processingAutoRenew}
-                className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50"
-              >
+                className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
                 {processingAutoRenew ? 'İşleniyor...' : 'Onayla'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -531,12 +516,10 @@ export default function MembershipManagePage() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Yeni Kart Ekle</h2>
-              <button
-                onClick={() => setShowAddCardModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
+              <Button variant="secondary" onClick={() => setShowAddCardModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg">
                 <XMarkIcon className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleAddNewCard} className="space-y-4">
@@ -544,27 +527,23 @@ export default function MembershipManagePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Kart Numarası
                 </label>
-                <input
-                  type="text"
+                <Input type="text"
                   value={newCard.cardNumber}
                   onChange={(e) => setNewCard({ ...newCard, cardNumber: formatCardNumber(e.target.value) })}
                   placeholder="0000 0000 0000 0000"
                   maxLength={19}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  className="px-4 py-3 rounded-xl" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Kart Üzerindeki İsim
                 </label>
-                <input
-                  type="text"
+                <Input type="text"
                   value={newCard.cardHolder}
                   onChange={(e) => setNewCard({ ...newCard, cardHolder: e.target.value.toUpperCase() })}
                   placeholder="AD SOYAD"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  className="px-4 py-3 rounded-xl" />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -572,10 +551,10 @@ export default function MembershipManagePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Ay
                   </label>
-                  <select
+                  <Select
                     value={newCard.expiryMonth}
                     onChange={(e) => setNewCard({ ...newCard, expiryMonth: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="rounded-xl"
                   >
                     <option value="">AA</option>
                     {Array.from({ length: 12 }, (_, i) => (
@@ -583,16 +562,16 @@ export default function MembershipManagePage() {
                         {(i + 1).toString().padStart(2, '0')}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Yıl
                   </label>
-                  <select
+                  <Select
                     value={newCard.expiryYear}
                     onChange={(e) => setNewCard({ ...newCard, expiryYear: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="rounded-xl"
                   >
                     <option value="">YY</option>
                     {Array.from({ length: 10 }, (_, i) => {
@@ -603,34 +582,29 @@ export default function MembershipManagePage() {
                         </option>
                       );
                     })}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     CVV
                   </label>
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={newCard.cvv}
                     onChange={(e) => setNewCard({ ...newCard, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                     placeholder="***"
                     maxLength={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
+                    className="px-4 py-3 rounded-xl" />
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="saveCard"
                   checked={newCard.saveCard}
                   onChange={(e) => setNewCard({ ...newCard, saveCard: e.target.checked })}
-                  className="w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                  label="Bu kartı sonraki ödemeler için kaydet"
                 />
-                <label htmlFor="saveCard" className="text-sm text-gray-600">
-                  Bu kartı sonraki ödemeler için kaydet
-                </label>
+
               </div>
 
               <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
@@ -638,20 +612,16 @@ export default function MembershipManagePage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => setShowAddCardModal(false)}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-                >
+                  className="flex-1 py-3 text-gray-700 rounded-xl font-medium hover:bg-gray-50">
                   İptal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="secondary" type="submit"
                   disabled={processingAutoRenew}
-                  className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50"
-                >
+                  className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
                   {processingAutoRenew ? 'İşleniyor...' : 'Kartı Ekle ve Aktifleştir'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

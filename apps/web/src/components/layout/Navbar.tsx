@@ -24,7 +24,7 @@ import {
   FireIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { messagesApi, api, wishlistApi, searchApi } from '@/lib/api';
@@ -421,14 +421,12 @@ export default function Navbar() {
               {/* Marquee: bir set reklam + viewport boşluğu + tekrar aynı set → aynı anda tek logo görünür */}
               <div className="ad-marquee-track flex flex-nowrap items-center flex-shrink-0 gap-8 h-full pr-8">
                 {topAds.map((ad, index) => (
-                  <button
-                    key={`a-${ad.id}-${index}`}
+                  <Button variant="secondary" key={`a-${ad.id}-${index}`}
                     type="button"
                     onClick={() => handleAdClick(ad)}
                     className="flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity"
                     style={{ height: isMobile ? 40 : 50 }}
-                    aria-label={ad.altText || ad.title}
-                  >
+                    aria-label={ad.altText || ad.title}>
                     {ad.imageUrl && !adImageError.has(ad.id) ? (
                       <img
                         src={ad.imageUrl}
@@ -440,23 +438,21 @@ export default function Navbar() {
                         onError={() => handleAdImageError(ad.id)}
                       />
                     ) : (
-                      <span className="text-orange-400 text-xs font-medium px-4 whitespace-nowrap">
+                      <span className="text-primary-400 text-xs font-medium px-4 whitespace-nowrap">
                         {ad.title}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
                 {/* İki set arasında en az viewport genişliği boşluk → ikinci logo ekranda çıkana kadar birinci kayar */}
                 <div className="flex-shrink-0 h-full" style={{ minWidth: '100vw' }} aria-hidden />
                 {topAds.map((ad, index) => (
-                  <button
-                    key={`b-${ad.id}-${index}`}
+                  <Button variant="secondary" key={`b-${ad.id}-${index}`}
                     type="button"
                     onClick={() => handleAdClick(ad)}
                     className="flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity"
                     style={{ height: isMobile ? 40 : 50 }}
-                    aria-label={ad.altText || ad.title}
-                  >
+                    aria-label={ad.altText || ad.title}>
                     {ad.imageUrl && !adImageError.has(ad.id) ? (
                       <img
                         src={ad.imageUrl}
@@ -468,11 +464,11 @@ export default function Navbar() {
                         onError={() => handleAdImageError(ad.id)}
                       />
                     ) : (
-                      <span className="text-orange-400 text-xs font-medium px-4 whitespace-nowrap">
+                      <span className="text-primary-400 text-xs font-medium px-4 whitespace-nowrap">
                         {ad.title}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {/* Sponsorlu badge - sol üst */}
@@ -487,7 +483,7 @@ export default function Navbar() {
         </>
       )}
 
-      <nav className={`bg-orange-500 border-b border-orange-600 sticky top-0 z-50 shadow-sm transition-transform duration-300 ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+      <nav className={`bg-primary-500 border-b border-primary-600 sticky top-0 z-50 shadow-sm transition-transform duration-300 ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
             {/* Logo */}
@@ -506,11 +502,10 @@ export default function Navbar() {
             <div ref={searchContainerRef} className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4">
               <div className="w-full max-w-xl relative flex-shrink-0">
                 <form onSubmit={handleSearchSubmit} className="relative h-10 block">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-orange-400">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-primary-400">
                     <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
                   </span>
-                  <input
-                    ref={searchInputRef}
+                  <Input ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -519,16 +514,13 @@ export default function Navbar() {
                     placeholder={t('nav.searchPlaceholder')}
                     className="w-full h-10 pl-10 pr-10 bg-white/95 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
                     aria-label={t('nav.searchPlaceholder')}
-                    autoComplete="off"
-                  />
+                    autoComplete="off" />
                   {searchQuery && (
-                    <button
-                      type="button"
+                    <Button variant="secondary" type="button"
                       onClick={() => { setSearchQuery(''); setDebouncedQuery(''); searchInputRef.current?.focus(); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                       <XMarkIcon className="w-4 h-4" />
-                    </button>
+                    </Button>
                   )}
                 </form>
 
@@ -547,33 +539,27 @@ export default function Navbar() {
                                 <ClockIcon className="w-3.5 h-3.5 shrink-0" />
                                 {locale === 'en' ? 'Recent Searches' : 'Son Aramalar'}
                               </span>
-                              <button
-                                type="button"
+                              <Button variant="secondary" type="button"
                                 onClick={clearSearches}
-                                className="text-xs text-orange-500 hover:text-orange-600 font-medium"
-                              >
+                                className="text-xs text-primary-500 hover:text-primary-600 font-medium">
                                 {locale === 'en' ? 'Clear' : 'Temizle'}
-                              </button>
+                              </Button>
                             </div>
                             <div className="space-y-0.5">
                               {recentSearches.map((s, idx) => (
                                 <div key={s} className="flex items-center justify-between gap-1 group">
-                                  <button
-                                    type="button"
+                                  <Button variant="secondary" type="button"
                                     onClick={() => navigateSearch(s)}
-                                    className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'}`}
-                                  >
+                                    className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-primary-50 text-primary-600' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}>
                                     <ClockIcon className="w-4 h-4 text-gray-400 shrink-0" />
                                     <span className="truncate">{s}</span>
-                                  </button>
-                                  <button
-                                    type="button"
+                                  </Button>
+                                  <Button variant="secondary" type="button"
                                     onClick={(e) => { e.stopPropagation(); removeSearch(s); }}
-                                    className="p-1.5 shrink-0 text-gray-400 hover:text-red-500 rounded transition-opacity opacity-0 group-hover:opacity-100"
-                                    aria-label={locale === 'en' ? 'Remove' : 'Kaldır'}
-                                  >
+                                    className="p-1.5 shrink-0 text-gray-400 hover:text-danger-500 rounded transition-opacity opacity-0 group-hover:opacity-100"
+                                    aria-label={locale === 'en' ? 'Remove' : 'Kaldır'}>
                                     <XMarkIcon className="w-4 h-4" />
-                                  </button>
+                                  </Button>
                                 </div>
                               ))}
                             </div>
@@ -588,14 +574,12 @@ export default function Navbar() {
                           </span>
                           <div className="flex flex-wrap gap-2">
                             {POPULAR_SEARCHES[locale as 'tr' | 'en']?.map((s) => (
-                              <button
-                                key={s}
+                              <Button variant="secondary" key={s}
                                 type="button"
                                 onClick={() => navigateSearch(s)}
-                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 rounded-full transition-colors whitespace-nowrap"
-                              >
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-primary-100 text-gray-700 hover:text-primary-600 rounded-full transition-colors whitespace-nowrap">
                                 {s}
-                              </button>
+                              </Button>
                             ))}
                           </div>
                         </div>
@@ -603,7 +587,7 @@ export default function Navbar() {
                         {/* Tüm ilanları gör */}
                         <Link
                           href="/listings"
-                          className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-orange-50 hover:text-orange-600 border-t border-gray-100 transition-colors"
+                          className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-primary-50 hover:text-primary-600 border-t border-gray-100 transition-colors"
                           onClick={() => setShowSearchDropdown(false)}
                         >
                           <span>{locale === 'en' ? 'Browse all listings' : 'Tüm ilanları gör'}</span>
@@ -615,7 +599,7 @@ export default function Navbar() {
                       <div className="max-h-[480px] overflow-y-auto">
                         {richAutoQuery.isLoading ? (
                           <div className="flex items-center justify-center py-8">
-                            <Spinner size="md" color="border-orange-500 border-t-transparent" />
+                            <Spinner size="md" color="border-primary-500 border-t-transparent" />
                           </div>
                         ) : (
                           <>
@@ -635,7 +619,7 @@ export default function Navbar() {
                                     <Link
                                       key={product.id}
                                       href={`/listings/${product.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {product.imageUrl && isValidImageSrc(product.imageUrl) ? (
@@ -654,7 +638,7 @@ export default function Navbar() {
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm text-gray-900 font-medium truncate">{product.title}</p>
-                                        <p className="text-xs text-orange-600 font-semibold">
+                                        <p className="text-xs text-primary-600 font-semibold">
                                           {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                                         </p>
                                       </div>
@@ -676,7 +660,7 @@ export default function Navbar() {
                                     <Link
                                       key={brand.id}
                                       href={`/listings?brand=${encodeURIComponent(brand.name)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {brand.logo ? (
@@ -686,12 +670,12 @@ export default function Navbar() {
                                           className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
                                         />
                                       ) : (
-                                        <div className="w-10 h-10 rounded-full bg-orange-100 flex-shrink-0 flex items-center justify-center text-orange-600 text-sm font-bold">
+                                        <div className="w-10 h-10 rounded-full bg-primary-100 flex-shrink-0 flex items-center justify-center text-primary-600 text-sm font-bold">
                                           {brand.name.charAt(0)}
                                         </div>
                                       )}
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{brand.name}</span>
-                                      <span className="text-[11px] text-orange-600 font-medium px-2 py-0.5 bg-orange-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Brand' : 'Marka'}
                                       </span>
                                     </Link>
@@ -709,14 +693,14 @@ export default function Navbar() {
                                     <Link
                                       key={cat.id}
                                       href={`/listings?categoryId=${cat.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-blue-50 flex-shrink-0 flex items-center justify-center text-blue-500 border border-blue-100">
+                                      <div className="w-10 h-10 rounded-full bg-info-50 flex-shrink-0 flex items-center justify-center text-info-500 border border-info-100">
                                         <TagIcon className="w-5 h-5" />
                                       </div>
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cat.name}</span>
-                                      <span className="text-[11px] text-blue-600 font-medium px-2 py-0.5 bg-blue-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-info-600 font-medium px-2 py-0.5 bg-info-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Category' : 'Kategori'}
                                       </span>
                                     </Link>
@@ -734,7 +718,7 @@ export default function Navbar() {
                                     <Link
                                       key={mfr.id}
                                       href={`/listings?manufacturer=${encodeURIComponent(mfr.name)}&manufacturerId=${mfr.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {mfr.logo ? (
@@ -744,12 +728,12 @@ export default function Navbar() {
                                           className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
                                         />
                                       ) : (
-                                        <div className="w-10 h-10 rounded-full bg-purple-50 flex-shrink-0 flex items-center justify-center text-purple-600 text-sm font-bold border border-purple-100">
+                                        <div className="w-10 h-10 rounded-full bg-primary-50 flex-shrink-0 flex items-center justify-center text-primary-600 text-sm font-bold border border-primary-100">
                                           {mfr.name.charAt(0)}
                                         </div>
                                       )}
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mfr.name}</span>
-                                      <span className="text-[11px] text-purple-600 font-medium px-2 py-0.5 bg-purple-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Manufacturer' : 'Üretici'}
                                       </span>
                                     </Link>
@@ -767,14 +751,14 @@ export default function Navbar() {
                                     <Link
                                       key={m.id}
                                       href={`/listings?carModelId=${m.id}&carModel=${encodeURIComponent(m.name)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex-shrink-0 flex items-center justify-center text-emerald-600 text-sm font-bold border border-emerald-100">
+                                      <div className="w-10 h-10 rounded-full bg-success-50 flex-shrink-0 flex items-center justify-center text-success-600 text-sm font-bold border border-success-100">
                                         {m.name.charAt(0)}
                                       </div>
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{m.name}</span>
-                                      <span className="text-[11px] text-emerald-600 font-medium px-2 py-0.5 bg-emerald-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Model' : 'Model'}
                                       </span>
                                     </Link>
@@ -792,14 +776,14 @@ export default function Navbar() {
                                     <Link
                                       key={s}
                                       href={`/listings?scale=${encodeURIComponent(s)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-amber-50 flex-shrink-0 flex items-center justify-center text-amber-600 text-xs font-bold border border-amber-100">
+                                      <div className="w-10 h-10 rounded-full bg-warning-50 flex-shrink-0 flex items-center justify-center text-warning-600 text-xs font-bold border border-warning-100">
                                         {s}
                                       </div>
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{s}</span>
-                                      <span className="text-[11px] text-amber-600 font-medium px-2 py-0.5 bg-amber-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-warning-600 font-medium px-2 py-0.5 bg-warning-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Scale' : 'Ölçek'}
                                       </span>
                                     </Link>
@@ -817,7 +801,7 @@ export default function Navbar() {
                                     <Link
                                       key={mat.slug}
                                       href={`/listings?material=${encodeURIComponent(mat.slug)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       <div className="w-10 h-10 rounded-full bg-slate-50 flex-shrink-0 flex items-center justify-center text-slate-600 text-sm font-bold border border-slate-100">
@@ -842,14 +826,14 @@ export default function Navbar() {
                                     <Link
                                       key={cond.value}
                                       href={`/listings?condition=${encodeURIComponent(cond.value)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-orange-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-teal-50 flex-shrink-0 flex items-center justify-center text-teal-600 text-sm font-bold border border-teal-100">
+                                      <div className="w-10 h-10 rounded-full bg-success-50 flex-shrink-0 flex items-center justify-center text-success-600 text-sm font-bold border border-success-100">
                                         {cond.label.charAt(0)}
                                       </div>
                                       <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cond.label}</span>
-                                      <span className="text-[11px] text-teal-600 font-medium px-2 py-0.5 bg-teal-50 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Condition' : 'Durum'}
                                       </span>
                                     </Link>
@@ -866,16 +850,14 @@ export default function Navbar() {
                             )}
 
                             {/* "...ile ara" footer */}
-                            <button
-                              type="button"
+                            <Button variant="secondary" type="button"
                               onClick={() => navigateSearch(debouncedQuery)}
-                              className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium border-t border-gray-100 transition-colors ${activeIndex === flatItems.length - 1 ? 'bg-orange-50 text-orange-600' : 'text-orange-600 hover:bg-orange-50'}`}
-                            >
+                              className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium border-t border-gray-100 transition-colors ${activeIndex === flatItems.length - 1 ? 'bg-primary-50 text-primary-600' : 'text-primary-600 hover:bg-primary-50'}`}>
                               <span>
                                 &ldquo;{debouncedQuery}&rdquo; {locale === 'en' ? 'search for' : 'ile ara'}
                               </span>
                               <ArrowRightIcon className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </>
                         )}
                       </div>
@@ -890,7 +872,7 @@ export default function Navbar() {
               {/* İlan Ver - her zaman görünür */}
               <Link
                 href="/listings/new"
-                className="flex items-center justify-center gap-1.5 h-9 px-4 bg-white text-orange-500 rounded-md text-sm font-medium hover:bg-orange-50 transition-colors"
+                className="flex items-center justify-center gap-1.5 h-9 px-4 bg-white text-primary-500 rounded-md text-sm font-medium hover:bg-primary-50 transition-colors"
                 onClick={(e) => { if (!showAuthUI) { e.preventDefault(); setShowAuthModal(true); } }}
               >
                 <PlusIcon className="w-4 h-4" />
@@ -914,21 +896,24 @@ export default function Navbar() {
                   accountDropdownLeaveTimer.current = setTimeout(() => setShowAccountDropdown(false), 150);
                 }}
               >
-                <button
+                <Button
+                  variant="nav"
+                  size="sm"
                   onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                  className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-orange-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors"
+                  aria-expanded={showAccountDropdown}
+                  className="gap-1.5 h-9 rounded-md"
                 >
                   <UserCircleIcon className="w-5 h-5" />
                   <span className="hidden sm:inline">{showAuthUI ? (user?.displayName || t('nav.account')) : t('common.login')}</span>
                   <ChevronDownIcon className={`w-4 h-4 transition-transform ${showAccountDropdown ? 'rotate-180' : ''}`} />
-                </button>
+                </Button>
 
                 {showAccountDropdown && (
                   <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]">
                     {showAuthUI ? (
                       <>
                         {/* Profil - en üstte, profesyonel */}
-                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="block px-4 py-3 hover:bg-orange-50/50 transition-colors">
+                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="block px-4 py-3 hover:bg-primary-50/50 transition-colors">
                           <div className="flex items-center gap-3">
                             <UserAvatar
                               displayName={user?.displayName || user?.email}
@@ -940,7 +925,7 @@ export default function Navbar() {
                               <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
                               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                               {membershipTier !== 'free' && (
-                                <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded">
+                                <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded">
                                   {membershipTier}
                                 </span>
                               )}
@@ -948,7 +933,7 @@ export default function Navbar() {
                           </div>
                         </Link>
                         <div className="border-t border-gray-100 my-1" />
-                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
@@ -966,11 +951,11 @@ export default function Navbar() {
                                 }
                                 setShowAccountDropdown(false);
                               }}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
                             >
                               {link.label}
                               {showTradesBadge && (
-                                <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                                <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-[10px] font-bold rounded-full">
                                   {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
                                 </span>
                               )}
@@ -978,62 +963,62 @@ export default function Navbar() {
                           );
                         })}
                         <div className="border-t border-gray-100 my-1" />
-                        <Link href="/messages" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/messages" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <ChatBubbleLeftRightIcon className="w-5 h-5" />
                           {t('nav.messages')}
-                          {unreadMessageCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
+                          {unreadMessageCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-xs rounded-full">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
                         </Link>
-                        <Link href="/favorites" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/favorites" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <HeartIcon className="w-5 h-5" />
                           {t('nav.favorites')}
                           {wishlistCount > 0 && <span className="ml-auto text-xs text-gray-500">{wishlistCount}</span>}
                         </Link>
-                        <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <BellIcon className="w-5 h-5" />
                           {t('nav.notifications')}
                           {unreadNotificationsCount > 0 && (
-                            <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                            <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-xs rounded-full">
                               {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                             </span>
                           )}
                         </Link>
 
                         <div className="border-t border-gray-100 my-1" />
-                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <UserCircleIcon className="w-5 h-5" />
                           {t('profile.myProfile')}
                         </Link>
-                        <Link href="/profile/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/profile/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <ShoppingBagIcon className="w-5 h-5" />
                           {t('nav.myListings')}
                         </Link>
-                        <Link href="/orders" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/orders" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <TagIcon className="w-5 h-5" />
                           {t('order.myOrders')}
                         </Link>
-                        <Link href="/offers" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/offers" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <CurrencyDollarIcon className="w-5 h-5" />
                           {t('offer.myOffers')}
-                          {pendingOffersCount > 0 && <span className="ml-auto text-xs text-red-600">{pendingOffersCount}</span>}
+                          {pendingOffersCount > 0 && <span className="ml-auto text-xs text-danger-600">{pendingOffersCount}</span>}
                         </Link>
                         <div className="border-t border-gray-100 my-1" />
                         <div className="px-4 py-2">
                           <LanguageSwitcher variant="minimal" />
                         </div>
-                        <button onClick={() => { logout(); router.push('/'); setShowAccountDropdown(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
+                        <Button variant="secondary" onClick={() => { logout(); router.push('/'); setShowAccountDropdown(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-danger-600 hover:bg-danger-50">
                           <ArrowRightOnRectangleIcon className="w-5 h-5" />
                           {t('common.logout')}
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <>
                         <div className="px-4 py-3 border-b border-gray-100">
                           <div className="flex items-center gap-2">
-                            <UserCircleIcon className="w-6 h-6 text-orange-500" />
-                            <span className="text-sm font-semibold text-orange-500">{t('common.login')}</span>
+                            <UserCircleIcon className="w-6 h-6 text-primary-500" />
+                            <span className="text-sm font-semibold text-primary-500">{t('common.login')}</span>
                           </div>
                         </div>
-                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600">
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
@@ -1050,7 +1035,7 @@ export default function Navbar() {
                                 }
                                 setShowAccountDropdown(false);
                               }}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
                             >
                               {link.label}
                             </Link>
@@ -1061,14 +1046,14 @@ export default function Navbar() {
                           <Link
                             href="/login"
                             onClick={() => setShowAccountDropdown(false)}
-                            className="flex items-center justify-center w-full py-2.5 px-4 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                            className="flex items-center justify-center w-full py-2.5 px-4 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
                           >
                             {t('common.login')}
                           </Link>
                           <Link
                             href="/register"
                             onClick={() => setShowAccountDropdown(false)}
-                            className="flex items-center justify-center w-full py-2.5 px-4 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                            className="items-center justify-center py-2.5 px-4 text-gray-700 font-medium hover:bg-gray-50"
                           >
                             {t('common.register')}
                           </Link>
@@ -1082,13 +1067,13 @@ export default function Navbar() {
               {/* Sepet - en sağda, Giriş Yap'ın sağında ikon + yazı */}
               <Link
                 href="/cart"
-                className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-orange-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors relative"
+                className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-primary-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors relative"
                 title={t('nav.cart')}
               >
                 <ShoppingCartIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">{t('nav.cart')}</span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-white text-orange-500 text-xs rounded-full flex items-center justify-center font-semibold">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-white text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">
                     {cartCount > 9 ? '9+' : cartCount}
                   </span>
                 )}

@@ -15,7 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
@@ -162,7 +162,7 @@ export default function NotificationsPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center">
                 <BellSolidIcon className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -183,24 +183,20 @@ export default function NotificationsPage() {
 
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                >
+                <Button variant="secondary" onClick={markAllAsRead}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                   <CheckCircleIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">
                     {locale === 'en' ? 'Mark all read' : 'Tümünü oku'}
                   </span>
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
+              <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
                 className={`p-2 rounded-lg transition-colors ${
-                  showFilters ? 'bg-orange-100 text-orange-600' : 'hover:bg-gray-100 text-gray-600'
-                }`}
-              >
+                  showFilters ? 'bg-primary-100 text-primary-600' : 'hover:bg-gray-100 text-gray-600'
+                }`}>
                 <FunnelIcon className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -215,22 +211,20 @@ export default function NotificationsPage() {
               >
                 <div className="flex flex-wrap gap-2 pt-4">
                   {(Object.keys(FILTER_LABELS) as FilterType[]).map((filterKey) => (
-                    <button
-                      key={filterKey}
+                    <Button variant="secondary" key={filterKey}
                       onClick={() => setFilter(filterKey)}
                       className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                         filter === filterKey
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
+                      }`}>
                       {FILTER_LABELS[filterKey][locale as 'tr' | 'en']}
                       {filterKey === 'unread' && unreadCount > 0 && (
                         <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
                           {unreadCount}
                         </span>
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </motion.div>
@@ -243,7 +237,7 @@ export default function NotificationsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <Spinner size="xl" color="border-orange-500 border-t-transparent" className="mb-4" />
+            <Spinner size="xl" color="border-primary-500 border-t-transparent" className="mb-4" />
             <p className="text-gray-500">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
           </div>
         ) : filteredNotifications.length === 0 ? (
@@ -279,12 +273,12 @@ export default function NotificationsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.03 }}
                 className={`relative bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md ${
-                  !notification.isRead ? 'ring-2 ring-orange-200' : ''
+                  !notification.isRead ? 'ring-2 ring-primary-200' : ''
                 }`}
               >
                 {/* Unread indicator */}
                 {!notification.isRead && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-400 to-orange-600" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-400 to-primary-600" />
                 )}
 
                 <div className="p-4 pl-5">
@@ -293,7 +287,7 @@ export default function NotificationsPage() {
                     <div
                       className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xl ${
                         !notification.isRead
-                          ? 'bg-orange-100'
+                          ? 'bg-primary-100'
                           : 'bg-gray-100'
                       }`}
                     >
@@ -321,17 +315,15 @@ export default function NotificationsPage() {
                             {getTimeAgo(notification.createdAt)}
                           </span>
                           {!notification.isRead && (
-                            <button
-                              onClick={(e) => {
+                            <Button variant="secondary" onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 markAsRead(notification.id);
                               }}
-                              className="p-1 text-gray-400 hover:text-orange-500 transition-colors"
-                              title={locale === 'en' ? 'Mark as read' : 'Okundu işaretle'}
-                            >
+                              className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
+                              title={locale === 'en' ? 'Mark as read' : 'Okundu işaretle'}>
                               <CheckIcon className="w-4 h-4" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -345,7 +337,7 @@ export default function NotificationsPage() {
                               markAsRead(notification.id);
                             }
                           }}
-                          className="inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 font-medium mt-2"
+                          className="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 font-medium mt-2"
                         >
                           {locale === 'en' ? 'View details' : 'Detayları gör'}
                           <span>→</span>

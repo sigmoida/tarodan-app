@@ -16,7 +16,7 @@ import {
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 
 interface OrderDetail {
@@ -74,13 +74,13 @@ interface OrderDetail {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending_payment: { label: 'Ödeme Bekliyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  paid: { label: 'Ödendi', color: 'text-blue-600', bg: 'bg-blue-100' },
-  preparing: { label: 'Hazırlanıyor', color: 'text-purple-600', bg: 'bg-purple-100' },
-  shipped: { label: 'Kargoda', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-  delivered: { label: 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: 'İptal', color: 'text-red-600', bg: 'bg-red-100' },
+  pending_payment: { label: 'Ödeme Bekliyor', color: 'text-warning-600', bg: 'bg-warning-100' },
+  paid: { label: 'Ödendi', color: 'text-info-600', bg: 'bg-info-100' },
+  preparing: { label: 'Hazırlanıyor', color: 'text-primary-600', bg: 'bg-primary-100' },
+  shipped: { label: 'Kargoda', color: 'text-info-600', bg: 'bg-info-100' },
+  delivered: { label: 'Teslim Edildi', color: 'text-success-600', bg: 'bg-success-100' },
+  completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
+  cancelled: { label: 'İptal', color: 'text-danger-600', bg: 'bg-danger-100' },
   refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
@@ -321,33 +321,25 @@ export default function OrderDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setShowStatusModal(true)}
-              className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-            >
+            <Button variant="secondary" onClick={() => setShowStatusModal(true)}
+              className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
               Durum Güncelle
-            </button>
-            <button
-              onClick={() => setShowTrackingModal(true)}
-              className="px-4 py-2 bg-indigo-600 text-gray-900 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setShowTrackingModal(true)}
+              className="px-4 py-2 bg-info-600 text-gray-900 rounded-lg hover:bg-info-700 transition-colors flex items-center gap-2">
               <TruckIcon className="w-5 h-5" />
               Kargo Takibi Ekle
-            </button>
-            <button
-              onClick={() => setShowNotifyModal(true)}
-              className="px-4 py-2 bg-purple-600 text-gray-900 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setShowNotifyModal(true)}
+              className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
               <BellIcon className="w-5 h-5" />
               Bildirim Gönder
-            </button>
-            <button
-              onClick={handlePrintInvoice}
-              className="px-4 py-2 bg-gray-600 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={handlePrintInvoice}
+              className="px-4 py-2 bg-gray-600 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2">
               <PrinterIcon className="w-5 h-5" />
               Fatura Yazdır
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -575,10 +567,9 @@ export default function OrderDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Yeni Durum
                 </label>
-                <select
+                <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="pending_payment">Ödeme Bekliyor</option>
                   <option value="paid">Ödendi</option>
@@ -588,23 +579,19 @@ export default function OrderDetailPage() {
                   <option value="completed">Tamamlandı</option>
                   <option value="cancelled">İptal</option>
                   <option value="refunded">İade Edildi</option>
-                </select>
+                </Select>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowStatusModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowStatusModal(false)}
+                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleStatusUpdate}
+                </Button>
+                <Button variant="secondary" onClick={handleStatusUpdate}
                   className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -618,41 +605,34 @@ export default function OrderDetailPage() {
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Kargo Firması</label>
-                  <select
+                  <Select
                     value={carrier}
                     onChange={(e) => setCarrier(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                   >
                     <option value="">Seçiniz</option>
                     {carriers.map((c) => (<option key={c} value={c}>{c}</option>))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Takip Numarası</label>
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                    placeholder="Örn: 123456789"
-                  />
+                    className="text-gray-900"
+                    placeholder="Örn: 123456789" />
                 </div>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTrackingModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowTrackingModal(false)}
+                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleAddTracking}
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-gray-900 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleAddTracking}
+                  className="flex-1 px-4 py-2 bg-info-600 text-gray-900 rounded-lg hover:bg-info-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Kaydet'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -666,45 +646,38 @@ export default function OrderDetailPage() {
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bildirim Türü</label>
-                  <select
+                  <Select
                     value={notifyType}
                     onChange={(e) => setNotifyType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                   >
                     <option value="status_update">Durum Güncelleme</option>
                     <option value="shipped">Kargoya Verildi</option>
                     <option value="delivered">Teslim Edildi</option>
                     <option value="custom">Özel Mesaj</option>
-                  </select>
+                  </Select>
                 </div>
                 {notifyType === 'custom' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Mesaj</label>
-                    <textarea
-                      value={notifyMessage}
+                    <Textarea value={notifyMessage}
                       onChange={(e) => setNotifyMessage(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      className="text-gray-900"
                       rows={3}
-                      placeholder="Alıcıya gönderilecek mesajı yazın..."
-                    />
+                      placeholder="Alıcıya gönderilecek mesajı yazın..." />
                   </div>
                 )}
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowNotifyModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowNotifyModal(false)}
+                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleSendNotification}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-gray-900 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleSendNotification}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Gönder'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

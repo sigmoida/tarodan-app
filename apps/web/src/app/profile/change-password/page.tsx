@@ -18,12 +18,13 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input } from '@tarodan/ui';
+
 
 function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-400'}`}>
-      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-green-100' : 'bg-gray-100'}`}>
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-success-600' : 'text-gray-400'}`}>
+      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-success-100' : 'bg-gray-100'}`}>
         {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
       </div>
       <span>{text}</span>
@@ -101,8 +102,8 @@ export default function ChangePasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
+        <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
           <div className="max-w-4xl mx-auto px-4 py-8">
             <Link
               href="/profile/settings"
@@ -119,8 +120,8 @@ export default function ChangePasswordPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 md:p-10 text-center"
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircleIcon className="w-12 h-12 text-green-600" />
+            <div className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircleIcon className="w-12 h-12 text-success-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('settings.passwordChanged')}</h2>
             <p className="text-gray-500 mb-8">
@@ -130,7 +131,7 @@ export default function ChangePasswordPage() {
             </p>
             <Link
               href="/profile/settings"
-              className="inline-flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+              className="inline-flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
             >
               <ArrowLeftIcon className="w-5 h-5" />
               {locale === 'en' ? 'Back to Settings' : 'Ayarlara Dön'}
@@ -142,8 +143,8 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
+      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Link
             href="/profile/settings"
@@ -174,7 +175,7 @@ export default function ChangePasswordPage() {
         >
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <LockClosedIcon className="w-5 h-5 text-orange-500" />
+              <LockClosedIcon className="w-5 h-5 text-primary-500" />
               {t('settings.changePassword')}
             </h2>
           </div>
@@ -185,25 +186,21 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showCurrent ? 'text' : 'password'}
+                <Input type={showCurrent ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => {
                     setCurrentPassword(e.target.value);
                     setError('');
                   }}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-orange-500 transition-colors text-gray-900"
+                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-gray-900"
                   required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
+                  autoComplete="current-password" />
+                <Button variant="secondary" type="button"
                   onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showCurrent ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -213,25 +210,21 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showNew ? 'text' : 'password'}
+                <Input type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);
                     setError('');
                   }}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-orange-500 transition-colors text-gray-900"
+                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-gray-900"
                   required
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
+                  autoComplete="new-password" />
+                <Button variant="secondary" type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showNew ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -253,8 +246,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showConfirm ? 'text' : 'password'}
+                <Input type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
@@ -262,27 +254,24 @@ export default function ChangePasswordPage() {
                   }}
                   placeholder="••••••••"
                   className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-0 transition-colors text-gray-900 ${
-                    confirmPassword && !passwordsMatch ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-orange-500'
+                    confirmPassword && !passwordsMatch ? 'border-danger-300 bg-danger-50' : 'border-gray-200 focus:border-primary-500'
                   }`}
                   required
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
+                  autoComplete="new-password" />
+                <Button variant="secondary" type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showConfirm ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </button>
+                </Button>
               </div>
               {confirmPassword && !passwordsMatch && (
-                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <p className="mt-2 text-sm text-danger-600 flex items-center gap-1">
                   <ExclamationCircleIcon className="w-4 h-4" />
                   {locale === 'tr' ? 'Şifreler eşleşmiyor' : 'Passwords do not match'}
                 </p>
               )}
               {passwordsMatch && (
-                <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
+                <p className="mt-2 text-sm text-success-600 flex items-center gap-1">
                   <CheckCircleIcon className="w-4 h-4" />
                   {locale === 'tr' ? 'Şifreler eşleşiyor' : 'Passwords match'}
                 </p>
@@ -293,20 +282,18 @@ export default function ChangePasswordPage() {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-red-50 border border-red-200 rounded-xl p-4"
+                className="bg-danger-50 border border-danger-200 rounded-xl p-4"
               >
-                <p className="text-sm text-red-600 flex items-center gap-2">
+                <p className="text-sm text-danger-600 flex items-center gap-2">
                   <ExclamationCircleIcon className="w-5 h-5 shrink-0" />
                   {error}
                 </p>
               </motion.div>
             )}
 
-            <button
-              type="submit"
+            <Button variant="secondary" type="submit"
               disabled={loading || !currentPassword.trim() || !isNewPasswordValid || !passwordsMatch}
-              className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all"
-            >
+              className="w-full py-4 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all">
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -318,7 +305,7 @@ export default function ChangePasswordPage() {
               ) : (
                 t('settings.changePassword')
               )}
-            </button>
+            </Button>
           </form>
         </motion.div>
       </main>

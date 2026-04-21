@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
+import { Button, Checkbox, Input, Radio } from '@tarodan/ui';
 
 interface Category {
     id: string;
@@ -245,7 +246,7 @@ export default function SidebarFilters({
                     <FunnelIcon className="w-5 h-5 text-gray-600" />
                     <span className="font-semibold text-gray-900">{t('product.filters')}</span>
                     {activeFilterCount > 0 && (
-                        <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-sm">
+                        <span className="px-2 py-0.5 bg-primary-500 text-white text-xs font-bold rounded-sm">
                             {activeFilterCount}
                         </span>
                     )}
@@ -257,10 +258,8 @@ export default function SidebarFilters({
 
                 {/* Araç Türü (Category) - loaded from API */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('category')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('category')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Vehicle Type' : 'Araç Türü'}
                         </span>
@@ -269,20 +268,18 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.category && (
                         <div className="mt-3 space-y-1">
                             {categories.map((cat) => (
-                                <button
-                                    key={cat.id}
+                                <Button variant="secondary" key={cat.id}
                                     onClick={() => handleCategoryChange(cat.id, cat.name)}
                                     className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${filters.categoryId === cat.id
-                                        ? 'bg-orange-100 text-orange-700'
+                                        ? 'bg-primary-100 text-primary-700'
                                         : 'text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                >
+                                        }`}>
                                     <span>{cat.name}</span>
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     )}
@@ -290,10 +287,8 @@ export default function SidebarFilters({
 
                 {/* Marka */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('brand')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('brand')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Brand' : 'Marka'}
                         </span>
@@ -302,15 +297,16 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.brand && (
                         <div className="mt-3">
-                            <input
+                            <Input
                                 type="text"
                                 placeholder={locale === 'en' ? 'Search brands...' : 'Marka ara...'}
                                 value={brandSearch}
                                 onChange={(e) => setBrandSearch(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
+                                inputSize="sm"
+                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1">
                                 {filteredBrands.map((brand) => {
@@ -321,17 +317,14 @@ export default function SidebarFilters({
                                         <label
                                             key={brand.id}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
-                                                ? 'bg-orange-100 text-orange-700'
+                                                ? 'bg-primary-100 text-primary-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            <input
-                                                type="radio"
-                                                name="brand"
+                                            <Radio name="brand"
                                                 checked={isSelected}
                                                 onChange={() => handleBrandChange(brand.id, brand.name)}
-                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
-                                            />
+                                                className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
                                             <span className="text-sm">{brand.name}</span>
                                         </label>
                                     );
@@ -343,10 +336,8 @@ export default function SidebarFilters({
 
                 {/* Model */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('model')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('model')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Model' : 'Model'}
                         </span>
@@ -355,15 +346,16 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.model && (
                         <div className="mt-3">
-                            <input
+                            <Input
                                 type="text"
                                 placeholder={locale === 'en' ? 'Search models...' : 'Model ara...'}
                                 value={modelSearch}
                                 onChange={(e) => setModelSearch(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
+                                inputSize="sm"
+                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1 max-h-48 overflow-y-auto">
                                 {modelsForBrand.map((m) => {
@@ -372,17 +364,14 @@ export default function SidebarFilters({
                                         <label
                                             key={m.id}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
-                                                ? 'bg-orange-100 text-orange-700'
+                                                ? 'bg-primary-100 text-primary-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            <input
-                                                type="radio"
-                                                name="carModel"
+                                            <Radio name="carModel"
                                                 checked={isSelected}
                                                 onChange={() => handleCarModelChange(m.id, m.name)}
-                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
-                                            />
+                                                className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
                                             <span className="text-sm">{m.name}</span>
                                         </label>
                                     );
@@ -394,10 +383,8 @@ export default function SidebarFilters({
 
                 {/* Ölçek */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('scale')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('scale')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Scale' : 'Ölçek'}
                         </span>
@@ -406,20 +393,18 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.scale && (
                         <div className="mt-3 grid grid-cols-3 gap-2">
                             {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
-                                <button
-                                    key={scale}
+                                <Button variant="secondary" key={scale}
                                     onClick={() => handleScaleChange(scale)}
                                     className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${filters.scale === scale
-                                        ? 'bg-orange-500 text-white'
+                                        ? 'bg-primary-500 text-white'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                >
+                                        }`}>
                                     {scale}
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     )}
@@ -427,10 +412,8 @@ export default function SidebarFilters({
 
                 {/* Malzeme (Material) */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('material')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('material')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Material' : 'Malzeme'}
                         </span>
@@ -439,7 +422,7 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.material && (
                         <div className="mt-3 space-y-1">
                             {(materialList.length > 0 ? materialList : [
@@ -448,16 +431,14 @@ export default function SidebarFilters({
                                 { slug: 'composite', label: 'Composite (Kompozit)' },
                                 { slug: 'plastic', label: 'Plastic (Plastik)' },
                             ]).map((m) => (
-                                <button
-                                    key={m.slug}
+                                <Button variant="secondary" key={m.slug}
                                     onClick={() => handleMaterialChange(m.slug)}
                                     className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${filters.material === m.slug
-                                        ? 'bg-orange-100 text-orange-700'
+                                        ? 'bg-primary-100 text-primary-700'
                                         : 'text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                >
+                                        }`}>
                                     {m.label}
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     )}
@@ -465,10 +446,8 @@ export default function SidebarFilters({
 
                 {/* Üretici */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('manufacturer')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('manufacturer')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Manufacturer' : 'Üretici'}
                         </span>
@@ -477,15 +456,16 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.manufacturer && (
                         <div className="mt-3">
-                            <input
+                            <Input
                                 type="text"
                                 placeholder={locale === 'en' ? 'Search manufacturers...' : 'Üretici ara...'}
                                 value={manufacturerSearch}
                                 onChange={(e) => setManufacturerSearch(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400 mb-2"
+                                inputSize="sm"
+                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1">
                                 {displayManufacturers.map((m) => {
@@ -496,17 +476,14 @@ export default function SidebarFilters({
                                         <label
                                             key={m.id || m.name}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
-                                                ? 'bg-orange-100 text-orange-700'
+                                                ? 'bg-primary-100 text-primary-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            <input
-                                                type="radio"
-                                                name="manufacturer"
+                                            <Radio name="manufacturer"
                                                 checked={isSelected}
                                                 onChange={() => handleManufacturerChange(m.id, m.name)}
-                                                className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
-                                            />
+                                                className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
                                             <span className="text-sm">{m.name}</span>
                                         </label>
                                     );
@@ -518,10 +495,8 @@ export default function SidebarFilters({
 
                 {/* Durum */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('condition')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('condition')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {t('product.condition')}
                         </span>
@@ -530,24 +505,21 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.condition && (
                         <div className="mt-3 space-y-1">
                             {CONDITIONS.map((condition) => (
                                 <label
                                     key={condition.value}
                                     className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.condition === condition.value
-                                        ? 'bg-orange-100 text-orange-700'
+                                        ? 'bg-primary-100 text-primary-700'
                                         : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                 >
-                                    <input
-                                        type="radio"
-                                        name="condition"
+                                    <Radio name="condition"
                                         checked={filters.condition === condition.value}
                                         onChange={() => handleConditionChange(condition.value)}
-                                        className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-400"
-                                    />
+                                        className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
                                     <span className="text-sm">{condition.label}</span>
                                 </label>
                             ))}
@@ -557,10 +529,8 @@ export default function SidebarFilters({
 
                 {/* Fiyat */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('price')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('price')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Price' : 'Fiyat'}
                         </span>
@@ -569,24 +539,26 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.price && (
                         <div className="mt-3 space-y-2">
                             <div className="flex gap-2 items-center">
-                                <input
+                                <Input
                                     type="number"
                                     placeholder="Min ₺"
                                     value={filters.minPrice}
                                     onChange={(e) => onFilterChange({ ...filters, minPrice: e.target.value })}
-                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400"
+                                    inputSize="sm"
+                                    className="flex-1 min-w-0 px-2 rounded border-gray-200 focus:border-primary-400"
                                 />
                                 <span className="text-gray-400 flex-shrink-0">-</span>
-                                <input
+                                <Input
                                     type="number"
                                     placeholder="Max ₺"
                                     value={filters.maxPrice}
                                     onChange={(e) => onFilterChange({ ...filters, maxPrice: e.target.value })}
-                                    className="flex-1 min-w-0 w-full px-2 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-orange-400"
+                                    inputSize="sm"
+                                    className="flex-1 min-w-0 px-2 rounded border-gray-200 focus:border-primary-400"
                                 />
                             </div>
                             {/* Quick price buttons */}
@@ -595,8 +567,7 @@ export default function SidebarFilters({
                                     const [min, max] = range.split('-');
                                     const isActive = filters.minPrice === (min || '') && filters.maxPrice === (max || '');
                                     return (
-                                        <button
-                                            key={range}
+                                        <Button variant="secondary" key={range}
                                             onClick={() => {
                                                 if (isActive) {
                                                     onFilterChange({ ...filters, minPrice: '', maxPrice: '' });
@@ -609,12 +580,11 @@ export default function SidebarFilters({
                                                 }
                                             }}
                                             className={`px-2 py-1 text-xs rounded transition-colors ${isActive
-                                                ? 'bg-orange-500 text-white'
+                                                ? 'bg-primary-500 text-white'
                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}
-                                        >
+                                                }`}>
                                             {range === '1000+' ? '₺1000+' : `₺${range}`}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -624,10 +594,8 @@ export default function SidebarFilters({
 
                 {/* Diğer Seçenekler */}
                 <div className="py-3 px-4">
-                    <button
-                        onClick={() => toggleSection('options')}
-                        className="flex items-center justify-between w-full text-left"
-                    >
+                    <Button variant="secondary" onClick={() => toggleSection('options')}
+                        className="flex items-center justify-between w-full text-left">
                         <span className="font-medium text-gray-900">
                             {locale === 'en' ? 'Options' : 'Seçenekler'}
                         </span>
@@ -636,15 +604,14 @@ export default function SidebarFilters({
                         ) : (
                             <ChevronUpIcon className="w-5 h-5 text-gray-400" />
                         )}
-                    </button>
+                    </Button>
                     {!collapsedSections.options && (
                         <div className="mt-3">
                             <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-gray-50">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={filters.tradeOnly}
                                     onChange={(e) => onFilterChange({ ...filters, tradeOnly: e.target.checked })}
-                                    className="w-5 h-5 text-orange-500 border-gray-300 rounded focus:ring-orange-400"
+                                    className="h-5 w-5"
                                 />
                                 <div>
                                     <span className="text-sm font-medium text-gray-700">{t('product.tradeAvailable')}</span>

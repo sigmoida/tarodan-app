@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -163,30 +163,30 @@ export default function CarModelsPage() {
 
         <div className="flex gap-4 items-center">
           <label className="text-sm font-medium text-gray-700">Marka:</label>
-          <select
+          <Select
             value={selectedBrandId}
             onChange={(e) => setSelectedBrandId(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 min-w-[200px]"
+            className="min-w-[200px]"
           >
             <option value="">Tüm markalar</option>
             {brands.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto" />
+              <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
               <p className="mt-2 text-gray-500">Yükleniyor...</p>
             </div>
           ) : models.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-500">Bu marka için henüz model eklenmemiş</p>
-              <button onClick={openCreateModal} className="mt-4 text-orange-500 hover:text-orange-600 font-medium">
+              <Button variant="secondary" onClick={openCreateModal} className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
                 İlk modeli ekle
-              </button>
+              </Button>
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200">
@@ -213,21 +213,19 @@ export default function CarModelsPage() {
                       {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleStatus(m)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
-                      >
+                      <Button variant="secondary" onClick={() => toggleStatus(m)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
                         {m.isActive ? <><CheckCircleIcon className="w-4 h-4" />Aktif</> : <><XCircleIcon className="w-4 h-4" />Pasif</>}
-                      </button>
+                      </Button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
+                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
                           <PencilIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Sil">
+                        </Button>
+                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
                           <TrashIcon className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -246,10 +244,9 @@ export default function CarModelsPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Marka *</label>
-                    <select
+                    <Select
                       value={formData.brandId}
                       onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       required
                       disabled={!!editingModel}
                     >
@@ -257,55 +254,45 @@ export default function CarModelsPage() {
                       {brands.map((b) => (
                         <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Model Adı *</label>
-                    <input
-                      type="text"
+                    <Input type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       required
-                      placeholder="Örn: M4, 911 GT3"
-                    />
+                      placeholder="Örn: M4, 911 GT3" />
                   </div>
                   <div className="flex gap-4">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Yılı</label>
-                      <input
-                        type="number"
+                      <Input type="number"
                         value={formData.yearStart}
                         onChange={(e) => setFormData({ ...formData, yearStart: e.target.value ? parseInt(e.target.value) : '' })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                         min="1900"
                         max="2100"
-                        placeholder="2014"
-                      />
+                        placeholder="2014" />
                     </div>
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Yılı</label>
-                      <input
-                        type="number"
+                      <Input type="number"
                         value={formData.yearEnd}
                         onChange={(e) => setFormData({ ...formData, yearEnd: e.target.value ? parseInt(e.target.value) : '' })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                         min="1900"
                         max="2100"
-                        placeholder="Boş = devam ediyor"
-                      />
+                        placeholder="Boş = devam ediyor" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                    <select
+                    <Select
                       value={formData.isActive ? 'true' : 'false'}
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     >
                       <option value="true">Aktif</option>
                       <option value="false">Pasif</option>
-                    </select>
+                    </Select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)}>

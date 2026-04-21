@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
 import clsx from 'clsx';
+import { Button } from '@tarodan/ui';
 import {
   HomeIcon,
   UsersIcon,
@@ -116,12 +117,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             />
             <span className="ml-2 text-xs text-gray-500 font-medium">Admin</span>
           </Link>
-          <button
-            className="lg:hidden text-gray-400 hover:text-gray-700"
-            onClick={() => setSidebarOpen(false)}
-          >
+          <Button variant="secondary" className="lg:hidden text-gray-400 hover:text-gray-700"
+            onClick={() => setSidebarOpen(false)}>
             <XMarkIcon className="h-6 w-6" />
-          </button>
+          </Button>
         </div>
 
         {/* Navigation */}
@@ -161,13 +160,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <p className="text-xs text-gray-500">{user?.role}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-          >
+          <Button variant="secondary" onClick={handleLogout}
+            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-danger-50 hover:text-danger-600 transition-colors">
             <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
             Çıkış Yap
-          </button>
+          </Button>
         </div>
       </aside>
 
@@ -176,12 +173,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
-            <button
-              className="lg:hidden text-gray-500 hover:text-gray-700 mr-4"
-              onClick={() => setSidebarOpen(true)}
-            >
+            <Button variant="secondary" className="lg:hidden text-gray-500 hover:text-gray-700 mr-4"
+              onClick={() => setSidebarOpen(true)}>
               <Bars3Icon className="h-6 w-6" />
-            </button>
+            </Button>
             <div className="hidden lg:flex items-center">
               <Image
                 src="/tarodan-logo.jpg"

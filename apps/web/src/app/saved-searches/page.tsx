@@ -7,6 +7,7 @@ import { MagnifyingGlassIcon, TrashIcon, BellIcon, ArrowLeftIcon } from '@heroic
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { Button } from '@tarodan/ui';
 
 interface SavedSearch {
   id: string;
@@ -138,8 +139,8 @@ export default function SavedSearchesPage() {
         </div>
 
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-          <p className="text-blue-800 text-sm">
+        <div className="bg-info-50 border border-info-200 rounded-xl p-4 mb-6">
+          <p className="text-info-800 text-sm">
             <strong>İpucu:</strong> Arama yaparken sonuç sayfasında "Bu aramayı kaydet" butonunu kullanarak yeni arama ekleyebilirsiniz.
           </p>
         </div>
@@ -204,35 +205,29 @@ export default function SavedSearchesPage() {
                   </div>
                   
                   <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleToggleNotify(search.id)}
+                    <Button variant="secondary" onClick={() => handleToggleNotify(search.id)}
                       className={`p-2 rounded-lg transition-colors ${
                         search.notifyEnabled
                           ? 'bg-primary-100 text-primary-600'
                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                       }`}
-                      title={search.notifyEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}
-                    >
+                      title={search.notifyEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}>
                       <BellIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(search.id)}
-                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                      title="Sil"
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => handleDelete(search.id)}
+                      className="p-2 bg-danger-100 text-danger-600 rounded-lg hover:bg-danger-200 transition-colors"
+                      title="Sil">
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={() => handleRunSearch(search)}
-                    className="w-full py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                  >
+                  <Button variant="secondary" onClick={() => handleRunSearch(search)}
+                    className="w-full py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                     <MagnifyingGlassIcon className="w-5 h-5" />
                     Bu Aramayı Çalıştır
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -241,8 +236,8 @@ export default function SavedSearchesPage() {
 
         {/* Limit Warning */}
         {savedSearches.length >= searchLimit && (
-          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <p className="text-yellow-800 text-sm">
+          <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4">
+            <p className="text-warning-800 text-sm">
               Kayıtlı arama limitinize ulaştınız ({searchLimit} arama).{' '}
               {user?.membershipTier === 'free' && (
                 <Link href="/pricing" className="font-medium underline">

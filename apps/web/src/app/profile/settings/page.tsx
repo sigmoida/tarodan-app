@@ -21,7 +21,7 @@ import {
   FingerPrintIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Modal } from '@tarodan/ui';
+import { Button, Input, Modal } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
@@ -129,25 +129,23 @@ export default function SettingsPage() {
   }
 
   const Toggle = ({ enabled, onChange }: { enabled: boolean; onChange: () => void }) => (
-    <button
-      type="button"
+    <Button variant="secondary" type="button"
       onClick={onChange}
       className={`relative w-12 h-6 rounded-full transition-colors ${
-        enabled ? 'bg-orange-500' : 'bg-gray-300'
-      }`}
-    >
+        enabled ? 'bg-primary-500' : 'bg-gray-300'
+      }`}>
       <motion.div
         animate={{ x: enabled ? 24 : 2 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         className="absolute top-1 w-4 h-4 bg-white rounded-full shadow"
       />
-    </button>
+    </Button>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
         <div className="max-w-3xl mx-auto px-4 py-8">
           <Link
             href="/profile"
@@ -183,7 +181,7 @@ export default function SettingsPage() {
         >
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <BellIcon className="w-5 h-5 text-orange-500" />
+              <BellIcon className="w-5 h-5 text-primary-500" />
               {locale === 'en' ? 'Notification Preferences' : 'Bildirim Tercihleri'}
             </h2>
           </div>
@@ -192,8 +190,8 @@ export default function SettingsPage() {
             {/* Email Notifications */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <EnvelopeIcon className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 bg-info-50 rounded-xl flex items-center justify-center">
+                  <EnvelopeIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -210,8 +208,8 @@ export default function SettingsPage() {
             {/* Push Notifications */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <DevicePhoneMobileIcon className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+                  <DevicePhoneMobileIcon className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -228,8 +226,8 @@ export default function SettingsPage() {
             {/* Order Updates */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                  <ShoppingBagIcon className="w-5 h-5 text-green-600" />
+                <div className="w-10 h-10 bg-success-50 rounded-xl flex items-center justify-center">
+                  <ShoppingBagIcon className="w-5 h-5 text-success-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -246,8 +244,8 @@ export default function SettingsPage() {
             {/* Message Alerts */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
-                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-cyan-600" />
+                <div className="w-10 h-10 bg-info-50 rounded-xl flex items-center justify-center">
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -264,8 +262,8 @@ export default function SettingsPage() {
             {/* Price Drop Alerts */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-                  <TagIcon className="w-5 h-5 text-red-600" />
+                <div className="w-10 h-10 bg-danger-50 rounded-xl flex items-center justify-center">
+                  <TagIcon className="w-5 h-5 text-danger-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -282,8 +280,8 @@ export default function SettingsPage() {
             {/* Marketing Emails */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <MegaphoneIcon className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 bg-warning-50 rounded-xl flex items-center justify-center">
+                  <MegaphoneIcon className="w-5 h-5 text-warning-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -308,7 +306,7 @@ export default function SettingsPage() {
         >
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <ShieldCheckIcon className="w-5 h-5 text-orange-500" />
+              <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
               {locale === 'en' ? 'Security' : 'Güvenlik'}
             </h2>
           </div>
@@ -319,8 +317,8 @@ export default function SettingsPage() {
               className="flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
-                  <KeyIcon className="w-5 h-5 text-indigo-600" />
+                <div className="w-10 h-10 bg-info-50 rounded-xl flex items-center justify-center">
+                  <KeyIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
@@ -360,10 +358,10 @@ export default function SettingsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-red-50 rounded-2xl border border-red-200 overflow-hidden"
+          className="bg-danger-50 rounded-2xl border border-danger-200 overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-red-200 bg-red-100/50">
-            <h2 className="text-lg font-semibold text-red-700 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-danger-200 bg-danger-100/50">
+            <h2 className="text-lg font-semibold text-danger-700 flex items-center gap-2">
               <ExclamationTriangleIcon className="w-5 h-5" />
               {locale === 'en' ? 'Danger Zone' : 'Tehlikeli Bölge'}
             </h2>
@@ -372,10 +370,10 @@ export default function SettingsPage() {
           <div className="p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="font-medium text-red-800">
+                <p className="font-medium text-danger-800">
                   {locale === 'en' ? 'Delete Account' : 'Hesabı Sil'}
                 </p>
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-danger-600">
                   {locale === 'en' 
                     ? 'Permanently delete your account and all data' 
                     : 'Hesabınızı ve tüm verilerinizi kalıcı olarak silin'}
@@ -397,8 +395,8 @@ export default function SettingsPage() {
         {/* Delete Confirmation Modal */}
         <Modal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }} title={locale === 'en' ? 'Delete Account?' : 'Hesabı Sil?'} maxWidth="max-w-md">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+                <div className="w-16 h-16 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ExclamationTriangleIcon className="w-8 h-8 text-danger-600" />
                 </div>
                 <p className="text-gray-500">
                   {locale === 'en'
@@ -411,13 +409,11 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {locale === 'en' ? 'Type SİL to confirm:' : 'Onaylamak için SİL yazın:'}
                 </label>
-                <input
-                  type="text"
+                <Input type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="SİL"
-                />
+                  className="px-4 py-3 rounded-xl focus:ring-danger-500 focus:border-danger-500"
+                  placeholder="SİL" />
               </div>
 
               <div className="flex gap-3">

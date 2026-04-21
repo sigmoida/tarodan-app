@@ -149,8 +149,8 @@ export default function CookieConsentBanner() {
                         {!showSettings && (
                             <div className="p-6">
                                 <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
-                                        <ShieldCheckIcon className="w-6 h-6 text-orange-500" />
+                                    <div className="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center">
+                                        <ShieldCheckIcon className="w-6 h-6 text-primary-500" />
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -159,7 +159,7 @@ export default function CookieConsentBanner() {
                                         <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-4">
                                             Sitemizde deneyiminizi geliştirmek, trafiği analiz etmek ve size kişiselleştirilmiş
                                             içerik sunmak için çerezler kullanıyoruz. Detaylı bilgi için{' '}
-                                            <Link href="/cookies" className="text-orange-500 hover:underline font-medium">
+                                            <Link href="/cookies" className="text-primary-500 hover:underline font-medium">
                                                 Çerez Politikamızı
                                             </Link>{' '}
                                             inceleyebilirsiniz.
@@ -208,12 +208,10 @@ export default function CookieConsentBanner() {
                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                         Çerez Ayarları
                                     </h3>
-                                    <button
-                                        onClick={() => setShowSettings(false)}
-                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                                    >
+                                    <Button variant="secondary" onClick={() => setShowSettings(false)}
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
                                         <XMarkIcon className="w-5 h-5 text-gray-500" />
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 <div className="space-y-4 mb-6">
@@ -222,7 +220,7 @@ export default function CookieConsentBanner() {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium text-gray-900 dark:text-white">Zorunlu Çerezler</span>
-                                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                                                <span className="px-2 py-0.5 bg-success-100 text-success-700 text-xs rounded-full font-medium">
                                                     Her Zaman Aktif
                                                 </span>
                                             </div>
@@ -232,7 +230,7 @@ export default function CookieConsentBanner() {
                                             </p>
                                         </div>
                                         <div className="ml-4">
-                                            <div className="w-12 h-7 bg-green-600 rounded-full flex items-center justify-end px-1">
+                                            <div className="w-12 h-7 bg-success-600 rounded-full flex items-center justify-end px-1">
                                                 <div className="w-5 h-5 bg-white rounded-full shadow" />
                                             </div>
                                         </div>
@@ -249,16 +247,14 @@ export default function CookieConsentBanner() {
                                             </p>
                                         </div>
                                         <div className="ml-4">
-                                            <button
-                                                onClick={() => setPreferences({ ...preferences, analytics: !preferences.analytics })}
-                                                className={`w-12 h-7 rounded-full flex items-center px-1 transition-colors ${preferences.analytics ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-                                                    }`}
-                                            >
+                                            <Button variant="secondary" onClick={() => setPreferences({ ...preferences, analytics: !preferences.analytics })}
+                                                className={`w-12 h-7 rounded-full flex items-center px-1 transition-colors ${preferences.analytics ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'
+                                                    }`}>
                                                 <div
                                                     className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${preferences.analytics ? 'translate-x-5' : ''
                                                         }`}
                                                 />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
 
@@ -273,16 +269,14 @@ export default function CookieConsentBanner() {
                                             </p>
                                         </div>
                                         <div className="ml-4">
-                                            <button
-                                                onClick={() => setPreferences({ ...preferences, marketing: !preferences.marketing })}
-                                                className={`w-12 h-7 rounded-full flex items-center px-1 transition-colors ${preferences.marketing ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-                                                    }`}
-                                            >
+                                            <Button variant="secondary" onClick={() => setPreferences({ ...preferences, marketing: !preferences.marketing })}
+                                                className={`w-12 h-7 rounded-full flex items-center px-1 transition-colors ${preferences.marketing ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'
+                                                    }`}>
                                                 <div
                                                     className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${preferences.marketing ? 'translate-x-5' : ''
                                                         }`}
                                                 />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>

@@ -15,7 +15,7 @@ import {
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Select, Spinner } from '@tarodan/ui';
 
 interface Product {
   id: string;
@@ -163,25 +163,21 @@ export default function CategoryPage() {
           <div className="flex items-center gap-4">
             {/* View Mode */}
             <div className="flex bg-dark-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
+              <Button variant="secondary" onClick={() => setViewMode('grid')}
+                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}>
                 <Squares2X2Icon className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => setViewMode('list')}
+                className={`p-2 rounded ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}>
                 <ListBulletIcon className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             {/* Sort - API: created_desc | created_asc | price_asc | price_desc | title_asc | title_desc */}
-            <select
+            <Select
               value={filters.sortBy}
               onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as typeof filters.sortBy })}
-              className="bg-dark-800 border border-dark-700 rounded-lg px-4 py-2 text-white"
+              className="w-auto bg-dark-800 border-dark-700 text-white"
             >
               <option value="created_desc">En Yeni</option>
               <option value="created_asc">En Eski</option>
@@ -189,20 +185,18 @@ export default function CategoryPage() {
               <option value="price_desc">Fiyat (Yüksekten)</option>
               <option value="title_asc">A-Z</option>
               <option value="title_desc">Z-A</option>
-            </select>
+            </Select>
 
             {/* Filter Toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                 showFilters
                   ? 'bg-primary-600 border-primary-600 text-white'
                   : 'bg-dark-800 border-dark-700 text-gray-300 hover:border-primary-500'
-              }`}
-            >
+              }`}>
               <FunnelIcon className="h-5 w-5" />
               Filtrele
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -213,18 +207,16 @@ export default function CategoryPage() {
               <div className="bg-dark-800 rounded-lg p-6 sticky top-24">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-white">Filtreler</h3>
-                  <button
-                    onClick={() => setFilters({
+                  <Button variant="secondary" onClick={() => setFilters({
                       minPrice: '',
                       maxPrice: '',
                       condition: '',
                       isTradeEnabled: false,
                       sortBy: 'created_desc',
                     })}
-                    className="text-sm text-primary-400 hover:text-primary-300"
-                  >
+                    className="text-sm text-primary-400 hover:text-primary-300">
                     Temizle
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Price Range */}
@@ -233,21 +225,17 @@ export default function CategoryPage() {
                     Fiyat Aralığı
                   </label>
                   <div className="flex gap-2 items-center">
-                    <input
-                      type="number"
+                    <Input type="number"
                       value={filters.minPrice}
                       onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
                       placeholder="Min"
-                      className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white"
-                    />
+                      className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white" />
                     <span className="text-gray-500">-</span>
-                    <input
-                      type="number"
+                    <Input type="number"
                       value={filters.maxPrice}
                       onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
                       placeholder="Max"
-                      className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white"
-                    />
+                      className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white" />
                   </div>
                 </div>
 
@@ -256,10 +244,10 @@ export default function CategoryPage() {
                   <label className="block text-sm font-medium text-gray-400 mb-2">
                     Durum
                   </label>
-                  <select
+                  <Select
                     value={filters.condition}
                     onChange={(e) => setFilters({ ...filters, condition: e.target.value })}
-                    className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2 text-white"
+                    className="bg-dark-700 border-dark-600 text-white"
                   >
                     <option value="">Tümü</option>
                     <option value="new">Sıfır</option>
@@ -267,20 +255,16 @@ export default function CategoryPage() {
                     <option value="very_good">Çok İyi</option>
                     <option value="good">İyi</option>
                     <option value="fair">Orta</option>
-                  </select>
+                  </Select>
                 </div>
 
                 {/* Trade Enabled */}
                 <div className="mb-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={filters.isTradeEnabled}
-                      onChange={(e) => setFilters({ ...filters, isTradeEnabled: e.target.checked })}
-                      className="rounded border-dark-600 text-primary-500 focus:ring-primary-500 bg-dark-700"
-                    />
-                    <span className="text-gray-300">Sadece takas kabul edenler</span>
-                  </label>
+                  <Checkbox
+                    checked={filters.isTradeEnabled}
+                    onChange={(e) => setFilters({ ...filters, isTradeEnabled: e.target.checked })}
+                    label={<span className="text-gray-300">Sadece takas kabul edenler</span>}
+                  />
                 </div>
               </div>
             </div>
@@ -317,14 +301,14 @@ export default function CategoryPage() {
                         logContext={{ productId: product.id, page: 'category-grid' }}
                       />
                       {product.isTradeEnabled && (
-                        <span className="absolute top-2 left-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
+                        <span className="absolute top-2 left-2 bg-primary-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                           <ArrowsRightLeftIcon className="h-3 w-3" />
                           Takas
                         </span>
                       )}
-                      <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm">
+                      <Button variant="secondary" className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm">
                         <HeartIcon className="h-5 w-5 text-gray-700" />
-                      </button>
+                      </Button>
                     </div>
                     <div className="p-4">
                       <h3 className="text-gray-900 font-medium line-clamp-2 mb-2">
@@ -367,7 +351,7 @@ export default function CategoryPage() {
                             {product.title}
                           </h3>
                           {product.isTradeEnabled && (
-                            <span className="bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
+                            <span className="bg-primary-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                               <ArrowsRightLeftIcon className="h-3 w-3" />
                               Takas
                             </span>
@@ -388,9 +372,9 @@ export default function CategoryPage() {
                         <span className="text-primary-500 font-bold text-xl">
                           {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </span>
-                        <button className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
+                        <Button variant="secondary" className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
                           <HeartIcon className="h-5 w-5 text-white" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </Link>

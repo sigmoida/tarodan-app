@@ -97,29 +97,29 @@ export default function PrivacyPage() {
           </ul>
 
           <h2>7. Veri Saklama Süreleri</h2>
-          <table className="w-full border-collapse border border-gray-300">
+          <table className="border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border border-gray-300 p-2 text-left">Veri Türü</th>
-                <th className="border border-gray-300 p-2 text-left">Saklama Süresi</th>
+                <th className="p-2 text-left">Veri Türü</th>
+                <th className="p-2 text-left">Saklama Süresi</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="border border-gray-300 p-2">Hesap Bilgileri</td>
-                <td className="border border-gray-300 p-2">Hesap silinene kadar</td>
+                <td className="p-2">Hesap Bilgileri</td>
+                <td className="p-2">Hesap silinene kadar</td>
               </tr>
               <tr>
-                <td className="border border-gray-300 p-2">İşlem Kayıtları</td>
-                <td className="border border-gray-300 p-2">10 yıl (yasal zorunluluk)</td>
+                <td className="p-2">İşlem Kayıtları</td>
+                <td className="p-2">10 yıl (yasal zorunluluk)</td>
               </tr>
               <tr>
-                <td className="border border-gray-300 p-2">Kullanım Logları</td>
-                <td className="border border-gray-300 p-2">2 yıl</td>
+                <td className="p-2">Kullanım Logları</td>
+                <td className="p-2">2 yıl</td>
               </tr>
               <tr>
-                <td className="border border-gray-300 p-2">Pazarlama Verileri</td>
-                <td className="border border-gray-300 p-2">İzin geri çekilene kadar</td>
+                <td className="p-2">Pazarlama Verileri</td>
+                <td className="p-2">İzin geri çekilene kadar</td>
               </tr>
             </tbody>
           </table>
@@ -182,8 +182,8 @@ export default function PrivacyPage() {
             <li><strong>Adres:</strong> [Şirket Adresi]</li>
           </ul>
 
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800">
+          <div className="mt-8 p-4 bg-info-50 rounded-lg border border-info-200">
+            <p className="text-sm text-info-800">
               <strong>Veri Koruma Görevlisi:</strong><br />
               Kişisel verilerinizle ilgili tüm sorularınız için Veri Koruma Görevlimize 
               dpo@tarodan.com adresinden ulaşabilirsiniz.

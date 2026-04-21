@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 import {
     PlusIcon,
     PencilIcon,
@@ -162,12 +162,12 @@ export default function CollectionsPage() {
 
                 {/* Search */}
                 <div className="admin-card p-4">
-                    <input
+                    <Input
                         type="text"
                         placeholder="Koleksiyon ara..."
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        className="admin-input w-full max-w-md"
+                        className="max-w-md"
                     />
                 </div>
 
@@ -225,45 +225,37 @@ export default function CollectionsPage() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center gap-2">
                                                     {collection.isPublic ? (
-                                                        <span className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">Görünür</span>
+                                                        <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">Görünür</span>
                                                     ) : (
                                                         <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded">Gizli</span>
                                                     )}
                                                     {collection.isFeatured && (
-                                                        <span className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded">Öne Çıkan</span>
+                                                        <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">Öne Çıkan</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => toggleVisibility(collection)}
+                                                    <Button variant="secondary" onClick={() => toggleVisibility(collection)}
                                                         className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                                                        title={collection.isPublic ? 'Gizle' : 'Görünür yap'}
-                                                    >
+                                                        title={collection.isPublic ? 'Gizle' : 'Görünür yap'}>
                                                         {collection.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleFeatured(collection)}
-                                                        className="p-2 text-gray-500 hover:text-yellow-700 hover:bg-gray-100 rounded-lg"
-                                                        title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}
-                                                    >
-                                                        {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-yellow-700" /> : <StarIcon className="h-5 w-5" />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openEditModal(collection)}
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => toggleFeatured(collection)}
+                                                        className="p-2 text-gray-500 hover:text-warning-700 hover:bg-gray-100 rounded-lg"
+                                                        title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
+                                                        {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => openEditModal(collection)}
                                                         className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                                                        title="Düzenle"
-                                                    >
+                                                        title="Düzenle">
                                                         <PencilIcon className="h-5 w-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeleteConfirm(collection.id)}
-                                                        className="p-2 text-red-600 hover:text-red-300 hover:bg-red-50 rounded-lg"
-                                                        title="Sil"
-                                                    >
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => setDeleteConfirm(collection.id)}
+                                                        className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
+                                                        title="Sil">
                                                         <TrashIcon className="h-5 w-5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -276,23 +268,19 @@ export default function CollectionsPage() {
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                            <button
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50">
                                 Önceki
-                            </button>
+                            </Button>
                             <span className="text-gray-500">
                                 Sayfa {page} / {totalPages}
                             </span>
-                            <button
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            <Button variant="secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50">
                                 Sonraki
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -308,52 +296,39 @@ export default function CollectionsPage() {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 mb-2">Koleksiyon Adı *</label>
-                                <input
+                                <Input
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="admin-input w-full"
                                     required
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 mb-2">Açıklama</label>
-                                <textarea
-                                    value={formData.description}
+                                <Textarea value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="admin-input w-full"
-                                    rows={3}
-                                />
+                                    rows={3} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 mb-2">Kapak Görseli URL</label>
-                                <input
+                                <Input
                                     type="url"
                                     value={formData.coverImageUrl}
                                     onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
-                                    className="admin-input w-full"
                                     placeholder="https://..."
                                 />
                             </div>
                             <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isPublic}
-                                        onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
-                                        className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                                    />
-                                    <span className="text-sm text-gray-600">Görünür</span>
-                                </label>
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isFeatured}
-                                        onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                                        className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                                    />
-                                    <span className="text-sm text-gray-600">Öne Çıkan</span>
-                                </label>
+                                <Checkbox
+                                    checked={formData.isPublic}
+                                    onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
+                                    label="Görünür"
+                                />
+                                <Checkbox
+                                    checked={formData.isFeatured}
+                                    onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                                    label="Öne Çıkan"
+                                />
                             </div>
                             <div className="flex gap-3 pt-4">
                                 <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">

@@ -101,11 +101,11 @@ function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
           {change !== undefined && (
             <div className="flex items-center mt-2">
               {change >= 0 ? (
-                <ArrowTrendingUpIcon className="h-4 w-4 text-green-700 mr-1" />
+                <ArrowTrendingUpIcon className="h-4 w-4 text-success-700 mr-1" />
               ) : (
-                <ArrowTrendingDownIcon className="h-4 w-4 text-red-600 mr-1" />
+                <ArrowTrendingDownIcon className="h-4 w-4 text-danger-600 mr-1" />
               )}
-              <span className={change >= 0 ? 'text-green-700' : 'text-red-600'}>
+              <span className={change >= 0 ? 'text-success-700' : 'text-danger-600'}>
                 {Math.abs(change)}%
               </span>
               <span className="text-gray-500 ml-1 text-sm">vs dün</span>
@@ -370,14 +370,14 @@ export default function DashboardPage() {
             value={stats?.totalOrders.toLocaleString() || 0}
             change={stats?.ordersChange}
             icon={ShoppingBagIcon}
-            color="bg-blue-500"
+            color="bg-info-500"
           />
           <StatCard
             title="Komisyon Geliri"
             value={`₺${stats?.totalCommission.toLocaleString() || 0}`}
             change={stats?.commissionChange}
             icon={CurrencyDollarIcon}
-            color="bg-green-500"
+            color="bg-success-500"
           />
           <StatCard
             title="Aktif Ürünler"
@@ -391,7 +391,7 @@ export default function DashboardPage() {
             value={stats?.totalUsers.toLocaleString() || 0}
             change={stats?.usersChange}
             icon={UsersIcon}
-            color="bg-purple-500"
+            color="bg-primary-500"
           />
         </div>
 
@@ -404,20 +404,20 @@ export default function DashboardPage() {
             <span className="font-medium text-gray-900">Ürünler</span>
           </Link>
           <Link href="/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg">
-              <ChartBarIcon className="h-6 w-6 text-blue-500" />
+            <div className="p-2 bg-info-500/20 rounded-lg">
+              <ChartBarIcon className="h-6 w-6 text-info-500" />
             </div>
             <span className="font-medium text-gray-900">Siparişler</span>
           </Link>
           <Link href="/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-purple-500/20 rounded-lg">
-              <UsersIcon className="h-6 w-6 text-purple-500" />
+            <div className="p-2 bg-primary-500/20 rounded-lg">
+              <UsersIcon className="h-6 w-6 text-primary-500" />
             </div>
             <span className="font-medium text-gray-900">Kullanıcılar</span>
           </Link>
           <Link href="/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-green-500/20 rounded-lg">
-              <ArrowsRightLeftIcon className="h-6 w-6 text-green-500" />
+            <div className="p-2 bg-success-500/20 rounded-lg">
+              <ArrowsRightLeftIcon className="h-6 w-6 text-success-500" />
             </div>
             <span className="font-medium text-gray-900">Mesajlar</span>
           </Link>
@@ -427,60 +427,60 @@ export default function DashboardPage() {
         {pendingActions && pendingActions.totalPending > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {pendingActions.pendingProducts > 0 && (
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-yellow-500/20 rounded-lg mr-4">
-                  <ShoppingBagIcon className="h-6 w-6 text-yellow-700" />
+              <div className="bg-warning-900/20 border border-warning-700 rounded-lg p-4 flex items-center">
+                <div className="p-2 bg-warning-500/20 rounded-lg mr-4">
+                  <ShoppingBagIcon className="h-6 w-6 text-warning-700" />
                 </div>
                 <div>
-                  <p className="text-yellow-700 font-medium">
+                  <p className="text-warning-700 font-medium">
                     {pendingActions.pendingProducts} ürün onay bekliyor
                   </p>
-                  <Link href="/products?status=pending" className="text-sm text-yellow-500 hover:underline">
+                  <Link href="/products?status=pending" className="text-sm text-warning-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
               </div>
             )}
             {pendingActions.refundRequests > 0 && (
-              <div className="bg-orange-900/20 border border-orange-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-orange-500/20 rounded-lg mr-4">
-                  <CurrencyDollarIcon className="h-6 w-6 text-orange-700" />
+              <div className="bg-primary-900/20 border border-primary-700 rounded-lg p-4 flex items-center">
+                <div className="p-2 bg-primary-500/20 rounded-lg mr-4">
+                  <CurrencyDollarIcon className="h-6 w-6 text-primary-700" />
                 </div>
                 <div>
-                  <p className="text-orange-700 font-medium">
+                  <p className="text-primary-700 font-medium">
                     {pendingActions.refundRequests} iade talebi
                   </p>
-                  <Link href="/orders?status=refund_requested" className="text-sm text-orange-500 hover:underline">
+                  <Link href="/orders?status=refund_requested" className="text-sm text-primary-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
               </div>
             )}
             {(pendingActions.pendingMessages ?? 0) > 0 && (
-              <div className="bg-indigo-900/20 border border-indigo-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-indigo-500/20 rounded-lg mr-4">
-                  <ArrowsRightLeftIcon className="h-6 w-6 text-indigo-700" />
+              <div className="bg-info-900/20 border border-info-700 rounded-lg p-4 flex items-center">
+                <div className="p-2 bg-info-500/20 rounded-lg mr-4">
+                  <ArrowsRightLeftIcon className="h-6 w-6 text-info-700" />
                 </div>
                 <div>
-                  <p className="text-indigo-700 font-medium">
+                  <p className="text-info-700 font-medium">
                     {pendingActions.pendingMessages} mesaj onay bekliyor
                   </p>
-                  <Link href="/messages" className="text-sm text-indigo-500 hover:underline">
+                  <Link href="/messages" className="text-sm text-info-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
               </div>
             )}
             {(pendingActions.identityVerificationRequests ?? 0) > 0 && (
-              <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-blue-500/20 rounded-lg mr-4">
-                  <UsersIcon className="h-6 w-6 text-blue-700" />
+              <div className="bg-info-900/20 border border-info-700 rounded-lg p-4 flex items-center">
+                <div className="p-2 bg-info-500/20 rounded-lg mr-4">
+                  <UsersIcon className="h-6 w-6 text-info-700" />
                 </div>
                 <div>
-                  <p className="text-blue-700 font-medium">
+                  <p className="text-info-700 font-medium">
                     {pendingActions.identityVerificationRequests} kimlik doğrulama talebi
                   </p>
-                  <Link href="/users?status=pending_verification" className="text-sm text-blue-500 hover:underline">
+                  <Link href="/users?status=pending_verification" className="text-sm text-info-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
@@ -644,8 +644,8 @@ export default function DashboardPage() {
                 recentTrades.map((trade) => (
                   <div key={trade.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
                     <div className="flex items-center flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mr-3 flex-shrink-0">
-                        <ArrowsRightLeftIcon className="h-5 w-5 text-green-700" />
+                      <div className="w-10 h-10 rounded-full bg-success-500/20 flex items-center justify-center mr-3 flex-shrink-0">
+                        <ArrowsRightLeftIcon className="h-5 w-5 text-success-700" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm text-gray-900 truncate">

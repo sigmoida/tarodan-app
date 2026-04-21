@@ -5,7 +5,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner } from '@tarodan/ui';
 import axios from 'axios';
 
 interface Brand {
@@ -109,20 +109,18 @@ export default function ModelsPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </span>
-                            <input
-                                type="text"
+                            <Input type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('models.searchPlaceholder')}
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-gray-800 placeholder-gray-400"
-                            />
+                                className="pl-12 pr-4 py-3 bg-gray-50 border-gray-200 rounded-xl outline-none transition-all text-gray-800 placeholder-gray-400" />
                         </div>
 
                         <div className="flex gap-3 w-full md:w-auto">
-                            <select
+                            <Select
                                 value={selectedBrand}
                                 onChange={(e) => setSelectedBrand(e.target.value)}
-                                className="w-full md:w-48 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer text-gray-700 font-medium"
+                                className="w-full md:w-48 bg-gray-50 rounded-xl cursor-pointer font-medium"
                             >
                                 <option value="all">{t('models.allBrands')}</option>
                                 {brands.map((b) => (
@@ -130,7 +128,7 @@ export default function ModelsPage() {
                                         {b.name}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
                         </div>
                     </div>
                 </div>
@@ -151,12 +149,10 @@ export default function ModelsPage() {
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">{t('models.noResults')}</h3>
                         <p className="text-gray-500">{t('models.searchNoResultDesc') || 'Lütfen farklı bir arama yapmayı deneyin.'}</p>
-                        <button
-                            onClick={() => { setSearch(''); setSelectedBrand('all'); }}
-                            className="mt-6 px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-                        >
+                        <Button variant="secondary" onClick={() => { setSearch(''); setSelectedBrand('all'); }}
+                            className="mt-6 px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
                             {t('common.clearFilters') || 'Filtreleri Temizle'}
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -201,8 +197,8 @@ export default function ModelsPage() {
                                             🏎️
                                         </div>
                                         {m.productCount > 0 && (
-                                            <span className="bg-green-50 text-green-600 text-xs font-bold px-2.5 py-1 rounded-lg border border-green-100 flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                            <span className="bg-success-50 text-success-600 text-xs font-bold px-2.5 py-1 rounded-lg border border-success-100 flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 bg-success-500 rounded-full animate-pulse" />
                                                 {m.productCount} {t('models.listings')}
                                             </span>
                                         )}

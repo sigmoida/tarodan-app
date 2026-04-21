@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Input, Select } from '@tarodan/ui';
 
 type TabId = 'transactions' | 'schedule';
 
@@ -54,8 +55,8 @@ interface ScheduleItem {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  held: { label: 'Beklemede', color: 'text-amber-600' },
-  released: { label: 'Ödendi', color: 'text-green-600' },
+  held: { label: 'Beklemede', color: 'text-warning-600' },
+  released: { label: 'Ödendi', color: 'text-success-600' },
   cancelled: { label: 'İptal', color: 'text-gray-500' },
 };
 
@@ -194,29 +195,27 @@ export default function PayoutsPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl font-bold text-gray-900">Satıcı Ödemeleri</h1>
-          <button
-            type="button"
+          <Button variant="secondary" type="button"
             onClick={handleExport}
             disabled={loadingExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-          >
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50">
             <ArrowDownTrayIcon className="h-5 w-5" />
             {loadingExport ? 'Hazırlanıyor...' : 'Dışa Aktar (CSV)'}
-          </button>
+          </Button>
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-4 border border-gray-200">
             <p className="text-sm text-gray-500">Bekleyen Toplam</p>
-            <p className="text-2xl font-semibold text-amber-500">
+            <p className="text-2xl font-semibold text-warning-500">
               {summary != null ? formatCurrency(summary.totalPending) : '—'}
             </p>
             <p className="text-xs text-gray-500 mt-1">{summary?.countHeld ?? 0} işlem</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-200">
             <p className="text-sm text-gray-500">Ödenen Toplam</p>
-            <p className="text-2xl font-semibold text-green-500">
+            <p className="text-2xl font-semibold text-success-500">
               {summary != null ? formatCurrency(summary.totalReleased) : '—'}
             </p>
             <p className="text-xs text-gray-500 mt-1">{summary?.countReleased ?? 0} işlem</p>
@@ -239,69 +238,58 @@ export default function PayoutsPage() {
         {/* Tabs */}
         <div className="border-b border-gray-200">
           <nav className="flex gap-4">
-            <button
-              type="button"
+            <Button variant="secondary" type="button"
               onClick={() => setActiveTab('transactions')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'transactions'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
-            >
+              }`}>
               <span className="flex items-center gap-2">
                 <ListBulletIcon className="h-4 w-4" />
                 İşlem Geçmişi
               </span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="secondary" type="button"
               onClick={() => setActiveTab('schedule')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'schedule'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
-            >
+              }`}>
               <span className="flex items-center gap-2">
                 <CalendarDaysIcon className="h-4 w-4" />
                 Ödeme Takvimi
               </span>
-            </button>
+            </Button>
           </nav>
         </div>
 
         {activeTab === 'transactions' && (
           <>
             <div className="flex flex-wrap gap-3 items-center">
-              <select
+              <Select
                 value={filters.status}
                 onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
+                className="w-auto"
+                selectSize="sm"
               >
                 <option value="">Tüm durumlar</option>
                 <option value="held">Beklemede</option>
                 <option value="released">Ödendi</option>
                 <option value="cancelled">İptal</option>
-              </select>
-              <input
-                type="date"
+              </Select>
+              <Input type="date"
                 value={filters.dateFrom}
-                onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
-              />
-              <input
-                type="date"
+                onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+              <Input type="date"
                 value={filters.dateTo}
-                onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
+                onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))} />
+              <Button variant="secondary" type="button"
                 onClick={() => loadTransactions()}
-                className="p-2 rounded-lg bg-gray-100 text-gray-500 hover:text-gray-900"
-              >
+                className="p-2 rounded-lg bg-gray-100 text-gray-500 hover:text-gray-900">
                 <ArrowPathIcon className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {loading ? (
@@ -340,15 +328,13 @@ export default function PayoutsPage() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {t.status === 'held' && (
-                              <button
-                                type="button"
+                              <Button variant="secondary" type="button"
                                 onClick={() => handleRelease(t.orderId)}
                                 disabled={releasingOrderId === t.orderId}
-                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50"
-                              >
+                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50">
                                 <CheckCircleIcon className="h-4 w-4" />
                                 {releasingOrderId === t.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
-                              </button>
+                              </Button>
                             )}
                           </td>
                         </tr>
@@ -363,22 +349,18 @@ export default function PayoutsPage() {
                     Toplam {pagination.total} kayıt
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
+                    <Button variant="secondary" type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
                       disabled={pagination.page <= 1}
-                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
-                    >
+                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50">
                       Önceki
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button variant="secondary" type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
-                    >
+                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50">
                       Sonraki
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

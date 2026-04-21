@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   CheckCircleIcon,
   ArrowRightIcon,
@@ -11,12 +12,12 @@ import {
   DocumentArrowDownIcon,
   TruckIcon,
   CalendarIcon,
-} from '@heroicons/react/24/outline';
-import { paymentsApi, api } from '@/lib/api';
-import { Spinner } from '@tarodan/ui';
-import { useAuthStore } from '@/stores/authStore';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { useTranslation } from '@/i18n/LanguageContext';
+} from "@heroicons/react/24/outline";
+import { paymentsApi, api } from "@/lib/api";
+import { Button, Spinner } from "@tarodan/ui";
+import { useAuthStore } from "@/stores/authStore";
+import AuthLoadingScreen from "@/components/AuthLoadingScreen";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface InvoiceDetails {
   id: string;
@@ -34,11 +35,11 @@ function getEstimatedDelivery(orderDate: string, locale: string): string {
       businessDays++;
     }
   }
-  return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  return date.toLocaleDateString(locale === "en" ? "en-US" : "tr-TR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
@@ -47,12 +48,13 @@ export default function PaymentSuccessPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
-  const paymentId = searchParams.get('paymentId');
-  const isGuestCheckout = searchParams.get('guest') === 'true';
-  const isMembershipPayment = searchParams.get('type') === 'membership';
+  const paymentId = searchParams.get("paymentId");
+  const isGuestCheckout = searchParams.get("guest") === "true";
+  const isMembershipPayment = searchParams.get("type") === "membership";
 
   // Support both cases for orderId from URL
-  const orderIdFromUrl = searchParams.get('orderId') || searchParams.get('orderid');
+  const orderIdFromUrl =
+    searchParams.get("orderId") || searchParams.get("orderid");
 
   const [payment, setPayment] = useState<any>(null);
   const [invoice, setInvoice] = useState<InvoiceDetails | null>(null);
@@ -69,19 +71,21 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     // Üyelik ödemesi için bu sayfa sipariş sayfası; doğru sayfaya yönlendir
     if (isMembershipPayment) {
-      router.replace('/membership/success');
+      router.replace("/membership/success");
       return;
     }
 
     if (authLoading) return;
 
     // Read guest from URL directly so we don't redirect before searchParams are ready (Next.js can delay them)
-    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+    const urlGuest =
+      typeof window !== "undefined" &&
+      window.location.search.includes("guest=true");
     const guestOk = isGuestCheckout || urlGuest;
 
     // Allow access for authenticated users OR guest checkout (URL param)
     if (!isAuthenticated && !guestOk) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
@@ -90,11 +94,21 @@ export default function PaymentSuccessPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout, isMembershipPayment, router]);
+  }, [
+    paymentId,
+    authLoading,
+    isAuthenticated,
+    isGuestCheckout,
+    isMembershipPayment,
+    router,
+  ]);
 
   const fetchPayment = async () => {
     try {
-      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const isGuest =
+        isGuestCheckout ||
+        (typeof window !== "undefined" &&
+          window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatus(paymentId!);
@@ -104,7 +118,7 @@ export default function PaymentSuccessPage() {
 
       // Üyelik ödemesi: siparişlerime atma, üyelik başarı sayfasına git (URL'de type=membership olmasa bile)
       if (paymentData?.isMembershipOrder) {
-        router.replace('/membership/success');
+        router.replace("/membership/success");
         return;
       }
 
@@ -115,13 +129,18 @@ export default function PaymentSuccessPage() {
         attemptFetchInvoice(actualOrderId, paymentId, 0);
       }
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
+      if (process.env.NODE_ENV === "development")
+        console.error("Failed to fetch payment:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const attemptFetchInvoice = async (orderId: string, paymentId: string, retryCount: number) => {
+  const attemptFetchInvoice = async (
+    orderId: string,
+    paymentId: string,
+    retryCount: number,
+  ) => {
     try {
       // Use public endpoint for better reliability even if auth exists (matches current session)
       const url = isAuthenticated
@@ -136,7 +155,10 @@ export default function PaymentSuccessPage() {
     } catch (error) {
       // If 404 and we have retries left, try again in 2 seconds
       if (retryCount < 5) {
-        setTimeout(() => attemptFetchInvoice(orderId, paymentId, retryCount + 1), 2000);
+        setTimeout(
+          () => attemptFetchInvoice(orderId, paymentId, retryCount + 1),
+          2000,
+        );
       } else {
         setInvoiceError(true);
       }
@@ -153,19 +175,24 @@ export default function PaymentSuccessPage() {
         : `/invoices/download/${invoice.id}/public?paymentId=${paymentId}`;
 
       const response = await api.get(url, {
-        responseType: 'blob',
+        responseType: "blob",
       });
 
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
       link.href = blobUrl;
-      link.setAttribute('download', `fatura-${invoice.invoiceNumber || invoice.id}.pdf`);
+      link.setAttribute(
+        "download",
+        `fatura-${invoice.invoiceNumber || invoice.id}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Failed to download invoice:', error);
+      console.error("Failed to download invoice:", error);
     } finally {
       setDownloading(false);
     }
@@ -179,7 +206,9 @@ export default function PaymentSuccessPage() {
     );
   }
 
-  const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
+  const urlGuest =
+    typeof window !== "undefined" &&
+    window.location.search.includes("guest=true");
   const guestOk = isGuestCheckout || urlGuest;
   if (authLoading && !guestOk) {
     return <AuthLoadingScreen />;
@@ -206,19 +235,23 @@ export default function PaymentSuccessPage() {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-              className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto"
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto"
             >
-              <CheckCircleIcon className="w-12 h-12 text-green-500" />
+              <CheckCircleIcon className="w-12 h-12 text-success-500" />
             </motion.div>
           </div>
 
           {/* Success Message */}
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {locale === 'en' ? 'Payment Completed Successfully!' : 'Ödeme Başarıyla Tamamlandı!'}
+            {locale === "en"
+              ? "Payment Completed Successfully!"
+              : "Ödeme Başarıyla Tamamlandı!"}
           </h1>
           <p className="text-gray-600 mb-6">
-            {locale === 'en' ? 'Your payment has been received and your order is being prepared.' : 'Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı.'}
+            {locale === "en"
+              ? "Your payment has been received and your order is being prepared."
+              : "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı."}
           </p>
 
           {/* Payment Details */}
@@ -226,53 +259,70 @@ export default function PaymentSuccessPage() {
             <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                {locale === 'en' ? 'Payment Details' : 'Ödeme Detayları'}
+                {locale === "en" ? "Payment Details" : "Ödeme Detayları"}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{locale === 'en' ? 'Payment Amount:' : 'Ödeme Tutarı:'}</span>
+                  <span className="text-gray-600">
+                    {locale === "en" ? "Payment Amount:" : "Ödeme Tutarı:"}
+                  </span>
                   <span className="font-semibold">
-                    {payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                    {payment.amount?.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    TL
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{locale === 'en' ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
-                  <span className="font-semibold">
-                    PayTR
+                  <span className="text-gray-600">
+                    {locale === "en" ? "Payment Method:" : "Ödeme Yöntemi:"}
                   </span>
+                  <span className="font-semibold">PayTR</span>
                 </div>
                 {payment.providerTransactionId && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">{locale === 'en' ? 'Transaction ID:' : 'İşlem No:'}</span>
+                    <span className="text-gray-600">
+                      {locale === "en" ? "Transaction ID:" : "İşlem No:"}
+                    </span>
                     <span className="font-mono text-xs">
                       {payment.providerTransactionId}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{locale === 'en' ? 'Status:' : 'Durum:'}</span>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {locale === 'en' ? 'Completed' : 'Tamamlandı'}
+                  <span className="text-gray-600">
+                    {locale === "en" ? "Status:" : "Durum:"}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                    {locale === "en" ? "Completed" : "Tamamlandı"}
                   </span>
                 </div>
               </div>
 
               {/* Invoice Download Button */}
               {invoice ? (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={handleDownloadInvoice}
                   disabled={downloading}
                   className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-50 text-primary-700 font-medium rounded-lg border border-primary-200 hover:bg-primary-100 transition-colors disabled:opacity-50"
                 >
                   <DocumentArrowDownIcon className="w-5 h-5" />
                   {downloading
-                    ? (locale === 'en' ? 'Downloading...' : 'İndiriliyor...')
-                    : (locale === 'en' ? 'Download Invoice (PDF)' : 'Faturayı İndir (PDF)')}
-                </button>
+                    ? locale === "en"
+                      ? "Downloading..."
+                      : "İndiriliyor..."
+                    : locale === "en"
+                      ? "Download Invoice (PDF)"
+                      : "Faturayı İndir (PDF)"}
+                </Button>
               ) : !invoiceError ? (
                 <div className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-gray-400 text-sm font-medium rounded-lg border border-gray-100 border-dashed">
                   <div className="animate-spin h-3 w-3 border-2 border-gray-200 border-t-gray-400 rounded-full"></div>
-                  {locale === 'en' ? 'Preparing Invoice...' : 'Fatura Hazırlanıyor...'}
+                  {locale === "en"
+                    ? "Preparing Invoice..."
+                    : "Fatura Hazırlanıyor..."}
                 </div>
               ) : null}
             </div>
@@ -280,65 +330,100 @@ export default function PaymentSuccessPage() {
 
           {/* Estimated Delivery */}
           {payment?.createdAt && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-info-50 border border-info-200 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <TruckIcon className="w-5 h-5 text-blue-600" />
-                <span className="font-semibold text-blue-900">
-                  {locale === 'en' ? 'Estimated Delivery' : 'Tahmini Teslimat'}
+                <TruckIcon className="w-5 h-5 text-info-600" />
+                <span className="font-semibold text-info-900">
+                  {locale === "en" ? "Estimated Delivery" : "Tahmini Teslimat"}
                 </span>
               </div>
-              <div className="flex items-center justify-center gap-2 text-blue-700">
+              <div className="flex items-center justify-center gap-2 text-info-700">
                 <CalendarIcon className="w-5 h-5" />
-                <span className="font-medium">{getEstimatedDelivery(payment.createdAt, locale)}</span>
+                <span className="font-medium">
+                  {getEstimatedDelivery(payment.createdAt, locale)}
+                </span>
               </div>
-              <p className="text-xs text-blue-600 mt-2">
-                {locale === 'en'
-                  ? '*Delivery time may vary depending on the seller and shipping company.'
-                  : '*Teslimat süresi satıcı ve kargo firmasına göre değişebilir.'}
+              <p className="text-xs text-info-600 mt-2">
+                {locale === "en"
+                  ? "*Delivery time may vary depending on the seller and shipping company."
+                  : "*Teslimat süresi satıcı ve kargo firmasına göre değişebilir."}
               </p>
             </div>
           )}
 
           {/* Info Message: logged-in → Siparişlerim; guest → track-order with order no + email */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-blue-800">
-              <strong>{locale === 'en' ? 'Information:' : 'Bilgilendirme:'}</strong>{' '}
-              {isAuthenticated
-                ? (locale === 'en'
-                  ? <>Order confirmation email has been sent. You can track your order from the <Link href="/orders" className="underline font-medium">My Orders</Link> page.</>
-                  : <>Sipariş onay e-postası gönderildi. Sipariş durumunuzu <Link href="/orders" className="underline font-medium">Siparişlerim</Link> sayfasından takip edebilirsiniz.</>)
-                : (locale === 'en'
-                  ? <>Order confirmation email has been sent to your email. You can track your order from the <Link href="/track-order" className="underline font-medium">Track order</Link> page (use the order number from the email).</>
-                  : <>Sipariş onay e-postası e-posta adresinize gönderildi. Siparişinizi <Link href="/track-order" className="underline font-medium">Sipariş takip</Link> sayfasından (e-postadaki sipariş numarası ile) takip edebilirsiniz.</>)
-              }
+          <div className="bg-info-50 border border-info-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-info-800">
+              <strong>
+                {locale === "en" ? "Information:" : "Bilgilendirme:"}
+              </strong>{" "}
+              {isAuthenticated ? (
+                locale === "en" ? (
+                  <>
+                    Order confirmation email has been sent. You can track your
+                    order from the{" "}
+                    <Link href="/orders" className="underline font-medium">
+                      My Orders
+                    </Link>{" "}
+                    page.
+                  </>
+                ) : (
+                  <>
+                    Sipariş onay e-postası gönderildi. Sipariş durumunuzu{" "}
+                    <Link href="/orders" className="underline font-medium">
+                      Siparişlerim
+                    </Link>{" "}
+                    sayfasından takip edebilirsiniz.
+                  </>
+                )
+              ) : locale === "en" ? (
+                <>
+                  Order confirmation email has been sent to your email. You can
+                  track your order from the{" "}
+                  <Link href="/track-order" className="underline font-medium">
+                    Track order
+                  </Link>{" "}
+                  page (use the order number from the email).
+                </>
+              ) : (
+                <>
+                  Sipariş onay e-postası e-posta adresinize gönderildi.
+                  Siparişinizi{" "}
+                  <Link href="/track-order" className="underline font-medium">
+                    Sipariş takip
+                  </Link>{" "}
+                  sayfasından (e-postadaki sipariş numarası ile) takip
+                  edebilirsiniz.
+                </>
+              )}
             </p>
           </div>
 
           {/* Action Buttons: logged-in → Siparişlerim (or order detail); guest → track-order */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {isAuthenticated ? (
-              <Link
-                href={payment?.orderId ? `/orders/${payment.orderId}` : '/orders'}
-                className="btn-primary flex items-center justify-center gap-2"
+              <ButtonLink
+                href={
+                  payment?.orderId ? `/orders/${payment.orderId}` : "/orders"
+                }
+                className="flex gap-2"
               >
-                {locale === 'en' ? 'View my order' : 'Siparişimi Görüntüle'}
+                {locale === "en" ? "View my order" : "Siparişimi Görüntüle"}
                 <ArrowRightIcon className="w-5 h-5" />
-              </Link>
+              </ButtonLink>
             ) : (
-              <Link
-                href="/track-order"
-                className="btn-primary flex items-center justify-center gap-2"
-              >
-                {locale === 'en' ? 'Track my order' : 'Siparişimi takip et'}
+              <ButtonLink href="/track-order" className="flex gap-2">
+                {locale === "en" ? "Track my order" : "Siparişimi takip et"}
                 <ArrowRightIcon className="w-5 h-5" />
-              </Link>
+              </ButtonLink>
             )}
-            <Link
+            <ButtonLink
+              variant="secondary"
               href="/listings"
-              className="btn-secondary flex items-center justify-center gap-2"
+              className="flex gap-2"
             >
-              {locale === 'en' ? 'Continue Shopping' : 'Alışverişe Devam Et'}
-            </Link>
+              {locale === "en" ? "Continue Shopping" : "Alışverişe Devam Et"}
+            </ButtonLink>
           </div>
         </motion.div>
       </div>

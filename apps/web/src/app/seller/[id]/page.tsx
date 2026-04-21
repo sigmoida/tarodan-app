@@ -34,6 +34,7 @@ import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Button } from '@tarodan/ui';
 
 const AuthRequiredModal = dynamic(
   withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
@@ -260,8 +261,8 @@ export default function SellerProfilePage() {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-primary-200"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-primary-500 border-t-transparent animate-spin"></div>
           </div>
           <p className="text-gray-500">{locale === 'en' ? 'Loading profile...' : 'Profil yükleniyor...'}</p>
         </div>
@@ -284,7 +285,7 @@ export default function SellerProfilePage() {
           </p>
           <Link 
             href="/listings" 
-            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
           >
             {t('seller.backToListings')}
           </Link>
@@ -302,7 +303,7 @@ export default function SellerProfilePage() {
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-500 via-primary-600 to-warning-600">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-white rounded-full translate-x-1/3 translate-y-1/3"></div>
@@ -321,7 +322,7 @@ export default function SellerProfilePage() {
                 <UserAvatar displayName={seller.displayName} avatarUrl={seller.avatarUrl} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-white/20 backdrop-blur-sm text-white shadow-2xl ring-4 ring-white/30" />
                 {seller.isVerified && (
                   <div className="absolute -bottom-3 -right-3 bg-white rounded-xl p-2 shadow-lg">
-                    <CheckBadgeSolidIcon className="w-7 h-7 text-green-500" />
+                    <CheckBadgeSolidIcon className="w-7 h-7 text-success-500" />
                   </div>
                 )}
               </div>
@@ -356,7 +357,7 @@ export default function SellerProfilePage() {
                 </span>
                 {hasRatings && (
                   <span className="flex items-center gap-2">
-                    <StarSolidIcon className="w-4 h-4 text-yellow-300" />
+                    <StarSolidIcon className="w-4 h-4 text-warning-300" />
                     <span className="text-white font-semibold">{averageRating.toFixed(1)}</span>
                     <span>({seller.stats?.totalRatings} {locale === 'en' ? 'reviews' : 'değerlendirme'})</span>
                   </span>
@@ -370,31 +371,25 @@ export default function SellerProfilePage() {
               {/* Action Buttons */}
               {!isOwnProfile && (
                 <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                  <button
-                    onClick={handleMessage}
-                    className="flex items-center gap-2 bg-white text-orange-600 hover:bg-orange-50 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
-                  >
+                  <Button variant="secondary" onClick={handleMessage}
+                    className="flex items-center gap-2 bg-white text-primary-600 hover:bg-primary-50 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl">
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
                     {t('product.sendMessage')}
-                  </button>
-                  <button
-                    onClick={handleFollow}
+                  </Button>
+                  <Button variant="secondary" onClick={handleFollow}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
                       isFollowing 
                         ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm' 
-                        : 'bg-orange-700/50 text-white hover:bg-orange-700/70 backdrop-blur-sm'
-                    }`}
-                  >
+                        : 'bg-primary-700/50 text-white hover:bg-primary-700/70 backdrop-blur-sm'
+                    }`}>
                     <HeartIcon className={`w-5 h-5 ${isFollowing ? 'fill-current' : ''}`} />
                     {isFollowing ? t('seller.following') : t('seller.follow')}
-                  </button>
-                  <button
-                    onClick={handleReport}
+                  </Button>
+                  <Button variant="secondary" onClick={handleReport}
                     className="p-3 rounded-xl bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all backdrop-blur-sm"
-                    title={t('seller.report')}
-                  >
+                    title={t('seller.report')}>
                     <FlagIcon className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </motion.div>
@@ -430,40 +425,36 @@ export default function SellerProfilePage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-xl w-fit">
-          <button
-            onClick={() => setTab('listings')}
+          <Button variant="secondary" onClick={() => setTab('listings')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
               tab === 'listings'
-                ? 'bg-white text-orange-600 shadow-sm'
+                ? 'bg-white text-primary-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+            }`}>
             <CubeIcon className="w-5 h-5" />
             {t('nav.listings')}
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              tab === 'listings' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'
+              tab === 'listings' ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-600'
             }`}>
               {products.length}
             </span>
-          </button>
-          <button
-            onClick={() => {
+          </Button>
+          <Button variant="secondary" onClick={() => {
               setTab('reviews');
             }}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
               tab === 'reviews'
-                ? 'bg-white text-orange-600 shadow-sm'
+                ? 'bg-white text-primary-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+            }`}>
             <StarIcon className="w-5 h-5" />
             {t('review.reviews')}
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              tab === 'reviews' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'
+              tab === 'reviews' ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-600'
             }`}>
               {seller.stats?.totalRatings || 0}
             </span>
-          </button>
+          </Button>
         </div>
 
         <AnimatePresence mode="wait">
@@ -506,7 +497,7 @@ export default function SellerProfilePage() {
                             logContext={{ productId: product.id, page: 'seller-products' }}
                           />
                           {product.isTradeEnabled && (
-                            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                            <div className="absolute top-2 left-2 bg-success-500 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
                               <ArrowsRightLeftIcon className="w-3.5 h-3.5" />
                               {locale === 'en' ? 'Trade' : 'Takas'}
                             </div>
@@ -514,11 +505,11 @@ export default function SellerProfilePage() {
                           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <div className="p-3">
-                          <h3 className="font-medium text-gray-900 line-clamp-2 text-sm group-hover:text-orange-600 transition-colors mb-2">
+                          <h3 className="font-medium text-gray-900 line-clamp-2 text-sm group-hover:text-primary-600 transition-colors mb-2">
                             {product.title}
                           </h3>
                           <div className="flex items-center justify-between">
-                            <p className="text-orange-600 font-bold">
+                            <p className="text-primary-600 font-bold">
                               ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
                             </p>
                             {(product.viewCount || 0) > 0 && (
@@ -548,8 +539,8 @@ export default function SellerProfilePage() {
               {reviewsLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="relative w-12 h-12">
-                    <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
-                    <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-200"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-500 border-t-transparent animate-spin"></div>
                   </div>
                 </div>
               ) : reviews.length === 0 ? (
@@ -575,7 +566,7 @@ export default function SellerProfilePage() {
                               key={star}
                               className={`w-6 h-6 ${
                                 star <= Math.round(averageRating)
-                                  ? 'text-yellow-400'
+                                  ? 'text-warning-400'
                                   : 'text-gray-200'
                               }`}
                             />
@@ -598,10 +589,10 @@ export default function SellerProfilePage() {
                             return (
                               <div key={score} className="flex items-center gap-3">
                                 <span className="text-sm text-gray-600 w-3">{score}</span>
-                                <StarSolidIcon className="w-4 h-4 text-yellow-400" />
+                                <StarSolidIcon className="w-4 h-4 text-warning-400" />
                                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                                    className="h-full bg-warning-400 rounded-full transition-all duration-500"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>
@@ -645,13 +636,13 @@ export default function SellerProfilePage() {
                                     })}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-0.5 bg-yellow-50 px-2 py-1 rounded-lg">
+                                <div className="flex items-center gap-0.5 bg-warning-50 px-2 py-1 rounded-lg">
                                   {[1, 2, 3, 4, 5].map((star) => (
                                     <StarSolidIcon
                                       key={star}
                                       className={`w-4 h-4 ${
                                         star <= review.score
-                                          ? 'text-yellow-400'
+                                          ? 'text-warning-400'
                                           : 'text-gray-200'
                                       }`}
                                     />

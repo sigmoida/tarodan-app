@@ -14,7 +14,8 @@ import {
   CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/authStore';import { Button } from '@tarodan/ui';
+
 
 interface OrderDetails {
   id: string;
@@ -128,7 +129,7 @@ export default function CheckoutSuccessPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-16">
+    <div className="min-h-screen bg-gradient-to-b from-success-50 to-white py-16">
       <div className="max-w-2xl mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -136,8 +137,8 @@ export default function CheckoutSuccessPage() {
           className="text-center"
         >
           {/* Success Icon */}
-          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircleIcon className="w-14 h-14 text-green-500" />
+          <div className="w-24 h-24 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircleIcon className="w-14 h-14 text-success-500" />
           </div>
 
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
@@ -170,7 +171,7 @@ export default function CheckoutSuccessPage() {
 
                 <div className="flex justify-between items-center py-2">
                   <span className="text-gray-600">Toplam Tutar:</span>
-                  <span className="font-bold text-lg text-green-600">
+                  <span className="font-bold text-lg text-success-600">
                     {formatPrice(order.totalAmount)}
                   </span>
                 </div>
@@ -178,26 +179,24 @@ export default function CheckoutSuccessPage() {
 
               {/* Invoice Download Button */}
               {invoice && (
-                <button
-                  onClick={handleDownloadInvoice}
+                <Button variant="secondary" onClick={handleDownloadInvoice}
                   disabled={downloading}
-                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
-                >
+                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
                   <DocumentArrowDownIcon className="w-5 h-5" />
                   {downloading ? 'İndiriliyor...' : 'Faturayı İndir (PDF)'}
-                </button>
+                </Button>
               )}
             </div>
           )}
 
           {/* Estimated Delivery */}
           {order && !loading && (
-            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 mb-8">
+            <div className="bg-info-50 border border-info-100 rounded-2xl p-6 mb-8">
               <div className="flex items-center justify-center gap-3 mb-2">
-                <TruckIcon className="w-6 h-6 text-blue-500" />
+                <TruckIcon className="w-6 h-6 text-info-500" />
                 <span className="font-semibold text-gray-900">Tahmini Teslimat</span>
               </div>
-              <div className="flex items-center justify-center gap-2 text-blue-700">
+              <div className="flex items-center justify-center gap-2 text-info-700">
                 <CalendarIcon className="w-5 h-5" />
                 <span className="font-medium">{getEstimatedDelivery(order.createdAt)}</span>
               </div>

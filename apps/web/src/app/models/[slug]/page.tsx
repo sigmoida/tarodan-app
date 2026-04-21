@@ -123,7 +123,7 @@ export default function ModelDetailPage() {
 
                 {/* Hero / Header Section */}
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-10">
-                    <div className="relative h-48 bg-gradient-to-r from-primary-500 to-orange-400 opacity-10 absolute inset-0 w-full" />
+                    <div className="relative h-48 bg-gradient-to-r from-primary-500 to-primary-400 opacity-10 absolute inset-0 w-full" />
                     <div className="relative p-8 md:p-12 flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
                         <div className="w-32 h-32 bg-white rounded-2xl shadow-md border border-gray-100 flex items-center justify-center text-6xl shadow-primary-100">
                             🏎️
@@ -159,8 +159,8 @@ export default function ModelDetailPage() {
                             )}
 
                             <div className="flex gap-4">
-                                <div className="bg-green-50 text-green-700 font-bold px-4 py-2 rounded-xl border border-green-100 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                <div className="bg-success-50 text-success-700 font-bold px-4 py-2 rounded-xl border border-success-100 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-success-500 rounded-full animate-pulse" />
                                     {model.productCount} {t('models.listings')}
                                 </div>
                             </div>
@@ -214,19 +214,19 @@ export default function ModelDetailPage() {
                                         {/* Status Badges */}
                                         <div className="absolute top-3 left-3 flex flex-wrap gap-2">
                                             {p.isPreorder && (
-                                                <span className="bg-amber-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md shadow-sm">
+                                                <span className="bg-warning-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md shadow-sm">
                                                     PRE-ORDER
                                                 </span>
                                             )}
                                             {p.isLimited && (
-                                                <span className="bg-purple-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md shadow-sm">
+                                                <span className="bg-primary-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md shadow-sm">
                                                     LIMITED
                                                 </span>
                                             )}
                                         </div>
 
                                         {hasDiscount && (
-                                            <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-black px-2 py-1 rounded-md shadow-sm">
+                                            <div className="absolute top-3 right-3 bg-danger-500 text-white text-xs font-black px-2 py-1 rounded-md shadow-sm">
                                                 %{Math.round((1 - Number(p.salePrice) / Number(p.originalPrice)) * 100)} İndirim
                                             </div>
                                         )}
@@ -251,7 +251,7 @@ export default function ModelDetailPage() {
                                                 {hasDiscount ? (
                                                     <>
                                                         <span className="text-lg font-black text-gray-900 leading-none">₺{Number(p.salePrice).toLocaleString('tr-TR')}</span>
-                                                        <span className="text-xs text-gray-400 line-through decoration-red-400">₺{Number(p.originalPrice).toLocaleString('tr-TR')}</span>
+                                                        <span className="text-xs text-gray-400 line-through decoration-danger-400">₺{Number(p.originalPrice).toLocaleString('tr-TR')}</span>
                                                     </>
                                                 ) : (
                                                     <span className="text-lg font-black text-gray-900 leading-none">₺{Number(p.price).toLocaleString('tr-TR')}</span>

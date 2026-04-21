@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Checkbox } from '@tarodan/ui';
+
 
 const COOKIE_CATEGORIES = [
   {
@@ -140,13 +141,10 @@ export default function CookiesPage() {
                     <p className="text-sm text-gray-600">{category.description}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={category.required || preferences[category.id as keyof typeof preferences]}
+                    <Checkbox checked={category.required || preferences[category.id as keyof typeof preferences]}
                       onChange={() => !category.required && handlePreferenceChange(category.id)}
                       disabled={category.required}
-                      className="sr-only peer"
-                    />
+                      className="sr-only peer" />
                     <div className={`w-11 h-6 rounded-full peer ${
                       category.required 
                         ? 'bg-gray-400 cursor-not-allowed' 
@@ -180,18 +178,14 @@ export default function CookiesPage() {
           </div>
 
           <div className="mt-6 flex gap-4">
-            <button
-              onClick={savePreferences}
-              className="px-6 py-3 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors"
-            >
+            <Button variant="secondary" onClick={savePreferences}
+              className="px-6 py-3 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors">
               {t('legal.savePreferences')}
-            </button>
-            <button
-              onClick={() => setPreferences({ functional: true, analytics: true, marketing: true })}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setPreferences({ functional: true, analytics: true, marketing: true })}
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">
               {t('legal.acceptAll')}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -222,8 +216,8 @@ export default function CookiesPage() {
             Mobil cihazlarda çerez ayarlarını tarayıcı veya cihaz ayarlarından yönetebilirsiniz.
           </p>
 
-          <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-sm text-amber-800">
+          <div className="mt-6 p-4 bg-warning-50 rounded-lg border border-warning-200">
+            <p className="text-sm text-warning-800">
               <strong>Önemli:</strong> Zorunlu çerezleri devre dışı bırakmanız halinde 
               platformun bazı özellikleri düzgün çalışmayabilir.
             </p>

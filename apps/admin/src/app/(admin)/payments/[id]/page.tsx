@@ -11,7 +11,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Spinner, Textarea } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
 interface PaymentDetail {
@@ -61,10 +61,10 @@ interface PaymentDetail {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Bekliyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  processing: { label: 'İşleniyor', color: 'text-blue-600', bg: 'bg-blue-100' },
-  completed: { label: 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  failed: { label: 'Başarısız', color: 'text-red-600', bg: 'bg-red-100' },
+  pending: { label: 'Bekliyor', color: 'text-warning-600', bg: 'bg-warning-100' },
+  processing: { label: 'İşleniyor', color: 'text-info-600', bg: 'bg-info-100' },
+  completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
+  failed: { label: 'Başarısız', color: 'text-danger-600', bg: 'bg-danger-100' },
   refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
@@ -216,8 +216,8 @@ export default function AdminPaymentDetailPage() {
                   </span>
                 </div>
                 {payment.failureReason && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-800">
+                  <div className="mt-4 p-3 bg-danger-50 border border-danger-200 rounded-lg">
+                    <p className="text-sm text-danger-800">
                       <strong>Hata Nedeni:</strong> {payment.failureReason}
                     </p>
                   </div>
@@ -382,28 +382,22 @@ export default function AdminPaymentDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   İade Tutarı (Boş bırakırsanız tam iade yapılır)
                 </label>
-                <input
-                  type="number"
+                <Input type="number"
                   min="0.01"
                   max={payment.amount}
                   step="0.01"
                   value={refundAmount || ''}
                   onChange={(e) => setRefundAmount(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  placeholder="İade tutarı (opsiyonel)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  placeholder="İade tutarı (opsiyonel)" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   İade Nedeni (Opsiyonel)
                 </label>
-                <textarea
-                  value={refundReason}
+                <Textarea value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
                   placeholder="İade nedeni..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  rows={3} />
               </div>
               <div className="flex gap-3">
                 <Button
@@ -439,7 +433,7 @@ export default function AdminPaymentDetailPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <ExclamationTriangleIcon className="w-6 h-6 text-orange-500" />
+                <ExclamationTriangleIcon className="w-6 h-6 text-primary-500" />
                 Zorla İptal
               </h2>
               <p className="text-gray-600 mb-4">
@@ -447,16 +441,13 @@ export default function AdminPaymentDetailPage() {
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  İptal Nedeni <span className="text-red-500">*</span>
+                  İptal Nedeni <span className="text-danger-500">*</span>
                 </label>
-                <textarea
-                  value={cancelReason}
+                <Textarea value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="İptal nedeni..."
                   rows={3}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  required />
               </div>
               <div className="flex gap-3">
                 <Button

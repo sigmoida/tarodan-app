@@ -52,7 +52,7 @@ export default function UserAvatar({
   const base =
     'rounded-full flex items-center justify-center font-bold flex-shrink-0 overflow-hidden';
   const bg = isCompany
-    ? 'bg-orange-500/20 text-orange-600'
+    ? 'bg-primary-500/20 text-primary-600'
     : 'bg-primary-500 text-white';
   const ringClass = ring ? 'ring-4 ring-white/30' : '';
   const showImage = mounted && isValidUrl(avatarUrl) && !imgError;

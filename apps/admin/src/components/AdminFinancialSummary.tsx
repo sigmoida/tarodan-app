@@ -73,7 +73,7 @@ export function AdminFinancialSummary({ pricing, fallback, className = '' }: Adm
         </div>
         <div className="flex justify-between">
           <dt className="text-gray-600">Satıcı net (sellerNetAmount):</dt>
-          <dd className="font-medium text-green-700">₺{fmt(sellerNet)}</dd>
+          <dd className="font-medium text-success-700">₺{fmt(sellerNet)}</dd>
         </div>
       </dl>
     </div>

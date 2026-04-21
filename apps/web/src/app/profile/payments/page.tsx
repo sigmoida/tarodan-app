@@ -14,7 +14,7 @@ import {
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { StatusBadge, paymentStatusConfig, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, StatusBadge, paymentStatusConfig } from '@tarodan/ui';
 
 interface Payment {
   id: string;
@@ -188,22 +188,19 @@ export default function PaymentHistoryPage() {
               <FunnelIcon className="w-5 h-5" />
               {t('common.filter')}
             </h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-primary-600 hover:text-primary-700"
-            >
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
+              className="text-primary-600 hover:text-primary-700">
               {showFilters ? t('common.hide') : t('common.show')}
-            </button>
+            </Button>
           </div>
 
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.status')}</label>
-                <select
+                <Select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">{t('common.all')}</option>
                   <option value="pending">{locale === 'en' ? 'Pending' : 'Bekliyor'}</option>
@@ -211,51 +208,42 @@ export default function PaymentHistoryPage() {
                   <option value="completed">{locale === 'en' ? 'Completed' : 'Tamamlandı'}</option>
                   <option value="failed">{locale === 'en' ? 'Failed' : 'Başarısız'}</option>
                   <option value="refunded">{locale === 'en' ? 'Refunded' : 'İade Edildi'}</option>
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.provider')}</label>
-                <select
+                <Select
                   value={filters.provider}
                   onChange={(e) => handleFilterChange('provider', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">{t('common.all')}</option>
                   <option value="paytr">PayTR</option>
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.startDate')}</label>
-                <input
-                  type="date"
+                <Input type="date"
                   value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.endDate')}</label>
-                <input
-                  type="date"
+                <Input type="date"
                   value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)} />
               </div>
             </div>
           )}
 
           {showFilters && (
             <div className="mt-4 flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+              <Button variant="secondary" onClick={clearFilters}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800">
                 {t('product.clearFilters')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -351,7 +339,7 @@ export default function PaymentHistoryPage() {
                               label={paymentStatusLabel}
                             />
                             {payment.failureReason && (
-                              <p className="text-xs text-red-600 mt-1">{payment.failureReason}</p>
+                              <p className="text-xs text-danger-600 mt-1">{payment.failureReason}</p>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -375,20 +363,16 @@ export default function PaymentHistoryPage() {
                                 {t('common.details')}
                               </Link>
                               {payment.status === 'pending' && (
-                                <button
-                                  onClick={() => handleCancel(payment.id)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
+                                <Button variant="secondary" onClick={() => handleCancel(payment.id)}
+                                  className="text-danger-600 hover:text-danger-700">
                                   {t('common.cancel')}
-                                </button>
+                                </Button>
                               )}
                               {payment.status === 'failed' && (
-                                <button
-                                  onClick={() => handleRetry(payment.id)}
-                                  className="text-blue-600 hover:text-blue-700"
-                                >
+                                <Button variant="secondary" onClick={() => handleRetry(payment.id)}
+                                  className="text-info-600 hover:text-info-700">
                                   {t('payment.retry')}
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -408,20 +392,16 @@ export default function PaymentHistoryPage() {
                       : `Toplam ${pagination.total} ödeme, Sayfa ${pagination.page} / ${pagination.totalPages}`}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePageChange(pagination.page - 1)}
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50">
                       {t('common.previous')}
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(pagination.page + 1)}
+                    </Button>
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50">
                       {t('common.next')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

@@ -111,8 +111,8 @@ export default function SellerDashboardPage() {
                   className="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
+                    <div className="p-2 bg-success-100 rounded-lg">
+                      <CurrencyDollarIcon className="w-6 h-6 text-success-600" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-gray-900">
@@ -134,8 +134,8 @@ export default function SellerDashboardPage() {
                   className="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <ShoppingBagIcon className="w-6 h-6 text-blue-600" />
+                    <div className="p-2 bg-info-100 rounded-lg">
+                      <ShoppingBagIcon className="w-6 h-6 text-info-600" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-gray-900">
@@ -154,8 +154,8 @@ export default function SellerDashboardPage() {
                   className="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <ArrowTrendingUpIcon className="w-6 h-6 text-orange-600" />
+                    <div className="p-2 bg-primary-100 rounded-lg">
+                      <ArrowTrendingUpIcon className="w-6 h-6 text-primary-600" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-gray-900">
@@ -182,12 +182,12 @@ export default function SellerDashboardPage() {
               >
                 <Link
                   href="/orders?filter=seller"
-                  className="block bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-orange-200 hover:shadow-md transition-all"
+                  className="block bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-primary-200 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-amber-100 rounded-lg">
-                        <ClipboardDocumentListIcon className="w-6 h-6 text-amber-600" />
+                      <div className="p-2 bg-warning-100 rounded-lg">
+                        <ClipboardDocumentListIcon className="w-6 h-6 text-warning-600" />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900">
@@ -214,10 +214,10 @@ export default function SellerDashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Link
                   href="/listings/new"
-                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-orange-300 hover:shadow-md transition-all group"
+                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
-                  <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200">
-                    <PlusIcon className="w-5 h-5 text-orange-600" />
+                  <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200">
+                    <PlusIcon className="w-5 h-5 text-primary-600" />
                   </div>
                   <span className="font-medium text-gray-900">
                     {t('sellerDashboard.newListing')}
@@ -225,10 +225,10 @@ export default function SellerDashboardPage() {
                 </Link>
                 <Link
                   href="/orders?filter=seller"
-                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-orange-300 hover:shadow-md transition-all group"
+                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
-                  <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200">
-                    <ClipboardDocumentListIcon className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 bg-info-100 rounded-lg group-hover:bg-info-200">
+                    <ClipboardDocumentListIcon className="w-5 h-5 text-info-600" />
                   </div>
                   <span className="font-medium text-gray-900">
                     {t('sellerDashboard.myOrders')}
@@ -236,10 +236,10 @@ export default function SellerDashboardPage() {
                 </Link>
                 <Link
                   href="/profile/listings"
-                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-orange-300 hover:shadow-md transition-all group"
+                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
-                  <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200">
-                    <TagIcon className="w-5 h-5 text-green-600" />
+                  <div className="p-2 bg-success-100 rounded-lg group-hover:bg-success-200">
+                    <TagIcon className="w-5 h-5 text-success-600" />
                   </div>
                   <span className="font-medium text-gray-900">
                     {t('sellerDashboard.myListings')}
@@ -247,10 +247,10 @@ export default function SellerDashboardPage() {
                 </Link>
                 <Link
                   href="/analytics"
-                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-orange-300 hover:shadow-md transition-all group"
+                  className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
-                  <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200">
-                    <ChartBarIcon className="w-5 h-5 text-purple-600" />
+                  <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200">
+                    <ChartBarIcon className="w-5 h-5 text-primary-600" />
                   </div>
                   <span className="font-medium text-gray-900">
                     {t('sellerDashboard.analytics')}

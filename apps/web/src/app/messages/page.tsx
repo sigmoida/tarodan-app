@@ -7,7 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Spinner } from '@tarodan/ui';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
@@ -455,16 +455,14 @@ export default function MessagesPage() {
               {visibleThreads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id;
                 return (
-                  <button
-                    key={thread.id}
+                  <Button variant="secondary" key={thread.id}
                     type="button"
                     onClick={() => setSelectedThread(thread)}
                     className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-gray-100 last:border-b-0 ${
                       isSelected
                         ? 'border-l-primary-500 bg-primary-50/60'
                         : 'border-l-transparent hover:bg-gray-50'
-                    }`}
-                  >
+                    }`}>
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
                         <UserAvatar displayName={thread.otherUser?.displayName} avatarUrl={thread.otherUser?.avatarUrl} size="sm" className="!w-11 !h-11" />
@@ -494,18 +492,16 @@ export default function MessagesPage() {
                         )}
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
               {hasMoreThreads && (
                 <div className="flex-shrink-0 p-2 border-t border-gray-100">
-                  <button
-                    type="button"
+                  <Button variant="secondary" type="button"
                     onClick={() => setThreadsExpanded(true)}
-                    className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-                  >
+                    className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
                     {locale === 'en' ? `More (${remainingCount})` : `Daha fazla (${remainingCount})`}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -518,12 +514,10 @@ export default function MessagesPage() {
             <>
               {/* Sohbet başlığı (sabit) */}
               <div className="flex-shrink-0 px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm">
-                <button
-                  onClick={() => setSelectedThread(null)}
-                  className="sm:hidden p-1 -ml-1 mr-1 text-gray-500 hover:text-gray-700"
-                >
+                <Button variant="secondary" onClick={() => setSelectedThread(null)}
+                  className="sm:hidden p-1 -ml-1 mr-1 text-gray-500 hover:text-gray-700">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </button>
+                </Button>
                 <UserAvatar displayName={selectedThread.otherUser?.displayName} avatarUrl={selectedThread.otherUser?.avatarUrl} size="sm" className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">
@@ -557,7 +551,7 @@ export default function MessagesPage() {
                             message.status === 'pending'
                               ? 'opacity-60'
                               : message.status === 'rejected'
-                              ? 'ring-1 ring-red-200 bg-red-50/50'
+                              ? 'ring-1 ring-danger-200 bg-danger-50/50'
                               : ''
                           }`}
                         >
@@ -595,7 +589,7 @@ export default function MessagesPage() {
               {/* Yazma kutusu - altta sabit */}
               <div className="flex-shrink-0 p-4 pt-2 bg-white border-t border-gray-200">
                   {contentWarning && (
-                    <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    <div className="mb-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg text-warning-800 text-xs">
                       ⚠️ {contentWarning}
                     </div>
                   )}
@@ -604,8 +598,7 @@ export default function MessagesPage() {
                       {attachedUrls.map((url, i) => (
                         <div key={i} className="relative">
                           <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
-                          <button
-                            type="button"
+                          <Button variant="secondary" type="button"
                             onClick={() => {
                               if (!selectedThread) return;
                               setDraftsByThreadId((prev) => ({
@@ -616,23 +609,20 @@ export default function MessagesPage() {
                                 },
                               }));
                             }}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-700"
-                          >
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-danger-600 text-white rounded-full flex items-center justify-center text-xs hover:bg-danger-700">
                             ×
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleAttachImage} />
-                    <button
-                      type="button"
+                    <Input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleAttachImage} />
+                    <Button variant="secondary" type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={attaching}
                       title={locale === 'en' ? 'Attach image' : 'Resim ekle'}
-                      className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 disabled:opacity-50"
-                    >
+                      className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 disabled:opacity-50">
                       {attaching ? (
                         <span className="text-xs">...</span>
                       ) : (
@@ -640,18 +630,16 @@ export default function MessagesPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
                         </svg>
                       )}
-                    </button>
-                    <input
-                      type="text"
+                    </Button>
+                    <Input type="text"
                       value={newMessage}
                       onChange={(e) => handleMessageChange(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder={t('message.typeMessage')}
                       maxLength={maxMessageLength}
                       className={`flex-1 px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
-                        contentWarning ? 'border-amber-400 ring-1 ring-amber-200' : ''
-                      }`}
-                    />
+                        contentWarning ? 'border-warning-400 ring-1 ring-warning-200' : ''
+                      }`} />
                     <Button
                       type="button"
                       variant="primary"

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Input, Textarea } from '@tarodan/ui';
 import {
   PencilIcon,
   EyeIcon,
@@ -166,20 +167,18 @@ export default function AdminEmailTemplatesPage() {
                       <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{t.subject || '(varsayılan)'}</td>
                       <td className="px-4 py-3">
                         {t.hasCustomBody ? (
-                          <span className="text-green-500">Özel</span>
+                          <span className="text-success-500">Özel</span>
                         ) : (
                           <span className="text-gray-500">Varsayılan</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
+                        <Button variant="secondary" type="button"
                           onClick={() => openEdit(t.key)}
-                          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-400 text-sm"
-                        >
+                          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-400 text-sm">
                           <PencilIcon className="h-4 w-4" />
                           Düzenle
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -194,9 +193,9 @@ export default function AdminEmailTemplatesPage() {
             <div className="bg-white rounded-xl border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Şablon: {selectedKey}</h2>
-                <button type="button" onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-900">
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-900">
                   <XMarkIcon className="h-6 w-6" />
-                </button>
+                </Button>
               </div>
               <div className="p-4 space-y-4">
                 {selectedKey && (() => {
@@ -211,7 +210,7 @@ export default function AdminEmailTemplatesPage() {
                       })()
                     : Object.keys(SAMPLE_DATA[selectedKey] || {});
                   return vars.length > 0 ? (
-                    <div className="rounded-lg bg-gray-100/50 border border-gray-300 p-3">
+                    <div className="bg-gray-100/50 p-3">
                       <p className="text-sm font-medium text-gray-500 mb-2">Bu şablonda kullanılabilir değişkenler</p>
                       <p className="text-xs text-gray-500 font-mono flex flex-wrap gap-x-2 gap-y-1">
                         {vars.map((v) => (
@@ -223,70 +222,54 @@ export default function AdminEmailTemplatesPage() {
                 })()}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Görünen ad</label>
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
-                  />
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Konu</label>
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
-                    placeholder="E-posta konusu. {{orderNumber}} gibi değişkenler kullanılabilir."
-                  />
+                    placeholder="E-posta konusu. {{orderNumber}} gibi değişkenler kullanılabilir." />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">HTML gövde</label>
-                  <textarea
-                    value={form.bodyHtml}
+                  <Textarea value={form.bodyHtml}
                     onChange={(e) => setForm({ ...form, bodyHtml: e.target.value })}
                     rows={14}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm font-mono"
-                    placeholder="HTML içerik. {{name}}, {{orderNumber}} vb. değişkenler kullanılabilir."
-                  />
+                    className="font-mono"
+                    placeholder="HTML içerik. {{name}}, {{orderNumber}} vb. değişkenler kullanılabilir." />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  <Button variant="secondary" type="button"
                     onClick={handleSave}
-                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600"
-                  >
+                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
                     Kaydet
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button variant="secondary" type="button"
                     onClick={handlePreview}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100"
-                  >
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100">
                     <EyeIcon className="h-4 w-4" />
                     Önizleme
-                  </button>
+                  </Button>
                   <div className="flex items-center gap-2 ml-4">
-                    <input
-                      type="email"
+                    <Input type="email"
                       value={testEmail}
                       onChange={(e) => setTestEmail(e.target.value)}
                       placeholder="test@example.com"
-                      className="input-dark rounded-lg px-3 py-2 text-sm w-48"
-                    />
-                    <button
-                      type="button"
+                      className="w-48" />
+                    <Button variant="secondary" type="button"
                       onClick={handleSendTest}
                       disabled={sendingTest}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-                    >
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50">
                       <PaperAirplaneIcon className="h-4 w-4" />
                       {sendingTest ? 'Gönderiliyor...' : 'Test gönder'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 {preview && (
-                  <div className="border border-gray-300 rounded-lg p-4 mt-4">
+                  <div className="p-4 mt-4">
                     <p className="text-sm font-medium text-gray-500 mb-2">Önizleme</p>
                     <p className="text-sm text-gray-600 mb-2">Konu: {preview.subject}</p>
                     <div

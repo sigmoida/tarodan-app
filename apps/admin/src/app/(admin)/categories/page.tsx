@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -123,21 +123,17 @@ export default function CategoriesPage() {
           )}
       </div>
       <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-        <button
-          onClick={() => openEditModal(category)}
+        <Button variant="secondary" onClick={() => openEditModal(category)}
           className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-          title="Düzenle"
-        >
+          title="Düzenle">
           <PencilIcon className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => setDeleteConfirm(category.id)}
-          className="p-2 text-red-600 hover:text-red-300 hover:bg-red-50 rounded-lg"
+        </Button>
+        <Button variant="secondary" onClick={() => setDeleteConfirm(category.id)}
+          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
           title="Sil"
-          disabled={category.productCount > 0}
-        >
+          disabled={category.productCount > 0}>
           <TrashIcon className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -189,38 +185,28 @@ export default function CategoriesPage() {
                 <label className="block text-sm font-medium text-gray-600 mb-2">
                   Kategori Adı *
                 </label>
-                <input
-                  type="text"
+                <Input type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input-dark w-full"
-                  required
-                />
+                  required />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-2">
                   Açıklama
                 </label>
-                <textarea
-                  value={formData.description}
+                <Textarea value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="input-dark w-full"
-                  rows={3}
-                />
+                  rows={3} />
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
+              <div className="pt-2">
+                <Checkbox
                   id="isActive"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 bg-gray-100 text-primary-600 focus:ring-primary-500"
+                  label="Aktif"
                 />
-                <label htmlFor="isActive" className="text-sm text-gray-600">
-                  Aktif
-                </label>
               </div>
 
               <div className="flex gap-3 pt-4">

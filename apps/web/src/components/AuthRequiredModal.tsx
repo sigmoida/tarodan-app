@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { XMarkIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button } from '@tarodan/ui';
+
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -49,20 +50,18 @@ export default function AuthRequiredModal({
       {/* Modal */}
       <div className="relative bg-white shadow-2xl max-w-sm sm:max-w-md w-full mx-auto overflow-hidden" style={{borderRadius:'6px'}}>
         {/* Close button */}
-        <button
-          onClick={onClose}
+        <Button variant="secondary" onClick={onClose}
           className="absolute top-3 right-3 p-1.5 hover:bg-gray-100 transition-colors z-10"
-          style={{borderRadius:'4px'}}
-        >
+          style={{borderRadius:'4px'}}>
           <XMarkIcon className="w-5 h-5 text-gray-400" />
-        </button>
+        </Button>
 
         {/* Content */}
         <div className="p-6 sm:p-8 text-center">
           {/* Icon */}
-          <div className="w-16 h-16 mx-auto mb-5 bg-orange-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
+          <div className="w-16 h-16 mx-auto mb-5 bg-primary-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
             {icon || (
-              <UserIcon className="w-8 h-8 text-orange-500" />
+              <UserIcon className="w-8 h-8 text-primary-500" />
             )}
           </div>
 
@@ -78,23 +77,19 @@ export default function AuthRequiredModal({
 
           {/* Buttons */}
           <div className="space-y-2.5">
-            <button
-              onClick={handleLogin}
-              className="w-full py-2.5 px-4 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}
-            >
+            <Button variant="secondary" onClick={handleLogin}
+              className="w-full py-2.5 px-4 bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
+              style={{borderRadius:'4px'}}>
               <UserIcon className="w-4 h-4" />
               {t('common.login')}
-            </button>
+            </Button>
             
-            <button
-              onClick={handleRegister}
+            <Button variant="secondary" onClick={handleRegister}
               className="w-full py-2.5 px-4 bg-gray-100 text-gray-800 font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}
-            >
+              style={{borderRadius:'4px'}}>
               <UserPlusIcon className="w-4 h-4" />
               {t('auth.freeSignUp')}
-            </button>
+            </Button>
           </div>
 
           {/* Benefits hint */}

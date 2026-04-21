@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, FlagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
-import { Button } from '@tarodan/ui';
+import { Button, Radio, Textarea } from '@tarodan/ui';
 
 export type ReportEntityType = 'product' | 'user' | 'collection' | 'message';
 
@@ -131,15 +131,13 @@ export default function ReportModal({
             {/* Header - Compact */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <FlagIcon className="w-5 h-5 text-red-600" />
+                <FlagIcon className="w-5 h-5 text-danger-600" />
                 <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
               </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-              >
+              <Button variant="secondary" onClick={onClose}
+                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
                 <XMarkIcon className="w-5 h-5 text-gray-500" />
-              </button>
+              </Button>
             </div>
 
             {/* Content - Scrollable */}
@@ -154,7 +152,7 @@ export default function ReportModal({
               {/* Reason Selection - Compact */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-red-500">*</span>
+                  {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-danger-500">*</span>
                 </label>
                 <div className="space-y-1.5">
                   {REPORT_REASONS.map((reason) => (
@@ -162,18 +160,15 @@ export default function ReportModal({
                       key={reason.value}
                       className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
                         selectedReason === reason.value
-                          ? 'border-red-500 bg-red-50'
+                          ? 'border-danger-500 bg-danger-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="reportReason"
+                      <Radio name="reportReason"
                         value={reason.value}
                         checked={selectedReason === reason.value}
                         onChange={(e) => setSelectedReason(e.target.value as ReportReason)}
-                        className="w-3.5 h-3.5 text-red-600 border-gray-300 focus:ring-red-500"
-                      />
+                        className="w-3.5 h-3.5 text-danger-600 focus:ring-danger-500" />
                       <span className="ml-2 text-gray-700">
                         {locale === 'en' ? reason.labelEn : reason.labelTr}
                       </span>
@@ -187,14 +182,12 @@ export default function ReportModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   {locale === 'en' ? 'Details (optional, min 10 chars)' : 'Detaylar (isteğe bağlı, min 10 karakter)'}
                 </label>
-                <textarea
-                  value={description}
+                <Textarea value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={locale === 'en' ? 'More details...' : 'Daha fazla detay...'}
                   rows={2}
                   maxLength={500}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
-                />
+                  className="focus:ring-danger-500 focus:border-danger-500 resize-none" />
                 <p className="text-xs text-gray-400 mt-0.5 text-right">{description.length}/500</p>
               </div>
 

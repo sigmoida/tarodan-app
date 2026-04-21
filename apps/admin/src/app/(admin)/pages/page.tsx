@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import RichTextEditor from '@/components/RichTextEditor';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 
 interface StaticPage {
   id: string;
@@ -126,14 +127,12 @@ export default function AdminPagesPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl font-bold text-gray-900">Sayfa Yönetimi</h1>
-          <button
-            type="button"
+          <Button variant="secondary" type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600"
-          >
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
             <PlusIcon className="h-5 w-5" />
             Yeni Sayfa
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -162,41 +161,33 @@ export default function AdminPagesPage() {
                       <td className="px-4 py-3 text-sm">{p.title}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{p.metaTitle || '-'}</td>
                       <td className="px-4 py-3">
-                        <span className={p.isPublished ? 'text-green-500' : 'text-gray-500'}>
+                        <span className={p.isPublished ? 'text-success-500' : 'text-gray-500'}>
                           {p.isPublished ? 'Yayında' : 'Taslak'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
+                        <Button variant="secondary" type="button"
                           onClick={() => openEdit(p)}
-                          className="text-primary-600 hover:text-primary-400 p-1"
-                        >
+                          className="text-primary-600 hover:text-primary-400 p-1">
                           <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button variant="secondary" type="button"
                           onClick={() => setDeleteConfirm(p.id)}
-                          className="text-red-500 hover:text-red-600 p-1 ml-2"
-                        >
+                          className="text-danger-500 hover:text-danger-600 p-1 ml-2">
                           <TrashIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                         {deleteConfirm === p.id && (
                           <span className="ml-2">
-                            <button
-                              type="button"
+                            <Button variant="secondary" type="button"
                               onClick={() => handleDelete(p.id)}
-                              className="text-xs text-red-500 underline"
-                            >
+                              className="text-xs text-danger-500 underline">
                               Sil
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button variant="secondary" type="button"
                               onClick={() => setDeleteConfirm(null)}
-                              className="text-xs text-gray-500 ml-2"
-                            >
+                              className="text-xs text-gray-500 ml-2">
                               İptal
-                            </button>
+                            </Button>
                           </span>
                         )}
                       </td>
@@ -215,36 +206,32 @@ export default function AdminPagesPage() {
                 <h2 className="text-lg font-semibold text-gray-900">
                   {editing ? 'Sayfayı Düzenle' : 'Yeni Sayfa'}
                 </h2>
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => setShowModal(false)}
-                  className="text-gray-500 hover:text-gray-900"
-                >
+                  className="text-gray-500 hover:text-gray-900">
                   <XMarkIcon className="h-6 w-6" />
-                </button>
+                </Button>
               </div>
               <form onSubmit={handleSubmit} className="p-4 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Slug *</label>
-                  <input
+                  <Input
                     type="text"
                     required
                     value={form.slug}
                     onChange={(e) => setForm({ ...form, slug: e.target.value })}
                     placeholder="about, faq, iletisim"
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
                     disabled={!!editing}
                   />
                   <p className="text-xs text-gray-500 mt-1">URL: /sayfa/[slug]. Sadece yeni sayfada düzenlenebilir.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Başlık *</label>
-                  <input
+                  <Input
                     type="text"
                     required
                     value={form.title}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -258,67 +245,55 @@ export default function AdminPagesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">SEO Başlık</label>
-                    <input
+                    <Input
                       type="text"
                       value={form.metaTitle}
                       onChange={(e) => setForm({ ...form, metaTitle: e.target.value })}
-                      className="input-dark w-full rounded-lg px-3 py-2 text-sm"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">Sıra</label>
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       value={form.sortOrder}
                       onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value, 10) || 0 })}
-                      className="input-dark w-full rounded-lg px-3 py-2 text-sm"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">SEO Açıklama</label>
-                  <textarea
-                    value={form.metaDescription}
+                  <Textarea value={form.metaDescription}
                     onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
-                    rows={2}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
-                  />
+                    rows={2} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">SEO Anahtar Kelimeler</label>
-                  <input
+                  <Input
                     type="text"
                     value={form.metaKeywords}
                     onChange={(e) => setForm({ ...form, metaKeywords: e.target.value })}
-                    className="input-dark w-full rounded-lg px-3 py-2 text-sm"
                     placeholder="kelime1, kelime2"
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     id="isPublished"
                     checked={form.isPublished}
                     onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
-                    className="rounded border-gray-300"
                   />
                   <label htmlFor="isPublished" className="text-sm text-gray-600">Yayında</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    type="button"
+                  <Button variant="secondary" type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-900"
-                  >
+                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-900">
                     İptal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="submit"
+                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
                     {editing ? 'Güncelle' : 'Oluştur'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

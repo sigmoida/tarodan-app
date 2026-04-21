@@ -49,7 +49,7 @@ export default function TrustBadges() {
                 className="flex flex-col items-center text-center px-2 py-3 bg-gray-50 border border-gray-100"
                 style={{borderRadius:'4px'}}
               >
-                <Icon className="w-5 h-5 text-orange-500 mb-1.5" />
+                <Icon className="w-5 h-5 text-primary-500 mb-1.5" />
                 <p className="text-[11px] sm:text-xs font-semibold text-gray-900 leading-tight">{badge.label}</p>
                 <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 hidden md:block">{badge.description}</p>
               </motion.div>

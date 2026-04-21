@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { Button, Input, Select } from '@tarodan/ui';
 
 interface Payment {
   id: string;
@@ -53,10 +54,10 @@ interface PaymentListResponse {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Bekliyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  processing: { label: 'İşleniyor', color: 'text-blue-600', bg: 'bg-blue-100' },
-  completed: { label: 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  failed: { label: 'Başarısız', color: 'text-red-600', bg: 'bg-red-100' },
+  pending: { label: 'Bekliyor', color: 'text-warning-600', bg: 'bg-warning-100' },
+  processing: { label: 'İşleniyor', color: 'text-info-600', bg: 'bg-info-100' },
+  completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
+  failed: { label: 'Başarısız', color: 'text-danger-600', bg: 'bg-danger-100' },
   refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
@@ -159,12 +160,10 @@ export default function AdminPaymentsPage() {
               <FunnelIcon className="w-5 h-5" />
               Filtreler
             </h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-primary-600 hover:text-primary-700"
-            >
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
+              className="text-primary-600 hover:text-primary-700">
               {showFilters ? 'Gizle' : 'Göster'}
-            </button>
+            </Button>
           </div>
 
           {showFilters && (
@@ -173,22 +172,19 @@ export default function AdminPaymentsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Arama</label>
                 <div className="relative">
                   <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input
-                    type="text"
+                  <Input type="text"
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
                     placeholder="Sipariş no, transaction ID..."
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
+                    className="pl-10 pr-3" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Durum</label>
-                <select
+                <Select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Tümü</option>
                   <option value="pending">Bekliyor</option>
@@ -196,51 +192,42 @@ export default function AdminPaymentsPage() {
                   <option value="completed">Tamamlandı</option>
                   <option value="failed">Başarısız</option>
                   <option value="refunded">İade Edildi</option>
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sağlayıcı</label>
-                <select
+                <Select
                   value={filters.provider}
                   onChange={(e) => handleFilterChange('provider', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Tümü</option>
                   <option value="paytr">PayTR</option>
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Başlangıç Tarihi</label>
-                <input
-                  type="date"
+                <Input type="date"
                   value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bitiş Tarihi</label>
-                <input
-                  type="date"
+                <Input type="date"
                   value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)} />
               </div>
             </div>
           )}
 
           {showFilters && (
             <div className="mt-4 flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+              <Button variant="secondary" onClick={clearFilters}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800">
                 Filtreleri Temizle
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -323,7 +310,7 @@ export default function AdminPaymentsPage() {
                               {statusInfo.label}
                             </span>
                             {payment.failureReason && (
-                              <p className="text-xs text-red-600 mt-1">{payment.failureReason}</p>
+                              <p className="text-xs text-danger-600 mt-1">{payment.failureReason}</p>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -357,20 +344,16 @@ export default function AdminPaymentsPage() {
                     Toplam {pagination.total} ödeme, Sayfa {pagination.page} / {pagination.totalPages}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePageChange(pagination.page - 1)}
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50">
                       Önceki
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(pagination.page + 1)}
+                    </Button>
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50">
                       Sonraki
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

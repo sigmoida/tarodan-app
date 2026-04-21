@@ -18,6 +18,7 @@ import {
 import { CheckIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { Button, Input } from '@tarodan/ui';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function ResetPasswordPage() {
@@ -84,7 +85,7 @@ export default function ResetPasswordPage() {
   // Token Error State
   if (tokenError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
             <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
@@ -99,11 +100,11 @@ export default function ResetPasswordPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-red-500/10 p-8 md:p-10 border border-gray-100 text-center"
+            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-danger-500/10 p-8 md:p-10 border border-gray-100 text-center"
           >
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-rose-100 rounded-full flex items-center justify-center">
-                <XCircleIcon className="w-12 h-12 text-red-600" />
+              <div className="w-20 h-20 bg-gradient-to-br from-danger-100 to-danger-100 rounded-full flex items-center justify-center">
+                <XCircleIcon className="w-12 h-12 text-danger-600" />
               </div>
             </div>
 
@@ -132,7 +133,7 @@ export default function ResetPasswordPage() {
   // Success State
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
             <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
@@ -147,16 +148,16 @@ export default function ResetPasswordPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
+            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center"
           >
             <div className="flex justify-center mb-6">
               <motion.div 
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center"
+                className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center"
               >
-                <CheckCircleIcon className="w-12 h-12 text-green-600" />
+                <CheckCircleIcon className="w-12 h-12 text-success-600" />
               </motion.div>
             </div>
 
@@ -184,7 +185,7 @@ export default function ResetPasswordPage() {
 
   // Main Form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
@@ -217,7 +218,7 @@ export default function ResetPasswordPage() {
 
             {/* Icon */}
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-2xl flex items-center justify-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-2xl flex items-center justify-center">
                 <ShieldCheckIcon className="w-10 h-10 text-primary-600" />
               </div>
             </div>
@@ -243,7 +244,7 @@ export default function ResetPasswordPage() {
                 </label>
                 <div className="relative">
                   <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
+                  <Input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => {
@@ -251,16 +252,14 @@ export default function ResetPasswordPage() {
                       setError('');
                     }}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-12 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900"
+                    className="pl-12 pr-12 h-14 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium"
                     required
                   />
-                  <button
-                    type="button"
+                  <Button variant="secondary" type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  >
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
                     {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -284,7 +283,7 @@ export default function ResetPasswordPage() {
                 </label>
                 <div className="relative">
                   <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
+                  <Input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => {
@@ -292,27 +291,25 @@ export default function ResetPasswordPage() {
                       setError('');
                     }}
                     placeholder="••••••••"
-                    className={`w-full pl-12 pr-12 py-4 border-2 rounded-xl focus:ring-0 transition-all duration-200 ease-premium text-gray-900 ${
-                      confirmPassword && !passwordsMatch ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-primary-500'
+                    className={`pl-12 pr-12 h-14 border-2 rounded-xl focus:ring-0 transition-all duration-200 ease-premium ${
+                      confirmPassword && !passwordsMatch ? 'border-danger-300 bg-danger-50' : 'border-gray-200 focus:border-primary-500'
                     }`}
                     required
                   />
-                  <button
-                    type="button"
+                  <Button variant="secondary" type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  >
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
                     {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </button>
+                  </Button>
                 </div>
                 {confirmPassword && !passwordsMatch && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <p className="mt-2 text-sm text-danger-600 flex items-center gap-1">
                     <ExclamationCircleIcon className="w-4 h-4" />
                     {locale === 'tr' ? 'Şifreler eşleşmiyor' : 'Passwords do not match'}
                   </p>
                 )}
                 {passwordsMatch && (
-                  <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
+                  <p className="mt-2 text-sm text-success-600 flex items-center gap-1">
                     <CheckCircleIcon className="w-4 h-4" />
                     {locale === 'tr' ? 'Şifreler eşleşiyor' : 'Passwords match'}
                   </p>
@@ -324,9 +321,9 @@ export default function ResetPasswordPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-red-50 border border-red-200 rounded-xl p-4"
+                  className="bg-danger-50 border border-danger-200 rounded-xl p-4"
                 >
-                  <p className="text-sm text-red-600 flex items-center gap-2">
+                  <p className="text-sm text-danger-600 flex items-center gap-2">
                     <ExclamationCircleIcon className="w-5 h-5" />
                     {error}
                   </p>
@@ -334,11 +331,9 @@ export default function ResetPasswordPage() {
               )}
 
               {/* Submit Button */}
-              <button
-                type="submit"
+              <Button variant="secondary" type="submit"
                 disabled={isLoading || !isPasswordValid || !passwordsMatch}
-                className="w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
-              >
+                className="w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40">
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -350,7 +345,7 @@ export default function ResetPasswordPage() {
                 ) : (
                   locale === 'tr' ? 'Şifremi Değiştir' : 'Change Password'
                 )}
-              </button>
+              </Button>
             </form>
           </div>
         </motion.div>
@@ -369,8 +364,8 @@ export default function ResetPasswordPage() {
 // Password Requirement Component
 function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-400'}`}>
-      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-green-100' : 'bg-gray-100'}`}>
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-success-600' : 'text-gray-400'}`}>
+      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-success-100' : 'bg-gray-100'}`}>
         {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
       </div>
       <span>{text}</span>

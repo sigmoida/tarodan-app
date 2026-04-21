@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner } from '@tarodan/ui';
 
 interface PaymentStatistics {
   period: string;
@@ -114,43 +114,34 @@ export default function AdminPaymentStatisticsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Periyot</label>
-              <select
+              <Select
                 value={filters.period}
                 onChange={(e) => setFilters({ ...filters, period: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="daily">Günlük</option>
                 <option value="weekly">Haftalık</option>
                 <option value="monthly">Aylık</option>
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Başlangıç Tarihi</label>
-              <input
-                type="date"
+              <Input type="date"
                 value={filters.startDate}
-                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bitiş Tarihi</label>
-              <input
-                type="date"
+              <Input type="date"
                 value={filters.endDate}
-                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} />
             </div>
             <div className="flex items-end">
-              <button
-                onClick={() => {
+              <Button variant="secondary" onClick={() => {
                   setFilters({ period: 'monthly', startDate: '', endDate: '' });
                 }}
-                className="w-full px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+                className="w-full px-4 py-2 text-gray-600 hover:text-gray-800">
                 Sıfırla
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -165,7 +156,7 @@ export default function AdminPaymentStatisticsPage() {
                   ₺{statistics.summary.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <CurrencyDollarIcon className="w-12 h-12 text-green-500" />
+              <CurrencyDollarIcon className="w-12 h-12 text-success-500" />
             </div>
           </div>
 
@@ -175,7 +166,7 @@ export default function AdminPaymentStatisticsPage() {
                 <p className="text-sm text-gray-600 mb-1">Toplam Ödeme</p>
                 <p className="text-2xl font-bold text-gray-900">{statistics.summary.totalPayments}</p>
               </div>
-              <CreditCardIcon className="w-12 h-12 text-blue-500" />
+              <CreditCardIcon className="w-12 h-12 text-info-500" />
             </div>
           </div>
 
@@ -185,7 +176,7 @@ export default function AdminPaymentStatisticsPage() {
                 <p className="text-sm text-gray-600 mb-1">Başarı Oranı</p>
                 <p className="text-2xl font-bold text-gray-900">{statistics.summary.successRate.toFixed(1)}%</p>
               </div>
-              <CheckCircleIcon className="w-12 h-12 text-green-500" />
+              <CheckCircleIcon className="w-12 h-12 text-success-500" />
             </div>
           </div>
 
@@ -197,7 +188,7 @@ export default function AdminPaymentStatisticsPage() {
                   ₺{statistics.summary.averageAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <ChartBarIcon className="w-12 h-12 text-purple-500" />
+              <ChartBarIcon className="w-12 h-12 text-primary-500" />
             </div>
           </div>
         </div>
@@ -257,21 +248,21 @@ export default function AdminPaymentStatisticsPage() {
         <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Detaylı Özet</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-green-50 rounded-lg">
+            <div className="p-4 bg-success-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Tamamlanan</p>
-              <p className="text-2xl font-bold text-green-600">{statistics.summary.completedPayments}</p>
+              <p className="text-2xl font-bold text-success-600">{statistics.summary.completedPayments}</p>
             </div>
-            <div className="p-4 bg-red-50 rounded-lg">
+            <div className="p-4 bg-danger-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Başarısız</p>
-              <p className="text-2xl font-bold text-red-600">{statistics.summary.failedPayments}</p>
+              <p className="text-2xl font-bold text-danger-600">{statistics.summary.failedPayments}</p>
             </div>
-            <div className="p-4 bg-yellow-50 rounded-lg">
+            <div className="p-4 bg-warning-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Bekleyen</p>
-              <p className="text-2xl font-bold text-yellow-600">{statistics.summary.pendingPayments}</p>
+              <p className="text-2xl font-bold text-warning-600">{statistics.summary.pendingPayments}</p>
             </div>
-            <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="p-4 bg-info-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Toplam</p>
-              <p className="text-2xl font-bold text-blue-600">{statistics.summary.totalPayments}</p>
+              <p className="text-2xl font-bold text-info-600">{statistics.summary.totalPayments}</p>
             </div>
           </div>
         </div>

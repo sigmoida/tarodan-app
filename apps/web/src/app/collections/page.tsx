@@ -17,7 +17,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
-import { Button } from '@tarodan/ui';
+import { Button, Checkbox, Input, Select, Textarea } from '@tarodan/ui';
 
 interface Collection {
   id: string;
@@ -197,7 +197,7 @@ export default function CollectionsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+                <div className="w-1 h-6 bg-primary-500 rounded-sm" />
                 {t('collection.collections')}
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">{t('footer.description')}</p>
@@ -231,22 +231,18 @@ export default function CollectionsPage() {
         {/* Tabs */}
         {mounted && isAuthenticated && (
           <div className="flex gap-1 mb-5 bg-gray-100 rounded p-0.5 w-fit">
-            <button
-              onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
+            <Button variant="secondary" onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
                 activeTab === 'public' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
+              }`}>
               {t('collection.isPublic')}
-            </button>
-            <button
-              onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
+            </Button>
+            <Button variant="secondary" onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
                 activeTab === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
+              }`}>
               {t('collection.myCollections')} ({myCollections.length})
-            </button>
+            </Button>
           </div>
         )}
 
@@ -254,43 +250,43 @@ export default function CollectionsPage() {
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
+            <Input type="text"
               placeholder={t('collection.searchCollections')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
-            />
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <Button variant="secondary" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <XMarkIcon className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2">
             {activeTab === 'public' && (
-              <select
+              <Select
                 value={categoryId}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400 min-w-[140px]"
+                className="w-auto min-w-[140px]"
+                selectSize="sm"
               >
                 <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
                 {flatCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
-              </select>
+              </Select>
             )}
-            <select
+            <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400"
+              className="w-auto"
+              selectSize="sm"
             >
               <option value="popular">{t('common.popular')}</option>
               <option value="recent">{t('common.newest')}</option>
               <option value="name">A-Z</option>
               <option value="items_desc">{t('common.desc')}</option>
               <option value="items_asc">{t('common.asc')}</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -353,7 +349,7 @@ export default function CollectionsPage() {
               >
                 <Link
                   href={`/collections/${collection.id}`}
-                  className="block bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full"
+                  className="block bg-white rounded border border-gray-200 overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full"
                 >
                   <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                     {collection.coverImageUrl ? (
@@ -366,13 +362,13 @@ export default function CollectionsPage() {
                         logContext={{ collectionId: collection.id, page: 'collections' }}
                       />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 text-4xl">
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-4xl">
                         🚗
                       </div>
                     )}
                     <div className="absolute top-1.5 right-1.5">
                       {collection.isPublic ? (
-                        <span className="px-1.5 py-0.5 bg-emerald-500/90 text-white text-[10px] font-medium rounded">
+                        <span className="px-1.5 py-0.5 bg-success-500/90 text-white text-[10px] font-medium rounded">
                           {t('collection.isPublic')}
                         </span>
                       ) : (
@@ -383,7 +379,7 @@ export default function CollectionsPage() {
                     </div>
                   </div>
                   <div className="p-2.5">
-                    <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
+                    <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">{collection.name}</h3>
                     {collection.description && (
                       <p className="text-gray-400 text-[10px] mt-0.5 line-clamp-1">{collection.description}</p>
                     )}
@@ -431,8 +427,8 @@ export default function CollectionsPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded max-w-md w-full p-6 text-center"
           >
-            <div className="w-14 h-14 bg-orange-50 rounded flex items-center justify-center mx-auto mb-4">
-              <FolderPlusIcon className="w-7 h-7 text-orange-500" />
+            <div className="w-14 h-14 bg-primary-50 rounded flex items-center justify-center mx-auto mb-4">
+              <FolderPlusIcon className="w-7 h-7 text-primary-500" />
             </div>
             <h2 className="text-lg font-bold text-gray-900 mb-2">Üyelik Yükseltme Gerekli</h2>
             <p className="text-gray-500 text-sm mb-5">
@@ -442,7 +438,7 @@ export default function CollectionsPage() {
               <Button variant="outline" size="md" className="flex-1" onClick={() => setShowPremiumModal(false)}>
                 Vazgeç
               </Button>
-              <Link href="/membership" className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded font-medium hover:bg-orange-600 transition-colors text-center text-sm">
+              <Link href="/membership" className="flex-1 px-4 py-2.5 bg-primary-500 text-white rounded font-medium hover:bg-primary-600 transition-colors text-center text-sm">
                 Üyeliği Yükselt
               </Link>
             </div>
@@ -500,47 +496,41 @@ function CreateCollectionModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">İsim</label>
-            <input
-              type="text"
+            <Input type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400"
               placeholder="Hot Wheels Koleksiyonum"
-              required
-            />
+              required />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Açıklama</label>
-            <textarea
-              value={description}
+            <Textarea value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400"
               placeholder="Koleksiyon hakkında..."
-              rows={3}
-            />
+              rows={3} />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Kategori</label>
-            <select
+            <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-orange-400"
+              selectSize="sm"
             >
               <option value="">Kategori seçin (isteğe bağlı)</option>
               {flatCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="isPublic"
               checked={isPublic}
               onChange={(e) => setIsPublic(e.target.checked)}
-              className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+              label="Herkese açık koleksiyon"
             />
-            <label htmlFor="isPublic" className="text-sm text-gray-700">Herkese açık koleksiyon</label>
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" size="md" className="flex-1" onClick={onClose}>

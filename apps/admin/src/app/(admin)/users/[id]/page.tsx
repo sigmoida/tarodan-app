@@ -20,7 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { StatusBadge, Button } from '@tarodan/ui';
+import { Button, StatusBadge, Textarea } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { Spinner } from '@tarodan/ui';
@@ -266,8 +266,8 @@ export default function UserDetailPage() {
               <p className="text-gray-500">{user.email}</p>
               {user.averageRating && (
                 <div className="flex items-center gap-1 mt-1">
-                  <StarIcon className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-yellow-500 font-medium">{user.averageRating}</span>
+                  <StarIcon className="w-4 h-4 text-warning-500 fill-warning-500" />
+                  <span className="text-warning-500 font-medium">{user.averageRating}</span>
                   <span className="text-gray-500 text-sm">({user.stats?.receivedRatingsCount || 0} değerlendirme)</span>
                 </div>
               )}
@@ -276,7 +276,7 @@ export default function UserDetailPage() {
           <div className="flex items-center gap-3">
             {user.isBanned ? (
               <>
-                <span className="px-4 py-2 rounded-full font-medium text-red-600 bg-red-500/20">
+                <span className="px-4 py-2 rounded-full font-medium text-danger-600 bg-danger-500/20">
                   Banlı
                 </span>
                 <Button variant="success" size="md" onClick={() => setShowUnbanModal(true)}>
@@ -285,7 +285,7 @@ export default function UserDetailPage() {
               </>
             ) : (
               <>
-                <span className="px-4 py-2 rounded-full font-medium text-green-700 bg-green-500/20">
+                <span className="px-4 py-2 rounded-full font-medium text-success-700 bg-success-500/20">
                   Aktif
                 </span>
                 <Button variant="danger" size="md" onClick={() => setShowBanModal(true)}>
@@ -300,7 +300,7 @@ export default function UserDetailPage() {
         {user.stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="admin-card p-4 text-center">
-              <ShoppingBagIcon className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+              <ShoppingBagIcon className="w-8 h-8 text-info-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.ordersCount}</p>
               <p className="text-xs text-gray-500">Toplam Sipariş</p>
               <p className="text-xs text-gray-500">
@@ -308,12 +308,12 @@ export default function UserDetailPage() {
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <CubeIcon className="w-8 h-8 text-green-500 mx-auto mb-2" />
+              <CubeIcon className="w-8 h-8 text-success-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.productsCount}</p>
               <p className="text-xs text-gray-500">Ürün</p>
             </div>
             <div className="admin-card p-4 text-center">
-              <ArrowPathIcon className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+              <ArrowPathIcon className="w-8 h-8 text-primary-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.tradesCount}</p>
               <p className="text-xs text-gray-500">Takas</p>
               <p className="text-xs text-gray-500">
@@ -321,7 +321,7 @@ export default function UserDetailPage() {
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <ChatBubbleLeftRightIcon className="w-8 h-8 text-orange-500 mx-auto mb-2" />
+              <ChatBubbleLeftRightIcon className="w-8 h-8 text-primary-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.messagesCount}</p>
               <p className="text-xs text-gray-500">Mesaj</p>
               <p className="text-xs text-gray-500">
@@ -329,12 +329,12 @@ export default function UserDetailPage() {
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <StarIcon className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+              <StarIcon className="w-8 h-8 text-warning-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.receivedRatingsCount}</p>
               <p className="text-xs text-gray-500">Alınan Değerlendirme</p>
             </div>
             <div className="admin-card p-4 text-center">
-              <StarIcon className="w-8 h-8 text-cyan-500 mx-auto mb-2" />
+              <StarIcon className="w-8 h-8 text-info-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-gray-900">{user.stats.givenRatingsCount}</p>
               <p className="text-xs text-gray-500">Verilen Değerlendirme</p>
             </div>
@@ -355,7 +355,7 @@ export default function UserDetailPage() {
                   <p className="text-gray-500 text-sm">Email</p>
                   <p className="text-gray-900 font-medium">{user.email}</p>
                   {user.isEmailVerified ? (
-                    <span className="text-xs text-green-700 flex items-center gap-1">
+                    <span className="text-xs text-success-700 flex items-center gap-1">
                       <CheckCircleIcon className="w-3 h-3" /> Doğrulanmış
                     </span>
                   ) : (
@@ -367,7 +367,7 @@ export default function UserDetailPage() {
                   <p className="text-gray-900 font-medium">{user.phone || 'Belirtilmemiş'}</p>
                   {user.phone && (
                     user.isPhoneVerified ? (
-                      <span className="text-xs text-green-700 flex items-center gap-1">
+                      <span className="text-xs text-success-700 flex items-center gap-1">
                         <CheckCircleIcon className="w-3 h-3" /> Doğrulanmış
                       </span>
                     ) : (
@@ -395,7 +395,7 @@ export default function UserDetailPage() {
 
               {/* Seller Info */}
               {user.isSeller && (
-                <div className="mt-6 pt-6 border-t border-gray-300">
+                <div className="mt-6 pt-6 border-t">
                   <h3 className="text-md font-semibold text-gray-900 mb-3">Satıcı Bilgileri</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -420,12 +420,12 @@ export default function UserDetailPage() {
 
               {/* Ban Info */}
               {user.isBanned && (
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-red-600 font-medium">Ban Nedeni</p>
+                <div className="mt-6 pt-6 border-t">
+                  <div className="p-4 bg-danger-500/10 border border-danger-500/30 rounded-lg">
+                    <p className="text-danger-600 font-medium">Ban Nedeni</p>
                     <p className="text-gray-900 mt-1">{user.bannedReason || 'Belirtilmemiş'}</p>
                     {user.bannedAt && (
-                      <p className="text-red-600 text-sm mt-2">
+                      <p className="text-danger-600 text-sm mt-2">
                         Ban Tarihi: {new Date(user.bannedAt).toLocaleString('tr-TR')}
                       </p>
                     )}
@@ -465,7 +465,7 @@ export default function UserDetailPage() {
 
             {/* Tabs for Orders, Products, Trades, Ratings */}
             <div className="admin-card">
-              <div className="border-b border-gray-300">
+              <div className="border-b">
                 <div className="flex">
                   {[
                     { key: 'orders', label: 'Siparişler', count: user.recentOrders?.length || 0 },
@@ -473,17 +473,15 @@ export default function UserDetailPage() {
                     { key: 'trades', label: 'Takaslar', count: user.recentTrades?.length || 0 },
                     { key: 'ratings', label: 'Değerlendirmeler', count: (user.receivedRatings?.length || 0) },
                   ].map((tab) => (
-                    <button
-                      key={tab.key}
+                    <Button variant="secondary" key={tab.key}
                       onClick={() => setActiveTab(tab.key as any)}
                       className={`px-6 py-4 text-sm font-medium transition-colors ${
                         activeTab === tab.key
                           ? 'text-primary-600 border-b-2 border-primary-500'
                           : 'text-gray-500 hover:text-gray-900'
-                      }`}
-                    >
+                      }`}>
                       {tab.label} ({tab.count})
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -499,7 +497,7 @@ export default function UserDetailPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  order.role === 'buyer' ? 'bg-blue-500/20 text-blue-700' : 'bg-green-500/20 text-green-700'
+                                  order.role === 'buyer' ? 'bg-info-500/20 text-info-700' : 'bg-success-500/20 text-success-700'
                                 }`}>
                                   {order.role === 'buyer' ? 'Alıcı' : 'Satıcı'}
                                 </span>
@@ -589,7 +587,7 @@ export default function UserDetailPage() {
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  trade.role === 'initiator' ? 'bg-purple-500/20 text-purple-700' : 'bg-cyan-500/20 text-cyan-400'
+                                  trade.role === 'initiator' ? 'bg-primary-500/20 text-primary-700' : 'bg-info-500/20 text-info-400'
                                 }`}>
                                   {trade.role === 'initiator' ? 'Başlatan' : 'Alıcı'}
                                 </span>
@@ -637,7 +635,7 @@ export default function UserDetailPage() {
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <StarIcon
                                     key={star}
-                                    className={`w-4 h-4 ${star <= rating.score ? 'text-yellow-500 fill-yellow-500' : 'text-gray-600'}`}
+                                    className={`w-4 h-4 ${star <= rating.score ? 'text-warning-500 fill-warning-500' : 'text-gray-600'}`}
                                   />
                                 ))}
                                 <span className="text-gray-900 font-medium ml-2">{rating.score}/5</span>
@@ -665,7 +663,7 @@ export default function UserDetailPage() {
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <StarIcon
                                     key={star}
-                                    className={`w-4 h-4 ${star <= rating.score ? 'text-yellow-500 fill-yellow-500' : 'text-gray-600'}`}
+                                    className={`w-4 h-4 ${star <= rating.score ? 'text-warning-500 fill-warning-500' : 'text-gray-600'}`}
                                   />
                                 ))}
                                 <span className="text-gray-900 font-medium ml-2">{rating.score}/5</span>
@@ -725,7 +723,7 @@ export default function UserDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Email</span>
                   {user.isEmailVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
                     <XCircleIcon className="w-5 h-5 text-gray-500" />
                   )}
@@ -733,7 +731,7 @@ export default function UserDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Telefon</span>
                   {user.isPhoneVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
                     <XCircleIcon className="w-5 h-5 text-gray-500" />
                   )}
@@ -741,7 +739,7 @@ export default function UserDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Kimlik</span>
                   {user.isVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
                     <XCircleIcon className="w-5 h-5 text-gray-500" />
                   )}
@@ -749,7 +747,7 @@ export default function UserDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Satıcı</span>
                   {user.isSeller ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
                     <XCircleIcon className="w-5 h-5 text-gray-500" />
                   )}
@@ -789,19 +787,17 @@ export default function UserDetailPage() {
         {/* Ban Modal */}
         {showBanModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-300">
+            <div className="rounded-xl p-6 max-w-md mx-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcıyı Banla</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-600 mb-2">
                   Ban Nedeni *
                 </label>
-                <textarea
-                  value={banReason}
+                <Textarea value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="bg-gray-100 text-gray-900"
                   rows={4}
-                  placeholder="Ban nedenini açıklayın..."
-                />
+                  placeholder="Ban nedenini açıklayın..." />
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" size="md" onClick={() => { setShowBanModal(false); setBanReason(''); }} disabled={processing} className="flex-1">
@@ -818,7 +814,7 @@ export default function UserDetailPage() {
         {/* Unban Modal */}
         {showUnbanModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-300">
+            <div className="rounded-xl p-6 max-w-md mx-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Banı Kaldır</h3>
               <p className="text-gray-500 mb-6">
                 Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?

@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { Button, StatusBadge, tradeStatusConfig, Modal, Spinner, cn } from '@tarodan/ui';
+import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, tradeStatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
 // ---------- Types ----------
@@ -298,15 +298,15 @@ export default function TradeDetailPage() {
 
         {/* Admin Action Panel (prominent for review queue) */}
         {canApproveReject && (
-          <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-6 shadow-sm">
+          <div className="bg-warning-50 border-2 border-warning-400 rounded-xl p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <BuildingStorefrontIcon className="h-8 w-8 text-amber-600 flex-shrink-0" />
+                <BuildingStorefrontIcon className="h-8 w-8 text-warning-600 flex-shrink-0" />
                 <div>
-                  <h2 className="text-lg font-semibold text-amber-900">
+                  <h2 className="text-lg font-semibold text-warning-900">
                     Admin İncelemesi Gerekiyor
                   </h2>
-                  <p className="text-sm text-amber-800 mt-1">
+                  <p className="text-sm text-warning-800 mt-1">
                     Her iki ürün de Tarodan deposuna ulaştı. Lütfen ürünleri inceleyip takası
                     onaylayın veya reddedin.
                   </p>
@@ -477,12 +477,12 @@ export default function TradeDetailPage() {
 
         {/* Rejection / cancellation reason */}
         {(trade.rejectionReason || trade.cancellationReason) && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
+          <div className="bg-danger-50 border border-danger-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-danger-900 mb-2 flex items-center gap-2">
               <XCircleIcon className="w-5 h-5" />
               {trade.rejectionReason ? 'Red Sebebi' : 'İptal Sebebi'}
             </h2>
-            <p className="text-sm text-red-800 whitespace-pre-wrap">
+            <p className="text-sm text-danger-800 whitespace-pre-wrap">
               {trade.rejectionReason || trade.cancellationReason}
             </p>
           </div>
@@ -490,9 +490,9 @@ export default function TradeDetailPage() {
 
         {/* Admin notes */}
         {trade.adminNotes && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-blue-900 mb-2">Admin Notları</h2>
-            <p className="text-sm text-blue-800 whitespace-pre-wrap">{trade.adminNotes}</p>
+          <div className="bg-info-50 border border-info-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-info-900 mb-2">Admin Notları</h2>
+            <p className="text-sm text-info-800 whitespace-pre-wrap">{trade.adminNotes}</p>
           </div>
         )}
 
@@ -500,7 +500,7 @@ export default function TradeDetailPage() {
         {trade.dispute && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <ExclamationTriangleIcon className="w-5 h-5 text-orange-600" />
+              <ExclamationTriangleIcon className="w-5 h-5 text-primary-600" />
               İtiraz
             </h2>
             <div className="space-y-2">
@@ -513,8 +513,8 @@ export default function TradeDetailPage() {
                 </p>
               )}
               {trade.dispute.resolution && (
-                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
+                <div className="mt-3 p-3 bg-success-50 border border-success-200 rounded-lg">
+                  <p className="text-sm text-success-800">
                     <strong>Çözüm:</strong> {trade.dispute.resolution}
                   </p>
                 </div>
@@ -558,14 +558,11 @@ export default function TradeDetailPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Not (Opsiyonel)
             </label>
-            <textarea
-              value={approveNotes}
+            <Textarea value={approveNotes}
               onChange={(e) => setApproveNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               rows={3}
               placeholder="Onay notu..."
-              disabled={processingApprove}
-            />
+              disabled={processingApprove} />
           </div>
           <div className="flex gap-3">
             <Button
@@ -601,17 +598,16 @@ export default function TradeDetailPage() {
           </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Red Sebebi <span className="text-red-600">*</span>
+              Red Sebebi <span className="text-danger-600">*</span>
             </label>
-            <textarea
+            <Textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              className={cn(
-                'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
+              className={
                 rejectReason.length > 0 && rejectReason.trim().length < 10
-                  ? 'border-red-400'
-                  : 'border-gray-300',
-              )}
+                  ? 'border-danger-400 focus:border-danger-500 focus:ring-danger-200'
+                  : undefined
+              }
               rows={4}
               placeholder="Lütfen en az 10 karakter ile red sebebini belirtin..."
               disabled={processingReject}
@@ -651,30 +647,26 @@ export default function TradeDetailPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Çözüm</label>
-            <select
+            <Select
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               disabled={processingResolve}
             >
               <option value="complete_trade">Takası Tamamla</option>
               <option value="cancel">Takası İptal Et</option>
               <option value="favor_initiator">Teklif Veren Lehine</option>
               <option value="favor_receiver">Teklif Alan Lehine</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Not (Opsiyonel)
             </label>
-            <textarea
-              value={resolveNote}
+            <Textarea value={resolveNote}
               onChange={(e) => setResolveNote(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               rows={3}
               placeholder="Çözüm notu..."
-              disabled={processingResolve}
-            />
+              disabled={processingResolve} />
           </div>
           <div className="flex gap-3">
             <Button
@@ -728,7 +720,7 @@ function ShipmentLegCard({
         <span className="text-sm font-normal text-gray-500">({shipments.length})</span>
       </h2>
       {infoMessage && (
-        <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+        <p className="text-sm text-info-700 bg-info-50 border border-info-200 rounded p-3 mb-4">
           {infoMessage}
         </p>
       )}
@@ -741,7 +733,7 @@ function ShipmentLegCard({
               key={s.id}
               className={cn(
                 'p-4 rounded-lg border',
-                delivered ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200',
+                delivered ? 'bg-success-50 border-success-200' : 'bg-gray-50 border-gray-200',
               )}
             >
               <div className="flex items-start justify-between gap-4">
@@ -793,14 +785,14 @@ function ShipmentLegCard({
                     </p>
                   )}
                   {s.deliveredAt && (
-                    <p className="text-xs text-green-700">
+                    <p className="text-xs text-success-700">
                       Teslim: {new Date(s.deliveredAt).toLocaleString('tr-TR')}
                     </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-2 items-end">
                   {delivered ? (
-                    <span className="inline-flex items-center gap-1 text-green-700 text-sm font-medium">
+                    <span className="inline-flex items-center gap-1 text-success-700 text-sm font-medium">
                       <CheckCircleIcon className="w-5 h-5" />
                       Teslim Edildi
                     </span>

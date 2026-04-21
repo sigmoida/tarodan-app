@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
 import { UserMinusIcon, ArrowLeftIcon, UserIcon } from '@heroicons/react/24/outline';
-import { Spinner } from '@tarodan/ui';
+import { Button, Spinner } from '@tarodan/ui';
 
 interface FollowedUser {
   id: string;
@@ -137,13 +137,11 @@ export default function FollowingPage() {
                     </p>
                   </div>
                 </Link>
-                <button
-                  onClick={() => handleUnfollow(item.following.id)}
-                  className="px-4 py-2 border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors flex items-center gap-2"
-                >
+                <Button variant="secondary" onClick={() => handleUnfollow(item.following.id)}
+                  className="px-4 py-2 border border-danger-200 text-danger-600 rounded hover:bg-danger-50 transition-colors flex items-center gap-2">
                   <UserMinusIcon className="w-5 h-5" />
                   <span className="hidden sm:inline">Takibi Bırak</span>
-                </button>
+                </Button>
               </div>
             ))}
           </div>

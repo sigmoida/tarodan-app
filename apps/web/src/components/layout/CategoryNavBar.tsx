@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
+import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';import { Button } from '@tarodan/ui';
+
 
 interface Category {
     id: string;
@@ -185,7 +186,7 @@ export default function CategoryNavBar() {
                     onMouseLeave={handleMouseLeave}
                 >
                     <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
-                        <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                        <h3 className="text-primary-500 font-bold text-sm mb-4 uppercase tracking-wide">
                             {scalesMenu.title}
                         </h3>
                         <div className="flex flex-wrap gap-2.5">
@@ -193,7 +194,7 @@ export default function CategoryNavBar() {
                                 <Link
                                     key={scale}
                                     href={`/listings?scale=${encodeURIComponent(scale)}`}
-                                    className="px-4 py-2 bg-gray-50 border border-gray-200 hover:bg-orange-50 hover:border-orange-300 text-gray-700 hover:text-orange-600 text-sm font-medium transition-colors"
+                                    className="px-4 py-2 bg-gray-50 border border-gray-200 hover:bg-primary-50 hover:border-primary-300 text-gray-700 hover:text-primary-600 text-sm font-medium transition-colors"
                                     style={{ borderRadius: '4px' }}
                                 >
                                     {scale}
@@ -218,7 +219,7 @@ export default function CategoryNavBar() {
                     <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
                         <div className="grid grid-cols-2 gap-8">
                             <div>
-                                <h3 className="text-orange-500 font-bold text-sm mb-4 uppercase tracking-wide">
+                                <h3 className="text-primary-500 font-bold text-sm mb-4 uppercase tracking-wide">
                                     {locale === 'en' ? 'VEHICLE TYPES' : 'ARAÇ TÜRLERİ'}
                                 </h3>
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2">
@@ -226,7 +227,7 @@ export default function CategoryNavBar() {
                                         <Link
                                             key={type.slug}
                                             href={`/listings?category=${encodeURIComponent(type.slug)}`}
-                                            className="text-sm text-gray-600 hover:text-orange-600 transition-colors py-1"
+                                            className="text-sm text-gray-600 hover:text-primary-600 transition-colors py-1"
                                         >
                                             {type.label}
                                         </Link>
@@ -234,7 +235,7 @@ export default function CategoryNavBar() {
                                 </div>
                             </div>
                             <div>
-                                <h3 className="text-orange-500 font-bold text-sm mb-3 uppercase tracking-wide">
+                                <h3 className="text-primary-500 font-bold text-sm mb-3 uppercase tracking-wide">
                                     {manufacturersMenu.title}
                                 </h3>
                                 <div className="space-y-2.5">
@@ -246,7 +247,7 @@ export default function CategoryNavBar() {
                                                     <span key={item.id} className="inline-flex">
                                                         <Link
                                                             href={`/listings?manufacturer=${encodeURIComponent(item.name)}&manufacturerId=${encodeURIComponent(item.id)}`}
-                                                            className="text-xs text-gray-600 hover:text-orange-600 transition-colors"
+                                                            className="text-xs text-gray-600 hover:text-primary-600 transition-colors"
                                                         >
                                                             {item.name}
                                                         </Link>
@@ -258,7 +259,7 @@ export default function CategoryNavBar() {
                                     ))}
                                     <Link
                                         href="/listings"
-                                        className="text-xs text-orange-500 font-semibold hover:text-orange-600 transition-colors inline-block mt-1"
+                                        className="text-xs text-primary-500 font-semibold hover:text-primary-600 transition-colors inline-block mt-1"
                                     >
                                         {locale === 'en' ? 'All Manufacturers →' : 'Tüm Üreticiler →'}
                                     </Link>
@@ -274,7 +275,7 @@ export default function CategoryNavBar() {
 
     return (
         <>
-            <nav ref={navRef} className="bg-orange-500 border-b border-orange-600 relative z-40">
+            <nav ref={navRef} className="bg-primary-500 border-b border-primary-600 relative z-40">
                 <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
                     <div className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
                         {categoryItems.map((item) => (
@@ -292,12 +293,15 @@ export default function CategoryNavBar() {
                                         {item.label}
                                     </Link>
                                 ) : (
-                                    <button
-                                        className={`whitespace-nowrap px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded flex items-center gap-1 ${activeDropdown === item.dropdown ? 'text-white bg-white/10' : ''}`}
+                                    <Button
+                                        variant="nav"
+                                        size="sm"
+                                        aria-expanded={activeDropdown === item.dropdown}
+                                        className="whitespace-nowrap gap-1 rounded"
                                     >
                                         {item.label}
                                         <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         ))}

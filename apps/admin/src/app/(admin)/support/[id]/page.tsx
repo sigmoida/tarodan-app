@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Select, Spinner, Textarea } from '@tarodan/ui';
 
 interface SupportTicketDetail {
   id: string;
@@ -47,18 +47,18 @@ interface SupportTicketDetail {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  open: { label: 'Açık', color: 'text-blue-600', bg: 'bg-blue-100' },
-  in_progress: { label: 'İşlemde', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  waiting_customer: { label: 'Müşteri Bekleniyor', color: 'text-orange-600', bg: 'bg-orange-100' },
-  resolved: { label: 'Çözüldü', color: 'text-green-600', bg: 'bg-green-100' },
+  open: { label: 'Açık', color: 'text-info-600', bg: 'bg-info-100' },
+  in_progress: { label: 'İşlemde', color: 'text-warning-600', bg: 'bg-warning-100' },
+  waiting_customer: { label: 'Müşteri Bekleniyor', color: 'text-primary-600', bg: 'bg-primary-100' },
+  resolved: { label: 'Çözüldü', color: 'text-success-600', bg: 'bg-success-100' },
   closed: { label: 'Kapatıldı', color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
 const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
   low: { label: 'Düşük', color: 'text-gray-600', bg: 'bg-gray-100' },
-  medium: { label: 'Orta', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  high: { label: 'Yüksek', color: 'text-orange-600', bg: 'bg-orange-100' },
-  urgent: { label: 'Acil', color: 'text-red-600', bg: 'bg-red-100' },
+  medium: { label: 'Orta', color: 'text-warning-600', bg: 'bg-warning-100' },
+  high: { label: 'Yüksek', color: 'text-primary-600', bg: 'bg-primary-100' },
+  urgent: { label: 'Acil', color: 'text-danger-600', bg: 'bg-danger-100' },
 };
 
 export default function SupportTicketDetailPage() {
@@ -186,12 +186,10 @@ export default function SupportTicketDetailPage() {
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
                     Mesajlar
                   </h2>
-                  <button
-                    onClick={() => setShowReplyModal(true)}
-                    className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                  >
+                  <Button variant="secondary" onClick={() => setShowReplyModal(true)}
+                    className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
                     Yanıtla
-                  </button>
+                  </Button>
                 </div>
                 <div className="space-y-4">
                   {ticket.messages.map((message) => (
@@ -199,7 +197,7 @@ export default function SupportTicketDetailPage() {
                       key={message.id}
                       className={`p-4 rounded-lg ${
                         message.isInternal
-                          ? 'bg-yellow-50 border border-yellow-200'
+                          ? 'bg-warning-50 border border-warning-200'
                           : 'bg-gray-50'
                       }`}
                     >
@@ -207,7 +205,7 @@ export default function SupportTicketDetailPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{message.sender.displayName}</span>
                           {message.isInternal && (
-                            <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded">
+                            <span className="text-xs px-2 py-1 bg-warning-200 text-warning-800 rounded">
                               İç Not
                             </span>
                           )}
@@ -272,12 +270,10 @@ export default function SupportTicketDetailPage() {
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
                 <div className="space-y-2">
-                  <button
-                    onClick={() => setShowStatusModal(true)}
-                    className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                  >
+                  <Button variant="secondary" onClick={() => setShowStatusModal(true)}
+                    className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
                     Durum Güncelle
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -323,32 +319,25 @@ export default function SupportTicketDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mesaj *
                 </label>
-                <textarea
-                  value={replyMessage}
+                <Textarea value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   rows={6}
-                  placeholder="Yanıtınızı yazın..."
-                />
+                  placeholder="Yanıtınızı yazın..." />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
+                <Button variant="secondary" onClick={() => {
                     setShowReplyModal(false);
                     setReplyMessage('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleReply}
+                </Button>
+                <Button variant="secondary" onClick={handleReply}
                   className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Gönder'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -363,33 +352,28 @@ export default function SupportTicketDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Yeni Durum
                 </label>
-                <select
+                <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="open">Açık</option>
                   <option value="in_progress">İşlemde</option>
                   <option value="waiting_customer">Müşteri Bekleniyor</option>
                   <option value="resolved">Çözüldü</option>
                   <option value="closed">Kapatıldı</option>
-                </select>
+                </Select>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowStatusModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowStatusModal(false)}
+                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleStatusUpdate}
+                </Button>
+                <Button variant="secondary" onClick={handleStatusUpdate}
                   className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

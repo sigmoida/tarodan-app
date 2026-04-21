@@ -11,7 +11,7 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
@@ -305,53 +305,45 @@ export default function MembershipCheckoutPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Kart Numarası
                     </label>
-                    <input
-                      type="text"
+                    <Input type="text"
                       value={cardData.number}
                       onChange={(e) => setCardData({ ...cardData, number: formatCardNumber(e.target.value) })}
                       placeholder="0000 0000 0000 0000"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      maxLength={19}
-                    />
+                      className="px-4 py-3"
+                      maxLength={19} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Kart Üzerindeki İsim
                     </label>
-                    <input
-                      type="text"
+                    <Input type="text"
                       value={cardData.name}
                       onChange={(e) => setCardData({ ...cardData, name: e.target.value.toUpperCase() })}
                       placeholder="AD SOYAD"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
+                      className="px-4 py-3" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Son Kullanma Tarihi
                       </label>
-                      <input
-                        type="text"
+                      <Input type="text"
                         value={cardData.expiry}
                         onChange={(e) => setCardData({ ...cardData, expiry: formatExpiry(e.target.value) })}
                         placeholder="AA/YY"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        maxLength={5}
-                      />
+                        className="px-4 py-3"
+                        maxLength={5} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         CVV
                       </label>
-                      <input
-                        type="text"
+                      <Input type="text"
                         value={cardData.cvv}
                         onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                         placeholder="000"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        maxLength={4}
-                      />
+                        className="px-4 py-3"
+                        maxLength={4} />
                     </div>
                   </div>
                 </div>
@@ -360,11 +352,10 @@ export default function MembershipCheckoutPage() {
               {/* Terms */}
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={agreed}
                     onChange={(e) => setAgreed(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                    className="mt-0.5 h-5 w-5"
                   />
                   <span className="text-sm text-gray-600">
                     <Link href="/terms" className="text-primary-500 hover:underline">Kullanım koşullarını</Link> ve{' '}
@@ -375,11 +366,9 @@ export default function MembershipCheckoutPage() {
               </div>
 
               {/* Submit */}
-              <button
-                type="submit"
+              <Button variant="secondary" type="submit"
                 disabled={isProcessing}
-                className="w-full py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+                className="w-full py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isProcessing ? (
                   <>
                     <Spinner size="sm" color="border-white border-t-transparent" />
@@ -391,7 +380,7 @@ export default function MembershipCheckoutPage() {
                     {finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL Öde
                   </>
                 )}
-              </button>
+              </Button>
 
               {/* Security Note */}
               <p className="text-center text-sm text-gray-500 flex items-center justify-center gap-2">
@@ -416,7 +405,7 @@ export default function MembershipCheckoutPage() {
               <ul className="space-y-2 mb-6">
                 {tierInfo.features.map((feature, idx) => (
                   <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <CheckIcon className="w-4 h-4 text-success-500 flex-shrink-0" />
                     {feature}
                   </li>
                 ))}
@@ -429,7 +418,7 @@ export default function MembershipCheckoutPage() {
                       <span>Normal fiyat</span>
                       <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-sm text-success-600">
                       <span>İndirim (%{membershipPrices.yearly_discount_percentage ?? 20})</span>
                       <span>-{(basePrice * 12 - finalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>

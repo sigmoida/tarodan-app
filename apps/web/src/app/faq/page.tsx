@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input } from '@tarodan/ui';
+
 
 const FAQ_CATEGORIES = [
   {
@@ -235,13 +236,11 @@ export default function FAQPage() {
           {/* Search */}
           <div className="relative max-w-xl mx-auto">
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
+            <Input type="text"
               placeholder={t('faq.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-white focus:outline-none"
-            />
+              className="w-full pl-12 pr-4 py-3 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-white focus:outline-none" />
           </div>
         </div>
       </div>
@@ -255,18 +254,16 @@ export default function FAQPage() {
                 <h3 className="font-semibold text-gray-900 mb-4">{t('faq.categories')}</h3>
                 <nav className="space-y-1">
                   {FAQ_CATEGORIES_LOCALIZED.map((category) => (
-                    <button
-                      key={category.id}
+                    <Button variant="secondary" key={category.id}
                       onClick={() => setActiveCategory(category.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
                         activeCategory === category.id
                           ? 'bg-primary-50 text-primary-600'
                           : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
+                      }`}>
                       <span className="text-xl">{category.icon}</span>
                       <span className="font-medium">{category.title}</span>
-                    </button>
+                    </Button>
                   ))}
                 </nav>
               </div>
@@ -291,10 +288,8 @@ export default function FAQPage() {
                         key={questionId}
                         className="bg-white rounded-xl shadow-sm overflow-hidden"
                       >
-                        <button
-                          onClick={() => toggleQuestion(questionId)}
-                          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                        >
+                        <Button variant="secondary" onClick={() => toggleQuestion(questionId)}
+                          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors">
                           <span className="font-medium text-gray-900 pr-4">
                             {faq.question}
                           </span>
@@ -303,7 +298,7 @@ export default function FAQPage() {
                               isOpen ? 'rotate-180' : ''
                             }`}
                           />
-                        </button>
+                        </Button>
                         <AnimatePresence>
                           {isOpen && (
                             <motion.div

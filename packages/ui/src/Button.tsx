@@ -12,9 +12,10 @@ const buttonVariants = cva(
         secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-400',
         outline: 'border border-gray-300 bg-transparent hover:bg-gray-50 focus-visible:ring-gray-400',
         ghost: 'hover:bg-gray-100 hover:text-gray-900',
-        danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600',
-        success: 'bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-600',
+        danger: 'bg-danger-600 text-white hover:bg-danger-700 focus-visible:ring-danger-600',
+        success: 'bg-success-600 text-white hover:bg-success-700 focus-visible:ring-success-600',
         link: 'text-primary-600 underline-offset-4 hover:underline p-0 h-auto',
+        nav: 'bg-transparent text-white/90 hover:text-white hover:bg-white/10 focus-visible:ring-white/60 aria-expanded:bg-white/10 aria-expanded:text-white data-[state=open]:bg-white/10 data-[state=open]:text-white',
       },
       size: {
         sm: 'h-8 px-3 text-sm',
@@ -28,7 +29,7 @@ const buttonVariants = cva(
       variant: 'primary',
       size: 'md',
     },
-  }
+  },
 );
 
 export { buttonVariants };
@@ -38,14 +39,50 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   isLoading?: boolean;
   asChild?: boolean;
+  /** Icon rendered before children. */
+  leftIcon?: React.ReactNode;
+  /** Icon rendered after children. */
+  rightIcon?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, asChild = false, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button';
+  (
+    {
+      className,
+      variant,
+      size,
+      isLoading,
+      asChild = false,
+      children,
+      disabled,
+      leftIcon,
+      rightIcon,
+      ...props
+    },
+    ref,
+  ) => {
+    const computedClassName = cn(buttonVariants({ variant, size, className }));
+
+    // `asChild` uses Radix `<Slot>` which *requires* exactly one React element
+    // child (it merges props onto that child). Mixing in leftIcon / rightIcon /
+    // isLoading wrappers would hand Slot an array and blow up at runtime with
+    // "React.Children.only expected to receive a single React element child."
+    // Callers that need those slots should avoid `asChild`.
+    if (asChild) {
+      return (
+        <Slot
+          className={computedClassName}
+          ref={ref as React.Ref<HTMLElement>}
+          {...props}
+        >
+          {children}
+        </Slot>
+      );
+    }
+
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+      <button
+        className={computedClassName}
         ref={ref}
         disabled={disabled || isLoading}
         {...props}
@@ -72,10 +109,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         )}
+        {!isLoading && leftIcon && <span className="mr-2 inline-flex">{leftIcon}</span>}
         {children}
-      </Comp>
+        {rightIcon && <span className="ml-2 inline-flex">{rightIcon}</span>}
+      </button>
     );
-  }
+  },
 );
 
 Button.displayName = 'Button';

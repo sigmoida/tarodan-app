@@ -1,14 +1,19 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { motion } from 'framer-motion';
-import Image from 'next/image';
-import Link from 'next/link';
-import { TrashIcon, ShoppingCartIcon, LockClosedIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { useCartStore } from '@/stores/cartStore';
-import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  TrashIcon,
+  ShoppingCartIcon,
+  LockClosedIcon,
+} from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { useCartStore } from "@/stores/cartStore";
+import { useAuthStore } from "@/stores/authStore";
+import { useTranslation } from "@/i18n";
 
 export default function CartPage() {
   const {
@@ -33,9 +38,9 @@ export default function CartPage() {
   const handleRemove = async (productId: string) => {
     try {
       await removeFromCart(productId);
-      toast.success(t('product.removedFromCart'));
+      toast.success(t("product.removedFromCart"));
     } catch (error) {
-      toast.error(t('product.removeFromCartFailed'));
+      toast.error(t("product.removeFromCartFailed"));
     }
   };
 
@@ -69,23 +74,33 @@ export default function CartPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <ShoppingCartIcon className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('cart.empty')}</h2>
-          <p className="text-gray-600 mb-6">{t('cart.emptyDesc')}</p>
-          <Link href="/listings" className="btn-primary">
-            {t('cart.browseListings')}
-          </Link>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {t("cart.empty")}
+          </h2>
+          <p className="text-gray-600 mb-6">{t("cart.emptyDesc")}</p>
+          <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
         </div>
       </div>
     );
   }
 
-  const shippingCost = apiShippingCost != null ? Number(apiShippingCost) : (subtotal >= 500 ? 0 : 49.90);
-  const displayGrandTotal = grandTotal > 0 ? grandTotal : Math.max(0, subtotal - (totalDiscount ?? 0) + shippingCost);
+  const shippingCost =
+    apiShippingCost != null
+      ? Number(apiShippingCost)
+      : subtotal >= 500
+        ? 0
+        : 49.9;
+  const displayGrandTotal =
+    grandTotal > 0
+      ? grandTotal
+      : Math.max(0, subtotal - (totalDiscount ?? 0) + shippingCost);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('cart.myCart')}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          {t("cart.myCart")}
+        </h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
@@ -101,7 +116,9 @@ export default function CartPage() {
                 <Link href={`/listings/${item.productId}`}>
                   <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                     <Image
-                      src={item.productImage || 'https://via.placeholder.com/96'}
+                      src={
+                        item.productImage || "https://via.placeholder.com/96"
+                      }
                       alt={item.productTitle}
                       width={96}
                       height={96}
@@ -116,16 +133,25 @@ export default function CartPage() {
                     </h3>
                   </Link>
                   <p className="text-sm text-gray-500 mt-1">
-                    {t('product.seller')}: @{item.sellerName}
+                    {t("product.seller")}: @{item.sellerName}
                   </p>
                   <div className="mt-2">
-                    {item.originalPrice != null && item.originalPrice > (item.effectivePrice ?? 0) && (
-                      <p className="text-sm text-gray-400 line-through">
-                        {(item.originalPrice ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                      </p>
-                    )}
+                    {item.originalPrice != null &&
+                      item.originalPrice > (item.effectivePrice ?? 0) && (
+                        <p className="text-sm text-gray-400 line-through">
+                          {(item.originalPrice ?? 0).toLocaleString("tr-TR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          TL
+                        </p>
+                      )}
                     <p className="text-lg font-bold text-primary-500">
-                      {(item.effectivePrice ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                      {(item.effectivePrice ?? 0).toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      TL
                     </p>
                   </div>
                 </div>
@@ -138,107 +164,147 @@ export default function CartPage() {
               </motion.div>
             ))}
             {/* Offline cart items (guest) */}
-            {!isAuthenticated && offlineItems.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="card p-4 flex gap-4"
-              >
-                <Link href={`/listings/${item.productId}`}>
-                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                    <Image
-                      src={item.imageUrl || 'https://via.placeholder.com/96'}
-                      alt={item.title}
-                      width={96}
-                      height={96}
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
-                </Link>
-                <div className="flex-1">
-                  <Link href={`/listings/${item.productId}`}>
-                    <h3 className="font-semibold text-gray-900 hover:text-primary-500 line-clamp-2">
-                      {item.title}
-                    </h3>
-                  </Link>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t('product.seller')}: @{item.seller.displayName}
-                  </p>
-                  <p className="text-lg font-bold text-primary-500 mt-2">
-                    {item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    const filtered = offlineItems.filter(i => i.id !== item.id);
-                    useCartStore.setState({ offlineItems: filtered });
-                    fetchCart();
-                    toast.success(t('product.removedFromCart'));
-                  }}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors self-start"
+            {!isAuthenticated &&
+              offlineItems.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="card p-4 flex gap-4"
                 >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
-              </motion.div>
-            ))}
+                  <Link href={`/listings/${item.productId}`}>
+                    <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                      <Image
+                        src={item.imageUrl || "https://via.placeholder.com/96"}
+                        alt={item.title}
+                        width={96}
+                        height={96}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  </Link>
+                  <div className="flex-1">
+                    <Link href={`/listings/${item.productId}`}>
+                      <h3 className="font-semibold text-gray-900 hover:text-primary-500 line-clamp-2">
+                        {item.title}
+                      </h3>
+                    </Link>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {t("product.seller")}: @{item.seller.displayName}
+                    </p>
+                    <p className="text-lg font-bold text-primary-500 mt-2">
+                      {item.price.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      TL
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const filtered = offlineItems.filter(
+                        (i) => i.id !== item.id,
+                      );
+                      useCartStore.setState({ offlineItems: filtered });
+                      fetchCart();
+                      toast.success(t("product.removedFromCart"));
+                    }}
+                    className="p-2 text-gray-400 hover:text-red-500 transition-colors self-start"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </motion.div>
+              ))}
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
-              <h2 className="text-lg font-semibold mb-4">{t('checkout.orderSummary')}</h2>
+              <h2 className="text-lg font-semibold mb-4">
+                {t("checkout.orderSummary")}
+              </h2>
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('checkout.subtotal')}</span>
-                  <span className="font-medium">{(subtotal ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                  <span className="text-gray-600">
+                    {t("checkout.subtotal")}
+                  </span>
+                  <span className="font-medium">
+                    {(subtotal ?? 0).toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    TL
+                  </span>
                 </div>
                 {appliedDiscounts && appliedDiscounts.length > 0 && (
                   <>
                     {appliedDiscounts.map((d) => (
-                      <div key={d.discountId} className="flex justify-between text-green-600">
+                      <div
+                        key={d.discountId}
+                        className="flex justify-between text-green-600"
+                      >
                         <span>{d.discountName}</span>
-                        <span className="font-medium">-{(Number(d.appliedAmount)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                        <span className="font-medium">
+                          -
+                          {Number(d.appliedAmount).toLocaleString("tr-TR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          TL
+                        </span>
                       </div>
                     ))}
                     <div className="flex justify-between text-gray-600">
                       <span>Toplam indirim</span>
-                      <span className="font-medium">-{(Number(totalDiscount) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                      <span className="font-medium">
+                        -
+                        {(Number(totalDiscount) || 0).toLocaleString("tr-TR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        TL
+                      </span>
                     </div>
                   </>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('checkout.shipping')}</span>
-                  <span className="font-medium">₺{shippingCost.toFixed(2)}</span>
+                  <span className="text-gray-600">
+                    {t("checkout.shipping")}
+                  </span>
+                  <span className="font-medium">
+                    ₺{shippingCost.toFixed(2)}
+                  </span>
                 </div>
                 <hr className="my-4" />
                 <div className="flex justify-between text-lg">
-                  <span className="font-semibold">{t('checkout.total')}</span>
+                  <span className="font-semibold">{t("checkout.total")}</span>
                   <span className="font-bold text-primary-500">
                     ₺{(displayGrandTotal ?? 0).toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              <Link
-                href="/checkout"
-                className="btn-primary w-full mt-6 flex items-center justify-center gap-2"
-              >
-                {t('cart.proceedToCheckout')}
-              </Link>
+              <ButtonLink href="/checkout" className="w-full mt-6 flex gap-2">
+                {t("cart.proceedToCheckout")}
+              </ButtonLink>
               {!isAuthenticated && (
                 <div className="mt-3 space-y-2">
-                  <Link
-                    href={`/login?redirect=${encodeURIComponent('/cart')}`}
-                    className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+                  <ButtonLink
+                    variant="secondary"
+                    href={`/login?redirect=${encodeURIComponent("/cart")}`}
+                    className="w-full flex gap-2"
                   >
                     <LockClosedIcon className="w-4 h-4" />
-                    {locale === 'en' ? 'Login for faster checkout' : 'Hızlı ödeme için giriş yapın'}
-                  </Link>
+                    {locale === "en"
+                      ? "Login for faster checkout"
+                      : "Hızlı ödeme için giriş yapın"}
+                  </ButtonLink>
                   <p className="text-xs text-gray-500 text-center">
-                    {locale === 'en' ? 'Your cart will be saved after login.' : 'Sepetiniz giriş yaptıktan sonra korunacak.'}
+                    {locale === "en"
+                      ? "Your cart will be saved after login."
+                      : "Sepetiniz giriş yaptıktan sonra korunacak."}
                   </p>
                 </div>
               )}
@@ -247,7 +313,7 @@ export default function CartPage() {
                 href="/listings"
                 className="block text-center text-sm text-gray-500 hover:text-primary-500 mt-4"
               >
-                {t('cart.continueShopping')}
+                {t("cart.continueShopping")}
               </Link>
             </div>
           </div>

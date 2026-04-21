@@ -18,7 +18,8 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
-import { Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
+import { formatPhoneNumber } from '@/lib/phone';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -38,18 +39,8 @@ export default function RegisterPage() {
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 
-  const formatPhoneNumber = (value: string): string => {
-    const digits = value.replace(/\D/g, '');
-    const limited = digits.slice(0, 10);
-    if (limited.length <= 3) return limited;
-    if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
-    if (limited.length <= 8) return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
-    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
-  };
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhoneNumber(e.target.value);
-    setPhone(formatted);
+    setPhone(formatPhoneNumber(e.target.value));
   };
 
   const getMaxBirthDate = (): string => {
@@ -89,7 +80,7 @@ export default function RegisterPage() {
 
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
             <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
@@ -106,9 +97,9 @@ export default function RegisterPage() {
             transition={{ duration: 0.5 }}
             className="w-full max-w-lg"
           >
-            <div className="bg-white rounded-3xl shadow-2xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center relative overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-2xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center relative overflow-hidden">
               {/* Decorative background circles */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-50 rounded-full opacity-60" />
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-success-50 rounded-full opacity-60" />
               <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary-50 rounded-full opacity-60" />
               
               <div className="relative z-10">
@@ -117,7 +108,7 @@ export default function RegisterPage() {
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-                    className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30"
+                    className="w-24 h-24 bg-gradient-to-br from-success-400 to-success-500 rounded-full flex items-center justify-center shadow-lg shadow-success-500/30"
                   >
                     <EnvelopeIcon className="w-12 h-12 text-white" />
                   </motion.div>
@@ -187,10 +178,10 @@ export default function RegisterPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.9 }}
-                  className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3"
+                  className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-6 flex items-start gap-3"
                 >
-                  <span className="text-amber-500 text-lg flex-shrink-0 mt-0.5">💡</span>
-                  <p className="text-sm text-amber-800 text-left">
+                  <span className="text-warning-500 text-lg flex-shrink-0 mt-0.5">💡</span>
+                  <p className="text-sm text-warning-800 text-left">
                     {locale === 'en' 
                       ? "Can't find it? Check your spam/junk folder. Verification link expires in 24 hours." 
                       : "Bulamıyor musunuz? Spam/Gereksiz klasörünü kontrol edin. Doğrulama linki 24 saat geçerlidir."}
@@ -210,8 +201,7 @@ export default function RegisterPage() {
                     {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
                   </Link>
                   
-                  <button
-                    onClick={async () => {
+                  <Button variant="secondary" onClick={async () => {
                       try {
                         await api.post('/auth/resend-verification', { email: registeredEmail });
                         toast.success(locale === 'en' ? 'Verification email resent!' : 'Doğrulama e-postası tekrar gönderildi!');
@@ -219,10 +209,9 @@ export default function RegisterPage() {
                         toast.error(locale === 'en' ? 'Could not resend email' : 'E-posta gönderilemedi');
                       }
                     }}
-                    className="block w-full py-3 bg-white border-2 border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all"
-                  >
+                    className="block w-full py-3 bg-white border-2 border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all">
                     {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
-                  </button>
+                  </Button>
                   
                   <Link
                     href="/verify-email"
@@ -317,7 +306,7 @@ export default function RegisterPage() {
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium";
+  const inputClass = "pl-10 pr-4 bg-gray-50 focus:bg-white transition-all duration-200 ease-premium";
 
   return (
     <div className="min-h-screen flex">
@@ -393,11 +382,11 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {locale === 'en' ? 'Full Name' : 'Ad Soyad'} <span className="text-red-500">*</span>
+                {locale === 'en' ? 'Full Name' : 'Ad Soyad'} <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
                 <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                <input
+                <Input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -409,11 +398,11 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('auth.email')} <span className="text-red-500">*</span>
+                {t('auth.email')} <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
                 <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                <input
+                <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -429,27 +418,27 @@ export default function RegisterPage() {
                   {t('auth.phone')}
                 </label>
                 <div className="relative flex min-w-0">
-                  <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 text-gray-500 text-sm font-medium rounded-l-lg flex-shrink-0">
+                  <span className="inline-flex items-center bg-gray-100 border-r-0 text-gray-500 font-medium rounded-l-lg flex-shrink-0">
                     +90
                   </span>
-                  <input
+                  <Input
                     type="tel"
                     value={phone}
                     onChange={handlePhoneChange}
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
-                    className="flex-1 min-w-0 pl-3 pr-4 py-2.5 text-sm border border-gray-300 rounded-r-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
+                    className="flex-1 min-w-0 rounded-r-lg rounded-l-none bg-gray-50 focus:bg-white transition-all duration-200 ease-premium"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t('auth.birthDate')} <span className="text-red-500">*</span>
+                  {t('auth.birthDate')} <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                  <input
+                  <Input
                     type="date"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
@@ -463,24 +452,22 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('auth.password')} <span className="text-red-500">*</span>
+                {t('auth.password')} <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                <input
+                <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 outline-none transition-all duration-200 ease-premium"
+                  className="pl-10 pr-10 bg-gray-50 focus:bg-white transition-all duration-200 ease-premium"
                 />
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                >
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
                   {showPassword ? <EyeSlashIcon className="w-[18px] h-[18px]" /> : <EyeIcon className="w-[18px] h-[18px]" />}
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-400 mt-1">
                 {locale === 'en' ? 'Min 8 chars, uppercase, lowercase & number' : 'En az 8 karakter, büyük/küçük harf ve rakam'}
@@ -489,11 +476,11 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('auth.confirmPassword')} <span className="text-red-500">*</span>
+                {t('auth.confirmPassword')} <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400" />
-                <input
+                <Input
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -505,11 +492,10 @@ export default function RegisterPage() {
 
             <div className="space-y-3 pt-1">
               <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded-sm border-gray-300 text-primary-500 focus:ring-primary-500 transition-colors duration-200"
+                  className="mt-0.5 rounded-sm transition-colors duration-200"
                 />
                 <span className="text-sm text-gray-600 leading-snug">
                   {locale === 'en' ? (
@@ -530,26 +516,18 @@ export default function RegisterPage() {
                 </span>
               </label>
 
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acceptMarketing}
-                  onChange={(e) => setAcceptMarketing(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded-sm border-gray-300 text-primary-500 focus:ring-primary-500 transition-colors duration-200"
-                />
-                <span className="text-sm text-gray-600 leading-snug">
-                  {locale === 'en' 
-                    ? 'I want to receive promotional emails and special offers.'
-                    : 'Reklam ve kampanya e-postalarını almak istiyorum.'}
-                </span>
-              </label>
+              <Checkbox
+                checked={acceptMarketing}
+                onChange={(e) => setAcceptMarketing(e.target.checked)}
+                label={locale === 'en'
+                  ? 'I want to receive promotional emails and special offers.'
+                  : 'Reklam ve kampanya e-postalarını almak istiyorum.'}
+              />
             </div>
 
-            <button
-              type="submit"
+            <Button variant="secondary" type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2 mt-1"
-            >
+              className="w-full py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2 mt-1">
               {isLoading && (
                 <svg className="animate-spin h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
@@ -559,7 +537,7 @@ export default function RegisterPage() {
               {isLoading 
                 ? (locale === 'en' ? 'Signing up...' : 'Kayıt yapılıyor...') 
                 : t('common.register')}
-            </button>
+            </Button>
           </form>
 
           <p className="text-center mt-5 text-sm text-gray-500">
@@ -572,7 +550,7 @@ export default function RegisterPage() {
           <div className="mt-5 pt-5 border-t border-gray-200">
             <Link
               href="/register/business"
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-all duration-200 ease-premium"
+              className="items-center justify-center gap-2 py-2.5 text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200 ease-premium"
             >
               {locale === 'en' ? 'Open Business Account' : 'Şirket Hesabı Aç'}
             </Link>

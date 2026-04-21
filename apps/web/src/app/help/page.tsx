@@ -22,7 +22,7 @@ const HELP_CATEGORIES = [
     title: 'Başlangıç',
     description: 'TARODAN\'a yeni misiniz? Buradan başlayın.',
     icon: QuestionMarkCircleIcon,
-    color: 'bg-blue-500',
+    color: 'bg-info-500',
     links: [
       { href: '/guides', label: 'Kullanım Kılavuzu' },
       { href: '/faq', label: 'Sıkça Sorulan Sorular' },
@@ -33,7 +33,7 @@ const HELP_CATEGORIES = [
     title: 'Satın Alma',
     description: 'Ürün arama, sipariş verme ve ödeme işlemleri.',
     icon: ShoppingCartIcon,
-    color: 'bg-green-500',
+    color: 'bg-success-500',
     links: [
       { href: '/faq#buying', label: 'Nasıl Alışveriş Yapılır?' },
       { href: '/faq#shipping', label: 'Kargo Bilgileri' },
@@ -44,7 +44,7 @@ const HELP_CATEGORIES = [
     title: 'Satış Yapma',
     description: 'İlan verme ve satış süreçleri hakkında.',
     icon: CurrencyDollarIcon,
-    color: 'bg-yellow-500',
+    color: 'bg-warning-500',
     links: [
       { href: '/guides#selling', label: 'İlan Verme Rehberi' },
       { href: '/faq#selling', label: 'Komisyon Oranları' },
@@ -55,7 +55,7 @@ const HELP_CATEGORIES = [
     title: 'Takas',
     description: 'Model araba takas işlemleri.',
     icon: ArrowsRightLeftIcon,
-    color: 'bg-purple-500',
+    color: 'bg-primary-500',
     links: [
       { href: '/faq#trade', label: 'Takas Nasıl Çalışır?' },
       { href: '/guides#trade', label: 'Takas Rehberi' },
@@ -66,7 +66,7 @@ const HELP_CATEGORIES = [
     title: 'Kargo ve Teslimat',
     description: 'Gönderim ve teslimat süreçleri.',
     icon: TruckIcon,
-    color: 'bg-orange-500',
+    color: 'bg-primary-500',
     links: [
       { href: '/faq#shipping', label: 'Kargo Takibi' },
       { href: '/faq#shipping', label: 'Teslimat Süreleri' },
@@ -77,7 +77,7 @@ const HELP_CATEGORIES = [
     title: 'Güvenlik',
     description: 'Hesap güvenliği ve gizlilik.',
     icon: ShieldCheckIcon,
-    color: 'bg-red-500',
+    color: 'bg-danger-500',
     links: [
       { href: '/faq#account', label: 'Şifre İşlemleri' },
       { href: '/privacy', label: 'Gizlilik Politikası' },
@@ -88,7 +88,7 @@ const HELP_CATEGORIES = [
     title: 'Hesap',
     description: 'Profil ve hesap yönetimi.',
     icon: UserCircleIcon,
-    color: 'bg-indigo-500',
+    color: 'bg-info-500',
     links: [
       { href: '/profile/edit', label: 'Profil Düzenleme' },
       { href: '/profile/addresses', label: 'Adres Yönetimi' },
@@ -99,7 +99,7 @@ const HELP_CATEGORIES = [
     title: 'Ödeme',
     description: 'Ödeme ve iade işlemleri.',
     icon: CreditCardIcon,
-    color: 'bg-teal-500',
+    color: 'bg-success-500',
     links: [
       { href: '/faq#buying', label: 'Ödeme Yöntemleri' },
       { href: '/profile/payments', label: 'Ödeme Geçmişi' },

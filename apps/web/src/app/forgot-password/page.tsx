@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { Button, Input } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 
 export default function ForgotPasswordPage() {
@@ -54,7 +55,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-amber-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
@@ -88,7 +89,7 @@ export default function ForgotPasswordPage() {
 
               {/* Icon */}
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-amber-100 rounded-2xl flex items-center justify-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-2xl flex items-center justify-center">
                   <LockClosedIcon className="w-10 h-10 text-primary-600" />
                 </div>
               </div>
@@ -113,7 +114,7 @@ export default function ForgotPasswordPage() {
                   </label>
                   <div className="relative">
                     <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
+                    <Input
                       type="email"
                       value={email}
                       onChange={(e) => {
@@ -121,8 +122,8 @@ export default function ForgotPasswordPage() {
                         setError('');
                       }}
                       placeholder="ornek@email.com"
-                      className={`w-full pl-12 pr-4 py-4 border-2 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium text-gray-900 placeholder-gray-400 ${
-                        error ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                      className={`pl-12 pr-4 h-14 border-2 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium ${
+                        error ? 'border-danger-300 bg-danger-50' : 'border-gray-200'
                       }`}
                       autoFocus
                     />
@@ -131,7 +132,7 @@ export default function ForgotPasswordPage() {
                     <motion.p
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 text-sm text-red-600 flex items-center gap-1"
+                      className="mt-2 text-sm text-danger-600 flex items-center gap-1"
                     >
                       <ExclamationCircleIcon className="w-4 h-4" />
                       {error}
@@ -139,11 +140,9 @@ export default function ForgotPasswordPage() {
                   )}
                 </div>
 
-                <button
-                  type="submit"
+                <Button variant="secondary" type="submit"
                   disabled={isLoading}
-                  className="w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
-                >
+                  className="w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40">
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -155,7 +154,7 @@ export default function ForgotPasswordPage() {
                   ) : (
                     locale === 'tr' ? 'Sıfırlama Bağlantısı Gönder' : 'Send Reset Link'
                   )}
-                </button>
+                </Button>
               </form>
 
               {/* Help Text */}
@@ -171,11 +170,11 @@ export default function ForgotPasswordPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-3xl shadow-xl shadow-green-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-white rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center"
             >
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center">
-                  <CheckCircleIcon className="w-12 h-12 text-green-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center">
+                  <CheckCircleIcon className="w-12 h-12 text-success-600" />
                 </div>
               </div>
 
@@ -193,8 +192,8 @@ export default function ForgotPasswordPage() {
                 <strong className="text-gray-600">{email}</strong>
               </p>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <p className="text-sm text-amber-800">
+              <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-6">
+                <p className="text-sm text-warning-800">
                   💡 {locale === 'tr' 
                     ? 'E-postanızı bulamıyor musunuz? Spam/Gereksiz klasörünüzü kontrol edin.' 
                     : "Can't find the email? Check your spam/junk folder."}
@@ -209,15 +208,13 @@ export default function ForgotPasswordPage() {
                   {locale === 'tr' ? 'Giriş Sayfasına Dön' : 'Back to Login'}
                 </Link>
                 
-                <button
-                  onClick={() => {
+                <Button variant="secondary" onClick={() => {
                     setIsSubmitted(false);
                     setEmail('');
                   }}
-                  className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 ease-premium"
-                >
+                  className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 ease-premium">
                   {locale === 'tr' ? 'Farklı E-posta Dene' : 'Try Different Email'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           )}

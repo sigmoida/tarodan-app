@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useAuthStore } from '@/stores/authStore';
-import { ButtonLink } from '@/components/ui/ButtonLink';
+import { ButtonLink } from '@/components/ui/ButtonLink';import { Button } from '@tarodan/ui';
+
 
 const HERO_SLIDES = {
   tr: [
@@ -277,36 +278,30 @@ export default function HeroSlider() {
       </div>
 
       {/* Navigation Arrows */}
-      <button
-        onClick={prevSlide}
+      <Button variant="secondary" onClick={prevSlide}
         className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
         style={{borderRadius:'4px'}}
-        aria-label="Previous slide"
-      >
+        aria-label="Previous slide">
         <ChevronLeftIcon className="w-4 h-4 text-heading" />
-      </button>
-      <button
-        onClick={nextSlide}
+      </Button>
+      <Button variant="secondary" onClick={nextSlide}
         className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
         style={{borderRadius:'4px'}}
-        aria-label="Next slide"
-      >
+        aria-label="Next slide">
         <ChevronRightIcon className="w-4 h-4 text-heading" />
-      </button>
+      </Button>
 
       {/* Slide Indicators */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
         {slides.map((_, index) => (
-          <button
-            key={index}
+          <Button variant="secondary" key={index}
             onClick={() => setCurrentSlide(index)}
             className={`h-2 rounded-full transition-all duration-300 ease-premium ${
               index === currentSlide
                 ? 'bg-primary-500 w-8'
                 : 'bg-gray-300 w-2 hover:bg-gray-400'
             }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
+            aria-label={`Go to slide ${index + 1}`} />
         ))}
       </div>
     </section>

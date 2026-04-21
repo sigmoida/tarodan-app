@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { discountsApi, userApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { StatusBadge, type StatusConfig, Button, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Input, Select, Spinner, StatusBadge, Textarea, type StatusConfig } from '@tarodan/ui';
 
 interface Discount {
   id: string;
@@ -333,7 +333,7 @@ export default function ProfileDiscountsPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Spinner size="xl" color="border-orange-500 border-t-transparent" />
+        <Spinner size="xl" color="border-primary-500 border-t-transparent" />
       </div>
     );
   }
@@ -350,7 +350,7 @@ export default function ProfileDiscountsPage() {
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <ReceiptPercentIcon className="w-6 h-6 text-orange-500" />
+                  <ReceiptPercentIcon className="w-6 h-6 text-primary-500" />
                   İndirimlerim
                 </h1>
               </div>
@@ -377,19 +377,19 @@ export default function ProfileDiscountsPage() {
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500">Aktif</p>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-success-600">
               {discounts.filter(d => d.isActive && d.isCurrentlyValid).length}
             </p>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500">Toplam Kampanya</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-info-600">
               {discounts.length}
             </p>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500">Toplam Kullanım</p>
-            <p className="text-2xl font-bold text-purple-600">
+            <p className="text-2xl font-bold text-primary-600">
               {discounts.reduce((sum, d) => sum + d.usedCount, 0)}
             </p>
           </div>
@@ -398,23 +398,21 @@ export default function ProfileDiscountsPage() {
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {FILTER_TABS.map(tab => (
-            <button
-              key={tab.value}
+            <Button variant="secondary" key={tab.value}
               onClick={() => setActiveFilter(tab.value)}
               className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${activeFilter === tab.value
-                ? 'bg-orange-500 text-white'
+                ? 'bg-primary-500 text-white'
                 : 'bg-white text-gray-600 hover:bg-gray-100'
-                }`}
-            >
+                }`}>
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Discount List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Spinner size="xl" color="border-orange-500 border-t-transparent" />
+            <Spinner size="xl" color="border-primary-500 border-t-transparent" />
           </div>
         ) : discounts.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
@@ -457,7 +455,7 @@ export default function ProfileDiscountsPage() {
 
                     <div className="flex flex-wrap gap-3 text-sm">
                       {/* Value */}
-                      <span className="flex items-center gap-1 text-orange-600 font-semibold">
+                      <span className="flex items-center gap-1 text-primary-600 font-semibold">
                         {discount.type === 'percentage' ? (
                           <>
                             <ReceiptPercentIcon className="w-4 h-4" />
@@ -472,7 +470,7 @@ export default function ProfileDiscountsPage() {
                       </span>
 
                       {/* Scope */}
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs">
+                      <span className="px-2 py-0.5 bg-info-50 text-info-700 rounded-full text-xs">
                         {SCOPE_LABELS[discount.scope] || discount.scope}
                       </span>
 
@@ -501,30 +499,24 @@ export default function ProfileDiscountsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => toggleDiscountStatus(discount)}
+                    <Button variant="secondary" onClick={() => toggleDiscountStatus(discount)}
                       className={`p-2 rounded-lg transition-colors ${discount.isActive
                         ? 'text-gray-500 hover:bg-gray-100'
-                        : 'text-green-600 hover:bg-green-50'
+                        : 'text-success-600 hover:bg-success-50'
                         }`}
-                      title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}
-                    >
+                      title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}>
                       {discount.isActive ? <XMarkIcon className="w-5 h-5" /> : <CheckIcon className="w-5 h-5" />}
-                    </button>
-                    <button
-                      onClick={() => openEditModal(discount)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Düzenle"
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => openEditModal(discount)}
+                      className="p-2 text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+                      title="Düzenle">
                       <PencilIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(discount.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Sil"
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => setDeleteConfirm(discount.id)}
+                      className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                      title="Sil">
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -557,13 +549,12 @@ export default function ProfileDiscountsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     İndirim Adı *
                   </label>
-                  <input
+                  <Input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Örn: Yaz İndirimi"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
               </div>
@@ -572,13 +563,11 @@ export default function ProfileDiscountsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Açıklama
                 </label>
-                <textarea
-                  value={formData.description}
+                <Textarea value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="İndirim açıklaması..."
                   rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
+                  className="px-4" />
               </div>
 
               {/* Type & Value */}
@@ -587,20 +576,19 @@ export default function ProfileDiscountsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     İndirim Türü *
                   </label>
-                  <select
+                  <Select
                     value={formData.type}
                     onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   >
                     <option value="percentage">Yüzde (%)</option>
                     <option value="fixed_amount">Sabit Tutar (TL)</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Değer *
                   </label>
-                  <input
+                  <Input
                     type="number"
                     required
                     min="0"
@@ -608,7 +596,6 @@ export default function ProfileDiscountsPage() {
                     step={formData.type === 'percentage' ? 1 : 0.01}
                     value={formData.value}
                     onChange={(e) => setFormData(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
               </div>
@@ -620,8 +607,7 @@ export default function ProfileDiscountsPage() {
                     Ürün Seçin *
                   </label>
                   {products.length > 0 && (
-                    <button
-                      type="button"
+                    <Button variant="secondary" type="button"
                       onClick={() => {
                         if (formData.targetProductIds.length === products.length) {
                           setFormData(prev => ({ ...prev, targetProductIds: [] }));
@@ -629,10 +615,9 @@ export default function ProfileDiscountsPage() {
                           setFormData(prev => ({ ...prev, targetProductIds: products.map(p => p.id) }));
                         }
                       }}
-                      className="text-sm text-orange-600 hover:text-orange-700 font-medium"
-                    >
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                       {formData.targetProductIds.length === products.length ? 'Seçimi Kaldır' : 'Hepsini Seç'}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {products.length === 0 ? (
@@ -646,11 +631,9 @@ export default function ProfileDiscountsPage() {
                         key={product.id}
                         className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={formData.targetProductIds.includes(product.id)}
                           onChange={() => toggleProductSelection(product.id)}
-                          className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
@@ -673,28 +656,26 @@ export default function ProfileDiscountsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Min. Sepet Tutarı (TL)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min="0"
                     step="0.01"
                     value={formData.minCartValue}
                     onChange={(e) => setFormData(prev => ({ ...prev, minCartValue: e.target.value }))}
                     placeholder="Örn: 100"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Max. İndirim Tutarı (TL)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min="0"
                     step="0.01"
                     value={formData.maxDiscountAmount}
                     onChange={(e) => setFormData(prev => ({ ...prev, maxDiscountAmount: e.target.value }))}
                     placeholder="Örn: 500"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
               </div>
@@ -705,25 +686,23 @@ export default function ProfileDiscountsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Toplam Kullanım Limiti
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     value={formData.usageLimitTotal}
                     onChange={(e) => setFormData(prev => ({ ...prev, usageLimitTotal: e.target.value }))}
                     placeholder="Sınırsız"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Kullanıcı Başı Limit
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     value={formData.usageLimitPerUser}
                     onChange={(e) => setFormData(prev => ({ ...prev, usageLimitPerUser: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
               </div>
@@ -734,48 +713,38 @@ export default function ProfileDiscountsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Başlangıç Tarihi *
                   </label>
-                  <input
+                  <Input
                     type="date"
                     required
                     value={formData.startDate}
                     onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Bitiş Tarihi *
                   </label>
-                  <input
+                  <Input
                     type="date"
                     required
                     value={formData.endDate}
                     onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
               </div>
 
               {/* Options */}
               <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isStackable}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isStackable: e.target.checked }))}
-                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700">Kombine edilebilir</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
-                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700">Aktif</span>
-                </label>
+                <Checkbox
+                  checked={formData.isStackable}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isStackable: e.target.checked }))}
+                  label="Kombine edilebilir"
+                />
+                <Checkbox
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                  label="Aktif"
+                />
               </div>
 
               {/* Actions */}

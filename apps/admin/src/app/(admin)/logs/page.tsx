@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
+import { Button, Input } from '@tarodan/ui';
 import {
     ExclamationTriangleIcon,
     ShieldExclamationIcon,
@@ -70,20 +71,20 @@ const tabs = [
 ];
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-500/10 text-red-600 border-red-500/20',
-    high: 'bg-red-500/10 text-red-600 border-red-500/20',
-    error: 'bg-red-500/10 text-red-600 border-red-500/20',
-    medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
-    warning: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
-    low: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
+    critical: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
+    high: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
+    error: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
+    medium: 'bg-warning-500/10 text-warning-700 border-warning-500/20',
+    warning: 'bg-warning-500/10 text-warning-700 border-warning-500/20',
+    low: 'bg-info-500/10 text-info-700 border-info-500/20',
 };
 
 const statusColors: Record<string, string> = {
-    sent: 'bg-green-500/10 text-green-700',
-    delivered: 'bg-green-500/10 text-green-700',
-    queued: 'bg-yellow-500/10 text-yellow-700',
-    bounced: 'bg-red-500/10 text-red-600',
-    failed: 'bg-red-500/10 text-red-600',
+    sent: 'bg-success-500/10 text-success-700',
+    delivered: 'bg-success-500/10 text-success-700',
+    queued: 'bg-warning-500/10 text-warning-700',
+    bounced: 'bg-danger-500/10 text-danger-600',
+    failed: 'bg-danger-500/10 text-danger-600',
 };
 
 const eventTypeLabels: Record<string, string> = {
@@ -180,19 +181,17 @@ export default function LogsPage() {
                 {/* Tabs */}
                 <div className="flex space-x-1 mb-6 bg-white p-1 rounded-lg w-fit">
                     {tabs.map(tab => (
-                        <button
-                            key={tab.id}
+                        <Button variant="secondary" key={tab.id}
                             onClick={() => handleTabChange(tab.id)}
                             className={clsx(
                                 'flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors',
                                 activeTab === tab.id
                                     ? 'bg-primary-500 text-gray-900'
                                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-                            )}
-                        >
+                            )}>
                             <tab.icon className="h-4 w-4 mr-2" />
                             {tab.name}
-                        </button>
+                        </Button>
                     ))}
                 </div>
 
@@ -254,21 +253,17 @@ export default function LogsPage() {
                 <div className="flex items-center gap-4 mb-6">
                     <div className="relative flex-1 max-w-md">
                         <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
-                        <input
-                            type="text"
+                        <Input type="text"
                             placeholder="Ara..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && loadLogs()}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                        />
+                            className="pl-10 pr-4 border-gray-200 text-gray-900 placeholder-gray-500 focus:ring-1" />
                     </div>
-                    <button
-                        onClick={() => loadLogs()}
-                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900"
-                    >
+                    <Button variant="secondary" onClick={() => loadLogs()}
+                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
                         <ArrowPathIcon className={clsx('h-5 w-5', loading && 'animate-spin')} />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Content */}
@@ -348,11 +343,11 @@ export default function LogsPage() {
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             {log.resolved ? (
-                                                                <span className="flex items-center text-green-700 text-sm">
+                                                                <span className="flex items-center text-success-700 text-sm">
                                                                     <CheckCircleIcon className="h-4 w-4 mr-1" /> Çözüldü
                                                                 </span>
                                                             ) : (
-                                                                <span className="flex items-center text-yellow-700 text-sm">
+                                                                <span className="flex items-center text-warning-700 text-sm">
                                                                     <ClockIcon className="h-4 w-4 mr-1" /> Bekliyor
                                                                 </span>
                                                             )}
@@ -360,12 +355,10 @@ export default function LogsPage() {
                                                         <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                         <td className="px-4 py-3">
                                                             {!log.resolved && (
-                                                                <button
-                                                                    onClick={() => handleResolve(log.id)}
-                                                                    className="text-xs px-2 py-1 bg-green-500/10 text-green-700 rounded hover:bg-green-500/20"
-                                                                >
+                                                                <Button variant="secondary" onClick={() => handleResolve(log.id)}
+                                                                    className="text-xs px-2 py-1 bg-success-500/10 text-success-700 rounded hover:bg-success-500/20">
                                                                     Çöz
-                                                                </button>
+                                                                </Button>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -423,20 +416,16 @@ export default function LogsPage() {
                                     ({meta.total} kayıt)
                                 </p>
                                 <div className="flex space-x-2">
-                                    <button
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    <Button variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))}
                                         disabled={page === 1}
-                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
-                                    >
+                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50">
                                         Önceki
-                                    </button>
-                                    <button
-                                        onClick={() => setPage(p => p + 1)}
+                                    </Button>
+                                    <Button variant="secondary" onClick={() => setPage(p => p + 1)}
                                         disabled={page >= meta.totalPages}
-                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
-                                    >
+                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50">
                                         Sonraki
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )}
@@ -449,10 +438,10 @@ export default function LogsPage() {
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
     const colorClasses: Record<string, string> = {
-        red: 'bg-red-500/10 border-red-500/20 text-red-600',
-        yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700',
-        green: 'bg-green-500/10 border-green-500/20 text-green-700',
-        blue: 'bg-blue-500/10 border-blue-500/20 text-blue-700',
+        red: 'bg-danger-500/10 border-danger-500/20 text-danger-600',
+        yellow: 'bg-warning-500/10 border-warning-500/20 text-warning-700',
+        green: 'bg-success-500/10 border-success-500/20 text-success-700',
+        blue: 'bg-info-500/10 border-info-500/20 text-info-700',
         gray: 'bg-gray-100 border-gray-300 text-gray-500',
     };
 

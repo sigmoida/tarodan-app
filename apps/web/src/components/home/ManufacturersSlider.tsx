@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { manufacturersApi } from '@/lib/api';
+import { manufacturersApi } from '@/lib/api';import { Button } from '@tarodan/ui';
+
 
 interface ManufacturerItem {
     id: string;
@@ -85,14 +86,14 @@ export default function ManufacturersSlider() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-1 h-8 bg-orange-500 rounded"></div>
+                        <div className="w-1 h-8 bg-primary-500 rounded"></div>
                         <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                             {locale === 'en' ? 'Diecast Manufacturers' : 'Diecast Üreticileri'}
                         </h2>
                     </div>
                     <Link
                         href="/listings"
-                        className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1 text-sm"
+                        className="text-primary-500 font-semibold hover:text-primary-600 flex items-center gap-1 text-sm"
                     >
                         {locale === 'en' ? 'View All' : 'Tümünü gör'}
                         <ArrowRightIcon className="w-4 h-4" />
@@ -101,13 +102,11 @@ export default function ManufacturersSlider() {
 
                 <div className="relative">
                     {canScrollLeft && (
-                        <button
-                            onClick={() => scroll('left')}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-orange-50 transition-colors"
-                            aria-label="Scroll left"
-                        >
+                        <Button variant="secondary" onClick={() => scroll('left')}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
+                            aria-label="Scroll left">
                             <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
-                        </button>
+                        </Button>
                     )}
 
                     <div
@@ -125,9 +124,9 @@ export default function ManufacturersSlider() {
                             >
                                 <Link
                                     href={buildHref(manufacturer)}
-                                    className="flex-shrink-0 w-28 h-20 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-all group"
+                                    className="flex-shrink-0 w-28 h-20 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-all group"
                                 >
-                                    <span className="text-sm font-bold text-gray-700 group-hover:text-orange-600 text-center px-2">
+                                    <span className="text-sm font-bold text-gray-700 group-hover:text-primary-600 text-center px-2">
                                         {manufacturer.name}
                                     </span>
                                 </Link>
@@ -136,13 +135,11 @@ export default function ManufacturersSlider() {
                     </div>
 
                     {canScrollRight && (
-                        <button
-                            onClick={() => scroll('right')}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-orange-50 transition-colors"
-                            aria-label="Scroll right"
-                        >
+                        <Button variant="secondary" onClick={() => scroll('right')}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
+                            aria-label="Scroll right">
                             <ChevronRightIcon className="w-5 h-5 text-gray-600" />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

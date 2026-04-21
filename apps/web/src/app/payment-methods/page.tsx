@@ -7,7 +7,8 @@ import { CreditCardIcon, PlusIcon, TrashIcon, ArrowLeftIcon, CheckCircleIcon } f
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import api from '@/lib/api';
+import api from '@/lib/api';import { Button } from '@tarodan/ui';
+
 
 interface PaymentMethod {
   id: string;
@@ -175,20 +176,16 @@ export default function PaymentMethodsPage() {
                   
                   <div className="flex items-center gap-2">
                     {!method.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(method.id)}
-                        className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => handleSetDefault(method.id)}
+                        className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                         Varsayılan Yap
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      onClick={() => handleDelete(method.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Sil"
-                    >
+                    <Button variant="secondary" onClick={() => handleDelete(method.id)}
+                      className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                      title="Sil">
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

@@ -14,7 +14,7 @@ export default function MaintenancePage() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center px-4 text-white">
       <div className="text-center max-w-md">
-        <WrenchScrewdriverIcon className="w-20 h-20 mx-auto text-amber-400 mb-6" />
+        <WrenchScrewdriverIcon className="w-20 h-20 mx-auto text-warning-400 mb-6" />
         <h1 className="text-3xl font-bold mb-2">{t('utility.maintenance.title')}</h1>
         <p className="text-gray-400 mb-6">{t('utility.maintenance.description')}</p>
         <p className="text-sm text-gray-500 mb-8">
@@ -26,7 +26,7 @@ export default function MaintenancePage() {
             <a
               key={s.name}
               href={s.href}
-              className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm font-medium hover:bg-orange-500 transition-colors"
+              className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm font-medium hover:bg-primary-500 transition-colors"
               aria-label={s.name}
             >
               {s.icon}

@@ -71,55 +71,26 @@ select option {
 }
 
 /* ─── Design System ─── */
+/*
+ * Legacy .btn-primary / .btn-secondary / .btn-ghost helpers were removed in
+ * favour of <Button> / <ButtonLink> from @tarodan/ui. Use the `variant` prop
+ * (primary | secondary | ghost | danger) instead.
+ *
+ * The `.btn-trade` helper is kept because it represents a brand-specific
+ * success-coloured action that the shared Button variant system does not
+ * expose yet. Convert to a `trade` variant on @tarodan/ui Button when the
+ * team is ready.
+ */
 @layer components {
-  /* Buttons */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2
-           bg-primary-500 text-white px-6 py-2.5 font-semibold text-sm
-           border border-primary-600
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-primary:hover {
-    @apply bg-primary-600 shadow-soft;
-  }
-  .btn-primary:active {
-    @apply bg-primary-700;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2
-           bg-white text-heading px-6 py-2.5 font-semibold text-sm
-           border border-gray-300
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-secondary:hover {
-    @apply border-gray-400 bg-gray-50;
-  }
-  .btn-secondary:active {
-    @apply bg-gray-100;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2
-           bg-transparent text-muted px-6 py-2.5 font-medium text-sm
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-ghost:hover {
-    @apply bg-gray-100 text-heading;
-  }
-
   .btn-trade {
     @apply inline-flex items-center justify-center gap-2
-           bg-green-600 text-white px-6 py-2.5 font-semibold text-sm
-           border border-green-700
+           bg-success-600 text-white px-6 py-2.5 font-semibold text-sm
+           border border-success-700
            transition-all duration-200 ease-premium;
     border-radius: 4px;
   }
   .btn-trade:hover {
-    @apply bg-green-700;
+    @apply bg-success-700;
   }
 
   /* Cards */
@@ -153,7 +124,7 @@ select option {
   }
 
   .badge-trade {
-    @apply bg-green-50 text-green-700 border border-green-200;
+    @apply bg-success-50 text-success-700 border border-success-200;
   }
 
   .badge-status {
@@ -166,12 +137,12 @@ select option {
   }
 
   .badge-new {
-    @apply bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5;
+    @apply bg-success-600 text-white text-[10px] font-bold px-2 py-0.5;
     border-radius: 2px;
   }
 
   .badge-rare {
-    @apply bg-violet-600 text-white text-[10px] font-bold px-2 py-0.5;
+    @apply bg-primary-600 text-white text-[10px] font-bold px-2 py-0.5;
     border-radius: 2px;
   }
 

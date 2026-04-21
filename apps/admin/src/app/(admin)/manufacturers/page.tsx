@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import {
   PlusIcon,
   PencilIcon,
@@ -182,15 +182,15 @@ export default function ManufacturersPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <Spinner size="lg" color="border-orange-500 border-t-transparent" className="mx-auto" />
+              <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
               <p className="mt-2 text-gray-500">Yükleniyor...</p>
             </div>
           ) : manufacturers.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-500">Henüz üretici eklenmemiş</p>
-              <button onClick={openCreateModal} className="mt-4 text-orange-500 hover:text-orange-600 font-medium">
+              <Button variant="secondary" onClick={openCreateModal} className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
                 İlk üreticiyi ekle
-              </button>
+              </Button>
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200">
@@ -224,7 +224,7 @@ export default function ManufacturersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{m.country || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {m.website ? (
-                        <a href={m.website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                        <a href={m.website} target="_blank" rel="noopener noreferrer" className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1">
                           <GlobeAltIcon className="w-4 h-4" />
                           Ziyaret Et
                         </a>
@@ -233,21 +233,19 @@ export default function ManufacturersPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleStatus(m)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
-                      >
+                      <Button variant="secondary" onClick={() => toggleStatus(m)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
                         {m.isActive ? <><CheckCircleIcon className="w-4 h-4" />Aktif</> : <><XCircleIcon className="w-4 h-4" />Pasif</>}
-                      </button>
+                      </Button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
+                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
                           <PencilIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Sil">
+                        </Button>
+                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
                           <TrashIcon className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -268,24 +266,21 @@ export default function ManufacturersPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Üretici Adı *</label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       required
                       placeholder="Örn: Hot Wheels"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
-                    <input
-                      ref={fileInputRef}
+                    <Input ref={fileInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       onChange={handleLogoUpload}
-                      className="hidden"
-                    />
+                      className="hidden" />
                     <div className="flex items-center gap-3">
                       {(logoPreview || formData.logo) ? (
                         <img
@@ -298,65 +293,55 @@ export default function ManufacturersPage() {
                           <PhotoIcon className="w-6 h-6 text-gray-400" />
                         </div>
                       )}
-                      <button
-                        type="button"
+                      <Button variant="secondary" type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingLogo}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                      >
+                        className="hover:bg-gray-50 disabled:opacity-50">
                         {uploadingLogo ? 'Yükleniyor...' : (logoPreview || formData.logo) ? 'Değiştir' : 'Logo Yükle'}
-                      </button>
+                      </Button>
                       {formData.logo && (
-                        <button
-                          type="button"
+                        <Button variant="secondary" type="button"
                           onClick={() => { setFormData({ ...formData, logo: '' }); setLogoPreview(null); }}
-                          className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
-                        >
+                          className="px-3 py-1.5 text-sm text-danger-600 border border-danger-200 rounded-lg hover:bg-danger-50">
                           Kaldır
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                    <input
+                    <Input
                       type="url"
                       value={formData.website}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       placeholder="https://www.hotwheels.com"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ülke</label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       placeholder="Örn: ABD"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
-                    <textarea
-                      value={formData.description}
+                    <Textarea value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       rows={2}
-                      placeholder="Üretici hakkında kısa açıklama"
-                    />
+                      placeholder="Üretici hakkında kısa açıklama" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                    <select
+                    <Select
                       value={formData.isActive ? 'true' : 'false'}
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     >
                       <option value="true">Aktif</option>
                       <option value="false">Pasif</option>
-                    </select>
+                    </Select>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)}>

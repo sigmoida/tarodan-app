@@ -17,6 +17,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { Button } from '@tarodan/ui';
 
 export default function MembershipPage() {
   const router = useRouter();
@@ -345,22 +346,22 @@ export default function MembershipPage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 bg-amber-50 border-2 border-amber-300 rounded-xl p-6"
+            className="mb-8 bg-warning-50 border-2 border-warning-300 rounded-xl p-6"
           >
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-warning-100 rounded-full flex items-center justify-center">
                   <span className="text-2xl">💼</span>
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-amber-900 mb-2">
+                <h3 className="text-lg font-bold text-warning-900 mb-2">
                   Business Üyelik Gerekli
                 </h3>
-                <p className="text-amber-800 mb-4">
+                <p className="text-warning-800 mb-4">
                   Şirket hesabınız için business üyelik almanız gerekmektedir. Üyeliğinizi tamamlamadan başka sayfalara geçemezsiniz.
                 </p>
-                <div className="flex items-center gap-2 text-sm text-amber-700">
+                <div className="flex items-center gap-2 text-sm text-warning-700">
                   <span>⚠️</span>
                   <span>Lütfen aşağıdaki business üyelik planını seçin ve ödeme işlemini tamamlayın.</span>
                 </div>
@@ -376,15 +377,15 @@ export default function MembershipPage() {
           </p>
           
           {membershipDetails?.pendingPayment && membershipDetails?.pendingTierName && (
-            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto">
-              <p className="text-amber-800 font-medium mb-2">Ödeme bekleniyor – {membershipDetails.pendingTierName} planı için ödemeyi tamamlayın.</p>
-              <Link href={`/membership/checkout?tier=${membershipDetails.pendingTierType || 'premium'}&period=monthly`} className="text-sm font-medium text-amber-700 underline">Ödemeyi tamamla</Link>
+            <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-warning-800 font-medium mb-2">Ödeme bekleniyor – {membershipDetails.pendingTierName} planı için ödemeyi tamamlayın.</p>
+              <Link href={`/membership/checkout?tier=${membershipDetails.pendingTierType || 'premium'}&period=monthly`} className="text-sm font-medium text-warning-700 underline">Ödemeyi tamamla</Link>
             </div>
           )}
           
           {!membershipDetails?.pendingPayment && currentTier && currentTier !== 'free' && (
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
-              <p className="text-blue-800 font-medium">
+            <div className="mt-6 bg-info-50 border border-info-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-info-800 font-medium">
                 {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}
               </p>
             </div>
@@ -398,8 +399,8 @@ export default function MembershipPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <CalendarIcon className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-info-100 rounded-lg">
+                  <CalendarIcon className="w-6 h-6 text-info-600" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Üyelik Başlangıç Tarihi</p>
@@ -416,8 +417,8 @@ export default function MembershipPage() {
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <CalendarIcon className="w-6 h-6 text-green-600" />
+                <div className="p-3 bg-success-100 rounded-lg">
+                  <CalendarIcon className="w-6 h-6 text-success-600" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Yenilenme Tarihi</p>
@@ -477,9 +478,9 @@ export default function MembershipPage() {
                   ))}
                 </div>
               ) : (
-                <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg text-center">
-                  <p className="text-amber-800 font-medium mb-2">Henüz kayıtlı kartınız yok</p>
-                  <p className="text-sm text-amber-700 mb-4">
+                <div className="p-6 bg-warning-50 border border-warning-200 rounded-lg text-center">
+                  <p className="text-warning-800 font-medium mb-2">Henüz kayıtlı kartınız yok</p>
+                  <p className="text-sm text-warning-700 mb-4">
                     Üyeliğinizin otomatik yenilenmesi için bir kart eklemeniz gerekmektedir.
                   </p>
                   <Link
@@ -496,29 +497,25 @@ export default function MembershipPage() {
 
         <div className="flex justify-center mb-8">
           <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-            <button
-              onClick={() => setSelectedPeriod('monthly')}
+            <Button variant="secondary" onClick={() => setSelectedPeriod('monthly')}
               className={`px-6 py-2 rounded-md font-medium transition-colors ${
                 selectedPeriod === 'monthly'
                   ? 'bg-primary-500 text-white'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
+              }`}>
               {t('membership.monthly')}
-            </button>
-            <button
-              onClick={() => setSelectedPeriod('yearly')}
+            </Button>
+            <Button variant="secondary" onClick={() => setSelectedPeriod('yearly')}
               className={`px-6 py-2 rounded-md font-medium transition-colors ${
                 selectedPeriod === 'yearly'
                   ? 'bg-primary-500 text-white'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
+              }`}>
               {t('membership.yearly')}
-              <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+              <span className="ml-2 text-xs bg-success-100 text-success-700 px-2 py-0.5 rounded-full">
                 20% {t('membership.savePercent')}
               </span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -578,13 +575,13 @@ export default function MembershipPage() {
                   </div>
                 )}
                 {isSelected && (
-                  <div className="absolute top-0 right-0 bg-green-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
+                  <div className="absolute top-0 right-0 bg-success-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
                     <CheckIcon className="w-4 h-4" />
                     {t('common.selected')}
                   </div>
                 )}
                 {isCurrent && !isSelected && (
-                  <div className="absolute top-0 left-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold rounded-br-lg">
+                  <div className="absolute top-0 left-0 bg-info-500 text-white px-4 py-1 text-sm font-semibold rounded-br-lg">
                     {t('membership.currentPlan')}
                   </div>
                 )}
@@ -620,7 +617,7 @@ export default function MembershipPage() {
                           </span>
                         )}
                         {membershipPrices.yearly_discount_percentage && (
-                          <span className="text-xs text-green-500 ml-1">
+                          <span className="text-xs text-success-500 ml-1">
                             (%{membershipPrices.yearly_discount_percentage} indirim)
                           </span>
                         )}
@@ -632,7 +629,7 @@ export default function MembershipPage() {
                     {tier.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start">
                         {feature.included ? (
-                          <CheckIcon className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                          <CheckIcon className="w-5 h-5 text-success-500 mr-2 flex-shrink-0 mt-0.5" />
                         ) : (
                           <XMarkIcon className="w-5 h-5 text-gray-300 mr-2 flex-shrink-0 mt-0.5" />
                         )}
@@ -647,7 +644,7 @@ export default function MembershipPage() {
                     isSelected
                       ? 'bg-primary-500 text-white'
                       : isCurrent
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-info-100 text-info-700'
                       : tier.price === 0
                       ? 'bg-gray-100 text-gray-400'
                       : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200'
@@ -667,12 +664,10 @@ export default function MembershipPage() {
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-center mb-12"
           >
-            <button
-              onClick={handleContinue}
-              className="px-12 py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
-            >
+            <Button variant="secondary" onClick={handleContinue}
+              className="px-12 py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl">
               {t('common.continue')}
-            </button>
+            </Button>
           </motion.div>
         )}
 

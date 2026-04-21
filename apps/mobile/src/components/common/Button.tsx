@@ -1,23 +1,22 @@
 /**
- * Custom Button Component
+ * Mobile Button — thin wrapper around @tarodan/ui-native Button.
+ *
+ * Preserves the legacy API (`title`, `onPress`, `loading`, `size: 'small'|'medium'|'large'`,
+ * `icon: string`, `iconPosition`) so existing screens keep working while the brand colour
+ * and visual language come from the shared design tokens.
  */
-
 import React from 'react';
-import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
+import { Button as UIButton, type ButtonProps as UIButtonProps } from '@tarodan/ui-native';
+import type { ViewStyle, TextStyle } from 'react-native';
 
-interface ButtonProps {
+type LegacySize = 'small' | 'medium' | 'large';
+
+export interface MobileButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'small' | 'medium' | 'large';
+  variant?: UIButtonProps['variant'];
+  size?: LegacySize;
   icon?: string;
   iconPosition?: 'left' | 'right';
   loading?: boolean;
@@ -27,193 +26,49 @@ interface ButtonProps {
   textStyle?: TextStyle;
 }
 
-const Button: React.FC<ButtonProps> = ({
+const sizeMap: Record<LegacySize, UIButtonProps['size']> = {
+  small: 'sm',
+  medium: 'md',
+  large: 'lg',
+};
+
+const MobileButton: React.FC<MobileButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
   size = 'medium',
   icon,
   iconPosition = 'left',
-  loading = false,
-  disabled = false,
-  fullWidth = false,
+  loading,
+  disabled,
+  fullWidth,
   style,
   textStyle,
 }) => {
-  const getContainerStyle = () => {
-    const styles: ViewStyle[] = [baseStyles.container, baseStyles[`${size}Container`]];
-    
-    switch (variant) {
-      case 'primary':
-        styles.push(baseStyles.primaryContainer);
-        break;
-      case 'secondary':
-        styles.push(baseStyles.secondaryContainer);
-        break;
-      case 'outline':
-        styles.push(baseStyles.outlineContainer);
-        break;
-      case 'ghost':
-        styles.push(baseStyles.ghostContainer);
-        break;
-    }
-    
-    if (disabled || loading) {
-      styles.push(baseStyles.disabledContainer);
-    }
-    
-    if (fullWidth) {
-      styles.push(baseStyles.fullWidth);
-    }
-    
-    return styles;
-  };
-
-  const getTextStyle = () => {
-    const styles: TextStyle[] = [baseStyles.text, baseStyles[`${size}Text`]];
-    
-    switch (variant) {
-      case 'primary':
-        styles.push(baseStyles.primaryText);
-        break;
-      case 'secondary':
-        styles.push(baseStyles.secondaryText);
-        break;
-      case 'outline':
-        styles.push(baseStyles.outlineText);
-        break;
-      case 'ghost':
-        styles.push(baseStyles.ghostText);
-        break;
-    }
-    
-    return styles;
-  };
-
-  const getIconColor = () => {
-    switch (variant) {
-      case 'primary':
-      case 'secondary':
-        return '#FFF';
-      case 'outline':
-      case 'ghost':
-        return '#E53935';
-    }
-  };
-
   const iconSize = size === 'small' ? 16 : size === 'medium' ? 18 : 20;
+  const iconColor =
+    variant === 'primary' || variant === 'danger' || variant === 'success' || variant === 'secondary'
+      ? '#FFF'
+      : '#EA580C';
+  const iconNode = icon ? (
+    <Ionicons name={icon as never} size={iconSize} color={iconColor} />
+  ) : undefined;
 
   return (
-    <TouchableOpacity
-      style={[...getContainerStyle(), style]}
+    <UIButton
+      title={title}
       onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator 
-          color={variant === 'primary' || variant === 'secondary' ? '#FFF' : '#E53935'} 
-          size="small" 
-        />
-      ) : (
-        <>
-          {icon && iconPosition === 'left' && (
-            <Icon name={icon} size={iconSize} color={getIconColor()} style={baseStyles.iconLeft} />
-          )}
-          <Text style={[...getTextStyle(), textStyle]}>{title}</Text>
-          {icon && iconPosition === 'right' && (
-            <Icon name={icon} size={iconSize} color={getIconColor()} style={baseStyles.iconRight} />
-          )}
-        </>
-      )}
-    </TouchableOpacity>
+      variant={variant}
+      size={sizeMap[size]}
+      isLoading={loading}
+      disabled={disabled}
+      fullWidth={fullWidth}
+      leftIcon={iconPosition === 'left' ? iconNode : undefined}
+      rightIcon={iconPosition === 'right' ? iconNode : undefined}
+      style={style}
+      textStyle={textStyle}
+    />
   );
 };
 
-const baseStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  
-  // Sizes
-  smallContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  mediumContainer: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-  },
-  largeContainer: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-  },
-  
-  // Variants
-  primaryContainer: {
-    backgroundColor: '#E53935',
-    shadowColor: '#E53935',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  secondaryContainer: {
-    backgroundColor: '#424242',
-  },
-  outlineContainer: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#E53935',
-  },
-  ghostContainer: {
-    backgroundColor: 'transparent',
-  },
-  disabledContainer: {
-    opacity: 0.6,
-  },
-  
-  // Text
-  text: {
-    fontWeight: '600',
-  },
-  smallText: {
-    fontSize: 14,
-  },
-  mediumText: {
-    fontSize: 16,
-  },
-  largeText: {
-    fontSize: 18,
-  },
-  primaryText: {
-    color: '#FFF',
-  },
-  secondaryText: {
-    color: '#FFF',
-  },
-  outlineText: {
-    color: '#E53935',
-  },
-  ghostText: {
-    color: '#E53935',
-  },
-  
-  // Icons
-  iconLeft: {
-    marginRight: 8,
-  },
-  iconRight: {
-    marginLeft: 8,
-  },
-});
-
-export default Button;
-
-
+export default MobileButton;

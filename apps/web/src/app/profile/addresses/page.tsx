@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 
 interface Address {
   id: string;
@@ -200,7 +201,7 @@ export default function AddressesPage() {
           </div>
           {addresses.length >= 3 ? (
             <div className="text-right">
-              <p className="text-sm text-orange-600 font-medium mb-1">
+              <p className="text-sm text-primary-600 font-medium mb-1">
                 {locale === 'en' ? 'Address limit reached (3/3)' : 'Adres limiti doldu (3/3)'}
               </p>
               <p className="text-xs text-gray-500">
@@ -210,35 +211,33 @@ export default function AddressesPage() {
               </p>
             </div>
           ) : (
-            <button
-              onClick={() => {
+            <Button variant="secondary" onClick={() => {
                 resetForm();
                 setEditingId(null);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
-            >
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600">
               <PlusIcon className="w-5 h-5" />
               {t('address.newAddress')}
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-sm">
                 {addresses.length}/3
               </span>
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Address Limit Warning */}
         {addresses.length >= 3 && !showForm && (
-          <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-6">
+          <div className="bg-primary-50 border border-primary-200 rounded p-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
-                <p className="font-medium text-orange-800">
+                <p className="font-medium text-primary-800">
                   {locale === 'en' 
                     ? 'You have reached the maximum address limit' 
                     : 'Maksimum adres limitine ulaştınız'}
                 </p>
-                <p className="text-sm text-orange-700">
+                <p className="text-sm text-primary-700">
                   {locale === 'en' 
                     ? 'You can save up to 3 addresses. To add a new address, please delete one of your existing addresses first.'
                     : '3 adet adres kaydedebilirsiniz. Yeni bir adres eklemek için mevcut adreslerinizden birini silmeniz gerekmektedir.'}
@@ -262,11 +261,11 @@ export default function AddressesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t('address.addressTitle')}
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="rounded"
                   placeholder={locale === 'en' ? 'Home, Work, etc.' : 'Ev, İş, vb.'}
                 />
               </div>
@@ -274,26 +273,26 @@ export default function AddressesPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('checkout.fullName')} <span className="text-red-500">*</span>
+                    {t('checkout.fullName')} <span className="text-danger-500">*</span>
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded"
+                    className="rounded"
                     required
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('checkout.phone')} <span className="text-red-500">*</span>
+                    {t('checkout.phone')} <span className="text-danger-500">*</span>
                   </label>
                   <div className="flex">
-                    <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-500 text-sm font-medium">
+                    <span className="inline-flex items-center bg-gray-100 border-r-0 rounded-l text-gray-500 font-medium">
                       +90
                     </span>
-                    <input
+                    <Input
                       type="tel"
                       value={formData.phone.replace('+90', '').replace(/\s/g, '').slice(0, 10).replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4').trim()}
                       onChange={(e) => {
@@ -303,7 +302,7 @@ export default function AddressesPage() {
                       }}
                       placeholder="5XX XXX XX XX"
                       maxLength={14}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-r"
+                      className="rounded-r rounded-l-none"
                       required
                     />
                   </div>
@@ -315,7 +314,7 @@ export default function AddressesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('address.cityDistrict')} <span className="text-red-500">*</span>
+                  {t('address.cityDistrict')} <span className="text-danger-500">*</span>
                 </label>
                 <CityDistrictSelector
                   city={formData.city}
@@ -329,63 +328,53 @@ export default function AddressesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('common.address')} <span className="text-red-500">*</span>
+                  {t('common.address')} <span className="text-danger-500">*</span>
                 </label>
-                <textarea
-                  value={formData.address}
+                <Textarea value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="px-4 rounded"
                   rows={3}
-                  required
-                />
+                  required />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t('checkout.zipCode')}
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.zipCode}
                   onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="rounded"
                 />
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="isDefault"
                   checked={formData.isDefault}
                   onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                  className="w-4 h-4"
+                  label={t('address.setAsDefault')}
                 />
-                <label htmlFor="isDefault" className="text-sm text-gray-700">
-                  {t('address.setAsDefault')}
-                </label>
               </div>
 
               <div className="flex gap-3">
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                >
+                  className="flex-1 px-4 rounded hover:bg-gray-50">
                   {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="secondary" type="submit"
                   disabled={isSaving}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-60"
-                >
+                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-60">
                   {isSaving
                     ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...')
                     : editingId ? t('common.update') : t('common.save')}
-                </button>
+                </Button>
               </div>
             </form>
           </motion.div>
@@ -394,12 +383,10 @@ export default function AddressesPage() {
         {addresses.length === 0 && !showForm ? (
           <div className="text-center py-16 bg-white rounded">
             <p className="text-gray-600 text-lg mb-4">{t('address.noAddresses')}</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
-            >
+            <Button variant="secondary" onClick={() => setShowForm(true)}
+              className="px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600">
               {t('address.addFirstAddress')}
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -429,28 +416,22 @@ export default function AddressesPage() {
                   </div>
                   <div className="flex gap-2">
                     {!address.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(address.id)}
+                      <Button variant="secondary" onClick={() => handleSetDefault(address.id)}
                         className="p-2 text-primary-500 hover:bg-primary-50 rounded"
-                        title={t('address.makeDefault')}
-                      >
+                        title={t('address.makeDefault')}>
                         <CheckIcon className="w-5 h-5" />
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      onClick={() => handleEdit(address)}
+                    <Button variant="secondary" onClick={() => handleEdit(address)}
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded"
-                      title={t('common.edit')}
-                    >
+                      title={t('common.edit')}>
                       <PencilIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(address.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded"
-                      title={t('common.delete')}
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => handleDelete(address.id)}
+                      className="p-2 text-danger-500 hover:bg-danger-50 rounded"
+                      title={t('common.delete')}>
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </motion.div>
