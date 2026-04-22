@@ -16,6 +16,8 @@ import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
 import { ProductLockService } from '../product/product-lock.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto/notification.dto';
 import { Request } from 'express';
 
 @Injectable()
@@ -31,6 +33,7 @@ export class PaymentService {
     private readonly eventService: EventService,
     private readonly invoiceService: InvoiceService,
     private readonly productLockService: ProductLockService,
+    private readonly notificationService: NotificationService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
   }
@@ -784,11 +787,33 @@ export class PaymentService {
         return null;
       }
 
-      // Update order status to PREPARING (first state after purchase; seller will then mark shipped when sent)
+      // Verify order is still pending_payment before promoting to preparing.
+      // Race window: cron may have cancelled the order while PayTR callback was in flight.
+      const currentOrder = await tx.order.findUnique({
+        where: { id: payment.orderId },
+        select: { status: true, orderNumber: true },
+      });
+
+      if (currentOrder?.status === OrderStatus.cancelled) {
+        this.logger.warn(
+          `Payment ${payment.id} succeeded but order ${payment.orderId} (${currentOrder.orderNumber}) already cancelled. Auto-refund required.`,
+        );
+        return { autoRefundRequired: true, orderId: payment.orderId, paymentId: payment.id };
+      }
+
+      // Update order status to PREPARING with shipping deadline for the seller
+      const preparingDays = parseInt(
+        this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+        10,
+      );
+      const preparingDeadline = new Date();
+      preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+
       await tx.order.update({
         where: { id: payment.orderId },
         data: {
           status: OrderStatus.preparing,
+          preparingDeadline,
           version: { increment: 1 },
         },
       });
@@ -965,6 +990,22 @@ export class PaymentService {
         `processSuccessfulPayment: payment ${payment.id} already completed — skipping duplicate success handling`,
       );
       return false;
+    }
+
+    // Handle auto-refund: payment succeeded but order was already cancelled (race with cron)
+    if ('autoRefundRequired' in result && result.autoRefundRequired) {
+      const refundOrderId = (result as any).orderId;
+      const refundPaymentId = (result as any).paymentId;
+      this.logger.warn(`Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`);
+      try {
+        await this.processRefund(refundOrderId);
+        this.logger.log(`Auto-refund completed for order ${refundOrderId}`);
+      } catch (refundError: any) {
+        this.logger.error(
+          `AUTO-REFUND FAILED for order ${refundOrderId}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+        );
+      }
+      return true;
     }
 
     const resultOrder = result.order;
@@ -2409,21 +2450,17 @@ export class PaymentService {
               data: { status: OfferStatus.payment_expired },
             });
           }
-        });
 
-        const pendingPayment = await this.prisma.payment.findFirst({
-          where: { orderId: order.id, status: PaymentStatus.pending },
-          select: { id: true },
-        });
-        if (pendingPayment) {
-          await this.prisma.payment.update({
-            where: { id: pendingPayment.id },
+          // Mark payment as failed INSIDE the transaction to prevent race condition
+          // with PayTR callback arriving between order cancel and payment update.
+          await tx.payment.updateMany({
+            where: { orderId: order.id, status: PaymentStatus.pending },
             data: {
               status: PaymentStatus.failed,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
             },
           });
-        }
+        });
         await this.cache.del(`products:detail:${order.productId}`);
         released++;
         this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
@@ -2505,5 +2542,133 @@ export class PaymentService {
     }
 
     return { count: cancelledCount };
+  }
+
+  /**
+   * Handle orders stuck in "preparing" status past their deadline.
+   * Two phases:
+   * 1. Warn: Send notification to seller 24h before deadline (once only).
+   * 2. Cancel: Auto-cancel + refund orders past deadline, re-stock product.
+   */
+  async handleExpiredPreparingOrders(): Promise<{ warned: number; cancelled: number }> {
+    const now = new Date();
+    const warningWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h from now
+
+    // --- Phase 1: Warn sellers approaching deadline ---
+    const approachingDeadline = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.preparing,
+        preparingDeadline: { gt: now, lte: warningWindow },
+        preparingWarningSentAt: null,
+      },
+      include: {
+        seller: { select: { id: true, email: true, displayName: true } },
+        product: { select: { id: true, title: true } },
+      },
+    });
+
+    let warned = 0;
+    for (const order of approachingDeadline) {
+      try {
+        const deadlineStr = order.preparingDeadline
+          ? order.preparingDeadline.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '';
+
+        await this.notificationService.createInAppNotification(
+          order.sellerId,
+          NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
+          { orderId: order.id, orderNumber: order.orderNumber, deadline: deadlineStr, productTitle: order.product.title },
+        );
+
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { preparingWarningSentAt: now },
+        });
+
+        warned++;
+        this.logger.log(`Preparing deadline warning sent to seller ${order.sellerId} for order ${order.orderNumber}`);
+      } catch (err: any) {
+        this.logger.error(`Failed to warn seller for order ${order.id}: ${err.message}`);
+      }
+    }
+
+    // --- Phase 2: Auto-cancel orders past deadline ---
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.preparing,
+        preparingDeadline: { lt: now },
+      },
+      include: {
+        buyer: { select: { id: true, email: true, displayName: true } },
+        seller: { select: { id: true, email: true, displayName: true } },
+        product: { select: { id: true, title: true, quantity: true } },
+      },
+    });
+
+    let cancelled = 0;
+    for (const order of expiredOrders) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+
+          const freshOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!freshOrder || freshOrder.status !== OrderStatus.preparing) {
+            return; // Already shipped or handled by another process
+          }
+
+          // Cancel order
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.cancelled,
+              cancelReason: 'Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi',
+              version: { increment: 1 },
+            },
+          });
+
+          // Cancel the payment hold (escrow)
+          await tx.paymentHold.updateMany({
+            where: { orderId: order.id, status: PaymentHoldStatus.held },
+            data: { status: PaymentHoldStatus.cancelled },
+          });
+
+          // Re-stock: increment quantity and recalculate status
+          const newQuantity = order.product.quantity !== null ? order.product.quantity + 1 : null;
+          await tx.product.update({
+            where: { id: order.product.id },
+            data: {
+              quantity: order.product.quantity !== null ? { increment: 1 } : undefined,
+              status: getProductStatusFromQuantity(newQuantity),
+            },
+          });
+        });
+
+        // Process refund via PayTR (outside transaction — calls external API)
+        try {
+          await this.processRefund(order.id);
+          this.logger.log(`Refund processed for expired preparing order ${order.orderNumber}`);
+        } catch (refundError: any) {
+          this.logger.error(
+            `REFUND FAILED for expired preparing order ${order.orderNumber}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+          );
+        }
+
+        // Invalidate product cache
+        await this.cache.del(`products:detail:${order.product.id}`);
+
+        cancelled++;
+        this.logger.log(
+          `Auto-cancelled expired preparing order ${order.orderNumber} (seller: ${order.sellerId}, product: ${order.product.id})`,
+        );
+      } catch (err: any) {
+        this.logger.error(`Failed to auto-cancel expired preparing order ${order.id}: ${err.message}`);
+      }
+    }
+
+    return { warned, cancelled };
   }
 }

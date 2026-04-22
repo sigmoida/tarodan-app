@@ -103,4 +103,25 @@ export class PaymentSchedulerService {
       this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
     }
   }
+
+  /**
+   * Run every 30 minutes: check for orders stuck in "preparing" past deadline.
+   * Warns sellers 24h before deadline, auto-cancels + refunds when deadline passes.
+   */
+  @Cron('*/30 * * * *') // Every 30 minutes
+  async handleExpiredPreparingOrders() {
+    this.logger.log('Checking for expired preparing orders...');
+
+    try {
+      const result = await this.paymentService.handleExpiredPreparingOrders();
+      if (result.warned > 0) {
+        this.logger.log(`Warned ${result.warned} seller(s) about preparing deadline`);
+      }
+      if (result.cancelled > 0) {
+        this.logger.log(`Auto-cancelled ${result.cancelled} order(s) past preparing deadline`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Error in expired preparing orders job: ${error.message}`, error.stack);
+    }
+  }
 }

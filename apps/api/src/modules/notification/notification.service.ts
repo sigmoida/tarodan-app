@@ -64,6 +64,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '💰',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: {
+    title: 'Kargo Süresi Dolmak Üzere',
+    message: '"{{productTitle}}" siparişini {{deadline}} tarihine kadar kargoya vermeniz gerekmektedir. Aksi halde sipariş otomatik iptal edilecektir.',
+    icon: '⚠️',
+    link: '/orders/{{orderId}}',
+  },
 
   // Offer notifications
   [NotificationType.OFFER_RECEIVED]: {

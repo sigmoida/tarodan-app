@@ -12,6 +12,7 @@ import { EventModule } from '../events';
 import { RawBodyMiddleware } from './middleware/raw-body.middleware';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { ProductModule } from '../product/product.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ProductModule } from '../product/product.module';
     EventModule,
     ScheduleModule.forRoot(),
     InvoiceModule,
+    NotificationModule,
     forwardRef(() => ProductModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],

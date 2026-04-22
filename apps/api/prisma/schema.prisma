@@ -960,8 +960,10 @@ model Order {
   discountBreakdown Json?       @map("discount_breakdown")
   discountCode      String?     @map("discount_code")
   subtotal          Decimal?    @db.Decimal(10, 2)
-  cancelReason      String?     @map("cancel_reason")
-  invoices          Invoice[]
+  cancelReason             String?     @map("cancel_reason")
+  preparingDeadline        DateTime?   @map("preparing_deadline")
+  preparingWarningSentAt   DateTime?   @map("preparing_warning_sent_at")
+  invoices                 Invoice[]
   buyer             User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer             Offer?      @relation(fields: [offerId], references: [id])
   product           Product     @relation(fields: [productId], references: [id])

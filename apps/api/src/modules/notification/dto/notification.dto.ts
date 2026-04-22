@@ -10,6 +10,7 @@ export enum NotificationType {
   ORDER_COMPLETED = 'order_completed',
   ORDER_CANCELLED = 'order_cancelled',
   ORDER_REFUNDED = 'order_refunded',
+  ORDER_PREPARING_DEADLINE_WARNING = 'order_preparing_deadline_warning',
 
   // Offer notifications
   OFFER_RECEIVED = 'offer_received',
